@@ -1,6 +1,8 @@
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum AgentDirection {
     Forward,
+    ForwardRight,
+    ForwardLeft,
     Back,
     Right,
     Left,
