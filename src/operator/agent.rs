@@ -8,15 +8,13 @@ pub enum AgentDirection {
     Left,
 }
 
-use super::trajectory_generator::Target;
-
 pub trait Position {}
 
-pub trait Agent<P: Position, T: Target> {
+pub trait Agent<P: Position> {
     fn wall_exists(&mut self, dir: AgentDirection) -> bool;
     fn rotate(&mut self, dir: AgentDirection);
     fn position(&self) -> P;
-    fn set_trajectory(&mut self, trajectory: &[T]);
+    fn set_position_candidates(&mut self, positions: &[P]);
     //This method is called by interrupt.
     fn track(&mut self);
 }
