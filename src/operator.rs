@@ -6,7 +6,7 @@ pub mod trajectory_generator;
 use core::marker::PhantomData;
 
 use agent::{Agent, Position};
-use maze::{Maze, Node, NodePosition};
+use maze::{Graph, Node, NodePosition};
 use solver::Solver;
 use trajectory_generator::{Target, TrajectoryGenerator};
 
@@ -15,7 +15,7 @@ where
     N: Node,
     P: Position,
     T: Target,
-    M: Maze<N> + NodePosition<N, P>,
+    M: Graph<N> + NodePosition<N, P>,
     A: Agent<P, T>,
     TG: TrajectoryGenerator<P, T>,
     S: Solver<N>,
@@ -34,7 +34,7 @@ where
     N: Node,
     P: Position,
     T: Target,
-    M: Maze<N> + NodePosition<N, P>,
+    M: Graph<N> + NodePosition<N, P>,
     A: Agent<P, T>,
     TG: TrajectoryGenerator<P, T>,
     S: Solver<N>,
@@ -44,7 +44,9 @@ where
     }
 
     pub fn run(&mut self) {
-        loop {}
+        loop {
+            let current_node = self.maze.position_to_node(self.agent.position());
+        }
     }
 }
 
@@ -52,12 +54,12 @@ pub struct OperatorBuilder<
     NodeType,
     PositionType,
     TargetType,
-    MazeType,
+    GraphType,
     AgentType,
     TrackGenType,
     SolverType,
 > {
-    maze: MazeType,
+    maze: GraphType,
     agent: AgentType,
     trackgen: TrackGenType,
     solver: SolverType,
@@ -85,7 +87,7 @@ where
     N: Node,
     P: Position,
     T: Target,
-    M: Maze<N> + NodePosition<N, P>,
+    M: Graph<N> + NodePosition<N, P>,
     A: Agent<P, T>,
     TG: TrajectoryGenerator<P, T>,
     S: Solver<N>,
@@ -103,12 +105,35 @@ where
     }
 }
 
-impl<T, A, TG, S> OperatorBuilder<(), (), T, (), A, TG, S> {
-    pub fn maze<N, P, M>(self, maze: M) -> OperatorBuilder<N, P, T, M, A, TG, S>
+impl<N, P, T, A, TG, S> OperatorBuilder<N, P, T, (), A, TG, S>
+where
+    N: Node,
+    P: Position,
+{
+    pub fn maze<M>(self, maze: M) -> OperatorBuilder<N, P, T, M, A, TG, S>
     where
-        N: Node,
+        M: Graph<N> + NodePosition<N, P>,
+    {
+        OperatorBuilder {
+            maze: maze,
+            agent: self.agent,
+            trackgen: self.trackgen,
+            solver: self.solver,
+            _node: PhantomData,
+            _position: PhantomData,
+            _target: PhantomData,
+        }
+    }
+}
+
+impl<N, T, A, TG, S> OperatorBuilder<N, (), T, (), A, TG, S>
+where
+    N: Node,
+{
+    pub fn maze<P, M>(self, maze: M) -> OperatorBuilder<N, P, T, M, A, TG, S>
+    where
         P: Position,
-        M: Maze<N> + NodePosition<N, P>,
+        M: Graph<N> + NodePosition<N, P>,
     {
         OperatorBuilder {
             maze: maze,
@@ -129,7 +154,26 @@ where
     pub fn maze<N, M>(self, maze: M) -> OperatorBuilder<N, P, T, M, A, TG, S>
     where
         N: Node,
-        M: Maze<N> + NodePosition<N, P>,
+        M: Graph<N> + NodePosition<N, P>,
+    {
+        OperatorBuilder {
+            maze: maze,
+            agent: self.agent,
+            trackgen: self.trackgen,
+            solver: self.solver,
+            _node: PhantomData,
+            _position: PhantomData,
+            _target: PhantomData,
+        }
+    }
+}
+
+impl<T, A, TG, S> OperatorBuilder<(), (), T, (), A, TG, S> {
+    pub fn maze<N, P, M>(self, maze: M) -> OperatorBuilder<N, P, T, M, A, TG, S>
+    where
+        N: Node,
+        P: Position,
+        M: Graph<N> + NodePosition<N, P>,
     {
         OperatorBuilder {
             maze: maze,
@@ -357,7 +401,7 @@ mod tests {
 
     impl Node for u8 {}
     impl Position for u8 {}
-    impl Maze<u8> for u8 {
+    impl Graph<u8> for u8 {
         fn neighbors<L>(&self, node: u8) -> Vec<u8, L>
         where
             L: ArrayLength<u8>,
@@ -394,7 +438,7 @@ mod tests {
     }
 
     impl Solver<u8> for u8 {
-        fn solve<M: Maze<u8>, L: ArrayLength<u8>>(
+        fn solve<M: Graph<u8>, L: ArrayLength<u8>>(
             start: &[u8],
             goals: &[u8],
             maze: &M,

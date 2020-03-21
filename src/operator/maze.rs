@@ -11,6 +11,6 @@ pub trait NodePosition<N: Node, P: Position> {
 }
 
 //Maze implementation should implement Maze and NodePosition
-pub trait Maze<N: Node> {
+pub trait Graph<N: Node> {
     fn neighbors<L: ArrayLength<N>>(&self, node: N) -> Vec<N, L>;
 }
