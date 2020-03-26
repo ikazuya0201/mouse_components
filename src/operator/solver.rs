@@ -1,11 +1,12 @@
 use heapless::{ArrayLength, Vec};
 
-use super::maze::{Graph, Node};
+use super::maze::{Cost, Graph, Node};
 
-pub trait Solver<N, G>
+pub trait Solver<N, C, G>
 where
     N: Node,
-    G: Graph<N>,
+    C: Cost,
+    G: Graph<N, C>,
 {
     fn solve<L: ArrayLength<N>>(&self, current: N, graph: &G) -> Vec<N, L>;
 }

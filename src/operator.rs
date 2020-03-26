@@ -8,31 +8,34 @@ use core::marker::PhantomData;
 use heapless::consts::*;
 
 use agent::{Agent, Position};
-use maze::{Graph, Node, NodePosition};
+use maze::{Cost, Graph, Node, NodePosition};
 use solver::Solver;
 
-pub struct Operator<N, P, M, A, S>
+pub struct Operator<N, C, P, M, A, S>
 where
     N: Node,
+    C: Cost,
     P: Position,
-    M: Graph<N> + NodePosition<N, P>,
+    M: Graph<N, C> + NodePosition<N, P>,
     A: Agent<P>,
-    S: Solver<N, M>,
+    S: Solver<N, C, M>,
 {
     maze: M,
     agent: A,
     solver: S,
     _node: PhantomData<fn() -> N>,
+    _cost: PhantomData<fn() -> C>,
     _position: PhantomData<fn() -> P>,
 }
 
-impl<N, P, M, A, S> Operator<N, P, M, A, S>
+impl<N, C, P, M, A, S> Operator<N, C, P, M, A, S>
 where
     N: Node,
+    C: Cost,
     P: Position,
-    M: Graph<N> + NodePosition<N, P>,
+    M: Graph<N, C> + NodePosition<N, P>,
     A: Agent<P>,
-    S: Solver<N, M>,
+    S: Solver<N, C, M>,
 {
     pub fn new(maze: M, agent: A, solver: S) -> Self {
         Self {
@@ -40,6 +43,7 @@ where
             agent: agent,
             solver: solver,
             _node: PhantomData,
+            _cost: PhantomData,
             _position: PhantomData,
         }
     }

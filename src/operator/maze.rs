@@ -2,7 +2,9 @@ use heapless::{ArrayLength, Vec};
 
 use super::agent::Position;
 
-pub trait Node {}
+pub trait Node: PartialEq + Eq + PartialOrd + Ord {}
+
+pub trait Cost: PartialEq + Eq + PartialOrd + Ord {}
 
 ///This is an interface of nodes and points.
 pub trait NodePosition<N: Node, P: Position> {
@@ -11,6 +13,6 @@ pub trait NodePosition<N: Node, P: Position> {
 }
 
 //Maze implementation should implement Maze and NodePosition
-pub trait Graph<N: Node> {
-    fn neighbors<L: ArrayLength<N>>(&self, node: N) -> Vec<N, L>;
+pub trait Graph<N: Node, C: Cost> {
+    fn neighbors<L: ArrayLength<N>>(&self, node: N) -> Vec<(N, C), L>;
 }
