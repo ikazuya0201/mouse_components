@@ -2,7 +2,10 @@ pub mod agent;
 pub mod maze;
 pub mod solver;
 
+use core::cell::RefCell;
 use core::marker::PhantomData;
+
+use heapless::consts::*;
 
 use agent::{Agent, Position};
 use maze::{Graph, Node, NodePosition};
@@ -14,7 +17,7 @@ where
     P: Position,
     M: Graph<N> + NodePosition<N, P>,
     A: Agent<P>,
-    S: Solver<N>,
+    S: Solver<N, M>,
 {
     maze: M,
     agent: A,
@@ -29,7 +32,7 @@ where
     P: Position,
     M: Graph<N> + NodePosition<N, P>,
     A: Agent<P>,
-    S: Solver<N>,
+    S: Solver<N, M>,
 {
     pub fn new(maze: M, agent: A, solver: S) -> Self {
         Self {
@@ -41,13 +44,14 @@ where
         }
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&self) {
         self.agent.track();
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&self) {
         loop {
             let current_node = self.maze.position_to_node(self.agent.position());
+            self.solver.solve::<U1024>(current_node, &self.maze);
         }
     }
 }
