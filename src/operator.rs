@@ -7,12 +7,12 @@ use core::marker::PhantomData;
 use heapless::{consts::*, ArrayLength, Vec};
 
 use agent::Agent;
-use maze::{Graph, GraphTranslator};
+use maze::{Graph, GraphTranslator, Storable};
 use solver::Solver;
 
 pub struct Operator<Node, Cost, Position, Direction, M, A, S>
 where
-    M: Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
+    M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
     A: Agent<Position, Direction>,
     S: Solver<Node, Cost, Direction, M>,
 {
@@ -27,7 +27,7 @@ where
 
 impl<Node, Cost, Position, Direction, M, A, S> Operator<Node, Cost, Position, Direction, M, A, S>
 where
-    M: Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
+    M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
     A: Agent<Position, Direction>,
     S: Solver<Node, Cost, Direction, M>,
 {

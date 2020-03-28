@@ -1,5 +1,10 @@
 use heapless::{ArrayLength, Vec};
 
+pub trait Storable {
+    fn store(&self);
+    fn restore(&self);
+}
+
 pub trait GraphTranslator<Node, Position> {
     fn node_to_position(&self, node: Node) -> Position;
     fn position_to_node(&self, position: Position) -> Node;
