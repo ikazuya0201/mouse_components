@@ -1,11 +1,10 @@
-use super::direction::RelativeDirection;
+use heapless::{ArrayLength, Vec};
 
-pub trait Position {}
-
-pub trait Agent<P: Position, D: RelativeDirection> {
-    fn wall_exists(&self, dir: D) -> bool;
-    fn position(&self) -> P;
-    fn set_next_route(&self, route: &[P]);
+pub trait Agent<Position, Direction> {
+    fn existing_obstacles<L: ArrayLength<Position>>(&self) -> Vec<Position, L>;
+    fn position(&self) -> Position;
+    fn set_next_route(&self, route: &[Position]);
+    fn set_direction_mapping(&self, mapping: fn(fn(Direction) -> bool) -> Direction);
     fn is_route_empty(&self) -> bool;
     //This method is called by interrupt.
     fn track_next(&self);

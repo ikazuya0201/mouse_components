@@ -1,15 +1,15 @@
-use heapless::{consts::*, ArrayLength, Vec};
+use heapless::{ArrayLength, Vec};
 
-use super::direction::AbsoluteDirection;
-use super::maze::{Cost, Graph, Node};
+use super::maze::Graph;
 
-pub trait Solver<N, C, D, G>
+pub trait Solver<Node, Cost, Direction, G>
 where
-    N: Node,
-    C: Cost,
-    D: AbsoluteDirection,
-    G: Graph<N, C, D>,
+    G: Graph<Node, Cost, Direction>,
 {
-    //return: (route, last directions)
-    fn solve<L: ArrayLength<N>>(&self, current: N, graph: &G) -> (Vec<N, L>, Vec<D, U4>);
+    //return: (route, last direction mapping)
+    fn solve<L: ArrayLength<Node>>(
+        &self,
+        current: Node,
+        graph: &G,
+    ) -> (Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction);
 }

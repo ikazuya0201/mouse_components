@@ -1,49 +1,35 @@
 pub mod agent;
-pub mod direction;
 pub mod maze;
 pub mod solver;
 
-use core::cell::RefCell;
 use core::marker::PhantomData;
 
-use heapless::{consts::*, Vec};
+use heapless::{consts::*, ArrayLength, Vec};
 
-use agent::{Agent, Position};
-use direction::{AbsoluteDirection, RelativeDirection};
-use maze::{Cost, Graph, GraphTranslator, Node};
+use agent::Agent;
+use maze::{Graph, GraphTranslator};
 use solver::Solver;
 
-pub struct Operator<N, C, AD, P, RD, M, A, S>
+pub struct Operator<Node, Cost, Position, Direction, M, A, S>
 where
-    N: Node,
-    C: Cost,
-    AD: AbsoluteDirection,
-    P: Position,
-    RD: RelativeDirection,
-    M: Graph<N, C, AD> + GraphTranslator<N, P>,
-    A: Agent<P, RD>,
-    S: Solver<N, C, AD, M>,
+    M: Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
+    A: Agent<Position, Direction>,
+    S: Solver<Node, Cost, Direction, M>,
 {
     maze: M,
     agent: A,
     solver: S,
-    _node: PhantomData<fn() -> N>,
-    _cost: PhantomData<fn() -> C>,
-    _relative_direction: PhantomData<fn() -> RD>,
-    _position: PhantomData<fn() -> P>,
-    _absolute_direction: PhantomData<fn() -> AD>,
+    _node: PhantomData<fn() -> Node>,
+    _cost: PhantomData<fn() -> Cost>,
+    _position: PhantomData<fn() -> Position>,
+    _direction: PhantomData<fn() -> Direction>,
 }
 
-impl<N, C, AD, P, RD, M, A, S> Operator<N, C, AD, P, RD, M, A, S>
+impl<Node, Cost, Position, Direction, M, A, S> Operator<Node, Cost, Position, Direction, M, A, S>
 where
-    N: Node,
-    C: Cost,
-    AD: AbsoluteDirection,
-    P: Position,
-    RD: RelativeDirection,
-    M: Graph<N, C, AD> + GraphTranslator<N, P>,
-    A: Agent<P, RD>,
-    S: Solver<N, C, AD, M>,
+    M: Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
+    A: Agent<Position, Direction>,
+    S: Solver<Node, Cost, Direction, M>,
 {
     pub fn new(maze: M, agent: A, solver: S) -> Self {
         Self {
@@ -52,26 +38,28 @@ where
             solver: solver,
             _node: PhantomData,
             _cost: PhantomData,
-            _absolute_direction: PhantomData,
             _position: PhantomData,
-            _relative_direction: PhantomData,
+            _direction: PhantomData,
         }
     }
 
     pub fn tick(&self) {
         self.agent.track_next();
+        let obstacles = self.agent.existing_obstacles::<U10>();
+        self.maze.update_obstacles(&obstacles);
     }
 
     pub fn run(&self) {
         loop {
             while !self.agent.is_route_empty() {}
             let current_node = self.maze.position_to_node(self.agent.position());
-            let (route, directions) = self.solver.solve::<U1024>(current_node, &self.maze);
+            let (route, mapping) = self.solver.solve::<U1024>(current_node, &self.maze);
             let route = route
                 .into_iter()
                 .map(|n| self.maze.node_to_position(n))
-                .collect::<Vec<P, U1024>>();
+                .collect::<Vec<Position, U1024>>();
             self.agent.set_next_route(&route);
+            self.agent.set_direction_mapping(mapping);
         }
     }
 }
