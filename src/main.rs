@@ -1,5 +1,13 @@
+#![no_std]
+#![no_main]
+
+extern crate panic_rtt;
+
 mod operator;
 
-fn main() {
-    println!("Hello, world!");
+use cortex_m_rt::entry;
+
+#[entry]
+fn main() -> ! {
+    loop {}
 }

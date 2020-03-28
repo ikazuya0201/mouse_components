@@ -8,3 +8,6 @@ edition = "2018"
 
 [dependencies]
 heapless = "0.5.3"
+cortex-m = "0.6.0"
+cortex-m-rt = "0.6.10"
+panic_rtt = "0.2.0"
