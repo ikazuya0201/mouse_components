@@ -50,9 +50,15 @@ where
 
     //called by periodic interrupt
     pub fn tick(&self) {
-        self.agent.track_next();
-        let obstacles = self.agent.existing_obstacles::<U10>();
-        self.maze.update_obstacles(&obstacles);
+        use Mode::*;
+        match self.mode.load(Ordering::Relaxed) {
+            Search => {
+                self.agent.track_next();
+                let obstacles = self.agent.existing_obstacles::<U10>();
+                self.maze.update_obstacles(&obstacles);
+            }
+            _ => (),
+        }
     }
 
     pub fn run(&self) {
