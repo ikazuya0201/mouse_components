@@ -2,18 +2,18 @@ mod agent;
 mod counter;
 mod maze;
 mod mode;
+mod searcher;
 mod solver;
 mod switch;
 
 use core::marker::PhantomData;
 use core::sync::atomic::Ordering;
 
-use heapless::{consts::*, Vec};
-
 pub use agent::Agent;
 pub use counter::Counter;
 pub use maze::{DirectionInstructor, Graph, GraphTranslator, Storable};
 use mode::{AtomicMode, Mode};
+use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
@@ -34,6 +34,7 @@ where
     mode: AtomicMode,
     switch: SW,
     counter: C,
+    searcher: Searcher<Node>,
     _node: PhantomData<fn() -> Node>,
     _cost: PhantomData<fn() -> Cost>,
     _position: PhantomData<fn() -> Position>,
@@ -43,6 +44,7 @@ where
 impl<Node, Cost, Position, Direction, M, A, S, SW, C>
     Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
+    Node: Copy + Clone,
     M: Storable
         + Graph<Node, Cost, Direction>
         + GraphTranslator<Node, Position>
@@ -53,6 +55,7 @@ where
     C: Counter,
 {
     pub fn new(maze: M, agent: A, solver: S, switch: SW, counter: C) -> Self {
+        let start = maze.start();
         Self {
             maze: maze,
             agent: agent,
@@ -60,6 +63,7 @@ where
             mode: AtomicMode::new(Mode::Idle),
             switch: switch,
             counter: counter,
+            searcher: Searcher::<Node>::new(start),
             _node: PhantomData,
             _cost: PhantomData,
             _position: PhantomData,
@@ -73,7 +77,10 @@ where
         use Ordering::Relaxed;
         match self.mode.load(Relaxed) {
             Idle => self.store_if_switch_enabled(Select),
-            Search => self.tick_search(),
+            Search => {
+                self.searcher.tick(&self.maze, &self.agent);
+                self.store_if_switch_enabled(Select);
+            }
             _ => (),
         }
     }
@@ -84,39 +91,16 @@ where
         }
     }
 
-    fn tick_search(&self) {
-        let obstacles = self.agent.existing_obstacles::<U10>();
-        self.maze.update_obstacles(&obstacles);
-        if let Some(direction) = self.maze.instruct_direction() {
-            self.agent.set_instructed_direction(direction);
-        }
-        self.agent.track_next();
-        self.store_if_switch_enabled(Mode::Select);
-    }
-
     pub fn run(&self) {
         use Mode::*;
         loop {
             match self.mode.load(Ordering::Relaxed) {
                 Idle => (),
-                Search => self.search(),
+                Search => self.searcher.search(&self.maze, &self.agent, &self.solver),
                 FastRun => self.fast_run(),
                 Select => self.mode_select(),
             }
         }
-    }
-
-    fn search(&self) {
-        if !self.agent.is_route_empty() {
-            return;
-        }
-        let current_node = self.maze.position_to_node(self.agent.position());
-        let (route, mapping) = self.solver.solve::<U1024>(current_node, &self.maze);
-        let route = route
-            .into_iter()
-            .map(|n| self.maze.node_to_position(n))
-            .collect::<Vec<Position, U1024>>();
-        self.agent.set_next_route(&route);
     }
 
     fn fast_run(&self) {}
