@@ -2,6 +2,7 @@ pub mod agent;
 pub mod maze;
 mod mode;
 pub mod solver;
+pub mod switch;
 
 use core::marker::PhantomData;
 use core::sync::atomic::Ordering;
@@ -12,35 +13,41 @@ use agent::Agent;
 use maze::{Graph, GraphTranslator, Storable};
 use mode::{AtomicMode, Mode};
 use solver::Solver;
+use switch::Switch;
 
-pub struct Operator<Node, Cost, Position, Direction, M, A, S>
+pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW>
 where
     M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
     A: Agent<Position, Direction>,
     S: Solver<Node, Cost, Direction, M>,
+    SW: Switch,
 {
     maze: M,
     agent: A,
     solver: S,
     mode: AtomicMode,
+    switch: SW,
     _node: PhantomData<fn() -> Node>,
     _cost: PhantomData<fn() -> Cost>,
     _position: PhantomData<fn() -> Position>,
     _direction: PhantomData<fn() -> Direction>,
 }
 
-impl<Node, Cost, Position, Direction, M, A, S> Operator<Node, Cost, Position, Direction, M, A, S>
+impl<Node, Cost, Position, Direction, M, A, S, SW>
+    Operator<Node, Cost, Position, Direction, M, A, S, SW>
 where
     M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
     A: Agent<Position, Direction>,
     S: Solver<Node, Cost, Direction, M>,
+    SW: Switch,
 {
-    pub fn new(maze: M, agent: A, solver: S) -> Self {
+    pub fn new(maze: M, agent: A, solver: S, switch: SW) -> Self {
         Self {
             maze: maze,
             agent: agent,
             solver: solver,
             mode: AtomicMode::new(Mode::Idle),
+            switch: switch,
             _node: PhantomData,
             _cost: PhantomData,
             _position: PhantomData,
@@ -51,14 +58,25 @@ where
     //called by periodic interrupt
     pub fn tick(&self) {
         use Mode::*;
-        match self.mode.load(Ordering::Relaxed) {
-            Search => {
-                self.agent.track_next();
-                let obstacles = self.agent.existing_obstacles::<U10>();
-                self.maze.update_obstacles(&obstacles);
-            }
+        use Ordering::Relaxed;
+        match self.mode.load(Relaxed) {
+            Idle => self.store_if_switch_enabled(Select),
+            Search => self.tick_search(),
             _ => (),
         }
+    }
+
+    fn store_if_switch_enabled(&self, mode: Mode) {
+        if self.switch.is_enabled() {
+            self.mode.store(mode, Ordering::Relaxed);
+        }
+    }
+
+    fn tick_search(&self) {
+        self.agent.track_next();
+        let obstacles = self.agent.existing_obstacles::<U10>();
+        self.maze.update_obstacles(&obstacles);
+        self.store_if_switch_enabled(Mode::Select);
     }
 
     pub fn run(&self) {
