@@ -12,6 +12,12 @@ pub enum Mode {
     Select,  //mode select
 }
 
+impl Mode {
+    pub const fn size() -> u8 {
+        4
+    }
+}
+
 impl num::FromPrimitive for Mode {
     fn from_i64(n: i64) -> Option<Mode> {
         match n {

@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod counter;
 pub mod maze;
 mod mode;
 pub mod solver;
@@ -10,44 +11,49 @@ use core::sync::atomic::Ordering;
 use heapless::{consts::*, Vec};
 
 use agent::Agent;
+use counter::Counter;
 use maze::{Graph, GraphTranslator, Storable};
 use mode::{AtomicMode, Mode};
 use solver::Solver;
 use switch::Switch;
 
-pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW>
+pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
     M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
     A: Agent<Position, Direction>,
     S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
+    C: Counter,
 {
     maze: M,
     agent: A,
     solver: S,
     mode: AtomicMode,
     switch: SW,
+    counter: C,
     _node: PhantomData<fn() -> Node>,
     _cost: PhantomData<fn() -> Cost>,
     _position: PhantomData<fn() -> Position>,
     _direction: PhantomData<fn() -> Direction>,
 }
 
-impl<Node, Cost, Position, Direction, M, A, S, SW>
-    Operator<Node, Cost, Position, Direction, M, A, S, SW>
+impl<Node, Cost, Position, Direction, M, A, S, SW, C>
+    Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
     M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
     A: Agent<Position, Direction>,
     S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
+    C: Counter,
 {
-    pub fn new(maze: M, agent: A, solver: S, switch: SW) -> Self {
+    pub fn new(maze: M, agent: A, solver: S, switch: SW, counter: C) -> Self {
         Self {
             maze: maze,
             agent: agent,
             solver: solver,
             mode: AtomicMode::new(Mode::Idle),
             switch: switch,
+            counter: counter,
             _node: PhantomData,
             _cost: PhantomData,
             _position: PhantomData,
@@ -107,5 +113,17 @@ where
 
     fn fast_run(&self) {}
 
-    fn mode_select(&self) {}
+    fn mode_select(&self) {
+        use num::FromPrimitive;
+        self.counter.reset();
+        let mut mode = Mode::Idle;
+        //waiting for switch off
+        while self.switch.is_enabled() {}
+
+        while !self.switch.is_enabled() {
+            let count = self.counter.count();
+            mode = Mode::from_u8(count % Mode::size()).unwrap();
+        }
+        self.mode.store(mode, Ordering::Relaxed);
+    }
 }
