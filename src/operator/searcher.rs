@@ -51,7 +51,7 @@ where
             return;
         }
         let current = self.current.get();
-        let (route, mapping) = solver.solve::<U1024>(current, &maze);
+        let (route, mapping) = solver.solve::<U1024>(current, maze);
         maze.set_direction_mapping(current, mapping);
         let route = route
             .into_iter()
