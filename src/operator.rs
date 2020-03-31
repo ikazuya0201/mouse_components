@@ -12,14 +12,17 @@ use heapless::{consts::*, Vec};
 
 pub use agent::Agent;
 pub use counter::Counter;
-pub use maze::{Graph, GraphTranslator, Storable};
+pub use maze::{DirectionInstructor, Graph, GraphTranslator, Storable};
 use mode::{AtomicMode, Mode};
 pub use solver::Solver;
 pub use switch::Switch;
 
 pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
-    M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
+    M: Storable
+        + Graph<Node, Cost, Direction>
+        + GraphTranslator<Node, Position>
+        + DirectionInstructor<Node, Direction>,
     A: Agent<Position, Direction>,
     S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
@@ -40,7 +43,10 @@ where
 impl<Node, Cost, Position, Direction, M, A, S, SW, C>
     Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
-    M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
+    M: Storable
+        + Graph<Node, Cost, Direction>
+        + GraphTranslator<Node, Position>
+        + DirectionInstructor<Node, Direction>,
     A: Agent<Position, Direction>,
     S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
@@ -79,9 +85,12 @@ where
     }
 
     fn tick_search(&self) {
-        self.agent.track_next();
         let obstacles = self.agent.existing_obstacles::<U10>();
         self.maze.update_obstacles(&obstacles);
+        if let Some(direction) = self.maze.instruct_direction() {
+            self.agent.set_instructed_direction(direction);
+        }
+        self.agent.track_next();
         self.store_if_switch_enabled(Mode::Select);
     }
 
@@ -108,7 +117,6 @@ where
             .map(|n| self.maze.node_to_position(n))
             .collect::<Vec<Position, U1024>>();
         self.agent.set_next_route(&route);
-        self.agent.set_direction_mapping(mapping);
     }
 
     fn fast_run(&self) {}

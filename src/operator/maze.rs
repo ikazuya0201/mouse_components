@@ -11,6 +11,11 @@ pub trait GraphTranslator<Node, Position> {
     fn update_obstacles(&self, positions: &[Position]);
 }
 
+pub trait DirectionInstructor<Node, Direction> {
+    fn set_direction_mapping(&self, node: &Node, mapping: fn(fn(Direction) -> bool) -> Direction);
+    fn instruct_direction(&self) -> Option<Direction>;
+}
+
 pub trait Graph<Node, Cost, Direction> {
     fn neighbors<L: ArrayLength<(Node, Cost)>>(&self, node: Node) -> Vec<(Node, Cost), L>;
     fn is_edge_checked(&self, node1: Node, node2: Node) -> bool;
