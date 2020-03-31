@@ -63,7 +63,7 @@ where
             mode: AtomicMode::new(Mode::Idle),
             switch: switch,
             counter: counter,
-            searcher: Searcher::<Node>::new(start),
+            searcher: Searcher::new(start),
             _node: PhantomData,
             _cost: PhantomData,
             _position: PhantomData,
