@@ -117,5 +117,7 @@ where
             mode = Mode::from_u8(count % Mode::size()).unwrap();
         }
         self.mode.store(mode, Ordering::Relaxed);
+
+        while self.switch.is_enabled() {}
     }
 }
