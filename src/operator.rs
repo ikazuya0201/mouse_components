@@ -76,13 +76,12 @@ where
         use Mode::*;
         use Ordering::Relaxed;
         match self.mode.load(Relaxed) {
-            Idle => self.store_if_switch_enabled(Select),
-            Search => {
-                self.searcher.tick(&self.maze, &self.agent);
-                self.store_if_switch_enabled(Select);
-            }
+            Idle => (),
+            Search => self.searcher.tick(&self.maze, &self.agent),
+            Select => return,
             _ => (),
         }
+        self.store_if_switch_enabled(Select);
     }
 
     fn store_if_switch_enabled(&self, mode: Mode) {
