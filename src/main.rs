@@ -4,6 +4,7 @@
 extern crate panic_rtt;
 
 mod operator;
+mod solver;
 
 use cortex_m_rt::entry;
 
