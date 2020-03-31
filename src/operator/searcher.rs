@@ -21,11 +21,9 @@ where
         }
     }
 
-    pub fn tick<Cost, Position, Direction, M, A>(&self, maze: &M, agent: &A)
+    pub fn tick<Position, Direction, M, A>(&self, maze: &M, agent: &A)
     where
-        M: Graph<Node, Cost, Direction>
-            + GraphTranslator<Node, Position>
-            + DirectionInstructor<Node, Direction>,
+        M: GraphTranslator<Node, Position> + DirectionInstructor<Node, Direction>,
         A: Agent<Position, Direction>,
     {
         let obstacles = agent.existing_obstacles::<U10>();
