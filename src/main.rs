@@ -3,6 +3,7 @@
 
 extern crate panic_rtt;
 
+mod direction;
 mod operator;
 mod solver;
 
