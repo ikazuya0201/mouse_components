@@ -113,7 +113,7 @@ where
 
         while !self.switch.is_enabled() {
             let count = self.counter.count();
-            mode = Mode::from_u8(count % Mode::size()).unwrap();
+            mode = Mode::from(count % Mode::size());
         }
         self.mode.store(mode, Ordering::Relaxed);
 

@@ -5,18 +5,18 @@ pub struct AtomicEnum<T>(AtomicU8, PhantomData<fn() -> T>);
 
 impl<T> AtomicEnum<T>
 where
-    T: num::FromPrimitive + num::ToPrimitive,
+    T: Into<u8> + From<u8>,
 {
     pub fn new(val: T) -> Self {
-        Self(AtomicU8::new(val.to_u8().unwrap()), PhantomData)
+        Self(AtomicU8::new(val.into()), PhantomData)
     }
 
     pub fn load(&self, order: Ordering) -> T {
         let raw = self.0.load(order);
-        T::from_u8(raw).unwrap()
+        T::from(raw)
     }
 
     pub fn store(&self, val: T, order: Ordering) {
-        self.0.store(val.to_u8().unwrap(), order)
+        self.0.store(val.into(), order)
     }
 }
