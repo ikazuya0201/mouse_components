@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use heapless::{consts::*, Vec};
+use heapless::{consts::*, ArrayLength, Vec};
 
 use super::{Agent, DirectionInstructor, Graph, GraphTranslator, Solver};
 
@@ -36,13 +36,14 @@ where
         agent.track_next();
     }
 
-    pub fn search<Cost, Position, Direction, M, A, S>(&self, maze: &M, agent: &A, solver: &S)
+    pub fn search<Cost, Position, Direction, M, A, S, L>(&self, maze: &M, agent: &A, solver: &S)
     where
         M: Graph<Node, Cost, Direction>
             + GraphTranslator<Node, Position>
             + DirectionInstructor<Node, Direction>,
         A: Agent<Position, Direction>,
-        S: Solver<Node, Cost, Direction, M>,
+        S: Solver<Node, Cost, Direction, M, L>,
+        L: ArrayLength<Node>,
     {
         if !self
             .is_updated
@@ -51,7 +52,7 @@ where
             return;
         }
         let current = self.current.get();
-        let (route, mapping) = solver.solve::<U1024>(current, maze);
+        let (route, mapping) = solver.solve(current, maze);
         maze.set_direction_mapping(current, mapping);
         let route = route
             .into_iter()
