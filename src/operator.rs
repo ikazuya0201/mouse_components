@@ -1,21 +1,21 @@
-pub mod agent;
-pub mod counter;
-pub mod maze;
+mod agent;
+mod counter;
+mod maze;
 mod mode;
-pub mod solver;
-pub mod switch;
+mod solver;
+mod switch;
 
 use core::marker::PhantomData;
 use core::sync::atomic::Ordering;
 
 use heapless::{consts::*, Vec};
 
-use agent::Agent;
-use counter::Counter;
-use maze::{Graph, GraphTranslator, Storable};
+pub use agent::Agent;
+pub use counter::Counter;
+pub use maze::{Graph, GraphTranslator, Storable};
 use mode::{AtomicMode, Mode};
-use solver::Solver;
-use switch::Switch;
+pub use solver::Solver;
+pub use switch::Switch;
 
 pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
