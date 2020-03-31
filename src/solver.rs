@@ -8,7 +8,8 @@ use heapless::{
 use num::Bounded;
 use typenum::Unsigned;
 
-use crate::operator;
+use crate::{direction, operator};
+use direction::Direction;
 
 pub struct Solver<Node, GL>
 where
@@ -21,6 +22,7 @@ where
 impl<Node, GL> Solver<Node, GL>
 where
     GL: ArrayLength<Node>,
+    Node: Clone + Copy,
 {
     pub fn new(start: Node, goals: &[Node]) -> Self {
         let mut goal_vec = Vec::new();
@@ -33,7 +35,7 @@ where
         }
     }
 
-    fn find_shortest_path<Cost, Direction, Graph, L>(
+    fn find_shortest_path<Cost, Graph, L>(
         &self,
         start: Node,
         goals: &[Node],
@@ -41,8 +43,8 @@ where
     ) -> Vec<Node, L>
     where
         Graph: operator::Graph<Node, Cost, Direction>,
-        Cost: PartialOrd + Ord + Clone + Add<Output = Cost> + Bounded,
-        Node: PartialOrd + Ord + Default + Clone + Into<usize>,
+        Cost: PartialOrd + Ord + Clone + Copy + Add<Output = Cost> + Bounded,
+        Node: PartialOrd + Ord + Default + Clone + Copy + Into<usize>,
         L: ArrayLength<Node>
             + ArrayLength<(Cost, Node)>
             + ArrayLength<(Node, Cost)>
@@ -62,7 +64,7 @@ where
         heap.push((Cost::min_value(), start));
         dist[start.into()] = Cost::min_value();
 
-        let construct_path = |goal: Node| {
+        let construct_path = |goal: Node, prev: GenericArray<Node, L>| {
             let mut rpath = Vec::<Node, L>::new();
             rpath.push(goal);
             let mut current = goal;
@@ -83,7 +85,7 @@ where
                 if node != goal {
                     continue;
                 }
-                return construct_path(goal);
+                return construct_path(goal, prev);
             }
             for &(next, c) in &graph.neighbors::<L>(node) {
                 if dist[next.into()] > cost + c {
@@ -94,17 +96,22 @@ where
                 }
             }
         }
-        Vec::new()
+        //panic if goal is unreachable
+        unreachable!()
     }
 }
 
-impl<Node, Cost, Direction, Graph, L, GL> operator::Solver<Node, Cost, Direction, Graph, L>
+impl<Node, Cost, Graph, L, GL> operator::Solver<Node, Cost, Direction, Graph, L>
     for Solver<Node, GL>
 where
     Graph: operator::Graph<Node, Cost, Direction>,
-    Cost: PartialOrd + Ord + Clone + Add<Output = Cost> + Bounded,
-    Node: PartialOrd + Ord + Default + Clone + Into<usize>,
-    L: ArrayLength<Node> + ArrayLength<(Cost, Node)> + ArrayLength<Cost> + Unsigned,
+    Cost: PartialOrd + Ord + Clone + Copy + Add<Output = Cost> + Bounded,
+    Node: PartialOrd + Ord + Default + Clone + Copy + Into<usize>,
+    L: ArrayLength<Node>
+        + ArrayLength<(Cost, Node)>
+        + ArrayLength<(Node, Cost)>
+        + ArrayLength<Cost>
+        + Unsigned,
     GL: ArrayLength<Node>,
 {
     fn start(&self) -> Node {
@@ -117,5 +124,7 @@ where
         graph: &Graph,
     ) -> (Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction) {
         let path = self.find_shortest_path(self.start, &self.goals, graph);
+        let dummy = |f: fn(Direction) -> bool| Direction::North;
+        (path, dummy)
     }
 }
