@@ -19,6 +19,10 @@ pub trait DirectionInstructor<Node, Direction> {
 pub trait Graph<Node, Cost, Direction> {
     fn neighbors<L: ArrayLength<(Node, Cost)>>(&self, node: Node) -> Vec<(Node, Cost), L>;
     fn checked_neighbors<L: ArrayLength<(Node, Cost)>>(&self, node: Node) -> Vec<(Node, Cost), L>;
-    fn is_edge_checked(&self, node1: Node, node2: Node) -> bool;
-    fn edge_direction(&self, src: Node, dst: Node) -> Direction;
+    fn is_checked(&self, edge: (Node, Node)) -> bool;
+    fn edge_direction(&self, edge: (Node, Node)) -> Direction;
+    fn separate_to_unit_edges<L: ArrayLength<(Node, Node)>>(
+        &self,
+        edge: (Node, Node),
+    ) -> Vec<(Node, Node), L>;
 }
