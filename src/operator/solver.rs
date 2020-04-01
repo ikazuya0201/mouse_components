@@ -13,5 +13,5 @@ where
         &self,
         current: Node,
         graph: &G,
-    ) -> (Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction);
+    ) -> Option<(Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction)>;
 }
