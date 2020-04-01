@@ -101,7 +101,11 @@ where
         loop {
             match self.mode.load(Ordering::Relaxed) {
                 Idle => (),
-                Search => self.searcher.search(&self.maze, &self.agent, &self.solver),
+                Search => {
+                    if !self.searcher.search(&self.maze, &self.agent, &self.solver) {
+                        self.mode.store(FastRun, Ordering::Relaxed);
+                    }
+                }
                 FastRun => self.fast_run(),
                 Select => self.mode_select(),
             }

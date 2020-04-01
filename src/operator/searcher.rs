@@ -36,7 +36,13 @@ where
         agent.track_next();
     }
 
-    pub fn search<Cost, Position, Direction, M, A, S, L>(&self, maze: &M, agent: &A, solver: &S)
+    //return: false if search finished
+    pub fn search<Cost, Position, Direction, M, A, S, L>(
+        &self,
+        maze: &M,
+        agent: &A,
+        solver: &S,
+    ) -> bool
     where
         M: Graph<Node, Cost, Direction>
             + GraphTranslator<Node, Position>
@@ -49,15 +55,19 @@ where
             .is_updated
             .compare_and_swap(true, false, Ordering::Relaxed)
         {
-            return;
+            return true;
         }
         let current = self.current.get();
-        let (route, mapping) = solver.solve(current, maze);
-        maze.set_direction_mapping(current, mapping);
-        let route = route
-            .into_iter()
-            .map(|n| maze.node_to_position(n))
-            .collect::<Vec<Position, U1024>>();
-        agent.set_next_route(&route);
+        if let Some((route, mapping)) = solver.solve(current, maze) {
+            maze.set_direction_mapping(current, mapping);
+            let route = route
+                .into_iter()
+                .map(|n| maze.node_to_position(n))
+                .collect::<Vec<Position, U1024>>();
+            agent.set_next_route(&route);
+            true
+        } else {
+            false
+        }
     }
 }
