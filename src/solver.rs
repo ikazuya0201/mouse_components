@@ -48,6 +48,7 @@ where
         L: ArrayLength<Node>
             + ArrayLength<(Cost, Node)>
             + ArrayLength<(Node, Cost)>
+            + ArrayLength<(Node, Node)>
             + ArrayLength<Cost>
             + Unsigned,
     {
@@ -99,6 +100,31 @@ where
         //panic if goal is unreachable
         unreachable!()
     }
+
+    ///This function finds an unchecked node, which is a endpoint of an unchecked edge.
+    ///Multiple unchecked nodes could exist in given path,
+    ///but in terms of calculation speed, consider only one node.
+    fn find_first_unchecked_node<Cost, Direction, Graph, L>(
+        &self,
+        path: Vec<Node, L>,
+        graph: &Graph,
+    ) -> Option<Node>
+    where
+        Graph: operator::Graph<Node, Cost, Direction>,
+        L: ArrayLength<(Node, Node)> + ArrayLength<Node>,
+    {
+        for i in 0..path.len() - 1 {
+            if graph.is_checked((path[i], path[i + 1])) {
+                continue;
+            }
+            for edge in graph.separate_to_unit_edges::<L>((path[i], path[i + 1])) {
+                if !graph.is_checked(edge) {
+                    return Some(edge.0);
+                }
+            }
+        }
+        None
+    }
 }
 
 impl<Node, Cost, Graph, L, GL> operator::Solver<Node, Cost, Direction, Graph, L>
@@ -110,6 +136,7 @@ where
     L: ArrayLength<Node>
         + ArrayLength<(Cost, Node)>
         + ArrayLength<(Node, Cost)>
+        + ArrayLength<(Node, Node)>
         + ArrayLength<Cost>
         + Unsigned,
     GL: ArrayLength<Node>,
@@ -122,9 +149,14 @@ where
         &self,
         current: Node,
         graph: &Graph,
-    ) -> (Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction) {
-        let path = self.find_shortest_path(self.start, &self.goals, graph);
+    ) -> Option<(Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction)> {
+        let shortest_path: Vec<Node, L> = self.find_shortest_path(self.start, &self.goals, graph);
+        let unchecked_node =
+            self.find_first_unchecked_node::<Cost, Direction, Graph, L>(shortest_path, graph)?;
+
+        let path: Vec<Node, L> = self.find_shortest_path(current, &[unchecked_node], graph);
+
         let dummy = |f: fn(Direction) -> bool| Direction::North;
-        (path, dummy)
+        Some((Vec::new(), dummy))
     }
 }
