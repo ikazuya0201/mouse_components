@@ -111,7 +111,6 @@ where
     fn fast_run(&self) {}
 
     fn mode_select(&self) {
-        use num::FromPrimitive;
         self.counter.reset();
         let mut mode = Mode::Idle;
         //waiting for switch off
