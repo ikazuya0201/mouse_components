@@ -6,7 +6,6 @@ use heapless::{
     ArrayLength, Vec,
 };
 use num::Bounded;
-use typenum::Unsigned;
 
 use crate::{direction, operator};
 use direction::Direction;
@@ -49,8 +48,7 @@ where
             + ArrayLength<(Cost, Node)>
             + ArrayLength<(Node, Cost)>
             + ArrayLength<(Node, Node)>
-            + ArrayLength<Cost>
-            + Unsigned,
+            + ArrayLength<Cost>,
     {
         let mut heap = BinaryHeap::<(Cost, Node), L, Min>::new();
 
@@ -75,8 +73,9 @@ where
                 current = next;
             }
             let mut path = Vec::new();
-            for node in rpath {
-                path.push(node).unwrap();
+            let len = rpath.len();
+            for i in 0..len {
+                path.push(rpath[len - i - 1]).unwrap();
             }
             path
         };
@@ -137,8 +136,7 @@ where
         + ArrayLength<(Cost, Node)>
         + ArrayLength<(Node, Cost)>
         + ArrayLength<(Node, Node)>
-        + ArrayLength<Cost>
-        + Unsigned,
+        + ArrayLength<Cost>,
     GL: ArrayLength<Node>,
 {
     fn start(&self) -> Node {

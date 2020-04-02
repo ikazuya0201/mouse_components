@@ -145,7 +145,6 @@ dependencies = [
  "heapless",
  "num",
  "panic_rtt",
- "typenum",
 ]
 
 [[package]]
