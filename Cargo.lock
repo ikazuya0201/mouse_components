@@ -119,6 +119,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "heap"
+version = "0.1.0"
+source = "git+https://github.com/ikazuya0201/heap#d36fff18605b12689698e0a521fcfb89f6e7d207"
+dependencies = [
+ "generic-array 0.13.2",
+]
+
+[[package]]
 name = "heapless"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -142,6 +150,7 @@ dependencies = [
  "cortex-m 0.6.2",
  "cortex-m-rt",
  "generic-array 0.13.2",
+ "heap",
  "heapless",
  "num",
  "panic_rtt",

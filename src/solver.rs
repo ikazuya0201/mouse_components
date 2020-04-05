@@ -1,10 +1,8 @@
 use core::ops::Add;
 
 use generic_array::GenericArray;
-use heapless::{
-    binary_heap::{BinaryHeap, Min},
-    ArrayLength, Vec,
-};
+use heap::BinaryHeap;
+use heapless::{ArrayLength, Vec};
 use num::Bounded;
 
 use crate::{direction, operator};
@@ -48,9 +46,10 @@ where
             + ArrayLength<(Cost, Node)>
             + ArrayLength<(Node, Cost)>
             + ArrayLength<(Node, Node)>
-            + ArrayLength<Cost>,
+            + ArrayLength<Cost>
+            + ArrayLength<Option<usize>>,
     {
-        let mut heap = BinaryHeap::<(Cost, Node), L, Min>::new();
+        let mut heap = BinaryHeap::<Node, Cost, L>::new();
 
         let mut dist = core::iter::repeat(Cost::max_value())
             .take(L::to_usize())
@@ -60,7 +59,7 @@ where
             .take(L::to_usize())
             .collect::<GenericArray<Node, L>>();
 
-        heap.push((Cost::min_value(), start)).unwrap();
+        heap.push(start, Cost::min_value()).unwrap();
         dist[start.into()] = Cost::min_value();
 
         let construct_path = |goal: Node, prev: GenericArray<Node, L>| {
@@ -80,7 +79,7 @@ where
             path
         };
 
-        while let Some((cost, node)) = heap.pop() {
+        while let Some((node, cost)) = heap.pop() {
             for &goal in goals {
                 if node != goal {
                     continue;
@@ -92,7 +91,7 @@ where
                     let ncost = cost + c;
                     dist[next.into()] = ncost;
                     prev[next.into()] = node;
-                    heap.push((ncost, next)).unwrap();
+                    heap.push_or_update(next, ncost).unwrap();
                 }
             }
         }
@@ -136,7 +135,8 @@ where
         + ArrayLength<(Cost, Node)>
         + ArrayLength<(Node, Cost)>
         + ArrayLength<(Node, Node)>
-        + ArrayLength<Cost>,
+        + ArrayLength<Cost>
+        + ArrayLength<Option<usize>>,
     GL: ArrayLength<Node>,
 {
     fn start(&self) -> Node {
