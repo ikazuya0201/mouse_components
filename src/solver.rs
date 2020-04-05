@@ -86,7 +86,7 @@ where
                 }
                 return construct_path(goal, prev);
             }
-            for &(next, c) in &graph.neighbors::<L>(node) {
+            for &(next, c) in &graph.successors::<L>(node) {
                 if dist[next.into()] > cost + c {
                     let ncost = cost + c;
                     dist[next.into()] = ncost;
