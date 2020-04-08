@@ -1,3 +1,5 @@
+mod path_computer;
+
 use core::ops::Add;
 
 use generic_array::GenericArray;
