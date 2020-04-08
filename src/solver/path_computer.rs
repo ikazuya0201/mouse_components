@@ -67,7 +67,7 @@ where
         self.g[node.into()].min(self.rhs[node.into()])
     }
 
-    fn update_node<Direction, Graph>(&mut self, node: Node, graph: &Graph)
+    pub fn update_node<Direction, Graph>(&mut self, node: Node, graph: &Graph)
     where
         Graph: operator::Graph<Node, Cost, Direction>,
     {
