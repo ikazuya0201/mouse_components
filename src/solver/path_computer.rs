@@ -89,7 +89,7 @@ where
         }
     }
 
-    pub fn compute_shortest_path<Direction, Graph>(&mut self, graph: &Graph)
+    fn compute_shortest_path<Direction, Graph>(&mut self, graph: &Graph) -> bool
     where
         Graph: operator::Graph<Node, Cost, Direction>,
     {
@@ -109,15 +109,16 @@ where
                 self.update_node(succ, graph);
             }
         }
-        if is_updated {
-            self.shortest_path = self.update_shortest_path(graph);
-        }
+        is_updated
     }
 
-    fn update_shortest_path<Direction, Graph>(&self, graph: &Graph) -> Vec<Node, L>
+    pub fn update_shortest_path<Direction, Graph>(&mut self, graph: &Graph)
     where
         Graph: operator::Graph<Node, Cost, Direction>,
     {
+        if !self.compute_shortest_path(graph) {
+            return;
+        }
         let mut path = Vec::<Node, L>::new();
         let mut current = self.goal;
         path.push(current).unwrap();
@@ -140,7 +141,7 @@ where
         for i in 0..path.len() {
             rpath.push(path[path.len() - i - 1]).unwrap();
         }
-        rpath
+        self.shortest_path = rpath;
     }
 
     pub fn get_shortest_path(&self) -> &Vec<Node, L> {
