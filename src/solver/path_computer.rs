@@ -238,9 +238,19 @@ mod tests {
         computer.update_shortest_path(&graph);
         assert_eq!(computer.get_shortest_path().as_ref(), [0, 2, 3, 5, 6]);
 
-        graph.update_edge(3, 4, 1);
-        computer.update_node(4, &graph);
+        graph.update_edge(3, 5, std::usize::MAX);
+        computer.update_node(5, &graph);
         computer.update_shortest_path(&graph);
         assert_eq!(computer.get_shortest_path().as_ref(), [0, 2, 3, 4, 6]);
+
+        graph.update_edge(2, 3, std::usize::MAX);
+        computer.update_node(3, &graph);
+        computer.update_shortest_path(&graph);
+        assert_eq!(computer.get_shortest_path().as_ref(), [0, 1, 3, 4, 6]);
+
+        graph.update_edge(0, 2, std::usize::MAX);
+        computer.update_node(2, &graph);
+        computer.update_shortest_path(&graph);
+        assert_eq!(computer.get_shortest_path().as_ref(), [0, 1, 3, 4, 6]);
     }
 }
