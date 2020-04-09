@@ -5,7 +5,7 @@ use core::ops::Add;
 use generic_array::{ArrayLength, GenericArray};
 use heap::BinaryHeap;
 use heapless::Vec;
-use num::Bounded;
+use num::{Bounded, Saturating};
 
 use super::operator;
 
@@ -28,7 +28,7 @@ where
 impl<Node, Cost, L> PathComputer<Node, Cost, L>
 where
     Node: Into<usize> + Clone + Copy + Debug + Eq,
-    Cost: Clone + Copy + Ord + Default + Bounded + Debug + Add<Output = Cost>,
+    Cost: Clone + Copy + Ord + Default + Bounded + Debug + Saturating,
     L: ArrayLength<Cost>
         + ArrayLength<Option<usize>>
         + ArrayLength<(Node, Cost)>
@@ -74,10 +74,7 @@ where
         if self.start != node {
             let mut min = Cost::max_value();
             for (pred, cost) in graph.predecessors::<L>(node) {
-                if self.g[pred.into()] == Cost::max_value() {
-                    continue;
-                }
-                min = min.min(self.g[pred.into()] + cost);
+                min = min.min(self.g[pred.into()].saturating_add(cost));
             }
             self.rhs[node.into()] = min;
         }
@@ -132,8 +129,9 @@ where
                 if self.g[pred.into()] == Cost::max_value() {
                     continue;
                 }
-                if min_cost > self.g[pred.into()] + cost {
-                    min_cost = self.g[pred.into()] + cost;
+                let new_cost = self.g[pred.into()].saturating_add(cost);
+                if min_cost > new_cost {
+                    min_cost = new_cost;
                     min_node = pred;
                 }
             }
