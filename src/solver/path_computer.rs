@@ -86,11 +86,10 @@ where
         }
     }
 
-    fn compute_shortest_path<Direction, Graph>(&mut self, graph: &Graph) -> bool
+    pub fn compute_shortest_path<Direction, Graph>(&mut self, graph: &Graph)
     where
         Graph: operator::Graph<Node, Cost, Direction>,
     {
-        let mut is_updated = false;
         while let Some((node, Reverse(value))) = self.heap.pop() {
             if self.calculate_value(self.goal) <= value
                 && self.rhs[self.goal.into()] == self.g[self.goal.into()]
@@ -98,7 +97,6 @@ where
                 self.heap.push(node, Reverse(value)).unwrap();
                 break;
             }
-            is_updated = true;
             if self.g[node.into()] > self.rhs[node.into()] {
                 self.g[node.into()] = self.rhs[node.into()];
             } else {
@@ -109,16 +107,12 @@ where
                 self.update_node(succ, graph);
             }
         }
-        is_updated
     }
 
-    pub fn update_shortest_path<Direction, Graph>(&mut self, graph: &Graph)
+    pub fn get_shortest_path<Direction, Graph>(&self, graph: &Graph) -> Vec<Node, L>
     where
         Graph: operator::Graph<Node, Cost, Direction>,
     {
-        if !self.compute_shortest_path(graph) {
-            return;
-        }
         let mut path = Vec::<Node, L>::new();
         let mut current = self.goal;
         path.push(current).unwrap();
@@ -142,11 +136,7 @@ where
         for i in 0..path.len() {
             rpath.push(path[path.len() - i - 1]).unwrap();
         }
-        self.shortest_path = rpath;
-    }
-
-    pub fn get_shortest_path(&self) -> &Vec<Node, L> {
-        &self.shortest_path
+        rpath
     }
 }
 
@@ -235,22 +225,22 @@ mod tests {
         let mut graph = Graph::new(&directed_edges);
         let mut computer = PathComputer::<usize, usize, U8>::new(start, goal);
 
-        computer.update_shortest_path(&graph);
-        assert_eq!(computer.get_shortest_path().as_ref(), [0, 2, 3, 5, 6]);
+        computer.compute_shortest_path(&graph);
+        assert_eq!(computer.get_shortest_path(&graph).as_ref(), [0, 2, 3, 5, 6]);
 
         graph.update_edge(3, 5, std::usize::MAX);
         computer.update_node(5, &graph);
-        computer.update_shortest_path(&graph);
-        assert_eq!(computer.get_shortest_path().as_ref(), [0, 2, 3, 4, 6]);
+        computer.compute_shortest_path(&graph);
+        assert_eq!(computer.get_shortest_path(&graph).as_ref(), [0, 2, 3, 4, 6]);
 
         graph.update_edge(2, 3, std::usize::MAX);
         computer.update_node(3, &graph);
-        computer.update_shortest_path(&graph);
-        assert_eq!(computer.get_shortest_path().as_ref(), [0, 1, 3, 4, 6]);
+        computer.compute_shortest_path(&graph);
+        assert_eq!(computer.get_shortest_path(&graph).as_ref(), [0, 1, 3, 4, 6]);
 
         graph.update_edge(0, 2, std::usize::MAX);
         computer.update_node(2, &graph);
-        computer.update_shortest_path(&graph);
-        assert_eq!(computer.get_shortest_path().as_ref(), [0, 1, 3, 4, 6]);
+        computer.compute_shortest_path(&graph);
+        assert_eq!(computer.get_shortest_path(&graph).as_ref(), [0, 1, 3, 4, 6]);
     }
 }
