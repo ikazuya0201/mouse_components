@@ -172,13 +172,13 @@ mod tests {
     }
 
     impl<N> operator::Graph<usize, usize> for Graph<N> 
-    where N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>,N>>
+    where N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>,N>> + ArrayLength<(usize, usize)>
     {
         type Edges = impl Iterator<Item = (usize, usize)>;
 
         fn successors(&self, node: usize) -> Self::Edges {
-            let mut succ = Vec::<(usize, usize), U8>::new();
-            for i in 0..8 {
+            let mut succ = Vec::<(usize, usize), N>::new();
+            for i in 0..N::to_usize() {
                 if let Some(cost) = self.mat[node][i] {
                     succ.push((i, cost)).unwrap();
                 }
@@ -187,8 +187,8 @@ mod tests {
         }
 
         fn predecessors(&self, node: usize) -> Self::Edges {
-            let mut pred = Vec::<(usize, usize), U8>::new();
-            for i in 0..8 {
+            let mut pred = Vec::<(usize, usize), N>::new();
+            for i in 0..N::to_usize() {
                 if let Some(cost) = self.mat[i][node] {
                     pred.push((i, cost)).unwrap();
                 }
