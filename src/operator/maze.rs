@@ -26,6 +26,11 @@ pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {
     fn is_checked(&self, edge: (Node, Node)) -> bool;
     fn unchecked_edge_to_target_nodes(&self, edge: (Node, Node)) -> Self::Iter;
     fn related_target_nodes(&self, node: Node) -> Self::Iter;
+    fn checked_successors<L: ArrayLength<(Node, Cost)>>(&self, node: Node) -> Vec<(Node, Cost), L>;
+    fn checked_predecessors<L: ArrayLength<(Node, Cost)>>(
+        &self,
+        node: Node,
+    ) -> Vec<(Node, Cost), L>;
 }
 
 pub trait Graph<Node, Cost> {
