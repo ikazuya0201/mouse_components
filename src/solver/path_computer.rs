@@ -33,9 +33,9 @@ where
         + ArrayLength<(Node, Reverse<Cost>)>
         + ArrayLength<Node>,
 {
-    pub fn new<Direction, Graph>(start: Node, goal: Node, graph: &Graph) -> Self
+    pub fn new<Graph>(start: Node, goal: Node, graph: &Graph) -> Self
     where
-        Graph: operator::Graph<Node, Cost, Direction>,
+        Graph: operator::Graph<Node, Cost>,
     {
         let heap = BinaryHeap::new();
         let g = GenericArray::default();
@@ -52,9 +52,9 @@ where
         computer
     }
 
-    fn initialize<Direction, Graph>(&mut self, graph: &Graph)
+    fn initialize<Graph>(&mut self, graph: &Graph)
     where
-        Graph: operator::Graph<Node, Cost, Direction>,
+        Graph: operator::Graph<Node, Cost>,
     {
         for i in 0..L::to_usize() {
             self.g[i] = Cost::max_value();
@@ -71,9 +71,9 @@ where
         self.g[node.into()].min(self.rhs[node.into()])
     }
 
-    pub fn update_node<Direction, Graph>(&mut self, node: Node, graph: &Graph)
+    pub fn update_node<Graph>(&mut self, node: Node, graph: &Graph)
     where
-        Graph: operator::Graph<Node, Cost, Direction>,
+        Graph: operator::Graph<Node, Cost>,
     {
         if self.start != node {
             let mut min = Cost::max_value();
@@ -90,9 +90,9 @@ where
         }
     }
 
-    pub fn compute_shortest_path<Direction, Graph>(&mut self, graph: &Graph)
+    pub fn compute_shortest_path<Graph>(&mut self, graph: &Graph)
     where
-        Graph: operator::Graph<Node, Cost, Direction>,
+        Graph: operator::Graph<Node, Cost>,
     {
         while let Some(&(node, Reverse(value))) = self.heap.peek() {
             if self.calculate_value(self.goal) <= value
@@ -113,9 +113,9 @@ where
         }
     }
 
-    pub fn get_shortest_path<Direction, Graph>(&self, graph: &Graph) -> Vec<Node, L>
+    pub fn get_shortest_path<Graph>(&self, graph: &Graph) -> Vec<Node, L>
     where
-        Graph: operator::Graph<Node, Cost, Direction>,
+        Graph: operator::Graph<Node, Cost>,
     {
         let mut path = Vec::<Node, L>::new();
         let mut current = self.goal;
@@ -163,7 +163,7 @@ mod tests {
         }
     }
 
-    impl operator::Graph<usize, usize, bool> for Graph {
+    impl operator::Graph<usize, usize> for Graph {
         fn successors<L: ArrayLength<(usize, usize)>>(
             &self,
             node: usize,
@@ -188,20 +188,6 @@ mod tests {
                 }
             }
             pred
-        }
-
-        fn is_checked(&self, _edge: (usize, usize)) -> bool {
-            true
-        }
-
-        fn edge_direction(&self, _edge: (usize, usize)) -> bool {
-            true
-        }
-        fn separate_to_unit_edges<L: ArrayLength<(usize, usize)>>(
-            &self,
-            _edge: (usize, usize),
-        ) -> Vec<(usize, usize), L> {
-            Vec::new()
         }
     }
 

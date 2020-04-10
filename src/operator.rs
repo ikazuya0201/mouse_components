@@ -13,7 +13,9 @@ use heapless::ArrayLength;
 
 pub use agent::Agent;
 pub use counter::Counter;
-pub use maze::{DirectionInstructor, Graph, GraphTranslator, Storable};
+pub use maze::{
+    CheckableGraph, DirectionInstructor, DirectionalGraph, Graph, GraphTranslator, Storable,
+};
 use mode::{AtomicMode, Mode};
 use searcher::Searcher;
 pub use solver::Solver;
@@ -22,7 +24,8 @@ pub use switch::Switch;
 pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C, L>
 where
     M: Storable
-        + Graph<Node, Cost, Direction>
+        + CheckableGraph<Node, Cost, L>
+        + DirectionalGraph<Node, Cost, Direction>
         + GraphTranslator<Node, Position>
         + DirectionInstructor<Node, Direction>,
     A: Agent<Position, Direction>,
@@ -50,7 +53,8 @@ impl<Node, Cost, Position, Direction, M, A, S, SW, C, L>
 where
     Node: Copy + Clone,
     M: Storable
-        + Graph<Node, Cost, Direction>
+        + CheckableGraph<Node, Cost, L>
+        + DirectionalGraph<Node, Cost, Direction>
         + GraphTranslator<Node, Position>
         + DirectionInstructor<Node, Direction>,
     A: Agent<Position, Direction>,

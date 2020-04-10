@@ -1,10 +1,10 @@
 use heapless::{ArrayLength, Vec};
 
-use super::maze::Graph;
+use super::maze::{CheckableGraph, DirectionalGraph};
 
 pub trait Solver<Node, Cost, Direction, G, L>
 where
-    G: Graph<Node, Cost, Direction>,
+    G: DirectionalGraph<Node, Cost, Direction> + CheckableGraph<Node, Cost, L>,
     L: ArrayLength<Node>,
 {
     //return: (route, last direction mapping)

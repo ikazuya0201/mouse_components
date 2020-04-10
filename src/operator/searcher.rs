@@ -3,7 +3,9 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use heapless::{consts::*, ArrayLength, Vec};
 
-use super::{Agent, DirectionInstructor, Graph, GraphTranslator, Solver};
+use super::{
+    Agent, CheckableGraph, DirectionInstructor, DirectionalGraph, GraphTranslator, Solver,
+};
 
 pub struct Searcher<Node> {
     current: Cell<Node>,
@@ -44,7 +46,8 @@ where
         solver: &S,
     ) -> bool
     where
-        M: Graph<Node, Cost, Direction>
+        M: DirectionalGraph<Node, Cost, Direction>
+            + CheckableGraph<Node, Cost, L>
             + GraphTranslator<Node, Position>
             + DirectionInstructor<Node, Direction>,
         A: Agent<Position, Direction>,

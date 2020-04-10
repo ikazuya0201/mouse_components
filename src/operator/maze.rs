@@ -16,13 +16,19 @@ pub trait DirectionInstructor<Node, Direction> {
     fn instruct_direction(&self) -> Option<(Direction, Node)>;
 }
 
-pub trait Graph<Node, Cost, Direction> {
+pub trait DirectionalGraph<Node, Cost, Direction>: Graph<Node, Cost> {
+    fn edge_direction(&self, edge: (Node, Node)) -> Direction;
+}
+
+pub trait CheckableGraph<Node, Cost, L>: Graph<Node, Cost>
+where
+    L: ArrayLength<Node>,
+{
+    fn is_checked(&self, edge: (Node, Node)) -> bool;
+    fn edge_to_target_nodes(&self, edge: (Node, Node)) -> Vec<Node, L>;
+}
+
+pub trait Graph<Node, Cost> {
     fn successors<L: ArrayLength<(Node, Cost)>>(&self, node: Node) -> Vec<(Node, Cost), L>;
     fn predecessors<L: ArrayLength<(Node, Cost)>>(&self, node: Node) -> Vec<(Node, Cost), L>;
-    fn is_checked(&self, edge: (Node, Node)) -> bool;
-    fn edge_direction(&self, edge: (Node, Node)) -> Direction;
-    fn separate_to_unit_edges<L: ArrayLength<(Node, Node)>>(
-        &self,
-        edge: (Node, Node),
-    ) -> Vec<(Node, Node), L>;
 }
