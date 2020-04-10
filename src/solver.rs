@@ -5,6 +5,7 @@ use core::fmt::Debug;
 
 use generic_array::GenericArray;
 use heapless::{ArrayLength, Vec};
+use heap::BinaryHeap;
 use num::{Bounded, Saturating};
 
 use crate::{direction, operator};
@@ -46,7 +47,7 @@ where
         }
     }
 
-    pub fn get_target_nodes<Graph>(&self, path: &[Node], graph: &Graph) -> GenericArray<bool, L>
+    fn get_target_nodes<Graph>(&self, path: &[Node], graph: &Graph) -> GenericArray<bool, L>
     where
         Graph: operator::CheckableGraph<Node, Cost>,
     {
@@ -59,6 +60,54 @@ where
             }
         }
         is_target_node
+    }
+
+    fn compute_shortest_path<Graph>(&self, start: Node, is_target: &[bool], graph: &Graph) -> Vec<Node, L> 
+    where Graph: operator::Graph<Node, Cost>,
+          L: ArrayLength<Cost> + ArrayLength<Option<Node>>,
+    {
+        let mut heap = BinaryHeap::<Node, Reverse<Cost>, L>::new();
+        let mut dist = GenericArray::<Cost, L>::default();
+        let mut prev = GenericArray::<Option<Node>,L>::default();
+        for i in 0..L::to_usize() {
+            dist[i] = Cost::max_value();
+        }
+
+        heap.push(start, Reverse(Cost::min_value())).unwrap();
+        dist[start.into()] = Cost::min_value();
+
+        let construct_path = |goal: Node, prev: GenericArray<Option<Node>,L>| {
+            let mut rpath = Vec::<Node, L>::new();
+            let mut current = goal;
+            rpath.push(goal).unwrap();
+            while let Some(next) = prev[current.into()] {
+                rpath.push(next).unwrap();
+                current = next;
+                if next == start {
+                    break;
+                }
+            }
+            let mut path = Vec::new();
+            for i in 0..rpath.len() {
+                path.push(rpath[rpath.len()-i-1]).unwrap();
+            }
+            path
+        };
+
+        while let Some((node, Reverse(cost))) = heap.pop() {
+            if is_target[node.into()] {
+                return construct_path(node, prev);
+            }
+            for (succ, scost) in graph.successors(node) {
+                let ncost = cost.saturating_add(scost);
+                if dist[succ.into()] > ncost {
+                    dist[succ.into()] = ncost;
+                    prev[succ.into()] = Some(node);
+                    heap.push_or_update(succ, Reverse(ncost)).unwrap();
+                }
+            }
+        }
+        unreachable!();
     }
 }
 
@@ -73,6 +122,7 @@ where
         + ArrayLength<(Node, Cost)>
         + ArrayLength<(Node, Reverse<Cost>)>
         + ArrayLength<bool>
+        + ArrayLength<Option<Node>>
         + ArrayLength<Node>,
 {
     fn start(&self) -> Node {
@@ -86,7 +136,9 @@ where
     ) -> Option<(Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction)> {
         let shortest_path = self.path_computer.get_shortest_path(graph);
 
-        let is_target_node = self.get_target_nodes(&shortest_path, graph);
+        let is_target = self.get_target_nodes(&shortest_path, graph);
+
+        let path_to_target = self.compute_shortest_path(current, &is_target, graph);
 
         let dummy = |f: fn(Direction) -> bool| Direction::North;
         Some((Vec::new(), dummy))
