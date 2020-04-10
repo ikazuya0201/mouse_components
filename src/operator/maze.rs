@@ -25,6 +25,7 @@ pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {
 
     fn is_checked(&self, edge: (Node, Node)) -> bool;
     fn unchecked_edge_to_target_nodes(&self, edge: (Node, Node)) -> Self::Iter;
+    fn related_target_nodes(&self, node: Node) -> Self::Iter;
 }
 
 pub trait Graph<Node, Cost> {
