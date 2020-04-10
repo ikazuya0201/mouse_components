@@ -31,8 +31,7 @@ where
         + ArrayLength<Option<usize>>
         + ArrayLength<(Node, Cost)>
         + ArrayLength<(Node, Reverse<Cost>)>
-        + ArrayLength<Node>
-        + ArrayLength<(Node, Node)>,
+        + ArrayLength<Node>,
 {
     pub fn new<Graph>(start: Node, goal: Node, graph: &Graph) -> Self
     where
@@ -56,7 +55,6 @@ where
         + ArrayLength<Option<usize>>
         + ArrayLength<(Node, Cost)>
         + ArrayLength<(Node, Reverse<Cost>)>
-        + ArrayLength<(Node, Node)>
         + ArrayLength<Node>,
 {
     fn start(&self) -> Node {
