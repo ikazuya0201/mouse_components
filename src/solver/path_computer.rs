@@ -1,6 +1,5 @@
 use core::cmp::Reverse;
 use core::fmt::Debug;
-use core::ops::Add;
 
 use generic_array::{ArrayLength, GenericArray};
 use heap::BinaryHeap;
@@ -22,7 +21,6 @@ where
     g: GenericArray<Cost, L>,
     rhs: GenericArray<Cost, L>,
     heap: BinaryHeap<Node, Reverse<Cost>, L>,
-    shortest_path: Vec<Node, L>,
 }
 
 impl<Node, Cost, L> PathComputer<Node, Cost, L>
@@ -46,7 +44,6 @@ where
             g: g,
             rhs: rhs,
             heap: heap,
-            shortest_path: Vec::new(),
         };
         computer.initialize();
         computer
