@@ -90,13 +90,13 @@ where
     where
         Graph: operator::Graph<Node, Cost, Direction>,
     {
-        while let Some((node, Reverse(value))) = self.heap.pop() {
+        while let Some(&(node, Reverse(value))) = self.heap.peek() {
             if self.calculate_value(self.goal) <= value
                 && self.rhs[self.goal.into()] == self.g[self.goal.into()]
             {
-                self.heap.push(node, Reverse(value)).unwrap();
                 break;
             }
+            self.heap.pop();
             if self.g[node.into()] > self.rhs[node.into()] {
                 self.g[node.into()] = self.rhs[node.into()];
             } else {
