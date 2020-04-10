@@ -21,19 +21,18 @@ pub trait DirectionalGraph<Node, Cost, Direction>: Graph<Node, Cost> {
 }
 
 pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {
-    type Iter: Iterator<Item = Node>;
+    type Nodes: Iterator<Item = Node>;
 
     fn is_checked(&self, edge: (Node, Node)) -> bool;
-    fn unchecked_edge_to_target_nodes(&self, edge: (Node, Node)) -> Self::Iter;
-    fn related_target_nodes(&self, node: Node) -> Self::Iter;
-    fn checked_successors<L: ArrayLength<(Node, Cost)>>(&self, node: Node) -> Vec<(Node, Cost), L>;
-    fn checked_predecessors<L: ArrayLength<(Node, Cost)>>(
-        &self,
-        node: Node,
-    ) -> Vec<(Node, Cost), L>;
+    fn unchecked_edge_to_target_nodes(&self, edge: (Node, Node)) -> Self::Nodes;
+    fn related_target_nodes(&self, node: Node) -> Self::Nodes;
+    fn checked_successors(&self, node: Node) -> Self::Edges;
+    fn checked_predecessors(&self, node: Node) -> Self::Edges;
 }
 
 pub trait Graph<Node, Cost> {
-    fn successors<L: ArrayLength<(Node, Cost)>>(&self, node: Node) -> Vec<(Node, Cost), L>;
-    fn predecessors<L: ArrayLength<(Node, Cost)>>(&self, node: Node) -> Vec<(Node, Cost), L>;
+    type Edges: Iterator<Item = (Node, Cost)>;
+
+    fn successors(&self, node: Node) -> Self::Edges;
+    fn predecessors(&self, node: Node) -> Self::Edges;
 }

@@ -77,7 +77,7 @@ where
     {
         if self.start != node {
             let mut min = Cost::max_value();
-            for (pred, cost) in graph.predecessors::<L>(node) {
+            for (pred, cost) in graph.predecessors(node) {
                 min = min.min(self.g[pred.into()].saturating_add(cost));
             }
             self.rhs[node.into()] = min;
@@ -107,7 +107,7 @@ where
                 self.g[node.into()] = Cost::max_value();
                 self.update_node(node, graph);
             }
-            for (succ, _) in graph.successors::<L>(node) {
+            for (succ, _) in graph.successors(node) {
                 self.update_node(succ, graph);
             }
         }
@@ -123,7 +123,7 @@ where
         while current != self.start {
             let mut min_cost = Cost::max_value();
             let mut min_node = current;
-            for (pred, cost) in graph.predecessors::<L>(current) {
+            for (pred, cost) in graph.predecessors(current) {
                 if self.g[pred.into()] == Cost::max_value() {
                     continue;
                 }
@@ -149,51 +149,51 @@ mod tests {
     use super::*;
     use heapless::consts::*;
 
-    struct Graph {
-        mat: GenericArray<GenericArray<Option<usize>, U8>, U8>,
+    struct Graph<N> 
+    where N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>,N>>
+    {
+        mat: GenericArray<GenericArray<Option<usize>, N>, N>,
     }
 
-    impl Graph {
+    impl<N> Graph<N> 
+    where N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>,N>>
+    {
         fn new(edges: &[(usize, usize, usize)]) -> Self {
-            let mut mat = GenericArray::<GenericArray<Option<usize>, U8>, U8>::default();
+            let mut mat = GenericArray::<GenericArray<Option<usize>, N>, N>::default();
             for &(src, dst, cost) in edges {
                 mat[src][dst] = Some(cost);
             }
             Self { mat: mat }
         }
+
+        fn update_edge(&mut self, src: usize, dst: usize, cost: usize) {
+            self.mat[src][dst] = Some(cost);
+        }
     }
 
-    impl operator::Graph<usize, usize> for Graph {
-        fn successors<L: ArrayLength<(usize, usize)>>(
-            &self,
-            node: usize,
-        ) -> Vec<(usize, usize), L> {
-            let mut succ = Vec::new();
-            for i in 0..L::to_usize() {
+    impl<N> operator::Graph<usize, usize> for Graph<N> 
+    where N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>,N>>
+    {
+        type Edges = impl Iterator<Item = (usize, usize)>;
+
+        fn successors(&self, node: usize) -> Self::Edges {
+            let mut succ = Vec::<(usize, usize), U8>::new();
+            for i in 0..8 {
                 if let Some(cost) = self.mat[node][i] {
                     succ.push((i, cost)).unwrap();
                 }
             }
-            succ
+            succ.into_iter()
         }
 
-        fn predecessors<L: ArrayLength<(usize, usize)>>(
-            &self,
-            node: usize,
-        ) -> Vec<(usize, usize), L> {
-            let mut pred = Vec::new();
-            for i in 0..L::to_usize() {
+        fn predecessors(&self, node: usize) -> Self::Edges {
+            let mut pred = Vec::<(usize, usize), U8>::new();
+            for i in 0..8 {
                 if let Some(cost) = self.mat[i][node] {
                     pred.push((i, cost)).unwrap();
                 }
             }
-            pred
-        }
-    }
-
-    impl Graph {
-        fn update_edge(&mut self, src: usize, dst: usize, cost: usize) {
-            self.mat[src][dst] = Some(cost);
+            pred.into_iter()
         }
     }
 
@@ -212,7 +212,7 @@ mod tests {
             (5, 6, 3),
         ];
 
-        let mut graph = Graph::new(&directed_edges);
+        let mut graph = Graph::<U8>::new(&directed_edges);
         let mut computer = PathComputer::<usize, usize, U8>::new(start, goal, &graph);
 
         computer.compute_shortest_path(&graph);
