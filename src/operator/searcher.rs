@@ -47,7 +47,7 @@ where
     ) -> bool
     where
         M: DirectionalGraph<Node, Cost, Direction>
-            + CheckableGraph<Node, Cost, L>
+            + CheckableGraph<Node, Cost>
             + GraphTranslator<Node, Position>
             + DirectionInstructor<Node, Direction>,
         A: Agent<Position, Direction>,

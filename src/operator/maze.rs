@@ -20,12 +20,11 @@ pub trait DirectionalGraph<Node, Cost, Direction>: Graph<Node, Cost> {
     fn edge_direction(&self, edge: (Node, Node)) -> Direction;
 }
 
-pub trait CheckableGraph<Node, Cost, L>: Graph<Node, Cost>
-where
-    L: ArrayLength<Node>,
-{
+pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {
+    type Iter: Iterator<Item = Node>;
+
     fn is_checked(&self, edge: (Node, Node)) -> bool;
-    fn edge_to_target_nodes(&self, edge: (Node, Node)) -> Vec<Node, L>;
+    fn unchecked_edge_to_target_nodes(&self, edge: (Node, Node)) -> Self::Iter;
 }
 
 pub trait Graph<Node, Cost> {

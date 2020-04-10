@@ -24,7 +24,7 @@ pub use switch::Switch;
 pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C, L>
 where
     M: Storable
-        + CheckableGraph<Node, Cost, L>
+        + CheckableGraph<Node, Cost>
         + DirectionalGraph<Node, Cost, Direction>
         + GraphTranslator<Node, Position>
         + DirectionInstructor<Node, Direction>,
@@ -53,7 +53,7 @@ impl<Node, Cost, Position, Direction, M, A, S, SW, C, L>
 where
     Node: Copy + Clone,
     M: Storable
-        + CheckableGraph<Node, Cost, L>
+        + CheckableGraph<Node, Cost>
         + DirectionalGraph<Node, Cost, Direction>
         + GraphTranslator<Node, Position>
         + DirectionInstructor<Node, Direction>,

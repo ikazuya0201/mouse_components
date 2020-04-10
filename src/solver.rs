@@ -49,8 +49,7 @@ where
 impl<Node, Cost, Graph, L> operator::Solver<Node, Cost, Direction, Graph, L>
     for Solver<Node, Cost, L>
 where
-    Graph:
-        operator::DirectionalGraph<Node, Cost, Direction> + operator::CheckableGraph<Node, Cost, L>,
+    Graph: operator::DirectionalGraph<Node, Cost, Direction> + operator::CheckableGraph<Node, Cost>,
     Node: Into<usize> + Clone + Copy + Debug + Eq,
     Cost: Clone + Copy + Ord + Default + Bounded + Debug + Saturating,
     L: ArrayLength<Cost>
