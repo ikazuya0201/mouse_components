@@ -33,7 +33,10 @@ where
         + ArrayLength<(Node, Reverse<Cost>)>
         + ArrayLength<Node>,
 {
-    pub fn new(start: Node, goal: Node) -> Self {
+    pub fn new<Direction, Graph>(start: Node, goal: Node, graph: &Graph) -> Self
+    where
+        Graph: operator::Graph<Node, Cost, Direction>,
+    {
         let heap = BinaryHeap::new();
         let g = GenericArray::default();
         let rhs = GenericArray::default();
@@ -45,11 +48,14 @@ where
             rhs: rhs,
             heap: heap,
         };
-        computer.initialize();
+        computer.initialize(graph);
         computer
     }
 
-    fn initialize(&mut self) {
+    fn initialize<Direction, Graph>(&mut self, graph: &Graph)
+    where
+        Graph: operator::Graph<Node, Cost, Direction>,
+    {
         for i in 0..L::to_usize() {
             self.g[i] = Cost::max_value();
             self.rhs[i] = Cost::max_value();
@@ -58,6 +64,7 @@ where
         self.heap
             .push(self.start, Reverse(self.calculate_value(self.start)))
             .unwrap();
+        self.compute_shortest_path(graph);
     }
 
     fn calculate_value(&self, node: Node) -> Cost {
@@ -220,7 +227,7 @@ mod tests {
         ];
 
         let mut graph = Graph::new(&directed_edges);
-        let mut computer = PathComputer::<usize, usize, U8>::new(start, goal);
+        let mut computer = PathComputer::<usize, usize, U8>::new(start, goal, &graph);
 
         computer.compute_shortest_path(&graph);
         assert_eq!(computer.get_shortest_path(&graph).as_ref(), [0, 2, 3, 5, 6]);

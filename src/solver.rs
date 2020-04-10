@@ -34,11 +34,14 @@ where
         + ArrayLength<Node>
         + ArrayLength<(Node, Node)>,
 {
-    pub fn new(start: Node, goal: Node) -> Self {
+    pub fn new<Direction, Graph>(start: Node, goal: Node, graph: &Graph) -> Self
+    where
+        Graph: operator::Graph<Node, Cost, Graph>,
+    {
         Self {
             start: start,
             goal: goal,
-            path_computer: PathComputer::new(start, goal),
+            path_computer: PathComputer::new(start, goal, graph),
         }
     }
 
