@@ -61,8 +61,8 @@ where
             return true;
         }
         let current = self.current.get();
-        if let Some((route, mapping)) = solver.solve(current, maze) {
-            maze.set_direction_mapping(current, mapping);
+        if let Some((route, directions)) = solver.solve(current, maze) {
+            maze.set_direction_iterator(current, directions);
             let route = route
                 .into_iter()
                 .map(|n| maze.node_to_position(n))

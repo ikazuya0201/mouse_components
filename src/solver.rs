@@ -2,30 +2,33 @@ mod path_computer;
 
 use core::cmp::Reverse;
 use core::fmt::Debug;
+use core::marker::PhantomData;
 
 use generic_array::GenericArray;
 use heap::BinaryHeap;
-use heapless::{ArrayLength, Vec};
+use heapless::{consts::*, ArrayLength, Vec};
 use num::{Bounded, Saturating};
 
-use crate::{direction, operator};
-use direction::Direction;
+use crate::operator;
 use path_computer::PathComputer;
 
-pub struct Solver<Node, Cost, L>
+pub struct Solver<Node, Cost, Direction, L, DL>
 where
     L: ArrayLength<Cost>
         + ArrayLength<Option<usize>>
         + ArrayLength<(Node, Cost)>
         + ArrayLength<(Node, Reverse<Cost>)>
         + ArrayLength<Node>,
+    DL: ArrayLength<Direction>,
 {
     start: Node,
     goal: Node,
     path_computer: PathComputer<Node, Cost, L>,
+    _direction: PhantomData<fn() -> Direction>,
+    _direction_length: PhantomData<fn() -> DL>,
 }
 
-impl<Node, Cost, L> Solver<Node, Cost, L>
+impl<Node, Cost, Direction, L, DL> Solver<Node, Cost, Direction, L, DL>
 where
     Node: Into<usize> + Clone + Copy + Debug + Eq,
     Cost: Clone + Copy + Ord + Default + Bounded + Debug + Saturating,
@@ -35,6 +38,7 @@ where
         + ArrayLength<(Node, Reverse<Cost>)>
         + ArrayLength<bool>
         + ArrayLength<Node>,
+    DL: ArrayLength<Direction>,
 {
     pub fn new<Graph>(start: Node, goal: Node, graph: &Graph) -> Self
     where
@@ -44,6 +48,8 @@ where
             start: start,
             goal: goal,
             path_computer: PathComputer::new(start, goal, graph),
+            _direction: PhantomData,
+            _direction_length: PhantomData,
         }
     }
 
@@ -116,7 +122,7 @@ where
         unreachable!();
     }
 
-    fn find_first_checker_node_and_next_direction<Direction, Graph>(
+    fn find_first_checker_node_and_next_direction<Graph>(
         &self,
         path: &[Node],
         graph: &Graph,
@@ -133,12 +139,13 @@ where
     }
 }
 
-impl<Node, Cost, Graph, L> operator::Solver<Node, Cost, Direction, Graph, L>
-    for Solver<Node, Cost, L>
+impl<Node, Cost, Direction, Graph, L, DL> operator::Solver<Node, Cost, Direction, Graph, L>
+    for Solver<Node, Cost, Direction, L, DL>
 where
     Graph: operator::DirectionalGraph<Node, Cost, Direction>,
     Node: Into<usize> + Clone + Copy + Debug + Eq,
     Cost: Clone + Copy + Ord + Default + Bounded + Debug + Saturating,
+    Direction: Debug,
     L: ArrayLength<Cost>
         + ArrayLength<Option<usize>>
         + ArrayLength<(Node, Cost)>
@@ -146,16 +153,15 @@ where
         + ArrayLength<bool>
         + ArrayLength<Option<Node>>
         + ArrayLength<Node>,
+    DL: ArrayLength<Direction>,
 {
+    type Directions = Vec<Direction, DL>;
+
     fn start(&self) -> Node {
         self.start
     }
 
-    fn solve(
-        &self,
-        current: Node,
-        graph: &Graph,
-    ) -> Option<(Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction)> {
+    fn solve(&self, current: Node, graph: &Graph) -> Option<(Vec<Node, L>, Self::Directions)> {
         let shortest_path = self.path_computer.get_shortest_path(graph);
 
         let is_checker = self.get_checker_nodes(&shortest_path, graph);
@@ -165,7 +171,9 @@ where
         let (checker, direction) =
             self.find_first_checker_node_and_next_direction(&path_to_checker, graph);
 
-        let dummy = |f: fn(Direction) -> bool| Direction::North;
-        Some((Vec::new(), dummy))
+        let mut directions = Vec::new();
+        directions.push(direction).unwrap();
+
+        Some((Vec::new(), directions))
     }
 }

@@ -7,11 +7,8 @@ where
     G: DirectionalGraph<Node, Cost, Direction> + CheckableGraph<Node, Cost>,
     L: ArrayLength<Node>,
 {
-    //return: (route, last direction mapping)
+    type Directions: IntoIterator<Item = Direction>;
+    //return: (route, last direction candidates sequence)
     fn start(&self) -> Node;
-    fn solve(
-        &self,
-        current: Node,
-        graph: &G,
-    ) -> Option<(Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction)>;
+    fn solve(&self, current: Node, graph: &G) -> Option<(Vec<Node, L>, Self::Directions)>;
 }

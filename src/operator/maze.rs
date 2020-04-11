@@ -10,7 +10,7 @@ pub trait GraphTranslator<Node, Position> {
 }
 
 pub trait DirectionInstructor<Node, Direction> {
-    fn set_direction_mapping(&self, node: Node, mapping: fn(fn(Direction) -> bool) -> Direction);
+    fn set_direction_iterator<Iter: IntoIterator<Item = Direction>>(&self, node: Node, iter: Iter);
     fn instruct_direction(&self) -> Option<(Direction, Node)>;
 }
 
