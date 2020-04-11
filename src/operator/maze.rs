@@ -1,5 +1,3 @@
-use heapless::{ArrayLength, Vec};
-
 pub trait Storable {
     fn store(&self);
     fn restore(&self);
@@ -16,8 +14,12 @@ pub trait DirectionInstructor<Node, Direction> {
     fn instruct_direction(&self) -> Option<(Direction, Node)>;
 }
 
-pub trait DirectionalGraph<Node, Cost, Direction>: Graph<Node, Cost> {
+pub trait DirectionalGraph<Node, Cost, Direction>: CheckableGraph<Node, Cost> {
     fn edge_direction(&self, edge: (Node, Node)) -> Direction;
+    //block outbound edge of the given node by the direction.
+    //return inbound node of updated edges
+    fn block(&self, node: Node, direction: Direction) -> Self::Nodes;
+    fn find_first_target_node_and_next_direction(&self) -> (Node, Direction);
 }
 
 pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {
