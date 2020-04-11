@@ -149,14 +149,16 @@ mod tests {
     use super::*;
     use heapless::consts::*;
 
-    struct Graph<N> 
-    where N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>,N>>
+    struct Graph<N>
+    where
+        N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>, N>>,
     {
         mat: GenericArray<GenericArray<Option<usize>, N>, N>,
     }
 
-    impl<N> Graph<N> 
-    where N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>,N>>
+    impl<N> Graph<N>
+    where
+        N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>, N>>,
     {
         fn new(edges: &[(usize, usize, usize)]) -> Self {
             let mut mat = GenericArray::<GenericArray<Option<usize>, N>, N>::default();
@@ -171,10 +173,13 @@ mod tests {
         }
     }
 
-    impl<N> operator::Graph<usize, usize> for Graph<N> 
-    where N: ArrayLength<Option<usize>> + ArrayLength<GenericArray<Option<usize>,N>> + ArrayLength<(usize, usize)>
+    impl<N> operator::Graph<usize, usize> for Graph<N>
+    where
+        N: ArrayLength<Option<usize>>
+            + ArrayLength<GenericArray<Option<usize>, N>>
+            + ArrayLength<(usize, usize)>,
     {
-        type Edges = Vec<(usize, usize),N>;
+        type Edges = Vec<(usize, usize), N>;
 
         fn successors(&self, node: usize) -> Self::Edges {
             let mut succ = Vec::<(usize, usize), N>::new();

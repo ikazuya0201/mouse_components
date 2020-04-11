@@ -4,8 +4,8 @@ use core::cmp::Reverse;
 use core::fmt::Debug;
 
 use generic_array::GenericArray;
-use heapless::{ArrayLength, Vec};
 use heap::BinaryHeap;
+use heapless::{ArrayLength, Vec};
 use num::{Bounded, Saturating};
 
 use crate::{direction, operator};
@@ -62,13 +62,19 @@ where
         is_checker_node
     }
 
-    fn compute_shortest_path<Graph>(&self, start: Node, is_goal: &[bool], graph: &Graph) -> Vec<Node, L> 
-    where Graph: operator::Graph<Node, Cost>,
-          L: ArrayLength<Cost> + ArrayLength<Option<Node>>,
+    fn compute_shortest_path<Graph>(
+        &self,
+        start: Node,
+        is_goal: &[bool],
+        graph: &Graph,
+    ) -> Vec<Node, L>
+    where
+        Graph: operator::Graph<Node, Cost>,
+        L: ArrayLength<Cost> + ArrayLength<Option<Node>>,
     {
         let mut heap = BinaryHeap::<Node, Reverse<Cost>, L>::new();
         let mut dist = GenericArray::<Cost, L>::default();
-        let mut prev = GenericArray::<Option<Node>,L>::default();
+        let mut prev = GenericArray::<Option<Node>, L>::default();
         for i in 0..L::to_usize() {
             dist[i] = Cost::max_value();
         }
@@ -76,7 +82,7 @@ where
         heap.push(start, Reverse(Cost::min_value())).unwrap();
         dist[start.into()] = Cost::min_value();
 
-        let construct_path = |goal: Node, prev: GenericArray<Option<Node>,L>| {
+        let construct_path = |goal: Node, prev: GenericArray<Option<Node>, L>| {
             let mut rpath = Vec::<Node, L>::new();
             let mut current = goal;
             rpath.push(goal).unwrap();
@@ -89,7 +95,7 @@ where
             }
             let mut path = Vec::new();
             for i in 0..rpath.len() {
-                path.push(rpath[rpath.len()-i-1]).unwrap();
+                path.push(rpath[rpath.len() - i - 1]).unwrap();
             }
             path
         };
@@ -105,6 +111,22 @@ where
                     prev[succ.into()] = Some(node);
                     heap.push_or_update(succ, Reverse(ncost)).unwrap();
                 }
+            }
+        }
+        unreachable!();
+    }
+
+    fn find_first_checker_node_and_next_direction<Direction, Graph>(
+        &self,
+        path: &[Node],
+        graph: &Graph,
+    ) -> (Node, Direction)
+    where
+        Graph: operator::DirectionalGraph<Node, Cost, Direction>,
+    {
+        for i in 0..path.len() - 1 {
+            if !graph.is_checked((path[i], path[i + 1])) {
+                return graph.find_first_checker_node_and_next_direction((path[i], path[i + 1]));
             }
         }
         unreachable!();
@@ -139,6 +161,9 @@ where
         let is_checker = self.get_checker_nodes(&shortest_path, graph);
 
         let path_to_checker = self.compute_shortest_path(current, &is_checker, graph);
+
+        let (checker, direction) =
+            self.find_first_checker_node_and_next_direction(&path_to_checker, graph);
 
         let dummy = |f: fn(Direction) -> bool| Direction::North;
         Some((Vec::new(), dummy))
