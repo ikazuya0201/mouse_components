@@ -20,7 +20,7 @@ pub trait DirectionalGraph<Node, Cost, Direction>: CheckableGraph<Node, Cost> {
     //return inbound node of updated edges
     fn block(&mut self, node: Node, direction: Direction) -> Self::Nodes;
     fn find_first_checker_node_and_next_direction(&self, edge: (Node, Node)) -> (Node, Direction);
-    fn unchecked_edge_direction(&self, node: Node) -> Option<Direction>;
+    fn nearest_unchecked_node(&self, node: Node) -> Option<Node>;
 }
 
 pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {

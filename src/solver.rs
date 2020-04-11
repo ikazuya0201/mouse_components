@@ -126,16 +126,23 @@ where
         &self,
         path: &[Node],
         graph: &Graph,
-    ) -> (Node, Direction)
+    ) -> Option<(Node, Direction)>
     where
         Graph: operator::DirectionalGraph<Node, Cost, Direction>,
     {
         for i in 0..path.len() - 1 {
             if !graph.is_checked((path[i], path[i + 1])) {
-                return graph.find_first_checker_node_and_next_direction((path[i], path[i + 1]));
+                return Some(
+                    graph.find_first_checker_node_and_next_direction((path[i], path[i + 1])),
+                );
             }
         }
-        unreachable!();
+        let last_node = path[path.len() - 1];
+        let nearest_unchecked_node = graph.nearest_unchecked_node(last_node)?;
+        Some((
+            last_node,
+            graph.edge_direction((last_node, nearest_unchecked_node)),
+        ))
     }
 }
 
@@ -169,7 +176,7 @@ where
         let path_to_checker = self.compute_shortest_path(current, &is_checker, graph);
 
         let (checker, direction) =
-            self.find_first_checker_node_and_next_direction(&path_to_checker, graph);
+            self.find_first_checker_node_and_next_direction(&path_to_checker, graph)?;
 
         let mut directions = Vec::new();
         directions.push(direction).unwrap();
