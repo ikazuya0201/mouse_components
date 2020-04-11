@@ -122,6 +122,56 @@ where
         unreachable!();
     }
 
+    fn compute_checked_shortest_path<Graph>(
+        &self,
+        start: Node,
+        goal: Node,
+        graph: &Graph,
+    ) -> Vec<Node, L>
+    where
+        Graph: operator::CheckableGraph<Node, Cost>,
+        L: ArrayLength<Option<Node>>,
+    {
+        let mut heap = BinaryHeap::<Node, Reverse<Cost>, L>::new();
+        let mut dist = GenericArray::<Cost, L>::default();
+        let mut prev = GenericArray::<Option<Node>, L>::default();
+        for i in 0..L::to_usize() {
+            dist[i] = Cost::max_value();
+        }
+
+        heap.push(goal, Reverse(Cost::min_value())).unwrap();
+        dist[goal.into()] = Cost::min_value();
+
+        let construct_path = |goal: Node, prev: GenericArray<Option<Node>, L>| {
+            let mut path = Vec::<Node, L>::new();
+            let mut current = start;
+            path.push(goal).unwrap();
+            while let Some(next) = prev[current.into()] {
+                path.push(next).unwrap();
+                current = next;
+                if next == goal {
+                    break;
+                }
+            }
+            path
+        };
+
+        while let Some((node, Reverse(cost))) = heap.pop() {
+            if node == start {
+                return construct_path(node, prev);
+            }
+            for (pred, pcost) in graph.checked_predecessors(node) {
+                let ncost = cost.saturating_add(pcost);
+                if dist[pred.into()] > ncost {
+                    dist[pred.into()] = ncost;
+                    prev[pred.into()] = Some(node);
+                    heap.push_or_update(pred, Reverse(ncost)).unwrap();
+                }
+            }
+        }
+        unreachable!();
+    }
+
     fn find_first_checker_node_and_next_direction<Graph>(
         &self,
         path: &[Node],
@@ -178,9 +228,11 @@ where
         let (checker, direction) =
             self.find_first_checker_node_and_next_direction(&path_to_checker, graph)?;
 
+        let path = self.compute_checked_shortest_path(current, checker, graph);
+
         let mut directions = Vec::new();
         directions.push(direction).unwrap();
 
-        Some((Vec::new(), directions))
+        Some((path, directions))
     }
 }
