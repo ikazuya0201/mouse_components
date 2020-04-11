@@ -23,7 +23,7 @@ pub trait DirectionalGraph<Node, Cost, Direction>: CheckableGraph<Node, Cost> {
 }
 
 pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {
-    type Nodes: Iterator<Item = Node>;
+    type Nodes: IntoIterator<Item = Node>;
 
     fn is_checked(&self, edge: (Node, Node)) -> bool;
     fn unchecked_edge_to_checker_nodes(&self, edge: (Node, Node)) -> Self::Nodes;
@@ -33,7 +33,7 @@ pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {
 }
 
 pub trait Graph<Node, Cost> {
-    type Edges: Iterator<Item = (Node, Cost)>;
+    type Edges: IntoIterator<Item = (Node, Cost)>;
 
     fn successors(&self, node: Node) -> Self::Edges;
     fn predecessors(&self, node: Node) -> Self::Edges;
