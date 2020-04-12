@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 
 use generic_array::GenericArray;
 use heap::BinaryHeap;
-use heapless::{consts::*, ArrayLength, Vec};
+use heapless::{ArrayLength, Vec};
 use num::{Bounded, Saturating};
 
 use crate::operator;
@@ -73,7 +73,7 @@ where
         start: Node,
         is_goal: &[bool],
         graph: &Graph,
-    ) -> Vec<Node, L>
+    ) -> Option<Vec<Node, L>>
     where
         Graph: operator::Graph<Node, Cost>,
         L: ArrayLength<Cost> + ArrayLength<Option<Node>>,
@@ -108,7 +108,7 @@ where
 
         while let Some((node, Reverse(cost))) = heap.pop() {
             if is_goal[node.into()] {
-                return construct_path(node, prev);
+                return Some(construct_path(node, prev));
             }
             for (succ, scost) in graph.successors(node) {
                 let ncost = cost.saturating_add(scost);
@@ -119,7 +119,7 @@ where
                 }
             }
         }
-        unreachable!();
+        None
     }
 
     fn compute_checked_shortest_path<Graph>(
@@ -194,15 +194,53 @@ where
             graph.edge_direction((last_node, nearest_unchecked_node)),
         ))
     }
+
+    fn compute_direction_sequence<Graph>(
+        &self,
+        start_node: Node,
+        first_direction: Direction,
+        graph: &Graph,
+    ) -> Vec<Direction, DL>
+    where
+        Direction: Clone + Copy + Debug,
+        Graph: operator::DirectionalGraph<Node, Cost, Direction> + Clone,
+        L: ArrayLength<Option<Node>>,
+    {
+        let mut directions = Vec::new();
+        let mut current_direction = first_direction;
+        let mut graph = graph.clone();
+        let mut path_computer = self.path_computer.clone();
+        loop {
+            directions.push(current_direction).unwrap();
+            let updated_nodes = graph.block(start_node, current_direction);
+            for node in updated_nodes {
+                path_computer.update_node(node, &graph);
+            }
+            path_computer.compute_shortest_path(&graph);
+            let shortest_path = path_computer.get_shortest_path(&graph);
+            let is_checker = self.get_checker_nodes(&shortest_path, &graph);
+            if let Some(path_to_checker) =
+                self.compute_shortest_path(start_node, &is_checker, &graph)
+            {
+                if path_to_checker.is_empty() {
+                    break;
+                }
+                current_direction = graph.edge_direction((start_node, path_to_checker[0]));
+            } else {
+                break;
+            }
+        }
+        directions
+    }
 }
 
 impl<Node, Cost, Direction, Graph, L, DL> operator::Solver<Node, Cost, Direction, Graph, L>
     for Solver<Node, Cost, Direction, L, DL>
 where
-    Graph: operator::DirectionalGraph<Node, Cost, Direction>,
+    Graph: operator::DirectionalGraph<Node, Cost, Direction> + Clone,
     Node: Into<usize> + Clone + Copy + Debug + Eq,
     Cost: Clone + Copy + Ord + Default + Bounded + Debug + Saturating,
-    Direction: Debug,
+    Direction: Clone + Copy + Debug,
     L: ArrayLength<Cost>
         + ArrayLength<Option<usize>>
         + ArrayLength<(Node, Cost)>
@@ -223,15 +261,14 @@ where
 
         let is_checker = self.get_checker_nodes(&shortest_path, graph);
 
-        let path_to_checker = self.compute_shortest_path(current, &is_checker, graph);
+        let path_to_checker = self.compute_shortest_path(current, &is_checker, graph)?;
 
         let (checker, direction) =
             self.find_first_checker_node_and_next_direction(&path_to_checker, graph)?;
 
         let path = self.compute_checked_shortest_path(current, checker, graph);
 
-        let mut directions = Vec::new();
-        directions.push(direction).unwrap();
+        let directions = self.compute_direction_sequence(checker, direction, graph);
 
         Some((path, directions))
     }
