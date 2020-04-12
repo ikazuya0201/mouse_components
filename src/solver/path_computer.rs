@@ -144,6 +144,27 @@ where
     }
 }
 
+impl<Node, Cost, L> Clone for PathComputer<Node, Cost, L>
+where
+    L: ArrayLength<Cost>
+        + ArrayLength<Option<usize>>
+        + ArrayLength<(Node, Cost)>
+        + ArrayLength<(Node, Reverse<Cost>)>
+        + ArrayLength<Node>,
+    Node: Clone,
+    Cost: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            start: self.start.clone(),
+            goal: self.goal.clone(),
+            g: self.g.clone(),
+            rhs: self.rhs.clone(),
+            heap: self.heap.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
