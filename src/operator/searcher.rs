@@ -61,13 +61,16 @@ where
             return true;
         }
         let current = self.current.get();
-        if let Some((route, directions)) = solver.solve(current, maze) {
-            maze.set_direction_iterator(current, directions);
-            let route = route
+        if let Some(path) = solver.next_path(current, maze) {
+            let path = path
                 .into_iter()
                 .map(|n| maze.node_to_position(n))
                 .collect::<Vec<Position, U1024>>();
-            agent.set_next_route(&route);
+            agent.set_next_route(&path);
+            maze.set_direction_iterator(
+                solver.last_node().unwrap(),
+                solver.next_directions(maze).unwrap(),
+            );
             true
         } else {
             false

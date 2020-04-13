@@ -62,7 +62,7 @@ where
     L: ArrayLength<Node>,
 {
     pub fn new(maze: M, agent: A, solver: S, switch: SW, counter: C) -> Self {
-        let start = solver.start();
+        let start = solver.start_node();
         Self {
             maze: maze,
             agent: agent,
