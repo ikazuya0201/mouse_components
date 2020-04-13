@@ -9,8 +9,6 @@ mod switch;
 use core::marker::PhantomData;
 use core::sync::atomic::Ordering;
 
-use heapless::ArrayLength;
-
 pub use agent::Agent;
 pub use counter::Counter;
 pub use maze::{

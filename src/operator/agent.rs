@@ -1,7 +1,7 @@
-use heapless::{ArrayLength, Vec};
-
 pub trait Agent<Position, Direction> {
-    fn existing_obstacles<L: ArrayLength<Position>>(&self) -> Vec<Position, L>;
+    type Positions: IntoIterator<Item = Position>;
+
+    fn existing_obstacles(&self) -> Self::Positions;
     fn position(&self) -> Position;
     fn set_next_path<Positions: IntoIterator<Item = Position>>(&self, path: Positions);
     fn set_instructed_direction(&self, dir: Direction);

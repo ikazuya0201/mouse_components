@@ -1,8 +1,6 @@
 use core::cell::Cell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use heapless::{consts::*, ArrayLength, Vec};
-
 use super::{
     Agent, CheckableGraph, DirectionInstructor, DirectionalGraph, GraphTranslator, Solver,
 };
@@ -28,8 +26,8 @@ where
         M: GraphTranslator<Node, Position> + DirectionInstructor<Node, Direction>,
         A: Agent<Position, Direction>,
     {
-        let obstacles = agent.existing_obstacles::<U10>();
-        maze.update_obstacles(&obstacles);
+        let obstacles = agent.existing_obstacles();
+        maze.update_obstacles(obstacles);
         if let Some((direction, node)) = maze.instruct_direction() {
             agent.set_instructed_direction(direction);
             self.current.set(node);

@@ -6,7 +6,7 @@ pub trait Storable {
 pub trait GraphTranslator<Node, Position> {
     fn node_to_position(&self, node: Node) -> Position;
     fn position_to_node(&self, position: Position) -> Node;
-    fn update_obstacles(&self, positions: &[Position]);
+    fn update_obstacles<Positions: IntoIterator<Item = Position>>(&self, positions: Positions);
 }
 
 pub trait DirectionInstructor<Node, Direction> {
