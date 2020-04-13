@@ -10,6 +10,7 @@ where
     type Directions: IntoIterator<Item = Direction>;
     //return: (route, last direction candidates sequence)
     fn start_node(&self) -> Node;
+    fn update_node(&self, node: Node, graph: &Graph);
     fn next_path(&self, current: Node, graph: &Graph) -> Option<Vec<Node, L>>;
     fn last_node(&self) -> Option<Node>;
     fn next_directions(&self, graph: &Graph) -> Option<Self::Directions>;

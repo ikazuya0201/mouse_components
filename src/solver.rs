@@ -1,6 +1,6 @@
 mod path_computer;
 
-use core::cell::Cell;
+use core::cell::{Cell, RefCell};
 use core::cmp::Reverse;
 use core::fmt::Debug;
 use core::marker::PhantomData;
@@ -22,7 +22,7 @@ where
         + ArrayLength<Node>,
     DL: ArrayLength<Direction>,
 {
-    path_computer: PathComputer<Node, Cost, L>,
+    path_computer: RefCell<PathComputer<Node, Cost, L>>,
     direction_calculator: Cell<Option<DirectionCalculator<Node, Direction, DL>>>,
     _direction: PhantomData<fn() -> Direction>,
     _direction_length: PhantomData<fn() -> DL>,
@@ -45,49 +45,11 @@ where
         Graph: operator::Graph<Node, Cost>,
     {
         Self {
-            path_computer: PathComputer::new(start, goal, graph),
+            path_computer: RefCell::new(PathComputer::new(start, goal, graph)),
             direction_calculator: Cell::new(None),
             _direction: PhantomData,
             _direction_length: PhantomData,
         }
-    }
-
-    fn compute_direction_sequence<Graph>(
-        &self,
-        start_node: Node,
-        first_direction: Direction,
-        graph: &Graph,
-    ) -> Vec<Direction, DL>
-    where
-        Direction: Clone + Copy + Debug,
-        Graph: operator::DirectionalGraph<Node, Cost, Direction> + Clone,
-        L: ArrayLength<Option<Node>>,
-    {
-        let mut directions = Vec::new();
-        let mut current_direction = first_direction;
-        let mut graph = graph.clone();
-        let mut path_computer = self.path_computer.clone();
-        loop {
-            directions.push(current_direction).unwrap();
-            let updated_nodes = graph.block(start_node, current_direction);
-            for node in updated_nodes {
-                path_computer.update_node(node, &graph);
-            }
-            path_computer.compute_shortest_path(&graph);
-            let shortest_path = path_computer.get_shortest_path(&graph);
-            let is_checker: GenericArray<bool, L> = get_checker_nodes(&shortest_path, &graph);
-            if let Some(path_to_checker) =
-                compute_shortest_path::<Node, Cost, Graph, L>(start_node, &is_checker, &graph)
-            {
-                if path_to_checker.is_empty() {
-                    break;
-                }
-                current_direction = graph.edge_direction((start_node, path_to_checker[0]));
-            } else {
-                break;
-            }
-        }
-        directions
     }
 }
 
@@ -110,11 +72,15 @@ where
     type Directions = Vec<Direction, DL>;
 
     fn start_node(&self) -> Node {
-        self.path_computer.start()
+        self.path_computer.borrow().start()
+    }
+
+    fn update_node(&self, node: Node, graph: &Graph) {
+        self.path_computer.borrow_mut().update_node(node, graph);
     }
 
     fn next_path(&self, current: Node, graph: &Graph) -> Option<Vec<Node, L>> {
-        let shortest_path = self.path_computer.get_shortest_path(graph);
+        let shortest_path = self.path_computer.borrow().get_shortest_path(graph);
 
         let is_checker: GenericArray<bool, L> = get_checker_nodes(&shortest_path, graph);
 
@@ -139,7 +105,7 @@ where
         Some(
             self.direction_calculator
                 .get()?
-                .calculate_directions(&self.path_computer, graph),
+                .calculate_directions(&self.path_computer.borrow(), graph),
         )
     }
 }
