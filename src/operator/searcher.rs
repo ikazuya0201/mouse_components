@@ -39,7 +39,7 @@ where
     }
 
     //return: false if search finished
-    pub fn search<Cost, Position, Direction, M, A, S, L>(
+    pub fn search<Cost, Position, Direction, M, A, S>(
         &self,
         maze: &M,
         agent: &A,
@@ -51,8 +51,7 @@ where
             + GraphTranslator<Node, Position>
             + DirectionInstructor<Node, Direction>,
         A: Agent<Position, Direction>,
-        S: Solver<Node, Cost, Direction, M, L>,
-        L: ArrayLength<Node>,
+        S: Solver<Node, Cost, Direction, M>,
     {
         if !self
             .is_updated
@@ -62,14 +61,11 @@ where
         }
         let current = self.current.get();
         if let Some(path) = solver.next_path(current, maze) {
-            let path = path
-                .into_iter()
-                .map(|n| maze.node_to_position(n))
-                .collect::<Vec<Position, U1024>>();
-            agent.set_next_route(&path);
-            maze.set_direction_iterator(
+            let path = path.into_iter().map(|n| maze.node_to_position(n));
+            agent.set_next_path(path);
+            maze.update_direction_candidates(
                 solver.last_node().unwrap(),
-                solver.next_directions(maze).unwrap(),
+                solver.next_direction_candidates(maze).unwrap(),
             );
             true
         } else {

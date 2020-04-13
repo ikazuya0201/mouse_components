@@ -53,7 +53,7 @@ where
     }
 }
 
-impl<Node, Cost, Direction, Graph, L, DL> operator::Solver<Node, Cost, Direction, Graph, L>
+impl<Node, Cost, Direction, Graph, L, DL> operator::Solver<Node, Cost, Direction, Graph>
     for Solver<Node, Cost, Direction, L, DL>
 where
     Graph: operator::DirectionalGraph<Node, Cost, Direction> + Clone,
@@ -69,6 +69,7 @@ where
         + ArrayLength<Node>,
     DL: ArrayLength<Direction>,
 {
+    type Nodes = Vec<Node, L>;
     type Directions = Vec<Direction, DL>;
 
     fn start_node(&self) -> Node {
@@ -79,7 +80,7 @@ where
         self.path_computer.borrow_mut().update_node(node, graph);
     }
 
-    fn next_path(&self, current: Node, graph: &Graph) -> Option<Vec<Node, L>> {
+    fn next_path(&self, current: Node, graph: &Graph) -> Option<Self::Nodes> {
         let shortest_path = self.path_computer.borrow().get_shortest_path(graph);
 
         let is_checker: GenericArray<bool, L> = get_checker_nodes(&shortest_path, graph);
@@ -101,7 +102,7 @@ where
         Some(self.direction_calculator.get()?.start())
     }
 
-    fn next_directions(&self, graph: &Graph) -> Option<Self::Directions> {
+    fn next_direction_candidates(&self, graph: &Graph) -> Option<Self::Directions> {
         Some(
             self.direction_calculator
                 .get()?

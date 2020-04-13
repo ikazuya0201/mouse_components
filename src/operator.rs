@@ -28,7 +28,7 @@ where
         + GraphTranslator<Node, Position>
         + DirectionInstructor<Node, Direction>,
     A: Agent<Position, Direction>,
-    S: Solver<Node, Cost, Direction, M, L>,
+    S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
     C: Counter,
     L: ArrayLength<Node>,
@@ -56,7 +56,7 @@ where
         + GraphTranslator<Node, Position>
         + DirectionInstructor<Node, Direction>,
     A: Agent<Position, Direction>,
-    S: Solver<Node, Cost, Direction, M, L>,
+    S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
     C: Counter,
     L: ArrayLength<Node>,
