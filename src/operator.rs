@@ -21,7 +21,7 @@ use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
-pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C, L>
+pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
     M: Storable
         + DirectionalGraph<Node, Cost, Direction>
@@ -31,7 +31,6 @@ where
     S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
     C: Counter,
-    L: ArrayLength<Node>,
 {
     maze: M,
     agent: A,
@@ -44,11 +43,10 @@ where
     _cost: PhantomData<fn() -> Cost>,
     _position: PhantomData<fn() -> Position>,
     _direction: PhantomData<fn() -> Direction>,
-    _route_length: PhantomData<fn() -> L>,
 }
 
-impl<Node, Cost, Position, Direction, M, A, S, SW, C, L>
-    Operator<Node, Cost, Position, Direction, M, A, S, SW, C, L>
+impl<Node, Cost, Position, Direction, M, A, S, SW, C>
+    Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
     Node: Copy + Clone,
     M: Storable
@@ -59,7 +57,6 @@ where
     S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
     C: Counter,
-    L: ArrayLength<Node>,
 {
     pub fn new(maze: M, agent: A, solver: S, switch: SW, counter: C) -> Self {
         let start = solver.start_node();
@@ -75,7 +72,6 @@ where
             _cost: PhantomData,
             _position: PhantomData,
             _direction: PhantomData,
-            _route_length: PhantomData,
         }
     }
 
