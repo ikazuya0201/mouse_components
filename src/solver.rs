@@ -22,8 +22,6 @@ where
         + ArrayLength<Node>,
     DL: ArrayLength<Direction>,
 {
-    start: Node,
-    goal: Node,
     path_computer: PathComputer<Node, Cost, L>,
     direction_calculator: Cell<Option<DirectionCalculator<Node, Direction, DL>>>,
     _direction: PhantomData<fn() -> Direction>,
@@ -47,8 +45,6 @@ where
         Graph: operator::Graph<Node, Cost>,
     {
         Self {
-            start: start,
-            goal: goal,
             path_computer: PathComputer::new(start, goal, graph),
             direction_calculator: Cell::new(None),
             _direction: PhantomData,
@@ -114,7 +110,7 @@ where
     type Directions = Vec<Direction, DL>;
 
     fn start_node(&self) -> Node {
-        self.start
+        self.path_computer.start()
     }
 
     fn next_path(&self, current: Node, graph: &Graph) -> Option<Vec<Node, L>> {

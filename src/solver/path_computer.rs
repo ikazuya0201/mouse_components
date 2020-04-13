@@ -52,6 +52,14 @@ where
         computer
     }
 
+    pub fn start(&self) -> Node {
+        self.start
+    }
+
+    pub fn goal(&self) -> Node {
+        self.goal
+    }
+
     fn initialize<Graph>(&mut self, graph: &Graph)
     where
         Graph: operator::Graph<Node, Cost>,
