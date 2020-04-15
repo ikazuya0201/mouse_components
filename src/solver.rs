@@ -352,3 +352,80 @@ where
     Direction: Copy,
 {
 }
+
+#[cfg(test)]
+mod tests {
+    use heapless::consts::*;
+
+    use super::{compute_checked_shortest_path, compute_shortest_path};
+    use crate::operator;
+
+    struct IGraph {
+        n: usize,
+        mat: Vec<Vec<Option<usize>>>,
+    }
+
+    impl IGraph {
+        fn new(n: usize, edges: &[(usize, usize, usize)]) -> Self {
+            let mut mat = vec![vec![None; n]; n];
+            for &(src, dst, cost) in edges {
+                mat[src][dst] = Some(cost);
+            }
+            Self { n: n, mat: mat }
+        }
+    }
+
+    impl operator::Graph<usize, usize> for IGraph {
+        type Edges = Vec<(usize, usize)>;
+
+        fn successors(&self, node: usize) -> Self::Edges {
+            let mut result = Vec::new();
+            for i in 0..self.n {
+                if let Some(cost) = self.mat[node][i] {
+                    result.push((i, cost));
+                }
+            }
+            result
+        }
+
+        fn predecessors(&self, node: usize) -> Self::Edges {
+            let mut result = Vec::new();
+            for i in 0..self.n {
+                if let Some(cost) = self.mat[i][node] {
+                    result.push((i, cost));
+                }
+            }
+            result
+        }
+    }
+
+    #[test]
+    fn test_compute_shortest_path() {
+        let edges = [
+            (0, 1, 2),
+            (0, 2, 1),
+            (1, 3, 1),
+            (2, 3, 3),
+            (3, 4, 2),
+            (3, 5, 5),
+            (3, 6, 4),
+            (5, 6, 3),
+            (5, 7, 7),
+            (7, 8, 1),
+        ];
+        let start = 0;
+        let goal = 8;
+        let n = 9;
+
+        let mut is_goal = vec![false; n];
+        is_goal[goal] = true;
+
+        let graph = IGraph::new(n, &edges);
+
+        let path = compute_shortest_path::<usize, usize, IGraph, U10>(start, &is_goal, &graph);
+        let expected = [0, 1, 3, 5, 7, 8];
+
+        assert!(path.is_some());
+        assert_eq!(path.unwrap().as_ref(), expected);
+    }
+}
