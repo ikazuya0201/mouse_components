@@ -399,6 +399,28 @@ mod tests {
         }
     }
 
+    impl operator::CheckableGraph<usize, usize> for IGraph {
+        type Nodes = Vec<usize>;
+
+        fn is_checked(&self, edge: (usize, usize)) -> bool {
+            true
+        }
+
+        fn unchecked_edge_to_checker_nodes(&self, edge: (usize, usize)) -> Self::Nodes {
+            Vec::new()
+        }
+
+        fn checked_successors(&self, node: usize) -> Self::Edges {
+            use operator::Graph;
+            self.successors(node)
+        }
+
+        fn checked_predecessors(&self, node: usize) -> Self::Edges {
+            use operator::Graph;
+            self.predecessors(node)
+        }
+    }
+
     #[test]
     fn test_compute_shortest_path() {
         let edges = [
@@ -423,6 +445,33 @@ mod tests {
         let graph = IGraph::new(n, &edges);
 
         let path = compute_shortest_path::<usize, usize, IGraph, U10>(start, &is_goal, &graph);
+        let expected = [0, 1, 3, 5, 7, 8];
+
+        assert!(path.is_some());
+        assert_eq!(path.unwrap().as_ref(), expected);
+    }
+
+    #[test]
+    fn test_compute_checked_shortest_path() {
+        let edges = [
+            (0, 1, 2),
+            (0, 2, 1),
+            (1, 3, 1),
+            (2, 3, 3),
+            (3, 4, 2),
+            (3, 5, 5),
+            (3, 6, 4),
+            (5, 6, 3),
+            (5, 7, 7),
+            (7, 8, 1),
+        ];
+        let start = 0;
+        let goal = 8;
+        let n = 9;
+
+        let graph = IGraph::new(n, &edges);
+
+        let path = compute_checked_shortest_path::<usize, usize, IGraph, U10>(start, goal, &graph);
         let expected = [0, 1, 3, 5, 7, 8];
 
         assert!(path.is_some());
