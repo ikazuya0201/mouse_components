@@ -358,7 +358,7 @@ mod tests {
     use heapless::consts::*;
 
     use super::{compute_checked_shortest_path, compute_shortest_path};
-    use crate::operator;
+    use crate::operator::{CheckableGraph, DirectionalGraph, Graph};
 
     struct IGraph {
         n: usize,
@@ -375,7 +375,7 @@ mod tests {
         }
     }
 
-    impl operator::Graph<usize, usize> for IGraph {
+    impl Graph<usize, usize> for IGraph {
         type Edges = Vec<(usize, usize)>;
 
         fn successors(&self, node: usize) -> Self::Edges {
@@ -399,7 +399,7 @@ mod tests {
         }
     }
 
-    impl operator::CheckableGraph<usize, usize> for IGraph {
+    impl CheckableGraph<usize, usize> for IGraph {
         type Nodes = Vec<usize>;
 
         fn is_checked(&self, edge: (usize, usize)) -> bool {
@@ -411,12 +411,10 @@ mod tests {
         }
 
         fn checked_successors(&self, node: usize) -> Self::Edges {
-            use operator::Graph;
             self.successors(node)
         }
 
         fn checked_predecessors(&self, node: usize) -> Self::Edges {
-            use operator::Graph;
             self.predecessors(node)
         }
     }
