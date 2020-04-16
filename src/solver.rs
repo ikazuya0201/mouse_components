@@ -357,12 +357,13 @@ where
 mod tests {
     use heapless::consts::*;
 
-    use super::{compute_checked_shortest_path, compute_shortest_path};
+    use super::{compute_checked_shortest_path, compute_shortest_path, get_checker_nodes};
     use crate::operator::{CheckableGraph, DirectionalGraph, Graph};
 
     struct IGraph {
         n: usize,
         mat: Vec<Vec<Option<usize>>>,
+        is_checked: Vec<Vec<bool>>,
     }
 
     impl IGraph {
@@ -371,7 +372,21 @@ mod tests {
             for &(src, dst, cost) in edges {
                 mat[src][dst] = Some(cost);
             }
-            Self { n: n, mat: mat }
+            Self {
+                n: n,
+                mat: mat,
+                is_checked: vec![vec![true; n]; n],
+            }
+        }
+
+        fn new_unchecked(n: usize, edges: &[(usize, usize, usize)]) -> Self {
+            let mut graph = Self::new(n, edges);
+            graph.is_checked = vec![vec![false; n]; n];
+            graph
+        }
+
+        fn check(&mut self, edge: (usize, usize)) {
+            self.is_checked[edge.0][edge.1] = true;
         }
     }
 
@@ -403,11 +418,11 @@ mod tests {
         type Nodes = Vec<usize>;
 
         fn is_checked(&self, edge: (usize, usize)) -> bool {
-            true
+            self.is_checked[edge.0][edge.1]
         }
 
         fn unchecked_edge_to_checker_nodes(&self, edge: (usize, usize)) -> Self::Nodes {
-            Vec::new()
+            vec![edge.0, edge.1]
         }
 
         fn checked_successors(&self, node: usize) -> Self::Edges {
@@ -474,5 +489,41 @@ mod tests {
 
         assert!(path.is_some());
         assert_eq!(path.unwrap().as_ref(), expected);
+    }
+
+    #[test]
+    fn test_get_checker_nodes() {
+        let edges = [
+            (0, 1, 2),
+            (0, 2, 1),
+            (1, 3, 1),
+            (2, 3, 3),
+            (3, 4, 2),
+            (3, 5, 5),
+            (3, 6, 4),
+            (5, 6, 3),
+            (5, 7, 7),
+            (7, 8, 1),
+        ];
+        let start = 0;
+        let goal = 8;
+        let n = 9;
+
+        let mut is_goal = vec![false; n];
+        is_goal[goal] = true;
+
+        let mut graph = IGraph::new_unchecked(n, &edges);
+        let checked_edges = [(0, 1), (0, 2), (3, 5), (5, 7)];
+        for &edge in &checked_edges {
+            graph.check(edge);
+        }
+
+        let path = compute_shortest_path::<usize, usize, IGraph, U9>(start, &is_goal, &graph);
+        assert!(path.is_some());
+        let path = path.unwrap();
+
+        let is_checker = get_checker_nodes::<usize, usize, IGraph, U9>(&path, &graph);
+        let expected = [false, true, false, true, false, false, false, true, true];
+        assert_eq!(is_checker.as_ref(), expected);
     }
 }
