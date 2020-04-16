@@ -23,7 +23,7 @@ where
     DL: ArrayLength<Direction>,
 {
     path_computer: RefCell<PathComputer<Node, Cost, L>>,
-    direction_calculator: Cell<Option<DirectionCalculator<Node, Direction, DL>>>,
+    direction_calculator: Cell<Option<DirectionComputer<Node, Direction, DL>>>,
     _direction: PhantomData<fn() -> Direction>,
     _direction_length: PhantomData<fn() -> DL>,
 }
@@ -94,7 +94,7 @@ where
         let path = compute_checked_shortest_path(current, checker, graph)?;
 
         self.direction_calculator
-            .set(Some(DirectionCalculator::new(checker, direction)));
+            .set(Some(DirectionComputer::new(checker, direction)));
 
         Some(path)
     }
@@ -107,7 +107,7 @@ where
         Some(
             self.direction_calculator
                 .get()?
-                .calculate_directions(&self.path_computer.borrow(), graph),
+                .compute_direction_candidates(&self.path_computer.borrow(), graph),
         )
     }
 }
@@ -264,15 +264,15 @@ where
     ))
 }
 
-struct DirectionCalculator<Node, Direction, DL> {
+struct DirectionComputer<Node, Direction, DL> {
     start: Node,
     first_direction: Direction,
     _direction_length: PhantomData<fn() -> DL>,
 }
 
-impl<Node, Direction, DL> DirectionCalculator<Node, Direction, DL> {
+impl<Node, Direction, DL> DirectionComputer<Node, Direction, DL> {
     fn new(start: Node, first_direction: Direction) -> Self {
-        Self {
+        DirectionComputer {
             start: start,
             first_direction: first_direction,
             _direction_length: PhantomData,
@@ -286,7 +286,7 @@ impl<Node, Direction, DL> DirectionCalculator<Node, Direction, DL> {
         self.start.clone()
     }
 
-    fn calculate_directions<Cost, Graph, L>(
+    fn compute_direction_candidates<Cost, Graph, L>(
         &self,
         path_computer: &PathComputer<Node, Cost, L>,
         graph: &Graph,
@@ -337,13 +337,13 @@ impl<Node, Direction, DL> DirectionCalculator<Node, Direction, DL> {
     }
 }
 
-impl<Node, Direction, DL> Clone for DirectionCalculator<Node, Direction, DL>
+impl<Node, Direction, DL> Clone for DirectionComputer<Node, Direction, DL>
 where
     Node: Clone,
     Direction: Clone,
 {
     fn clone(&self) -> Self {
-        Self {
+        DirectionComputer {
             start: self.start.clone(),
             first_direction: self.first_direction.clone(),
             _direction_length: PhantomData,
@@ -351,7 +351,7 @@ where
     }
 }
 
-impl<Node, Direction, DL> Copy for DirectionCalculator<Node, Direction, DL>
+impl<Node, Direction, DL> Copy for DirectionComputer<Node, Direction, DL>
 where
     Node: Copy,
     Direction: Copy,
