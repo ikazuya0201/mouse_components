@@ -85,7 +85,8 @@ where
 
         let is_checker: GenericArray<bool, L> = get_checker_nodes(&shortest_path, graph);
 
-        let path_to_checker: Vec<Node, L> = compute_shortest_path(current, &is_checker, graph)?;
+        let path_to_checker: Vec<Node, L> =
+            compute_shortest_path_with_multi_goals(current, &is_checker, graph)?;
 
         let (checker, direction) =
             find_first_checker_node_and_next_direction(&path_to_checker, graph)?;
@@ -128,7 +129,7 @@ where
     is_checker_node
 }
 
-fn compute_shortest_path<Node, Cost, Graph, L>(
+fn compute_shortest_path_with_multi_goals<Node, Cost, Graph, L>(
     start: Node,
     is_goal: &[bool],
     graph: &Graph,
@@ -317,8 +318,12 @@ impl<Node, Direction, DL> DirectionCalculator<Node, Direction, DL> {
             path_computer.compute_shortest_path(&graph);
             let shortest_path = path_computer.get_shortest_path(&graph);
             let is_checker: GenericArray<bool, L> = get_checker_nodes(&shortest_path, &graph);
-            if let Some(path_to_checker) =
-                compute_shortest_path::<Node, Cost, Graph, L>(self.start, &is_checker, &graph)
+            if let Some(path_to_checker) = compute_shortest_path_with_multi_goals::<
+                Node,
+                Cost,
+                Graph,
+                L,
+            >(self.start, &is_checker, &graph)
             {
                 if path_to_checker.is_empty() {
                     break;
@@ -357,7 +362,9 @@ where
 mod tests {
     use heapless::consts::*;
 
-    use super::{compute_checked_shortest_path, compute_shortest_path, get_checker_nodes};
+    use super::{
+        compute_checked_shortest_path, compute_shortest_path_with_multi_goals, get_checker_nodes,
+    };
     use crate::operator::{CheckableGraph, DirectionalGraph, Graph};
 
     struct IGraph {
@@ -457,7 +464,9 @@ mod tests {
 
         let graph = IGraph::new(n, &edges);
 
-        let path = compute_shortest_path::<usize, usize, IGraph, U10>(start, &is_goal, &graph);
+        let path = compute_shortest_path_with_multi_goals::<usize, usize, IGraph, U10>(
+            start, &is_goal, &graph,
+        );
         let expected = [0, 1, 3, 5, 7, 8];
 
         assert!(path.is_some());
@@ -518,7 +527,9 @@ mod tests {
             graph.check(edge);
         }
 
-        let path = compute_shortest_path::<usize, usize, IGraph, U9>(start, &is_goal, &graph);
+        let path = compute_shortest_path_with_multi_goals::<usize, usize, IGraph, U9>(
+            start, &is_goal, &graph,
+        );
         assert!(path.is_some());
         let path = path.unwrap();
 
