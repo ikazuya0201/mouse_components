@@ -1,15 +1,15 @@
-use heapless::{ArrayLength, Vec};
+use super::maze::DirectionalGraph;
 
-use super::maze::Graph;
-
-pub trait Solver<Node, Cost, Direction, G>
+pub trait Solver<Node, Cost, Direction, Graph>
 where
-    G: Graph<Node, Cost, Direction>,
+    Graph: DirectionalGraph<Node, Cost, Direction>,
 {
-    //return: (route, last direction mapping)
-    fn solve<L: ArrayLength<Node>>(
-        &self,
-        current: Node,
-        graph: &G,
-    ) -> (Vec<Node, L>, fn(fn(Direction) -> bool) -> Direction);
+    type Nodes: IntoIterator<Item = Node>;
+    type Directions: IntoIterator<Item = Direction>;
+    //return: (route, last direction candidates sequence)
+    fn start_node(&self) -> Node;
+    fn update_node(&self, node: Node, graph: &Graph);
+    fn next_path(&self, current: Node, graph: &Graph) -> Option<Self::Nodes>;
+    fn last_node(&self) -> Option<Node>;
+    fn next_direction_candidates(&self, graph: &Graph) -> Option<Self::Directions>;
 }

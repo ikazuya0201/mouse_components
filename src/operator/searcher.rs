@@ -1,9 +1,9 @@
 use core::cell::Cell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use heapless::{consts::*, Vec};
-
-use super::{Agent, DirectionInstructor, Graph, GraphTranslator, Solver};
+use super::{
+    Agent, CheckableGraph, DirectionInstructor, DirectionalGraph, GraphTranslator, Solver,
+};
 
 pub struct Searcher<Node> {
     current: Cell<Node>,
@@ -26,8 +26,8 @@ where
         M: GraphTranslator<Node, Position> + DirectionInstructor<Node, Direction>,
         A: Agent<Position, Direction>,
     {
-        let obstacles = agent.existing_obstacles::<U10>();
-        maze.update_obstacles(&obstacles);
+        let obstacles = agent.existing_obstacles();
+        maze.update_obstacles(obstacles);
         if let Some((direction, node)) = maze.instruct_direction() {
             agent.set_instructed_direction(direction);
             self.current.set(node);
@@ -36,9 +36,16 @@ where
         agent.track_next();
     }
 
-    pub fn search<Cost, Position, Direction, M, A, S>(&self, maze: &M, agent: &A, solver: &S)
+    //return: false if search finished
+    pub fn search<Cost, Position, Direction, M, A, S>(
+        &self,
+        maze: &M,
+        agent: &A,
+        solver: &S,
+    ) -> bool
     where
-        M: Graph<Node, Cost, Direction>
+        M: DirectionalGraph<Node, Cost, Direction>
+            + CheckableGraph<Node, Cost>
             + GraphTranslator<Node, Position>
             + DirectionInstructor<Node, Direction>,
         A: Agent<Position, Direction>,
@@ -48,15 +55,19 @@ where
             .is_updated
             .compare_and_swap(true, false, Ordering::Relaxed)
         {
-            return;
+            return true;
         }
         let current = self.current.get();
-        let (route, mapping) = solver.solve::<U1024>(current, maze);
-        maze.set_direction_mapping(current, mapping);
-        let route = route
-            .into_iter()
-            .map(|n| maze.node_to_position(n))
-            .collect::<Vec<Position, U1024>>();
-        agent.set_next_route(&route);
+        if let Some(path) = solver.next_path(current, maze) {
+            let path = path.into_iter().map(|n| maze.node_to_position(n));
+            agent.set_next_path(path);
+            maze.update_direction_candidates(
+                solver.last_node().unwrap(),
+                solver.next_direction_candidates(maze).unwrap(),
+            );
+            true
+        } else {
+            false
+        }
     }
 }

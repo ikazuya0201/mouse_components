@@ -11,7 +11,9 @@ use core::sync::atomic::Ordering;
 
 pub use agent::Agent;
 pub use counter::Counter;
-pub use maze::{DirectionInstructor, Graph, GraphTranslator, Storable};
+pub use maze::{
+    CheckableGraph, DirectionInstructor, DirectionalGraph, Graph, GraphTranslator, Storable,
+};
 use mode::{AtomicMode, Mode};
 use searcher::Searcher;
 pub use solver::Solver;
@@ -20,7 +22,7 @@ pub use switch::Switch;
 pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
     M: Storable
-        + Graph<Node, Cost, Direction>
+        + DirectionalGraph<Node, Cost, Direction>
         + GraphTranslator<Node, Position>
         + DirectionInstructor<Node, Direction>,
     A: Agent<Position, Direction>,
@@ -46,7 +48,7 @@ impl<Node, Cost, Position, Direction, M, A, S, SW, C>
 where
     Node: Copy + Clone,
     M: Storable
-        + Graph<Node, Cost, Direction>
+        + DirectionalGraph<Node, Cost, Direction>
         + GraphTranslator<Node, Position>
         + DirectionInstructor<Node, Direction>,
     A: Agent<Position, Direction>,
@@ -55,7 +57,7 @@ where
     C: Counter,
 {
     pub fn new(maze: M, agent: A, solver: S, switch: SW, counter: C) -> Self {
-        let start = maze.start();
+        let start = solver.start_node();
         Self {
             maze: maze,
             agent: agent,
@@ -95,7 +97,11 @@ where
         loop {
             match self.mode.load(Ordering::Relaxed) {
                 Idle => (),
-                Search => self.searcher.search(&self.maze, &self.agent, &self.solver),
+                Search => {
+                    if !self.searcher.search(&self.maze, &self.agent, &self.solver) {
+                        self.mode.store(FastRun, Ordering::Relaxed);
+                    }
+                }
                 FastRun => self.fast_run(),
                 Select => self.mode_select(),
             }
@@ -105,7 +111,6 @@ where
     fn fast_run(&self) {}
 
     fn mode_select(&self) {
-        use num::FromPrimitive;
         self.counter.reset();
         let mut mode = Mode::Idle;
         //waiting for switch off
