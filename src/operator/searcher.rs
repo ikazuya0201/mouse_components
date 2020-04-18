@@ -21,10 +21,10 @@ where
         }
     }
 
-    pub fn tick<Position, Direction, M, A>(&self, maze: &M, agent: &A)
+    pub fn tick<AgentState, Direction, M, A>(&self, maze: &M, agent: &A)
     where
-        M: GraphTranslator<Node, Position> + DirectionInstructor<Node, Direction>,
-        A: Agent<Position, Direction>,
+        M: GraphTranslator<Node, AgentState> + DirectionInstructor<Node, Direction>,
+        A: Agent<AgentState, Direction>,
     {
         let obstacles = agent.existing_obstacles();
         maze.update_obstacles(obstacles);
@@ -37,7 +37,7 @@ where
     }
 
     //return: false if search finished
-    pub fn search<Cost, Position, Direction, M, A, S>(
+    pub fn search<Cost, AgentState, Direction, M, A, S>(
         &self,
         maze: &M,
         agent: &A,
@@ -46,9 +46,9 @@ where
     where
         M: DirectionalGraph<Node, Cost, Direction>
             + CheckableGraph<Node, Cost>
-            + GraphTranslator<Node, Position>
+            + GraphTranslator<Node, AgentState>
             + DirectionInstructor<Node, Direction>,
-        A: Agent<Position, Direction>,
+        A: Agent<AgentState, Direction>,
         S: Solver<Node, Cost, Direction, M>,
     {
         if !self

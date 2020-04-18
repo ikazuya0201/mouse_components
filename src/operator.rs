@@ -19,13 +19,13 @@ use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
-pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
+pub struct Operator<Node, Cost, AgentState, Direction, M, A, S, SW, C>
 where
     M: Storable
         + DirectionalGraph<Node, Cost, Direction>
-        + GraphTranslator<Node, Position>
+        + GraphTranslator<Node, AgentState>
         + DirectionInstructor<Node, Direction>,
-    A: Agent<Position, Direction>,
+    A: Agent<AgentState, Direction>,
     S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
     C: Counter,
@@ -39,19 +39,19 @@ where
     searcher: Searcher<Node>,
     _node: PhantomData<fn() -> Node>,
     _cost: PhantomData<fn() -> Cost>,
-    _position: PhantomData<fn() -> Position>,
+    _agent_state: PhantomData<fn() -> AgentState>,
     _direction: PhantomData<fn() -> Direction>,
 }
 
-impl<Node, Cost, Position, Direction, M, A, S, SW, C>
-    Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
+impl<Node, Cost, AgentState, Direction, M, A, S, SW, C>
+    Operator<Node, Cost, AgentState, Direction, M, A, S, SW, C>
 where
     Node: Copy + Clone,
     M: Storable
         + DirectionalGraph<Node, Cost, Direction>
-        + GraphTranslator<Node, Position>
+        + GraphTranslator<Node, AgentState>
         + DirectionInstructor<Node, Direction>,
-    A: Agent<Position, Direction>,
+    A: Agent<AgentState, Direction>,
     S: Solver<Node, Cost, Direction, M>,
     SW: Switch,
     C: Counter,
@@ -68,7 +68,7 @@ where
             searcher: Searcher::new(start),
             _node: PhantomData,
             _cost: PhantomData,
-            _position: PhantomData,
+            _agent_state: PhantomData,
             _direction: PhantomData,
         }
     }
