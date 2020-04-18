@@ -23,7 +23,7 @@ where
     DL: ArrayLength<Direction>,
 {
     path_computer: RefCell<PathComputer<Node, Cost, L>>,
-    direction_calculator: Cell<Option<DirectionComputer<Node, Direction, DL>>>,
+    direction_computer: Cell<Option<DirectionComputer<Node, Direction, DL>>>,
     _direction: PhantomData<fn() -> Direction>,
     _direction_length: PhantomData<fn() -> DL>,
 }
@@ -46,7 +46,7 @@ where
     {
         Self {
             path_computer: RefCell::new(PathComputer::new(start, goal, graph)),
-            direction_calculator: Cell::new(None),
+            direction_computer: Cell::new(None),
             _direction: PhantomData,
             _direction_length: PhantomData,
         }
@@ -95,23 +95,23 @@ where
 
             let path = compute_checked_shortest_path(current, checker, graph).unwrap();
 
-            self.direction_calculator
+            self.direction_computer
                 .set(Some(DirectionComputer::new(checker, direction)));
 
             Some(path)
         } else {
-            self.direction_calculator.set(None);
+            self.direction_computer.set(None);
             None
         }
     }
 
     fn last_node(&self) -> Option<Node> {
-        Some(self.direction_calculator.get()?.start())
+        Some(self.direction_computer.get()?.start())
     }
 
     fn next_direction_candidates(&self, graph: &Graph) -> Option<Self::Directions> {
         Some(
-            self.direction_calculator
+            self.direction_computer
                 .get()?
                 .compute_direction_candidates(&self.path_computer.borrow(), graph),
         )
