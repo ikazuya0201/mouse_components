@@ -85,18 +85,24 @@ where
 
         let is_checker: GenericArray<bool, L> = get_checker_nodes(&shortest_path, graph);
 
-        let path_to_checker: Vec<Node, L> =
-            compute_shortest_path_with_multi_goals(current, &is_checker, graph)?;
+        if let Some(path_to_checker) = compute_shortest_path_with_multi_goals::<Node, Cost, Graph, L>(
+            current,
+            &is_checker,
+            graph,
+        ) {
+            let (checker, direction) =
+                find_first_checker_node_and_next_direction(&path_to_checker, graph).unwrap();
 
-        let (checker, direction) =
-            find_first_checker_node_and_next_direction(&path_to_checker, graph).unwrap();
+            let path = compute_checked_shortest_path(current, checker, graph).unwrap();
 
-        let path = compute_checked_shortest_path(current, checker, graph).unwrap();
+            self.direction_calculator
+                .set(Some(DirectionComputer::new(checker, direction)));
 
-        self.direction_calculator
-            .set(Some(DirectionComputer::new(checker, direction)));
-
-        Some(path)
+            Some(path)
+        } else {
+            self.direction_calculator.set(None);
+            None
+        }
     }
 
     fn last_node(&self) -> Option<Node> {
