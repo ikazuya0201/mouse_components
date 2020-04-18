@@ -249,6 +249,7 @@ fn find_first_checker_node_and_next_direction<Node, Cost, Direction, Graph>(
 ) -> Option<(Node, Direction)>
 where
     Node: Clone + Copy,
+    Cost: Bounded + Ord,
     Graph: operator::DirectionalGraph<Node, Cost, Direction>,
 {
     for i in 0..path.len() - 1 {
@@ -257,11 +258,15 @@ where
         }
     }
     let last_node = path[path.len() - 1];
-    let nearest_unchecked_node = graph.nearest_unchecked_node(last_node)?;
-    Some((
-        last_node,
-        graph.edge_direction((last_node, nearest_unchecked_node)),
-    ))
+    let mut next_node = None;
+    let mut min_cost = Cost::max_value();
+    for (succ, cost) in graph.unchecked_successors(last_node) {
+        if min_cost > cost {
+            next_node = Some(succ);
+            min_cost = cost;
+        }
+    }
+    Some((last_node, graph.edge_direction((last_node, next_node?))))
 }
 
 struct DirectionComputer<Node, Direction, DL> {
@@ -434,10 +439,30 @@ mod tests {
 
         fn checked_successors(&self, node: usize) -> Self::Edges {
             self.successors(node)
+                .into_iter()
+                .filter(|&(next, _)| self.is_checked((node, next)))
+                .collect()
         }
 
         fn checked_predecessors(&self, node: usize) -> Self::Edges {
             self.predecessors(node)
+                .into_iter()
+                .filter(|&(next, _)| self.is_checked((node, next)))
+                .collect()
+        }
+
+        fn unchecked_successors(&self, node: usize) -> Self::Edges {
+            self.successors(node)
+                .into_iter()
+                .filter(|&(next, _)| !self.is_checked((node, next)))
+                .collect()
+        }
+
+        fn unchecked_predecessors(&self, node: usize) -> Self::Edges {
+            self.predecessors(node)
+                .into_iter()
+                .filter(|&(next, _)| !self.is_checked((node, next)))
+                .collect()
         }
     }
 
