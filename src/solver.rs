@@ -89,9 +89,9 @@ where
             compute_shortest_path_with_multi_goals(current, &is_checker, graph)?;
 
         let (checker, direction) =
-            find_first_checker_node_and_next_direction(&path_to_checker, graph)?;
+            find_first_checker_node_and_next_direction(&path_to_checker, graph).unwrap();
 
-        let path = compute_checked_shortest_path(current, checker, graph)?;
+        let path = compute_checked_shortest_path(current, checker, graph).unwrap();
 
         self.direction_calculator
             .set(Some(DirectionComputer::new(checker, direction)));
