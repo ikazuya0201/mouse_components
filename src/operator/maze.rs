@@ -3,10 +3,10 @@ pub trait Storable {
     fn restore(&self);
 }
 
-pub trait GraphTranslator<Node, Position> {
-    fn node_to_position(&self, node: Node) -> Position;
-    fn position_to_node(&self, position: Position) -> Node;
-    fn update_obstacles<Positions: IntoIterator<Item = Position>>(&self, positions: Positions);
+pub trait GraphTranslator<Node, AgentState> {
+    fn node_to_position(&self, node: Node) -> AgentState;
+    fn position_to_node(&self, position: AgentState) -> Node;
+    fn update_obstacles<AgentStates: IntoIterator<Item = AgentState>>(&self, states: AgentStates);
 }
 
 pub trait DirectionInstructor<Node, Direction> {
