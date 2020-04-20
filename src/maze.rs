@@ -1,7 +1,4 @@
-use core::ops::Mul;
-
-use generic_array::GenericArray;
-use heapless::{consts::*, ArrayLength, Vec};
+use heapless::{consts::*, Vec};
 use static_assertions::const_assert;
 
 use crate::direction::AbsoluteDirection;
@@ -15,6 +12,7 @@ const MAX_W: usize = 32;
 const_assert!(MAX_H.is_power_of_two());
 const_assert!(MAX_W.is_power_of_two());
 
+#[derive(Clone, Copy)]
 pub struct Node(u16);
 
 impl Node {
@@ -264,8 +262,43 @@ impl Maze {
         }
     }
 
+    const fn y_offset() -> u32 {
+        MAX_W.trailing_zeros()
+    }
+
+    const fn z_offset() -> u32 {
+        MAX_W.trailing_zeros() + MAX_H.trailing_zeros()
+    }
+
+    fn is_wall(&self, x: usize, y: usize, z: bool) -> bool {
+        if z {
+            self.is_wall[x | (y << Self::y_offset()) | (1 << Self::z_offset())]
+        } else {
+            self.is_wall[x | (y << Self::y_offset())]
+        }
+    }
+
+    fn wall_exists(&self, node: Node) -> bool {
+        if node.in_cell() {
+            false
+        } else if node.on_horizontal_wall() {
+            let x = node.x() as usize / 2;
+            let y = node.y() as usize / 2;
+            self.is_wall(x, y, true)
+        } else {
+            let x = node.x() as usize / 2;
+            let y = node.y() as usize / 2;
+            self.is_wall(x, y, false)
+        }
+    }
+
     fn next(&self, node: Node) -> Option<Node> {
-        None
+        let next = node.next()?;
+        if self.wall_exists(next) {
+            None
+        } else {
+            Some(next)
+        }
     }
 }
 
