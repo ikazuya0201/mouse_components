@@ -109,7 +109,7 @@ impl Node {
 
     #[inline]
     fn y(&self) -> u16 {
-        (self.0 >> 6) & Self::y_max()
+        (self.0 >> Self::y_offset()) & Self::y_max()
     }
 
     #[inline]
