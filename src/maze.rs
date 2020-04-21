@@ -1,7 +1,11 @@
 mod node;
 
+use core::ops::Mul;
+
+use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
 use static_assertions::const_assert;
+use typenum::{PowerOfTwo, Unsigned};
 
 use crate::direction::AbsoluteDirection;
 use crate::operator::{
@@ -15,28 +19,37 @@ const MAX_W: usize = 32;
 const_assert!(MAX_H.is_power_of_two());
 const_assert!(MAX_W.is_power_of_two());
 
-pub struct Maze {
-    h: usize,
-    w: usize,
-    is_checked: [bool; MAX_H * MAX_W * 2],
-    is_wall: [bool; MAX_H * MAX_W * 2],
+pub struct Maze<H, W>
+where
+    H: Mul<W>,
+    <H as Mul<W>>::Output: Mul<U2>,
+    <<H as Mul<W>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+{
+    is_checked: GenericArray<bool, <<H as Mul<W>>::Output as Mul<U2>>::Output>,
+    is_wall: GenericArray<bool, <<H as Mul<W>>::Output as Mul<U2>>::Output>,
 }
 
-impl Maze {
-    pub fn new(h: usize, w: usize) -> Self {
+impl<H, W> Maze<H, W>
+where
+    H: Mul<W> + Unsigned + PowerOfTwo,
+    W: Unsigned + PowerOfTwo,
+    <H as Mul<W>>::Output: Mul<U2>,
+    <<H as Mul<W>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+{
+    pub fn new() -> Self {
         Self {
-            h,
-            w,
-            is_checked: [false; MAX_H * MAX_W * 2],
-            is_wall: [false; MAX_H * MAX_W * 2],
+            is_checked: GenericArray::default(),
+            is_wall: GenericArray::default(),
         }
     }
 
-    const fn y_offset() -> u32 {
+    #[inline]
+    fn y_offset() -> u32 {
         MAX_W.trailing_zeros()
     }
 
-    const fn z_offset() -> u32 {
+    #[inline]
+    fn z_offset() -> u32 {
         MAX_W.trailing_zeros() + MAX_H.trailing_zeros()
     }
 
@@ -48,7 +61,7 @@ impl Maze {
         }
     }
 
-    fn wall_exists(&self, node: Node) -> bool {
+    fn wall_exists(&self, node: Node<H, W>) -> bool {
         use Location::*;
         match node.location() {
             Cell => false,
@@ -65,7 +78,7 @@ impl Maze {
         }
     }
 
-    fn next_straight(&self, node: Node) -> Option<Node> {
+    fn next_straight(&self, node: Node<H, W>) -> Option<Node<H, W>> {
         let next = node.next_straight()?;
         if self.wall_exists(next) {
             None
@@ -75,15 +88,20 @@ impl Maze {
     }
 }
 
-impl Graph<Node, u16> for Maze {
-    type Edges = Vec<(Node, u16), U4096>;
+impl<H, W> Graph<Node<H, W>, u16> for Maze<H, W>
+where
+    H: Mul<W>,
+    <H as Mul<W>>::Output: Mul<U2>,
+    <<H as Mul<W>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+{
+    type Edges = Vec<(Node<H, W>, u16), U4096>;
 
-    fn successors(&self, node: Node) -> Self::Edges {
+    fn successors(&self, node: Node<H, W>) -> Self::Edges {
         let mut succs = Vec::new();
         succs
     }
 
-    fn predecessors(&self, node: Node) -> Self::Edges {
+    fn predecessors(&self, node: Node<H, W>) -> Self::Edges {
         let mut preds = Vec::new();
         preds
     }
