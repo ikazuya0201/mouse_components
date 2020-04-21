@@ -175,7 +175,7 @@ impl Node {
         self.x_is_even() && self.y_is_even()
     }
 
-    fn next(&self) -> Option<Self> {
+    fn next_straight(&self) -> Option<Self> {
         use AbsoluteDirection::*;
         let direction = self.direction();
         match direction {
@@ -292,8 +292,8 @@ impl Maze {
         }
     }
 
-    fn next(&self, node: Node) -> Option<Node> {
-        let next = node.next()?;
+    fn next_straight(&self, node: Node) -> Option<Node> {
+        let next = node.next_straight()?;
         if self.wall_exists(next) {
             None
         } else {
