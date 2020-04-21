@@ -12,6 +12,12 @@ const MAX_W: usize = 32;
 const_assert!(MAX_H.is_power_of_two());
 const_assert!(MAX_W.is_power_of_two());
 
+enum Location {
+    Cell,
+    VerticalBound,
+    HorizontalBound,
+}
+
 #[derive(Clone, Copy)]
 pub struct Node(u16);
 
@@ -159,20 +165,21 @@ impl Node {
         }
     }
 
-    fn on_wall(&self) -> bool {
-        self.on_vertical_wall() || self.on_horizontal_wall()
-    }
-
-    fn on_vertical_wall(&self) -> bool {
-        !self.x_is_even() && self.y_is_even()
-    }
-
-    fn on_horizontal_wall(&self) -> bool {
-        self.x_is_even() && !self.y_is_even()
-    }
-
-    fn in_cell(&self) -> bool {
-        self.x_is_even() && self.y_is_even()
+    fn location(&self) -> Location {
+        use Location::*;
+        if self.x_is_even() {
+            if self.y_is_even() {
+                Cell
+            } else {
+                HorizontalBound
+            }
+        } else {
+            if self.y_is_even() {
+                VerticalBound
+            } else {
+                unreachable!()
+            }
+        }
     }
 
     fn next_straight(&self) -> Option<Self> {
@@ -279,16 +286,19 @@ impl Maze {
     }
 
     fn wall_exists(&self, node: Node) -> bool {
-        if node.in_cell() {
-            false
-        } else if node.on_horizontal_wall() {
-            let x = node.x() as usize / 2;
-            let y = node.y() as usize / 2;
-            self.is_wall(x, y, true)
-        } else {
-            let x = node.x() as usize / 2;
-            let y = node.y() as usize / 2;
-            self.is_wall(x, y, false)
+        use Location::*;
+        match node.location() {
+            Cell => false,
+            HorizontalBound => {
+                let x = node.x() as usize / 2;
+                let y = node.y() as usize / 2;
+                self.is_wall(x, y, true)
+            }
+            VerticalBound => {
+                let x = node.x() as usize / 2;
+                let y = node.y() as usize / 2;
+                self.is_wall(x, y, false)
+            }
         }
     }
 
