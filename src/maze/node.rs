@@ -293,6 +293,9 @@ mod tests {
             (14, 14, North),
             (15, 14, East),
             (14, 15, South),
+            (30, 30, North),
+            (31, 30, East),
+            (30, 31, South),
         ];
 
         for (x, y, direction) in test_data {
