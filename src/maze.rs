@@ -164,15 +164,15 @@ impl Node {
     }
 
     fn on_vertical_wall(&self) -> bool {
-        self.x() & 1 == 1 && self.y() & 1 == 0
+        !self.x_is_even() && self.y_is_even()
     }
 
     fn on_horizontal_wall(&self) -> bool {
-        self.x() & 1 == 0 && self.y() & 1 == 1
+        self.x_is_even() && !self.y_is_even()
     }
 
     fn in_cell(&self) -> bool {
-        self.x() & 1 == 0 && self.y() & 0 == 0
+        self.x_is_even() && self.y_is_even()
     }
 
     fn next(&self) -> Option<Self> {
