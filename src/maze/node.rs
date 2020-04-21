@@ -24,6 +24,8 @@ where
 {
     pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Self {
         use AbsoluteDirection::*;
+        debug_assert!(x <= Self::x_max());
+        debug_assert!(y <= Self::y_max());
         let direction = if x & 1 == 0 {
             if y & 1 == 0 {
                 match direction {
@@ -317,5 +319,35 @@ mod tests {
             assert_eq!(node.y(), y);
             assert_eq!(node.direction(), direction);
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_x_unreachable() {
+        Node::<U16, U16>::new(32, 31, NorthEast);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_y_unreachable() {
+        Node::<U16, U16>::new(31, 32, NorthEast);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_direction_unreachable_in_cell() {
+        Node::<U16, U16>::new(0, 0, NorthEast);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_direction_unreachable_on_horizontal_bound() {
+        Node::<U16, U16>::new(0, 1, East);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_direction_unreachable_on_vertical_bound() {
+        Node::<U16, U16>::new(1, 0, North);
     }
 }
