@@ -1,4 +1,7 @@
-use super::{MAX_H, MAX_W};
+use core::marker::PhantomData;
+
+use typenum::{PowerOfTwo, Unsigned};
+
 use crate::direction::AbsoluteDirection;
 
 pub enum Location {
@@ -8,11 +11,21 @@ pub enum Location {
 }
 
 #[derive(Clone, Copy)]
-pub struct Node(u16);
+pub struct Node<H, W> {
+    raw: u16,
+    _height: PhantomData<fn() -> H>,
+    _width: PhantomData<fn() -> W>,
+}
 
-impl Node {
+impl<H, W> Node<H, W>
+where
+    H: Unsigned + PowerOfTwo,
+    W: Unsigned + PowerOfTwo,
+{
     pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Self {
         use AbsoluteDirection::*;
+        debug_assert!(x <= Self::x_max());
+        debug_assert!(y <= Self::y_max());
         let direction = if x & 1 == 0 {
             if y & 1 == 0 {
                 match direction {
@@ -48,23 +61,31 @@ impl Node {
                 unreachable!()
             }
         };
-        Self(x | (y << Self::y_offset()) | (direction << Self::direction_offset()))
+        Self {
+            raw: x | (y << Self::y_offset()) | (direction << Self::direction_offset()),
+            _height: PhantomData,
+            _width: PhantomData,
+        }
     }
 
-    const fn x_min() -> u16 {
+    #[inline]
+    fn x_min() -> u16 {
         0
     }
 
-    const fn y_min() -> u16 {
+    #[inline]
+    fn y_min() -> u16 {
         0
     }
 
-    const fn x_max() -> u16 {
-        MAX_W as u16 * 2 - 1
+    #[inline]
+    fn x_max() -> u16 {
+        W::U16 * 2 - 1
     }
 
-    const fn y_max() -> u16 {
-        MAX_H as u16 * 2 - 1
+    #[inline]
+    fn y_max() -> u16 {
+        H::U16 * 2 - 1
     }
 
     #[inline]
@@ -87,22 +108,24 @@ impl Node {
         self.y() == Self::y_max()
     }
 
-    const fn y_offset() -> u32 {
-        (MAX_W * 2).trailing_zeros()
+    #[inline]
+    fn y_offset() -> u32 {
+        (W::USIZE * 2).trailing_zeros()
     }
 
-    const fn direction_offset() -> u32 {
-        (MAX_W * 2).trailing_zeros() + (MAX_H * 2).trailing_zeros()
+    #[inline]
+    fn direction_offset() -> u32 {
+        (W::USIZE * 2).trailing_zeros() + (H::USIZE * 2).trailing_zeros()
     }
 
     #[inline]
     pub fn x(&self) -> u16 {
-        self.0 & Self::x_max()
+        self.raw & Self::x_max()
     }
 
     #[inline]
     pub fn y(&self) -> u16 {
-        (self.0 >> Self::y_offset()) & Self::y_max()
+        (self.raw >> Self::y_offset()) & Self::y_max()
     }
 
     #[inline]
@@ -119,7 +142,7 @@ impl Node {
         use AbsoluteDirection::*;
         if self.x_is_even() {
             if self.y_is_even() {
-                match self.0 >> Self::direction_offset() {
+                match self.raw >> Self::direction_offset() {
                     0 => North,
                     1 => East,
                     2 => South,
@@ -127,7 +150,7 @@ impl Node {
                     _ => unreachable!(),
                 }
             } else {
-                match self.0 >> Self::direction_offset() {
+                match self.raw >> Self::direction_offset() {
                     0 => North,
                     1 => NorthEast,
                     2 => SouthEast,
@@ -139,7 +162,7 @@ impl Node {
             }
         } else {
             if self.y_is_even() {
-                match self.0 >> Self::direction_offset() {
+                match self.raw >> Self::direction_offset() {
                     0 => NorthEast,
                     1 => East,
                     2 => SouthEast,
@@ -235,8 +258,96 @@ impl Node {
     }
 }
 
-impl Into<usize> for Node {
+impl<H, W> Into<usize> for Node<H, W> {
     fn into(self) -> usize {
-        self.0.into()
+        self.raw.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use typenum::consts::*;
+    use AbsoluteDirection::*;
+
+    #[test]
+    fn test_base_methods() {
+        let test_data = vec![
+            (0u16, 0u16, North),
+            (0, 0, East),
+            (0, 0, South),
+            (0, 0, West),
+            (0, 1, North),
+            (0, 1, NorthEast),
+            (0, 1, SouthEast),
+            (0, 1, South),
+            (0, 1, SouthWest),
+            (0, 1, NorthWest),
+            (1, 0, NorthEast),
+            (1, 0, East),
+            (1, 0, SouthEast),
+            (1, 0, SouthWest),
+            (1, 0, West),
+            (1, 0, NorthWest),
+            (4, 4, South),
+            (5, 4, West),
+            (4, 5, North),
+            (14, 14, North),
+            (15, 14, East),
+            (14, 15, South),
+            (30, 30, North),
+            (31, 30, East),
+            (30, 31, South),
+        ];
+
+        for (x, y, direction) in test_data {
+            let node = Node::<U16, U16>::new(x, y, direction);
+            assert_eq!(node.x(), x);
+            assert_eq!(node.y(), y);
+            assert_eq!(node.direction(), direction);
+        }
+    }
+
+    #[test]
+    fn test_different_height_and_width() {
+        let test_data = vec![(0u16, 0u16, North), (11, 14, East), (8, 7, North)];
+
+        for (x, y, direction) in test_data {
+            let node = Node::<U16, U8>::new(x, y, direction);
+            println!("{} {}", x, y);
+            assert_eq!(node.x(), x);
+            assert_eq!(node.y(), y);
+            assert_eq!(node.direction(), direction);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_x_unreachable() {
+        Node::<U16, U16>::new(32, 31, NorthEast);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_y_unreachable() {
+        Node::<U16, U16>::new(31, 32, NorthEast);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_direction_unreachable_in_cell() {
+        Node::<U16, U16>::new(0, 0, NorthEast);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_direction_unreachable_on_horizontal_bound() {
+        Node::<U16, U16>::new(0, 1, East);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_direction_unreachable_on_vertical_bound() {
+        Node::<U16, U16>::new(1, 0, North);
     }
 }
