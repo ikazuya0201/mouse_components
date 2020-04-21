@@ -261,3 +261,58 @@ impl<H, W> Into<usize> for Node<H, W> {
         self.raw.into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use typenum::consts::*;
+    use AbsoluteDirection::*;
+
+    #[test]
+    fn test_base_methods() {
+        let test_data = vec![
+            (0u16, 0u16, North),
+            (0, 0, East),
+            (0, 0, South),
+            (0, 0, West),
+            (0, 1, North),
+            (0, 1, NorthEast),
+            (0, 1, SouthEast),
+            (0, 1, South),
+            (0, 1, SouthWest),
+            (0, 1, NorthWest),
+            (1, 0, NorthEast),
+            (1, 0, East),
+            (1, 0, SouthEast),
+            (1, 0, SouthWest),
+            (1, 0, West),
+            (1, 0, NorthWest),
+            (4, 4, South),
+            (5, 4, West),
+            (4, 5, North),
+            (14, 14, North),
+            (15, 14, East),
+            (14, 15, South),
+        ];
+
+        for (x, y, direction) in test_data {
+            let node = Node::<U16, U16>::new(x, y, direction);
+            assert_eq!(node.x(), x);
+            assert_eq!(node.y(), y);
+            assert_eq!(node.direction(), direction);
+        }
+    }
+
+    #[test]
+    fn test_different_height_and_width() {
+        let test_data = vec![(0u16, 0u16, North), (11, 14, East), (8, 7, North)];
+
+        for (x, y, direction) in test_data {
+            let node = Node::<U16, U8>::new(x, y, direction);
+            println!("{} {}", x, y);
+            assert_eq!(node.x(), x);
+            assert_eq!(node.y(), y);
+            assert_eq!(node.direction(), direction);
+        }
+    }
+}
