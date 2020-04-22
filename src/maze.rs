@@ -11,7 +11,7 @@ use crate::direction::AbsoluteDirection;
 use crate::operator::{
     CheckableGraph, DirectionInstructor, DirectionalGraph, Graph, GraphTranslator,
 };
-use node::{Location, Node};
+use node::{Location, Node, NodeId};
 
 pub struct Maze<H, W, T, U>
 where
@@ -61,8 +61,9 @@ where
         }
     }
 
-    fn wall_exists(&self, node: Node<H, W>) -> bool {
+    fn wall_exists(&self, node: NodeId<H, W>) -> bool {
         use Location::*;
+        let node = node.as_node();
         match node.location() {
             Cell => false,
             HorizontalBound => {
@@ -75,15 +76,6 @@ where
                 let y = node.y() as usize / 2;
                 self.is_wall(x, y, false)
             }
-        }
-    }
-
-    fn next_straight(&self, node: Node<H, W>) -> Option<Node<H, W>> {
-        let next = node.next_straight()?;
-        if self.wall_exists(next) {
-            None
-        } else {
-            Some(next)
         }
     }
 }
