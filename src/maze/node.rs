@@ -10,14 +10,72 @@ pub enum Location {
     HorizontalBound,
 }
 
-#[derive(Clone, Copy)]
 pub struct Node<H, W> {
+    x: i16,
+    y: i16,
+    direction: AbsoluteDirection,
+    _height: PhantomData<fn() -> H>,
+    _width: PhantomData<fn() -> W>,
+}
+
+impl<H, W> Node<H, W> {
+    pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
+        Self {
+            x,
+            y,
+            direction,
+            _height: PhantomData,
+            _width: PhantomData,
+        }
+    }
+
+    pub fn x(&self) -> i16 {
+        self.x
+    }
+
+    pub fn y(&self) -> i16 {
+        self.y
+    }
+
+    pub fn direction(&self) -> AbsoluteDirection {
+        self.direction
+    }
+
+    #[inline]
+    fn x_is_even(&self) -> bool {
+        self.x & 1 == 0
+    }
+
+    #[inline]
+    fn y_is_even(&self) -> bool {
+        self.y & 1 == 0
+    }
+    pub fn location(&self) -> Location {
+        use Location::*;
+        if self.x_is_even() {
+            if self.y_is_even() {
+                Cell
+            } else {
+                HorizontalBound
+            }
+        } else {
+            if self.y_is_even() {
+                VerticalBound
+            } else {
+                unreachable!()
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct NodeId<H, W> {
     raw: u16,
     _height: PhantomData<fn() -> H>,
     _width: PhantomData<fn() -> W>,
 }
 
-impl<H, W> Node<H, W>
+impl<H, W> NodeId<H, W>
 where
     H: Unsigned + PowerOfTwo,
     W: Unsigned + PowerOfTwo,
@@ -68,6 +126,48 @@ where
         }
     }
 
+    pub fn as_node(&self) -> Node<H, W> {
+        use AbsoluteDirection::*;
+        let x = self.x_raw();
+        let y = self.y_raw();
+        let direction = if x & 1 == 0 {
+            if y & 1 == 0 {
+                match self.raw >> Self::direction_offset() {
+                    0 => North,
+                    1 => East,
+                    2 => South,
+                    3 => West,
+                    _ => unreachable!(),
+                }
+            } else {
+                match self.raw >> Self::direction_offset() {
+                    0 => North,
+                    1 => NorthEast,
+                    2 => SouthEast,
+                    3 => South,
+                    4 => SouthWest,
+                    5 => NorthWest,
+                    _ => unreachable!(),
+                }
+            }
+        } else {
+            if y & 1 == 0 {
+                match self.raw >> Self::direction_offset() {
+                    0 => NorthEast,
+                    1 => East,
+                    2 => SouthEast,
+                    3 => SouthWest,
+                    4 => West,
+                    5 => NorthWest,
+                    _ => unreachable!(),
+                }
+            } else {
+                unreachable!()
+            }
+        };
+        Node::<H, W>::new(x as i16, y as i16, direction)
+    }
+
     #[inline]
     fn x_min() -> u16 {
         0
@@ -90,22 +190,22 @@ where
 
     #[inline]
     fn x_is_min(&self) -> bool {
-        self.x() == Self::x_min()
+        self.x_raw() == Self::x_min()
     }
 
     #[inline]
     fn y_is_min(&self) -> bool {
-        self.y() == Self::y_min()
+        self.y_raw() == Self::y_min()
     }
 
     #[inline]
     fn x_is_max(&self) -> bool {
-        self.x() == Self::x_max()
+        self.x_raw() == Self::x_max()
     }
 
     #[inline]
     fn y_is_max(&self) -> bool {
-        self.y() == Self::y_max()
+        self.y_raw() == Self::y_max()
     }
 
     #[inline]
@@ -119,146 +219,17 @@ where
     }
 
     #[inline]
-    pub fn x(&self) -> u16 {
+    fn x_raw(&self) -> u16 {
         self.raw & Self::x_max()
     }
 
     #[inline]
-    pub fn y(&self) -> u16 {
+    fn y_raw(&self) -> u16 {
         (self.raw >> Self::y_offset()) & Self::y_max()
-    }
-
-    #[inline]
-    fn x_is_even(&self) -> bool {
-        self.x() & 1 == 0
-    }
-
-    #[inline]
-    fn y_is_even(&self) -> bool {
-        self.y() & 1 == 0
-    }
-
-    pub fn direction(&self) -> AbsoluteDirection {
-        use AbsoluteDirection::*;
-        if self.x_is_even() {
-            if self.y_is_even() {
-                match self.raw >> Self::direction_offset() {
-                    0 => North,
-                    1 => East,
-                    2 => South,
-                    3 => West,
-                    _ => unreachable!(),
-                }
-            } else {
-                match self.raw >> Self::direction_offset() {
-                    0 => North,
-                    1 => NorthEast,
-                    2 => SouthEast,
-                    3 => South,
-                    4 => SouthWest,
-                    5 => NorthWest,
-                    _ => unreachable!(),
-                }
-            }
-        } else {
-            if self.y_is_even() {
-                match self.raw >> Self::direction_offset() {
-                    0 => NorthEast,
-                    1 => East,
-                    2 => SouthEast,
-                    3 => SouthWest,
-                    4 => West,
-                    5 => NorthWest,
-                    _ => unreachable!(),
-                }
-            } else {
-                unreachable!()
-            }
-        }
-    }
-
-    pub fn location(&self) -> Location {
-        use Location::*;
-        if self.x_is_even() {
-            if self.y_is_even() {
-                Cell
-            } else {
-                HorizontalBound
-            }
-        } else {
-            if self.y_is_even() {
-                VerticalBound
-            } else {
-                unreachable!()
-            }
-        }
-    }
-
-    pub fn next_straight(&self) -> Option<Self> {
-        use AbsoluteDirection::*;
-        let direction = self.direction();
-        match direction {
-            North => {
-                if self.y_is_max() {
-                    None
-                } else {
-                    Some(Self::new(self.x(), self.y() + 1, direction))
-                }
-            }
-            NorthEast => {
-                if self.x_is_max() || self.y_is_max() {
-                    None
-                } else {
-                    Some(Self::new(self.x() + 1, self.y() + 1, direction))
-                }
-            }
-            East => {
-                if self.x_is_max() {
-                    None
-                } else {
-                    Some(Self::new(self.x() + 1, self.y(), direction))
-                }
-            }
-            SouthEast => {
-                if self.x_is_max() || self.y_is_min() {
-                    None
-                } else {
-                    Some(Self::new(self.x() + 1, self.y() - 1, direction))
-                }
-            }
-            South => {
-                if self.y_is_min() {
-                    None
-                } else {
-                    Some(Self::new(self.x(), self.y() - 1, direction))
-                }
-            }
-            SouthWest => {
-                if self.x_is_min() || self.y_is_min() {
-                    None
-                } else {
-                    Some(Self::new(self.x() - 1, self.y() - 1, direction))
-                }
-            }
-            West => {
-                if self.x_is_min() {
-                    None
-                } else {
-                    Some(Self::new(self.x() - 1, self.y(), direction))
-                }
-            }
-            NorthWest => {
-                if self.x_is_min() || self.y_is_max() {
-                    None
-                } else {
-                    Some(Self::new(self.x() - 1, self.y() + 1, direction))
-                }
-            }
-        }
     }
 }
 
-impl<H, W> Into<usize> for Node<H, W> {
+impl<H, W> Into<usize> for NodeId<H, W> {
     fn into(self) -> usize {
         self.raw.into()
     }
@@ -301,9 +272,10 @@ mod tests {
         ];
 
         for (x, y, direction) in test_data {
-            let node = Node::<U16, U16>::new(x, y, direction);
-            assert_eq!(node.x(), x);
-            assert_eq!(node.y(), y);
+            let node = NodeId::<U16, U16>::new(x, y, direction);
+            let node = node.as_node();
+            assert_eq!(node.x() as u16, x);
+            assert_eq!(node.y() as u16, y);
             assert_eq!(node.direction(), direction);
         }
     }
@@ -313,10 +285,10 @@ mod tests {
         let test_data = vec![(0u16, 0u16, North), (11, 14, East), (8, 7, North)];
 
         for (x, y, direction) in test_data {
-            let node = Node::<U16, U8>::new(x, y, direction);
-            println!("{} {}", x, y);
-            assert_eq!(node.x(), x);
-            assert_eq!(node.y(), y);
+            let node = NodeId::<U16, U8>::new(x, y, direction);
+            let node = node.as_node();
+            assert_eq!(node.x() as u16, x);
+            assert_eq!(node.y() as u16, y);
             assert_eq!(node.direction(), direction);
         }
     }
@@ -324,30 +296,30 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_x_unreachable() {
-        Node::<U16, U16>::new(32, 31, NorthEast);
+        NodeId::<U16, U16>::new(32, 31, NorthEast);
     }
 
     #[test]
     #[should_panic]
     fn test_y_unreachable() {
-        Node::<U16, U16>::new(31, 32, NorthEast);
+        NodeId::<U16, U16>::new(31, 32, NorthEast);
     }
 
     #[test]
     #[should_panic]
     fn test_direction_unreachable_in_cell() {
-        Node::<U16, U16>::new(0, 0, NorthEast);
+        NodeId::<U16, U16>::new(0, 0, NorthEast);
     }
 
     #[test]
     #[should_panic]
     fn test_direction_unreachable_on_horizontal_bound() {
-        Node::<U16, U16>::new(0, 1, East);
+        NodeId::<U16, U16>::new(0, 1, East);
     }
 
     #[test]
     #[should_panic]
     fn test_direction_unreachable_on_vertical_bound() {
-        Node::<U16, U16>::new(1, 0, North);
+        NodeId::<U16, U16>::new(1, 0, North);
     }
 }
