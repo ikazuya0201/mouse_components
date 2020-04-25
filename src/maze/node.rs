@@ -18,7 +18,11 @@ pub struct Node<H, W> {
     _width: PhantomData<fn() -> W>,
 }
 
-impl<H, W> Node<H, W> {
+impl<H, W> Node<H, W>
+where
+    H: Unsigned + PowerOfTwo,
+    W: Unsigned + PowerOfTwo,
+{
     pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
         Self {
             x,
@@ -50,6 +54,7 @@ impl<H, W> Node<H, W> {
     fn y_is_even(&self) -> bool {
         self.y & 1 == 0
     }
+
     pub fn location(&self) -> Location {
         use Location::*;
         if self.x_is_even() {
@@ -66,9 +71,21 @@ impl<H, W> Node<H, W> {
             }
         }
     }
+
+    pub fn to_node_id(&self) -> Option<NodeId<H, W>> {
+        if self.x < 0
+            || self.y < 0
+            || self.x > NodeId::<H, W>::x_max() as i16
+            || self.y > NodeId::<H, W>::y_max() as i16
+        {
+            None
+        } else {
+            Some(NodeId::new(self.x as u16, self.y as u16, self.direction))
+        }
+    }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NodeId<H, W> {
     raw: u16,
     _height: PhantomData<fn() -> H>,
@@ -229,6 +246,16 @@ where
     }
 }
 
+impl<H, W> Into<Node<H, W>> for NodeId<H, W>
+where
+    H: Unsigned + PowerOfTwo,
+    W: Unsigned + PowerOfTwo,
+{
+    fn into(self) -> Node<H, W> {
+        self.as_node()
+    }
+}
+
 impl<H, W> Into<usize> for NodeId<H, W> {
     fn into(self) -> usize {
         self.raw.into()
@@ -321,5 +348,25 @@ mod tests {
     #[should_panic]
     fn test_direction_unreachable_on_vertical_bound() {
         NodeId::<U16, U16>::new(1, 0, North);
+    }
+
+    #[test]
+    fn test_to_node_id() {
+        let test_data = vec![
+            (-1, 0, West, false),
+            (0, 100, North, false),
+            (0, 0, North, true),
+            (31, 30, East, true),
+        ];
+
+        for (x, y, direction, is_some) in test_data {
+            let expected = if is_some {
+                Some(NodeId::<U16, U16>::new(x as u16, y as u16, direction))
+            } else {
+                None
+            };
+            let node = Node::<U16, U16>::new(x, y, direction);
+            assert_eq!(node.to_node_id(), expected);
+        }
     }
 }
