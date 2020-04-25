@@ -13,12 +13,6 @@ use crate::operator::{
 };
 use node::{Location, Node};
 
-const MAX_H: usize = 32;
-const MAX_W: usize = 32;
-
-const_assert!(MAX_H.is_power_of_two());
-const_assert!(MAX_W.is_power_of_two());
-
 pub struct Maze<H, W, T, U>
 where
     H: Mul<W>,
@@ -51,12 +45,12 @@ where
 
     #[inline]
     fn y_offset() -> u32 {
-        MAX_W.trailing_zeros()
+        W::USIZE.trailing_zeros()
     }
 
     #[inline]
     fn z_offset() -> u32 {
-        MAX_W.trailing_zeros() + MAX_H.trailing_zeros()
+        W::USIZE.trailing_zeros() + H::USIZE.trailing_zeros()
     }
 
     fn is_wall(&self, x: usize, y: usize, z: bool) -> bool {
