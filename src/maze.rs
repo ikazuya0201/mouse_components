@@ -13,33 +13,27 @@ use crate::operator::{
 };
 use node::{Location, Node, NodeId};
 
-pub struct Maze<H, W, T, U>
+pub struct Maze<H, W>
 where
     H: Mul<W>,
     <H as Mul<W>>::Output: Mul<U2>,
     <<H as Mul<W>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
-    T: IntoIterator<Item = (Node<H, W>, u16, U)>,
-    U: IntoIterator<Item = Node<H, W>>,
 {
     is_checked: GenericArray<bool, <<H as Mul<W>>::Output as Mul<U2>>::Output>,
     is_wall: GenericArray<bool, <<H as Mul<W>>::Output as Mul<U2>>::Output>,
-    tables: [T; 3],
 }
 
-impl<H, W, T, U> Maze<H, W, T, U>
+impl<H, W> Maze<H, W>
 where
     H: Mul<W> + Unsigned + PowerOfTwo,
     W: Unsigned + PowerOfTwo,
     <H as Mul<W>>::Output: Mul<U2>,
     <<H as Mul<W>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
-    T: IntoIterator<Item = (Node<H, W>, u16, U)>,
-    U: IntoIterator<Item = Node<H, W>>,
 {
-    pub fn new(tables: [T; 3]) -> Self {
+    pub fn new() -> Self {
         Self {
             is_checked: GenericArray::default(),
             is_wall: GenericArray::default(),
-            tables,
         }
     }
 
@@ -80,13 +74,11 @@ where
     }
 }
 
-impl<H, W, T, U> Graph<Node<H, W>, u16> for Maze<H, W, T, U>
+impl<H, W> Graph<Node<H, W>, u16> for Maze<H, W>
 where
     H: Mul<W>,
     <H as Mul<W>>::Output: Mul<U2>,
     <<H as Mul<W>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
-    T: IntoIterator<Item = (Node<H, W>, u16, U)>,
-    U: IntoIterator<Item = Node<H, W>>,
 {
     type Edges = Vec<(Node<H, W>, u16), U4096>;
 
