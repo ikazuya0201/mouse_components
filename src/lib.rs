@@ -1,5 +1,5 @@
 #![cfg_attr(not(test), no_std)]
 
-mod direction;
-mod operator;
-mod solver;
+pub mod direction;
+pub mod operator;
+pub mod solver;

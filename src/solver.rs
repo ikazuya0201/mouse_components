@@ -376,7 +376,7 @@ mod tests {
     use super::{
         compute_checked_shortest_path, compute_shortest_path_with_multi_goals, get_checker_nodes,
     };
-    use crate::operator::{CheckableGraph, DirectionalGraph, Graph};
+    use crate::operator::{CheckableGraph, Graph};
 
     struct IGraph {
         n: usize,
