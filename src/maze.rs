@@ -9,7 +9,7 @@ use typenum::{PowerOfTwo, Unsigned};
 
 use crate::direction::AbsoluteDirection;
 use crate::operator::{
-    CheckableGraph, DirectionInstructor, DirectionalGraph, Graph, GraphTranslator,
+    CheckableGraph, DirectionalGraph, Graph, GraphTranslator, PatternInstructor,
 };
 use node::{Location, Node, NodeId};
 
