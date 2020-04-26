@@ -3,19 +3,20 @@ pub trait Storable {
     fn restore(&self);
 }
 
-pub trait GraphTranslator<Node, AgentState> {
-    fn node_to_position(&self, node: Node) -> AgentState;
-    fn position_to_node(&self, position: AgentState) -> Node;
-    fn update_obstacles<AgentStates: IntoIterator<Item = AgentState>>(&self, states: AgentStates);
+pub trait GraphTranslator<Node, Position, Pattern> {
+    type Patterns: IntoIterator<Item = Pattern>;
+
+    fn nodes_to_patterns<Nodes: IntoIterator<Item = Node>>(&self, nodes: Nodes) -> Self::Patterns;
+    fn update_obstacles<Positions: IntoIterator<Item = Position>>(&self, states: Positions);
 }
 
-pub trait DirectionInstructor<Node, Direction> {
+pub trait PatternInstructor<Node, Direction, Pattern> {
     fn update_direction_candidates<Directions: IntoIterator<Item = Direction>>(
         &self,
         node: Node,
         directions: Directions,
     );
-    fn instruct_direction(&self) -> Option<(Direction, Node)>;
+    fn instruct(&self) -> Option<(Pattern, Node)>;
 }
 
 pub trait DirectionalGraph<Node, Cost, Direction>: CheckableGraph<Node, Cost> {

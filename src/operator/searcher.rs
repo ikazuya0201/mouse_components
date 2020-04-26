@@ -1,9 +1,7 @@
 use core::cell::Cell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use super::{
-    Agent, CheckableGraph, DirectionInstructor, DirectionalGraph, GraphTranslator, Solver,
-};
+use super::{Agent, DirectionalGraph, GraphTranslator, PatternInstructor, Solver};
 
 pub struct Searcher<Node> {
     current: Cell<Node>,
@@ -21,15 +19,16 @@ where
         }
     }
 
-    pub fn tick<AgentState, Direction, M, A>(&self, maze: &M, agent: &A)
+    pub fn tick<Position, Direction, Pattern, Maze, IAgent>(&self, maze: &Maze, agent: &IAgent)
     where
-        M: GraphTranslator<Node, AgentState> + DirectionInstructor<Node, Direction>,
-        A: Agent<AgentState, Direction>,
+        Maze:
+            GraphTranslator<Node, Position, Pattern> + PatternInstructor<Node, Direction, Pattern>,
+        IAgent: Agent<Position, Pattern>,
     {
         let obstacles = agent.existing_obstacles();
         maze.update_obstacles(obstacles);
-        if let Some((direction, node)) = maze.instruct_direction() {
-            agent.set_instructed_direction(direction);
+        if let Some((pattern, node)) = maze.instruct() {
+            agent.set_instructed_pattern(pattern);
             self.current.set(node);
             self.is_updated.store(true, Ordering::Relaxed);
         }
@@ -37,19 +36,18 @@ where
     }
 
     //return: false if search finished
-    pub fn search<Cost, AgentState, Direction, M, A, S>(
+    pub fn search<Cost, Position, Direction, Pattern, Maze, IAgent, ISolver>(
         &self,
-        maze: &M,
-        agent: &A,
-        solver: &S,
+        maze: &Maze,
+        agent: &IAgent,
+        solver: &ISolver,
     ) -> bool
     where
-        M: DirectionalGraph<Node, Cost, Direction>
-            + CheckableGraph<Node, Cost>
-            + GraphTranslator<Node, AgentState>
-            + DirectionInstructor<Node, Direction>,
-        A: Agent<AgentState, Direction>,
-        S: Solver<Node, Cost, Direction, M>,
+        Maze: DirectionalGraph<Node, Cost, Direction>
+            + GraphTranslator<Node, Position, Pattern>
+            + PatternInstructor<Node, Direction, Pattern>,
+        IAgent: Agent<Position, Pattern>,
+        ISolver: Solver<Node, Cost, Direction, Maze>,
     {
         if !self
             .is_updated
@@ -59,7 +57,7 @@ where
         }
         let current = self.current.get();
         if let Some(path) = solver.next_path(current, maze) {
-            let path = path.into_iter().map(|n| maze.node_to_position(n));
+            let path = maze.nodes_to_patterns(path);
             agent.set_next_path(path);
             maze.update_direction_candidates(
                 solver.last_node().unwrap(),

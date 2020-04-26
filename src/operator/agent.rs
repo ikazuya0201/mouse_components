@@ -1,10 +1,9 @@
-pub trait Agent<AgentState, Direction> {
-    type AgentStates: IntoIterator<Item = AgentState>;
+pub trait Agent<Position, Pattern> {
+    type Positions: IntoIterator<Item = Position>;
 
-    fn existing_obstacles(&self) -> Self::AgentStates;
-    fn position(&self) -> AgentState;
-    fn set_next_path<AgentStates: IntoIterator<Item = AgentState>>(&self, path: AgentStates);
-    fn set_instructed_direction(&self, dir: Direction);
+    fn existing_obstacles(&self) -> Self::Positions;
+    fn set_next_path<Patterns: IntoIterator<Item = Pattern>>(&self, path: Patterns);
+    fn set_instructed_pattern(&self, pattern: Pattern);
     fn is_route_empty(&self) -> bool;
     //This method is called by interrupt.
     fn track_next(&self);
