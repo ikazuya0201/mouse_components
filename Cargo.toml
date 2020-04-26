@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 heapless = "0.5.3"
 generic-array = "0.13.2"
+static_assertions = "1.1.0"
 
 [dependencies.num]
 version = "0.2"
