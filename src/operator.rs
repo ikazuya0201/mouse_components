@@ -12,51 +12,52 @@ use core::sync::atomic::Ordering;
 pub use agent::Agent;
 pub use counter::Counter;
 pub use maze::{
-    CheckableGraph, DirectionInstructor, DirectionalGraph, Graph, GraphTranslator, Storable,
+    CheckableGraph, DirectionalGraph, Graph, GraphTranslator, PatternInstructor, Storable,
 };
 use mode::{AtomicMode, Mode};
 use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
-pub struct Operator<Node, Cost, AgentState, Direction, M, A, S, SW, C>
+pub struct Operator<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
 where
-    M: Storable
+    Maze: Storable
         + DirectionalGraph<Node, Cost, Direction>
-        + GraphTranslator<Node, AgentState>
-        + DirectionInstructor<Node, Direction>,
-    A: Agent<AgentState, Direction>,
-    S: Solver<Node, Cost, Direction, M>,
+        + GraphTranslator<Node, Position, Pattern>
+        + PatternInstructor<Node, Direction, Pattern>,
+    IAgent: Agent<Position, Pattern>,
+    ISolver: Solver<Node, Cost, Direction, Maze>,
     SW: Switch,
     C: Counter,
 {
-    maze: M,
-    agent: A,
-    solver: S,
+    maze: Maze,
+    agent: IAgent,
+    solver: ISolver,
     mode: AtomicMode,
     switch: SW,
     counter: C,
     searcher: Searcher<Node>,
     _node: PhantomData<fn() -> Node>,
     _cost: PhantomData<fn() -> Cost>,
-    _agent_state: PhantomData<fn() -> AgentState>,
+    _position: PhantomData<fn() -> Position>,
     _direction: PhantomData<fn() -> Direction>,
+    _pattern: PhantomData<fn() -> Pattern>,
 }
 
-impl<Node, Cost, AgentState, Direction, M, A, S, SW, C>
-    Operator<Node, Cost, AgentState, Direction, M, A, S, SW, C>
+impl<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
+    Operator<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
 where
     Node: Copy + Clone,
-    M: Storable
+    Maze: Storable
         + DirectionalGraph<Node, Cost, Direction>
-        + GraphTranslator<Node, AgentState>
-        + DirectionInstructor<Node, Direction>,
-    A: Agent<AgentState, Direction>,
-    S: Solver<Node, Cost, Direction, M>,
+        + GraphTranslator<Node, Position, Pattern>
+        + PatternInstructor<Node, Direction, Pattern>,
+    IAgent: Agent<Position, Pattern>,
+    ISolver: Solver<Node, Cost, Direction, Maze>,
     SW: Switch,
     C: Counter,
 {
-    pub fn new(maze: M, agent: A, solver: S, switch: SW, counter: C) -> Self {
+    pub fn new(maze: Maze, agent: IAgent, solver: ISolver, switch: SW, counter: C) -> Self {
         let start = solver.start_node();
         Self {
             maze: maze,
@@ -68,8 +69,9 @@ where
             searcher: Searcher::new(start),
             _node: PhantomData,
             _cost: PhantomData,
-            _agent_state: PhantomData,
+            _position: PhantomData,
             _direction: PhantomData,
+            _pattern: PhantomData,
         }
     }
 
