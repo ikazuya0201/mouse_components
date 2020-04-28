@@ -20,8 +20,8 @@ pub struct Node<H, W> {
 
 impl<H, W> Node<H, W>
 where
-    H: Unsigned + PowerOfTwo,
-    W: Unsigned + PowerOfTwo,
+    H: Unsigned,
+    W: Unsigned,
 {
     pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
         Self {
@@ -72,12 +72,21 @@ where
         }
     }
 
+    pub fn in_maze(&self) -> bool {
+        self.x >= NodeId::<H, W>::x_min() as i16
+            && self.x <= NodeId::<H, W>::x_max() as i16
+            && self.y >= NodeId::<H, W>::y_min() as i16
+            && self.y <= NodeId::<H, W>::y_max() as i16
+    }
+}
+
+impl<H, W> Node<H, W>
+where
+    H: Unsigned + PowerOfTwo,
+    W: Unsigned + PowerOfTwo,
+{
     pub fn to_node_id(&self) -> Option<NodeId<H, W>> {
-        if self.x < 0
-            || self.y < 0
-            || self.x > NodeId::<H, W>::x_max() as i16
-            || self.y > NodeId::<H, W>::y_max() as i16
-        {
+        if !self.in_maze() {
             None
         } else {
             Some(NodeId::new(self.x as u16, self.y as u16, self.direction))
@@ -90,6 +99,32 @@ pub struct NodeId<H, W> {
     raw: u16,
     _height: PhantomData<fn() -> H>,
     _width: PhantomData<fn() -> W>,
+}
+
+impl<H, W> NodeId<H, W>
+where
+    H: Unsigned,
+    W: Unsigned,
+{
+    #[inline]
+    fn x_min() -> u16 {
+        0
+    }
+
+    #[inline]
+    fn y_min() -> u16 {
+        0
+    }
+
+    #[inline]
+    fn x_max() -> u16 {
+        W::U16 * 2 - 1
+    }
+
+    #[inline]
+    fn y_max() -> u16 {
+        H::U16 * 2 - 1
+    }
 }
 
 impl<H, W> NodeId<H, W>
@@ -183,26 +218,6 @@ where
             }
         };
         Node::<H, W>::new(x as i16, y as i16, direction)
-    }
-
-    #[inline]
-    fn x_min() -> u16 {
-        0
-    }
-
-    #[inline]
-    fn y_min() -> u16 {
-        0
-    }
-
-    #[inline]
-    fn x_max() -> u16 {
-        W::U16 * 2 - 1
-    }
-
-    #[inline]
-    fn y_max() -> u16 {
-        H::U16 * 2 - 1
     }
 
     #[inline]
