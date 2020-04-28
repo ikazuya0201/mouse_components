@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::direction::AbsoluteDirection;
+use super::direction::{AbsoluteDirection, RelativeDirection};
 
 pub enum Location {
     Cell,
@@ -43,6 +43,26 @@ where
 
     pub fn direction(&self) -> AbsoluteDirection {
         self.direction
+    }
+
+    pub fn relative_node(
+        &self,
+        x_diff: i16,
+        y_diff: i16,
+        dir_diff: RelativeDirection,
+        base_dir: AbsoluteDirection,
+    ) -> Option<Self> {
+        use RelativeDirection::*;
+        let relative_direction = base_dir.relative(self.direction);
+        let (x, y) = match relative_direction {
+            Front => (self.x + x_diff, self.y + y_diff),
+            Right => (self.x + y_diff, self.y - x_diff),
+            Back => (self.x - x_diff, self.y - y_diff),
+            Left => (self.x - y_diff, self.y + x_diff),
+            _ => return None,
+        };
+        let direction = self.direction.rotate(dir_diff);
+        Some(Node::<H, W>::new(x, y, direction))
     }
 
     #[inline]
