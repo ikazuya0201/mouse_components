@@ -8,5 +8,5 @@ pub enum Pattern {
     FastRun135,
     FastRun180,
     FastRunDiagonal90,
-    Back,
+    SpinBack,
 }
