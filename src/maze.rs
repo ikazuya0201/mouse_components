@@ -339,9 +339,19 @@ where
                 North | East | South | West => self.cell_successors(node),
                 _ => Vec::new(),
             },
-            VerticalBound | HorizontalBound => match node.direction() {
-                North | East | South | West => self.bound_straight_successors(node),
-                _ => self.bound_diagonal_successors(node),
+            VerticalBound => match node.direction() {
+                East | West => self.bound_straight_successors(node),
+                NorthEast | SouthEast | SouthWest | NorthWest => {
+                    self.bound_diagonal_successors(node)
+                }
+                _ => Vec::new(),
+            },
+            HorizontalBound => match node.direction() {
+                North | South => self.bound_straight_successors(node),
+                NorthEast | SouthEast | SouthWest | NorthWest => {
+                    self.bound_diagonal_successors(node)
+                }
+                _ => Vec::new(),
             },
         };
         node_successors
