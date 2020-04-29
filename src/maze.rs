@@ -15,37 +15,34 @@ use crate::pattern::Pattern;
 use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, NodeId, Position};
 
-struct WallPosition<H, W> {
+struct WallPosition<N> {
     x: u16,
     y: u16,
     z: bool,
-    _height: PhantomData<fn() -> H>,
-    _width: PhantomData<fn() -> W>,
+    _size: PhantomData<fn() -> N>,
 }
 
-impl<H, W> WallPosition<H, W>
+impl<N> WallPosition<N>
 where
-    H: Unsigned,
-    W: Unsigned,
+    N: Unsigned + PowerOfTwo,
 {
     fn new(x: u16, y: u16, z: bool) -> Self {
         Self {
             x,
             y,
             z,
-            _height: PhantomData,
-            _width: PhantomData,
+            _size: PhantomData,
         }
     }
 
     #[inline]
     fn y_offset() -> u32 {
-        W::USIZE.trailing_zeros()
+        N::USIZE.trailing_zeros()
     }
 
     #[inline]
     fn z_offset() -> u32 {
-        W::USIZE.trailing_zeros() + H::USIZE.trailing_zeros()
+        2 * N::USIZE.trailing_zeros()
     }
 
     fn as_index(self) -> usize {
@@ -54,11 +51,11 @@ where
             | (self.z as usize) << Self::z_offset()
     }
 
-    fn from_node(node: Node<H, W>) -> Option<Self> {
+    fn from_node(node: Node<N>) -> Option<Self> {
         Self::from_position(node.position())
     }
 
-    fn from_position(position: Position<H, W>) -> Option<Self> {
+    fn from_position(position: Position<N>) -> Option<Self> {
         use Location::*;
         let x = position.x() / 2;
         let y = position.y() / 2;
@@ -74,26 +71,25 @@ where
     }
 }
 
-pub struct Maze<H, W, F>
+pub struct Maze<N, F>
 where
-    H: Mul<W>,
-    <H as Mul<W>>::Output: Mul<U2>,
-    <<H as Mul<W>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    N: Mul<N>,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
 {
-    is_checked: GenericArray<bool, <<H as Mul<W>>::Output as Mul<U2>>::Output>,
-    is_wall: GenericArray<bool, <<H as Mul<W>>::Output as Mul<U2>>::Output>,
+    is_checked: GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
+    is_wall: GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
     costs: F,
 }
 
-impl<H, W, F> Maze<H, W, F>
+impl<N, F> Maze<N, F>
 where
-    H: Mul<W> + Unsigned + PowerOfTwo,
-    W: Unsigned + PowerOfTwo,
-    <H as Mul<W>>::Output: Mul<U2>,
-    <<H as Mul<W>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
-    Node<H, W>: core::fmt::Debug,
+    Node<N>: core::fmt::Debug,
 {
     pub fn new(costs: F) -> Self {
         Self {
@@ -104,12 +100,12 @@ where
     }
 
     #[inline]
-    fn is_wall(&self, position: WallPosition<H, W>) -> bool {
+    fn is_wall(&self, position: WallPosition<N>) -> bool {
         self.is_wall[position.as_index()]
     }
 
     #[inline]
-    fn is_wall_by_position(&self, position: Position<H, W>) -> bool {
+    fn is_wall_by_position(&self, position: Position<N>) -> bool {
         if let Some(wall_position) = WallPosition::from_position(position) {
             self.is_wall(wall_position)
         } else {
@@ -118,7 +114,7 @@ where
     }
 
     #[inline]
-    fn is_checked(&self, position: WallPosition<H, W>) -> bool {
+    fn is_checked(&self, position: WallPosition<N>) -> bool {
         self.is_checked[position.as_index()]
     }
 
@@ -127,7 +123,7 @@ where
         (self.costs)(pattern)
     }
 
-    fn cell_successors(&self, node: Node<H, W>) -> Vec<(Node<H, W>, u16), U70> {
+    fn cell_successors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -135,14 +131,14 @@ where
         let is_wall_relative = |x: i16, y: i16| -> bool {
             self.is_wall_by_position(node.relative_position(x, y, North).unwrap())
         };
-        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<H, W> {
+        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
             node.relative_node(x, y, direction, North).unwrap()
         };
         if is_wall_relative(0, 1) {
             return Vec::new();
         }
 
-        let right_successors = || -> Vec<(Node<H, W>, u16), U70> {
+        let right_successors = || -> Vec<(Node<N>, u16), U70> {
             let mut succs = Vec::new();
             if is_wall_relative(1, 2) {
                 return succs;
@@ -166,7 +162,7 @@ where
             succs
         };
 
-        let left_successors = || -> Vec<(Node<H, W>, u16), U4> {
+        let left_successors = || -> Vec<(Node<N>, u16), U4> {
             let mut succs = Vec::new();
             if is_wall_relative(-1, 2) {
                 return succs;
@@ -199,7 +195,7 @@ where
         succs
             .push((relative_node(0, 2, Front), self.cost(Straight(2))))
             .unwrap();
-        for i in 1..core::cmp::max(H::I16, W::I16) / 2 {
+        for i in 1..N::I16 / 2 {
             if is_wall_relative(0, 2 * i + 1) {
                 break;
             }
@@ -220,7 +216,7 @@ where
         succs
     }
 
-    fn bound_straight_successors(&self, node: Node<H, W>) -> Vec<(Node<H, W>, u16), U70> {
+    fn bound_straight_successors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -228,7 +224,7 @@ where
         let is_wall_relative = |x: i16, y: i16| -> bool {
             self.is_wall_by_position(node.relative_position(x, y, North).unwrap())
         };
-        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<H, W> {
+        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
             node.relative_node(x, y, direction, North).unwrap()
         };
 
@@ -253,7 +249,7 @@ where
         succs
             .push((relative_node(0, 2, Front), self.cost(Straight(2))))
             .unwrap();
-        for i in 1..core::cmp::max(H::I16, W::I16) / 2 {
+        for i in 1..N::I16 / 2 {
             if is_wall_relative(0, 2 * i + 1) {
                 break;
             }
@@ -274,7 +270,7 @@ where
         succs
     }
 
-    fn bound_diagonal_successors(&self, node: Node<H, W>) -> Vec<(Node<H, W>, u16), U70> {
+    fn bound_diagonal_successors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -282,7 +278,7 @@ where
         let is_wall_relative = |x: i16, y: i16| -> bool {
             self.is_wall_by_position(node.relative_position(x, y, NorthEast).unwrap())
         };
-        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<H, W> {
+        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
             node.relative_node(x, y, direction, NorthEast).unwrap()
         };
 
@@ -307,7 +303,7 @@ where
             .push((relative_node(2, 0, Right), self.cost(FastRunDiagonal90)))
             .unwrap();
 
-        for i in 2..core::cmp::max(H::I16, W::I16) * 2 {
+        for i in 2..N::I16 * 2 {
             if is_wall_relative(i, i) {
                 break;
             }
@@ -323,23 +319,22 @@ where
     }
 }
 
-impl<H, W, F> Graph<NodeId<H, W>, u16> for Maze<H, W, F>
+impl<N, F> Graph<NodeId<N>, u16> for Maze<N, F>
 where
-    H: Mul<W> + Unsigned + PowerOfTwo,
-    W: Unsigned + PowerOfTwo,
-    <H as Mul<W>>::Output: Mul<U2>,
-    <<H as Mul<W>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
-    Node<H, W>: core::fmt::Debug,
+    Node<N>: core::fmt::Debug,
 {
-    type Edges = Vec<(NodeId<H, W>, u16), U70>;
+    type Edges = Vec<(NodeId<N>, u16), U70>;
 
-    fn successors(&self, node_id: NodeId<H, W>) -> Self::Edges {
+    fn successors(&self, node_id: NodeId<N>) -> Self::Edges {
         use AbsoluteDirection::*;
         use Location::*;
 
         let node = node_id.as_node();
-        let node_successors: Vec<(Node<H, W>, u16), U70> = match node.location() {
+        let node_successors: Vec<(Node<N>, u16), U70> = match node.location() {
             Cell => match node.direction() {
                 North | East | South | West => self.cell_successors(node),
                 _ => Vec::new(),
@@ -355,7 +350,7 @@ where
             .collect()
     }
 
-    fn predecessors(&self, node: NodeId<H, W>) -> Self::Edges {
+    fn predecessors(&self, node: NodeId<N>) -> Self::Edges {
         let mut preds = Vec::new();
         preds
     }
