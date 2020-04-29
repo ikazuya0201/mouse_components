@@ -295,7 +295,7 @@ where
         succs
     }
 
-    fn bound_diagonal_successors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
+    fn horizontal_bound_diagonal_successors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -335,12 +335,300 @@ where
             succs
                 .push((
                     relative_node(i, i, Front),
-                    self.cost(StraightDiagonal((i) as u16)),
+                    self.cost(StraightDiagonal(i as u16)),
                 ))
                 .unwrap();
         }
 
         succs
+    }
+
+    fn vertical_bound_diagonal_successors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+        use RelativeDirection::*;
+
+        let is_wall_relative = |x: i16, y: i16| -> bool {
+            self.is_wall_by_position(node.relative_position(x, y, NorthEast).unwrap())
+        };
+        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
+            node.relative_node(x, y, direction, NorthEast).unwrap()
+        };
+
+        let mut succs = Vec::new();
+        if is_wall_relative(1, 1) {
+            return succs;
+        }
+        succs
+            .push((relative_node(1, 1, Front), self.cost(StraightDiagonal(1))))
+            .unwrap();
+        succs
+            .push((relative_node(1, 2, FrontLeft), self.cost(FastRun45)))
+            .unwrap();
+
+        if is_wall_relative(0, 2) {
+            return succs;
+        }
+        succs
+            .push((relative_node(0, 2, BackLeft), self.cost(FastRun135)))
+            .unwrap();
+        succs
+            .push((relative_node(0, 2, Left), self.cost(FastRunDiagonal90)))
+            .unwrap();
+
+        for i in 2..N::I16 * 2 {
+            if is_wall_relative(i, i) {
+                break;
+            }
+            succs
+                .push((
+                    relative_node(i, i, Front),
+                    self.cost(StraightDiagonal(i as u16)),
+                ))
+                .unwrap();
+        }
+
+        succs
+    }
+
+    fn cell_predecessors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+        use RelativeDirection::*;
+
+        let is_wall_relative = |x: i16, y: i16| -> bool {
+            self.is_wall_by_position(node.relative_position(x, y, North).unwrap())
+        };
+        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
+            node.relative_node(x, y, direction, North).unwrap()
+        };
+        if is_wall_relative(0, -1) {
+            return Vec::new();
+        }
+
+        let right_predecessors = || -> Vec<(Node<N>, u16), U70> {
+            let mut preds = Vec::new();
+            if is_wall_relative(1, -2) {
+                return preds;
+            }
+            preds
+                .push((relative_node(1, -2, FrontLeft), self.cost(FastRun45)))
+                .unwrap();
+            preds
+                .push((relative_node(2, -2, Left), self.cost(FastRun90)))
+                .unwrap();
+
+            if is_wall_relative(2, -1) {
+                return preds;
+            }
+            preds
+                .push((relative_node(2, -1, BackLeft), self.cost(FastRun135)))
+                .unwrap();
+            preds
+                .push((relative_node(2, 0, Back), self.cost(FastRun180)))
+                .unwrap();
+            preds
+        };
+
+        let left_predecessors = || -> Vec<(Node<N>, u16), U4> {
+            let mut preds = Vec::new();
+            if is_wall_relative(-1, -2) {
+                return preds;
+            }
+            preds
+                .push((relative_node(-1, -2, FrontRight), self.cost(FastRun45)))
+                .unwrap();
+            preds
+                .push((relative_node(-2, -2, Right), self.cost(FastRun90)))
+                .unwrap();
+
+            if is_wall_relative(-2, -1) {
+                return preds;
+            }
+            preds
+                .push((relative_node(-2, -1, BackRight), self.cost(FastRun135)))
+                .unwrap();
+            preds
+                .push((relative_node(-2, 0, Back), self.cost(FastRun180)))
+                .unwrap();
+            preds
+        };
+
+        let mut preds = right_predecessors();
+        preds.extend_from_slice(&left_predecessors()).unwrap();
+
+        preds
+            .push((relative_node(0, -1, Front), self.cost(Straight(1))))
+            .unwrap();
+        preds
+            .push((relative_node(0, -2, Front), self.cost(Straight(2))))
+            .unwrap();
+        for i in 1..N::I16 {
+            if is_wall_relative(0, -2 * i - 1) {
+                break;
+            }
+            preds
+                .push((
+                    relative_node(0, -2 * i - 1, Front),
+                    self.cost(Straight((2 * i + 1) as u16)),
+                ))
+                .unwrap();
+            preds
+                .push((
+                    relative_node(0, -2 * i - 2, Front),
+                    self.cost(Straight((2 * i + 2) as u16)),
+                ))
+                .unwrap();
+        }
+
+        preds
+    }
+
+    fn bound_straight_predecessors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+        use RelativeDirection::*;
+
+        let is_wall_relative = |x: i16, y: i16| -> bool {
+            self.is_wall_by_position(node.relative_position(x, y, North).unwrap())
+        };
+        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
+            node.relative_node(x, y, direction, North).unwrap()
+        };
+
+        let mut preds = Vec::new();
+        preds
+            .push((relative_node(0, 0, Back), self.cost(SpinBack)))
+            .unwrap();
+        if !is_wall_relative(1, -1) {
+            preds
+                .push((relative_node(1, -1, Left), self.cost(Search90)))
+                .unwrap();
+        }
+        if !is_wall_relative(-1, -1) {
+            preds
+                .push((relative_node(-1, -1, Right), self.cost(Search90)))
+                .unwrap();
+        }
+
+        preds
+            .push((relative_node(0, -1, Front), self.cost(Straight(1))))
+            .unwrap();
+        for i in 1..N::I16 {
+            if is_wall_relative(0, -2 * i) {
+                break;
+            }
+            preds
+                .push((
+                    relative_node(0, -2 * i, Front),
+                    self.cost(Straight((2 * i) as u16)),
+                ))
+                .unwrap();
+            preds
+                .push((
+                    relative_node(0, -2 * i - 1, Front),
+                    self.cost(Straight((2 * i + 1) as u16)),
+                ))
+                .unwrap();
+        }
+
+        preds
+    }
+
+    fn horizontal_bound_diagonal_predecessors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+        use RelativeDirection::*;
+
+        let is_wall_relative = |x: i16, y: i16| -> bool {
+            self.is_wall_by_position(node.relative_position(x, y, NorthEast).unwrap())
+        };
+        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
+            node.relative_node(x, y, direction, NorthEast).unwrap()
+        };
+
+        let mut preds = Vec::new();
+        if is_wall_relative(-1, -1) {
+            return preds;
+        }
+        preds
+            .push((relative_node(-1, -1, Front), self.cost(StraightDiagonal(1))))
+            .unwrap();
+        preds
+            .push((relative_node(-2, -1, FrontRight), self.cost(FastRun45)))
+            .unwrap();
+
+        if is_wall_relative(-2, 0) {
+            return preds;
+        }
+        preds
+            .push((relative_node(-2, 0, BackRight), self.cost(FastRun135)))
+            .unwrap();
+        preds
+            .push((relative_node(-2, 0, Right), self.cost(FastRunDiagonal90)))
+            .unwrap();
+
+        for i in 2..N::I16 * 2 {
+            if is_wall_relative(-i, -i) {
+                break;
+            }
+            preds
+                .push((
+                    relative_node(-i, -i, Front),
+                    self.cost(StraightDiagonal(i as u16)),
+                ))
+                .unwrap();
+        }
+
+        preds
+    }
+
+    fn vertical_bound_diagonal_predecessors(&self, node: Node<N>) -> Vec<(Node<N>, u16), U70> {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+        use RelativeDirection::*;
+
+        let is_wall_relative = |x: i16, y: i16| -> bool {
+            self.is_wall_by_position(node.relative_position(x, y, NorthEast).unwrap())
+        };
+        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
+            node.relative_node(x, y, direction, NorthEast).unwrap()
+        };
+
+        let mut preds = Vec::new();
+        if is_wall_relative(-1, -1) {
+            return preds;
+        }
+        preds
+            .push((relative_node(-1, -1, Front), self.cost(StraightDiagonal(1))))
+            .unwrap();
+        preds
+            .push((relative_node(-1, -2, FrontLeft), self.cost(FastRun45)))
+            .unwrap();
+
+        if is_wall_relative(0, -2) {
+            return preds;
+        }
+        preds
+            .push((relative_node(0, -2, BackLeft), self.cost(FastRun135)))
+            .unwrap();
+        preds
+            .push((relative_node(0, -2, Left), self.cost(FastRunDiagonal90)))
+            .unwrap();
+
+        for i in 2..N::I16 * 2 {
+            if is_wall_relative(-i, -i) {
+                break;
+            }
+            preds
+                .push((
+                    relative_node(-i, -i, Front),
+                    self.cost(StraightDiagonal(i as u16)),
+                ))
+                .unwrap();
+        }
+
+        preds
     }
 }
 
@@ -367,14 +655,14 @@ where
             VerticalBound => match node.direction() {
                 East | West => self.bound_straight_successors(node),
                 NorthEast | SouthEast | SouthWest | NorthWest => {
-                    self.bound_diagonal_successors(node)
+                    self.vertical_bound_diagonal_successors(node)
                 }
                 _ => Vec::new(),
             },
             HorizontalBound => match node.direction() {
                 North | South => self.bound_straight_successors(node),
                 NorthEast | SouthEast | SouthWest | NorthWest => {
-                    self.bound_diagonal_successors(node)
+                    self.horizontal_bound_diagonal_successors(node)
                 }
                 _ => Vec::new(),
             },
@@ -385,9 +673,35 @@ where
             .collect()
     }
 
-    fn predecessors(&self, node: NodeId<N>) -> Self::Edges {
-        let mut preds = Vec::new();
-        preds
+    fn predecessors(&self, node_id: NodeId<N>) -> Self::Edges {
+        use AbsoluteDirection::*;
+        use Location::*;
+
+        let node = node_id.as_node();
+        let node_predecessors: Vec<(Node<N>, u16), U70> = match node.location() {
+            Cell => match node.direction() {
+                North | East | South | West => self.cell_predecessors(node),
+                _ => Vec::new(),
+            },
+            VerticalBound => match node.direction() {
+                East | West => self.bound_straight_predecessors(node),
+                NorthEast | SouthEast | SouthWest | NorthWest => {
+                    self.vertical_bound_diagonal_predecessors(node)
+                }
+                _ => Vec::new(),
+            },
+            HorizontalBound => match node.direction() {
+                North | South => self.bound_straight_predecessors(node),
+                NorthEast | SouthEast | SouthWest | NorthWest => {
+                    self.horizontal_bound_diagonal_predecessors(node)
+                }
+                _ => Vec::new(),
+            },
+        };
+        node_predecessors
+            .into_iter()
+            .filter_map(|(node, cost)| node.to_node_id().map(|node_id| (node_id, cost)))
+            .collect()
     }
 }
 
@@ -413,7 +727,6 @@ mod tests {
 
     #[test]
     fn test_successors() {
-        use std::collections::BTreeSet;
         use AbsoluteDirection::*;
         use Pattern::*;
 
@@ -509,6 +822,19 @@ mod tests {
                     (new(0, 3, NorthWest), cost(FastRunDiagonal90)),
                 ],
             ),
+            (
+                new(1, 0, NorthEast),
+                vec![
+                    (new(2, 1, NorthEast), cost(StraightDiagonal(1))),
+                    (new(3, 2, NorthEast), cost(StraightDiagonal(2))),
+                    (new(4, 3, NorthEast), cost(StraightDiagonal(3))),
+                    (new(5, 4, NorthEast), cost(StraightDiagonal(4))),
+                    (new(6, 5, NorthEast), cost(StraightDiagonal(5))),
+                    (new(2, 2, North), cost(FastRun45)),
+                    (new(1, 2, West), cost(FastRun135)),
+                    (new(1, 2, NorthWest), cost(FastRunDiagonal90)),
+                ],
+            ),
         ];
 
         for (src, mut expected) in test_data {
@@ -516,6 +842,74 @@ mod tests {
             let mut successors = maze.successors(src);
             successors.sort();
             assert_eq!(successors, expected.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_predecessors() {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+
+        let maze = Maze::<U4, _>::new(cost);
+
+        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
+            NodeId::<U4>::new(x, y, direction)
+        };
+
+        let test_data = vec![
+            (
+                new(2, 2, North),
+                vec![
+                    (new(2, 1, North), cost(Straight(1))),
+                    (new(2, 0, North), cost(Straight(2))),
+                    (new(3, 0, NorthWest), cost(FastRun45)),
+                    (new(4, 0, West), cost(FastRun90)),
+                    (new(4, 1, SouthWest), cost(FastRun135)),
+                    (new(4, 2, South), cost(FastRun180)),
+                    (new(1, 0, NorthEast), cost(FastRun45)),
+                    (new(0, 0, East), cost(FastRun90)),
+                    (new(0, 1, SouthEast), cost(FastRun135)),
+                    (new(0, 2, South), cost(FastRun180)),
+                ],
+            ),
+            (
+                new(3, 2, NorthEast),
+                vec![
+                    (new(2, 1, NorthEast), cost(Straight(1))),
+                    (new(1, 0, NorthEast), cost(Straight(2))),
+                    (new(2, 0, North), cost(FastRun45)),
+                    (new(3, 0, West), cost(FastRun135)),
+                    (new(3, 0, NorthWest), cost(FastRunDiagonal90)),
+                ],
+            ),
+            (
+                new(2, 3, NorthEast),
+                vec![
+                    (new(1, 2, NorthEast), cost(Straight(1))),
+                    (new(0, 1, NorthEast), cost(Straight(2))),
+                    (new(0, 2, East), cost(FastRun45)),
+                    (new(0, 3, South), cost(FastRun135)),
+                    (new(0, 3, SouthEast), cost(FastRunDiagonal90)),
+                ],
+            ),
+            (
+                new(2, 3, North),
+                vec![
+                    (new(2, 2, North), cost(Straight(1))),
+                    (new(2, 1, North), cost(Straight(2))),
+                    (new(2, 0, North), cost(Straight(3))),
+                    (new(3, 2, West), cost(Search90)),
+                    (new(1, 2, East), cost(Search90)),
+                    (new(2, 3, South), cost(SpinBack)),
+                ],
+            ),
+        ];
+
+        for (src, mut expected) in test_data {
+            expected.sort();
+            let mut predecessors = maze.predecessors(src);
+            predecessors.sort();
+            assert_eq!(predecessors, expected.as_slice());
         }
     }
 }
