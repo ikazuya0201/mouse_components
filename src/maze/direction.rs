@@ -50,7 +50,7 @@ impl AbsoluteDirection {
             Right => match self {
                 North => East,
                 NorthEast => SouthEast,
-                East => SouthEast,
+                East => South,
                 SouthEast => SouthWest,
                 South => West,
                 SouthWest => NorthWest,
