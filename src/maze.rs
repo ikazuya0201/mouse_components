@@ -15,6 +15,7 @@ use crate::pattern::Pattern;
 use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, NodeId, Position};
 
+#[derive(Clone)]
 struct WallPosition<N> {
     x: u16,
     y: u16,
@@ -33,6 +34,11 @@ where
             z,
             _size: PhantomData,
         }
+    }
+
+    #[inline]
+    fn max() -> u16 {
+        N::U16 - 1
     }
 
     #[inline]
@@ -92,11 +98,33 @@ where
     Node<N>: core::fmt::Debug,
 {
     pub fn new(costs: F) -> Self {
-        Self {
+        let mut maze = Self {
             is_checked: GenericArray::default(),
             is_wall: GenericArray::default(),
             costs,
+        };
+        maze.initialize();
+        maze
+    }
+
+    pub fn initialize(&mut self) {
+        for i in 0..WallPosition::<N>::max() + 1 {
+            self.check_wall(WallPosition::new(i, WallPosition::<N>::max(), false), true);
+            self.check_wall(WallPosition::new(WallPosition::<N>::max(), i, true), true);
         }
+    }
+
+    fn check_wall(&mut self, position: WallPosition<N>, is_wall: bool) {
+        self.update_wall(position.clone(), is_wall);
+        self.update_checked(position, true);
+    }
+
+    fn update_wall(&mut self, position: WallPosition<N>, is_wall: bool) {
+        self.is_wall[position.as_index()] = is_wall;
+    }
+
+    fn update_checked(&mut self, position: WallPosition<N>, is_checked: bool) {
+        self.is_checked[position.as_index()] = is_checked;
     }
 
     #[inline]
