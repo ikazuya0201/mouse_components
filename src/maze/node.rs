@@ -12,24 +12,21 @@ pub enum Location {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Position<H, W> {
+pub struct Position<N> {
     x: i16,
     y: i16,
-    _height: PhantomData<fn() -> H>,
-    _width: PhantomData<fn() -> W>,
+    _size: PhantomData<fn() -> N>,
 }
 
-impl<H, W> Position<H, W>
+impl<N> Position<N>
 where
-    H: Unsigned,
-    W: Unsigned,
+    N: Unsigned,
 {
     pub fn new(x: i16, y: i16) -> Self {
         Self {
             x,
             y,
-            _height: PhantomData,
-            _width: PhantomData,
+            _size: PhantomData,
         }
     }
 
@@ -72,15 +69,14 @@ where
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Node<H, W> {
-    position: Position<H, W>,
+pub struct Node<N> {
+    position: Position<N>,
     direction: AbsoluteDirection,
 }
 
-impl<H, W> Node<H, W>
+impl<N> Node<N>
 where
-    H: Unsigned,
-    W: Unsigned,
+    N: Unsigned,
 {
     pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
         Self {
@@ -90,7 +86,7 @@ where
     }
 
     #[inline]
-    pub fn position(&self) -> Position<H, W> {
+    pub fn position(&self) -> Position<N> {
         self.position.clone()
     }
 
@@ -118,7 +114,7 @@ where
     ) -> Option<Self> {
         let position = self.relative_position(x_diff, y_diff, base_dir)?;
         let direction = self.direction.rotate(dir_diff);
-        Some(Node::<H, W>::new(position.x(), position.y(), direction))
+        Some(Node::<N>::new(position.x(), position.y(), direction))
     }
 
     pub fn relative_position(
@@ -126,7 +122,7 @@ where
         x_diff: i16,
         y_diff: i16,
         base_dir: AbsoluteDirection,
-    ) -> Option<Position<H, W>> {
+    ) -> Option<Position<N>> {
         use RelativeDirection::*;
         let relative_direction = base_dir.relative(self.direction);
         match relative_direction {
@@ -143,19 +139,18 @@ where
     }
 
     pub fn in_maze(&self) -> bool {
-        self.x() >= NodeId::<H, W>::x_min() as i16
-            && self.x() <= NodeId::<H, W>::x_max() as i16
-            && self.y() >= NodeId::<H, W>::y_min() as i16
-            && self.y() <= NodeId::<H, W>::y_max() as i16
+        self.x() >= NodeId::<N>::x_min() as i16
+            && self.x() <= NodeId::<N>::x_max() as i16
+            && self.y() >= NodeId::<N>::y_min() as i16
+            && self.y() <= NodeId::<N>::y_max() as i16
     }
 }
 
-impl<H, W> Node<H, W>
+impl<N> Node<N>
 where
-    H: Unsigned + PowerOfTwo,
-    W: Unsigned + PowerOfTwo,
+    N: Unsigned + PowerOfTwo,
 {
-    pub fn to_node_id(&self) -> Option<NodeId<H, W>> {
+    pub fn to_node_id(&self) -> Option<NodeId<N>> {
         if !self.in_maze() {
             None
         } else {
@@ -169,16 +164,14 @@ where
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NodeId<H, W> {
+pub struct NodeId<N> {
     raw: u16,
-    _height: PhantomData<fn() -> H>,
-    _width: PhantomData<fn() -> W>,
+    _size: PhantomData<fn() -> N>,
 }
 
-impl<H, W> NodeId<H, W>
+impl<N> NodeId<N>
 where
-    H: Unsigned,
-    W: Unsigned,
+    N: Unsigned,
 {
     #[inline]
     fn x_min() -> u16 {
@@ -192,19 +185,18 @@ where
 
     #[inline]
     fn x_max() -> u16 {
-        W::U16 * 2 - 1
+        N::U16 * 2 - 1
     }
 
     #[inline]
     fn y_max() -> u16 {
-        H::U16 * 2 - 1
+        N::U16 * 2 - 1
     }
 }
 
-impl<H, W> NodeId<H, W>
+impl<N> NodeId<N>
 where
-    H: Unsigned + PowerOfTwo,
-    W: Unsigned + PowerOfTwo,
+    N: Unsigned + PowerOfTwo,
 {
     pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Self {
         use AbsoluteDirection::*;
@@ -247,12 +239,11 @@ where
         };
         Self {
             raw: x | (y << Self::y_offset()) | (direction << Self::direction_offset()),
-            _height: PhantomData,
-            _width: PhantomData,
+            _size: PhantomData,
         }
     }
 
-    pub fn as_node(&self) -> Node<H, W> {
+    pub fn as_node(&self) -> Node<N> {
         use AbsoluteDirection::*;
         let x = self.x_raw();
         let y = self.y_raw();
@@ -291,7 +282,7 @@ where
                 unreachable!()
             }
         };
-        Node::<H, W>::new(x as i16, y as i16, direction)
+        Node::<N>::new(x as i16, y as i16, direction)
     }
 
     #[inline]
@@ -316,12 +307,12 @@ where
 
     #[inline]
     fn y_offset() -> u32 {
-        (W::USIZE * 2).trailing_zeros()
+        (N::USIZE * 2).trailing_zeros()
     }
 
     #[inline]
     fn direction_offset() -> u32 {
-        (W::USIZE * 2).trailing_zeros() + (H::USIZE * 2).trailing_zeros()
+        2 * (N::USIZE * 2).trailing_zeros()
     }
 
     #[inline]
@@ -335,17 +326,16 @@ where
     }
 }
 
-impl<H, W> Into<Node<H, W>> for NodeId<H, W>
+impl<N> Into<Node<N>> for NodeId<N>
 where
-    H: Unsigned + PowerOfTwo,
-    W: Unsigned + PowerOfTwo,
+    N: Unsigned + PowerOfTwo,
 {
-    fn into(self) -> Node<H, W> {
+    fn into(self) -> Node<N> {
         self.as_node()
     }
 }
 
-impl<H, W> Into<usize> for NodeId<H, W> {
+impl<N> Into<usize> for NodeId<N> {
     fn into(self) -> usize {
         self.raw.into()
     }
@@ -388,20 +378,7 @@ mod tests {
         ];
 
         for (x, y, direction) in test_data {
-            let node = NodeId::<U16, U16>::new(x, y, direction);
-            let node = node.as_node();
-            assert_eq!(node.x() as u16, x);
-            assert_eq!(node.y() as u16, y);
-            assert_eq!(node.direction(), direction);
-        }
-    }
-
-    #[test]
-    fn test_different_height_and_width() {
-        let test_data = vec![(0u16, 0u16, North), (11, 14, East), (8, 7, North)];
-
-        for (x, y, direction) in test_data {
-            let node = NodeId::<U16, U8>::new(x, y, direction);
+            let node = NodeId::<U16>::new(x, y, direction);
             let node = node.as_node();
             assert_eq!(node.x() as u16, x);
             assert_eq!(node.y() as u16, y);
@@ -412,31 +389,31 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_x_unreachable() {
-        NodeId::<U16, U16>::new(32, 31, NorthEast);
+        NodeId::<U16>::new(32, 31, NorthEast);
     }
 
     #[test]
     #[should_panic]
     fn test_y_unreachable() {
-        NodeId::<U16, U16>::new(31, 32, NorthEast);
+        NodeId::<U16>::new(31, 32, NorthEast);
     }
 
     #[test]
     #[should_panic]
     fn test_direction_unreachable_in_cell() {
-        NodeId::<U16, U16>::new(0, 0, NorthEast);
+        NodeId::<U16>::new(0, 0, NorthEast);
     }
 
     #[test]
     #[should_panic]
     fn test_direction_unreachable_on_horizontal_bound() {
-        NodeId::<U16, U16>::new(0, 1, East);
+        NodeId::<U16>::new(0, 1, East);
     }
 
     #[test]
     #[should_panic]
     fn test_direction_unreachable_on_vertical_bound() {
-        NodeId::<U16, U16>::new(1, 0, North);
+        NodeId::<U16>::new(1, 0, North);
     }
 
     #[test]
@@ -450,11 +427,11 @@ mod tests {
 
         for (x, y, direction, is_some) in test_data {
             let expected = if is_some {
-                Some(NodeId::<U16, U16>::new(x as u16, y as u16, direction))
+                Some(NodeId::<U16>::new(x as u16, y as u16, direction))
             } else {
                 None
             };
-            let node = Node::<U16, U16>::new(x, y, direction);
+            let node = Node::<U16>::new(x, y, direction);
             assert_eq!(node.to_node_id(), expected);
         }
     }
