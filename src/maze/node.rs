@@ -163,7 +163,7 @@ where
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodeId<N> {
     raw: u16,
     _size: PhantomData<fn() -> N>,
@@ -209,7 +209,7 @@ where
                     East => 1,
                     South => 2,
                     West => 3,
-                    _ => unreachable!(),
+                    _ => unreachable!("x:{}, y:{}, direction:{:?}", x, y, direction),
                 }
             } else {
                 match direction {
@@ -219,7 +219,7 @@ where
                     South => 3,
                     SouthWest => 4,
                     NorthWest => 5,
-                    _ => unreachable!(),
+                    _ => unreachable!("x:{}, y:{}, direction:{:?}", x, y, direction),
                 }
             }
         } else {
@@ -231,10 +231,10 @@ where
                     SouthWest => 3,
                     West => 4,
                     NorthWest => 5,
-                    _ => unreachable!(),
+                    _ => unreachable!("x:{}, y:{}, direction:{:?}", x, y, direction),
                 }
             } else {
-                unreachable!()
+                unreachable!("x:{}, y:{}, direction:{:?}", x, y, direction)
             }
         };
         Self {
@@ -338,6 +338,17 @@ where
 impl<N> Into<usize> for NodeId<N> {
     fn into(self) -> usize {
         self.raw.into()
+    }
+}
+
+impl<N> core::fmt::Debug for NodeId<N>
+where
+    N: Unsigned + PowerOfTwo,
+    Node<N>: core::fmt::Debug,
+{
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let node: Node<N> = <NodeId<N> as Into<Node<N>>>::into(*self);
+        writeln!(fmt, "{:?}", node)
     }
 }
 

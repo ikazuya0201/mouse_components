@@ -196,17 +196,17 @@ where
                 return succs;
             }
             succs
-                .push((relative_node(-1, 2, FrontRight), self.cost(FastRun45)))
+                .push((relative_node(-1, 2, FrontLeft), self.cost(FastRun45)))
                 .unwrap();
             succs
-                .push((relative_node(-2, 2, Right), self.cost(FastRun90)))
+                .push((relative_node(-2, 2, Left), self.cost(FastRun90)))
                 .unwrap();
 
             if is_wall_relative(-2, 1) {
                 return succs;
             }
             succs
-                .push((relative_node(-2, 1, BackRight), self.cost(FastRun135)))
+                .push((relative_node(-2, 1, BackLeft), self.cost(FastRun135)))
                 .unwrap();
             succs
                 .push((relative_node(-2, 0, Back), self.cost(FastRun180)))
@@ -223,7 +223,7 @@ where
         succs
             .push((relative_node(0, 2, Front), self.cost(Straight(2))))
             .unwrap();
-        for i in 1..N::I16 / 2 {
+        for i in 1..N::I16 {
             if is_wall_relative(0, 2 * i + 1) {
                 break;
             }
@@ -274,23 +274,20 @@ where
         succs
             .push((relative_node(0, 1, Front), self.cost(Straight(1))))
             .unwrap();
-        succs
-            .push((relative_node(0, 2, Front), self.cost(Straight(2))))
-            .unwrap();
-        for i in 1..N::I16 / 2 {
-            if is_wall_relative(0, 2 * i + 1) {
+        for i in 1..N::I16 {
+            if is_wall_relative(0, 2 * i) {
                 break;
             }
             succs
                 .push((
-                    relative_node(0, 2 * i + 1, Front),
-                    self.cost(Straight((2 * i + 1) as u16)),
+                    relative_node(0, 2 * i, Front),
+                    self.cost(Straight((2 * i) as u16)),
                 ))
                 .unwrap();
             succs
                 .push((
-                    relative_node(0, 2 * i + 2, Front),
-                    self.cost(Straight((2 * i + 2) as u16)),
+                    relative_node(0, 2 * i + 1, Front),
+                    self.cost(Straight((2 * i + 1) as u16)),
                 ))
                 .unwrap();
         }
@@ -398,6 +395,127 @@ where
 mod tests {
     use super::*;
 
+    fn cost(pattern: Pattern) -> u16 {
+        use Pattern::*;
+
+        match pattern {
+            Straight(length) => length,
+            StraightDiagonal(length) => length,
+            Search90 => 3,
+            FastRun45 => 4,
+            FastRun90 => 5,
+            FastRun135 => 6,
+            FastRun180 => 7,
+            FastRunDiagonal90 => 8,
+            SpinBack => 9,
+        }
+    }
+
     #[test]
-    fn test_successors() {}
+    fn test_successors() {
+        use std::collections::BTreeSet;
+        use AbsoluteDirection::*;
+        use Pattern::*;
+
+        let maze = Maze::<U4, _>::new(cost);
+
+        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
+            NodeId::<U4>::new(x, y, direction)
+        };
+
+        let test_data = vec![
+            (
+                new(2, 0, North),
+                vec![
+                    (new(2, 1, North), cost(Straight(1))),
+                    (new(2, 2, North), cost(Straight(2))),
+                    (new(2, 3, North), cost(Straight(3))),
+                    (new(2, 4, North), cost(Straight(4))),
+                    (new(2, 5, North), cost(Straight(5))),
+                    (new(2, 6, North), cost(Straight(6))),
+                    (new(3, 2, NorthEast), cost(FastRun45)),
+                    (new(4, 2, East), cost(FastRun90)),
+                    (new(4, 1, SouthEast), cost(FastRun135)),
+                    (new(4, 0, South), cost(FastRun180)),
+                    (new(1, 2, NorthWest), cost(FastRun45)),
+                    (new(0, 2, West), cost(FastRun90)),
+                    (new(0, 1, SouthWest), cost(FastRun135)),
+                    (new(0, 0, South), cost(FastRun180)),
+                ],
+            ),
+            (
+                new(0, 2, East),
+                vec![
+                    (new(1, 2, East), cost(Straight(1))),
+                    (new(2, 2, East), cost(Straight(2))),
+                    (new(3, 2, East), cost(Straight(3))),
+                    (new(4, 2, East), cost(Straight(4))),
+                    (new(5, 2, East), cost(Straight(5))),
+                    (new(6, 2, East), cost(Straight(6))),
+                    (new(2, 1, SouthEast), cost(FastRun45)),
+                    (new(2, 0, South), cost(FastRun90)),
+                    (new(1, 0, SouthWest), cost(FastRun135)),
+                    (new(0, 0, West), cost(FastRun180)),
+                    (new(2, 3, NorthEast), cost(FastRun45)),
+                    (new(2, 4, North), cost(FastRun90)),
+                    (new(1, 4, NorthWest), cost(FastRun135)),
+                    (new(0, 4, West), cost(FastRun180)),
+                ],
+            ),
+            (
+                new(2, 1, North),
+                vec![
+                    (new(2, 2, North), cost(Straight(1))),
+                    (new(2, 3, North), cost(Straight(2))),
+                    (new(2, 4, North), cost(Straight(3))),
+                    (new(2, 5, North), cost(Straight(4))),
+                    (new(2, 6, North), cost(Straight(5))),
+                    (new(3, 2, East), cost(Search90)),
+                    (new(1, 2, West), cost(Search90)),
+                    (new(2, 1, South), cost(SpinBack)),
+                ],
+            ),
+            (
+                new(3, 2, West),
+                vec![
+                    (new(2, 2, West), cost(Straight(1))),
+                    (new(1, 2, West), cost(Straight(2))),
+                    (new(0, 2, West), cost(Straight(3))),
+                    (new(2, 3, North), cost(Search90)),
+                    (new(2, 1, South), cost(Search90)),
+                    (new(3, 2, East), cost(SpinBack)),
+                ],
+            ),
+            (
+                new(0, 1, NorthEast),
+                vec![
+                    (new(1, 2, NorthEast), cost(StraightDiagonal(1))),
+                    (new(2, 3, NorthEast), cost(StraightDiagonal(2))),
+                    (new(3, 4, NorthEast), cost(StraightDiagonal(3))),
+                    (new(4, 5, NorthEast), cost(StraightDiagonal(4))),
+                    (new(5, 6, NorthEast), cost(StraightDiagonal(5))),
+                    (new(2, 2, East), cost(FastRun45)),
+                    (new(2, 1, South), cost(FastRun135)),
+                    (new(2, 1, SouthEast), cost(FastRunDiagonal90)),
+                ],
+            ),
+            (
+                new(2, 3, SouthWest),
+                vec![
+                    (new(1, 2, SouthWest), cost(StraightDiagonal(1))),
+                    (new(0, 1, SouthWest), cost(StraightDiagonal(2))),
+                    (new(0, 2, West), cost(FastRun45)),
+                    (new(0, 3, North), cost(FastRun135)),
+                    (new(0, 3, NorthWest), cost(FastRunDiagonal90)),
+                ],
+            ),
+        ];
+
+        for (src, mut expected) in test_data {
+            expected.sort();
+            let mut successors = maze.successors(src);
+            successors.sort();
+            assert_eq!(successors, expected.as_slice());
+        }
+    }
 }
