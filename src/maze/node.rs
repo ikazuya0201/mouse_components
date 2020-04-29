@@ -2,57 +2,55 @@ use core::marker::PhantomData;
 
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::direction::AbsoluteDirection;
+use super::direction::{AbsoluteDirection, RelativeDirection};
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Location {
     Cell,
     VerticalBound,
     HorizontalBound,
 }
 
-pub struct Node<H, W> {
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Position<H, W> {
     x: i16,
     y: i16,
-    direction: AbsoluteDirection,
     _height: PhantomData<fn() -> H>,
     _width: PhantomData<fn() -> W>,
 }
 
-impl<H, W> Node<H, W>
+impl<H, W> Position<H, W>
 where
-    H: Unsigned + PowerOfTwo,
-    W: Unsigned + PowerOfTwo,
+    H: Unsigned,
+    W: Unsigned,
 {
-    pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
+    pub fn new(x: i16, y: i16) -> Self {
         Self {
             x,
             y,
-            direction,
             _height: PhantomData,
             _width: PhantomData,
         }
     }
 
+    #[inline]
     pub fn x(&self) -> i16 {
         self.x
     }
 
+    #[inline]
     pub fn y(&self) -> i16 {
         self.y
     }
 
-    pub fn direction(&self) -> AbsoluteDirection {
-        self.direction
-    }
-
     #[inline]
     fn x_is_even(&self) -> bool {
-        self.x & 1 == 0
+        self.x() & 1 == 0
     }
 
     #[inline]
     fn y_is_even(&self) -> bool {
-        self.y & 1 == 0
+        self.y() & 1 == 0
     }
 
     pub fn location(&self) -> Location {
@@ -71,16 +69,101 @@ where
             }
         }
     }
+}
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Node<H, W> {
+    position: Position<H, W>,
+    direction: AbsoluteDirection,
+}
+
+impl<H, W> Node<H, W>
+where
+    H: Unsigned,
+    W: Unsigned,
+{
+    pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
+        Self {
+            position: Position::new(x, y),
+            direction,
+        }
+    }
+
+    #[inline]
+    pub fn position(&self) -> Position<H, W> {
+        self.position.clone()
+    }
+
+    #[inline]
+    pub fn x(&self) -> i16 {
+        self.position().x()
+    }
+
+    #[inline]
+    pub fn y(&self) -> i16 {
+        self.position().y()
+    }
+
+    #[inline]
+    pub fn direction(&self) -> AbsoluteDirection {
+        self.direction
+    }
+
+    pub fn relative_node(
+        &self,
+        x_diff: i16,
+        y_diff: i16,
+        dir_diff: RelativeDirection,
+        base_dir: AbsoluteDirection,
+    ) -> Option<Self> {
+        let position = self.relative_position(x_diff, y_diff, base_dir)?;
+        let direction = self.direction.rotate(dir_diff);
+        Some(Node::<H, W>::new(position.x(), position.y(), direction))
+    }
+
+    pub fn relative_position(
+        &self,
+        x_diff: i16,
+        y_diff: i16,
+        base_dir: AbsoluteDirection,
+    ) -> Option<Position<H, W>> {
+        use RelativeDirection::*;
+        let relative_direction = base_dir.relative(self.direction);
+        match relative_direction {
+            Front => Some(Position::new(self.x() + x_diff, self.y() + y_diff)),
+            Right => Some(Position::new(self.x() + y_diff, self.y() - x_diff)),
+            Back => Some(Position::new(self.x() - x_diff, self.y() - y_diff)),
+            Left => Some(Position::new(self.x() - y_diff, self.y() + x_diff)),
+            _ => None,
+        }
+    }
+
+    pub fn location(&self) -> Location {
+        self.position.location()
+    }
+
+    pub fn in_maze(&self) -> bool {
+        self.x() >= NodeId::<H, W>::x_min() as i16
+            && self.x() <= NodeId::<H, W>::x_max() as i16
+            && self.y() >= NodeId::<H, W>::y_min() as i16
+            && self.y() <= NodeId::<H, W>::y_max() as i16
+    }
+}
+
+impl<H, W> Node<H, W>
+where
+    H: Unsigned + PowerOfTwo,
+    W: Unsigned + PowerOfTwo,
+{
     pub fn to_node_id(&self) -> Option<NodeId<H, W>> {
-        if self.x < 0
-            || self.y < 0
-            || self.x > NodeId::<H, W>::x_max() as i16
-            || self.y > NodeId::<H, W>::y_max() as i16
-        {
+        if !self.in_maze() {
             None
         } else {
-            Some(NodeId::new(self.x as u16, self.y as u16, self.direction))
+            Some(NodeId::new(
+                self.x() as u16,
+                self.y() as u16,
+                self.direction(),
+            ))
         }
     }
 }
@@ -90,6 +173,32 @@ pub struct NodeId<H, W> {
     raw: u16,
     _height: PhantomData<fn() -> H>,
     _width: PhantomData<fn() -> W>,
+}
+
+impl<H, W> NodeId<H, W>
+where
+    H: Unsigned,
+    W: Unsigned,
+{
+    #[inline]
+    fn x_min() -> u16 {
+        0
+    }
+
+    #[inline]
+    fn y_min() -> u16 {
+        0
+    }
+
+    #[inline]
+    fn x_max() -> u16 {
+        W::U16 * 2 - 1
+    }
+
+    #[inline]
+    fn y_max() -> u16 {
+        H::U16 * 2 - 1
+    }
 }
 
 impl<H, W> NodeId<H, W>
@@ -183,26 +292,6 @@ where
             }
         };
         Node::<H, W>::new(x as i16, y as i16, direction)
-    }
-
-    #[inline]
-    fn x_min() -> u16 {
-        0
-    }
-
-    #[inline]
-    fn y_min() -> u16 {
-        0
-    }
-
-    #[inline]
-    fn x_max() -> u16 {
-        W::U16 * 2 - 1
-    }
-
-    #[inline]
-    fn y_max() -> u16 {
-        H::U16 * 2 - 1
     }
 
     #[inline]
