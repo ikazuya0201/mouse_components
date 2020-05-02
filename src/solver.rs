@@ -127,7 +127,7 @@ where
     let mut is_checker_node = GenericArray::default();
     for i in 0..path.len() - 1 {
         if !graph.is_checked((path[i], path[i + 1])) {
-            for node in graph.unchecked_edge_to_checker_nodes((path[i], path[i + 1])) {
+            for node in graph.convert_to_checker_nodes((path[i], path[i + 1])) {
                 is_checker_node[node.into()] = true;
             }
         }
@@ -439,7 +439,7 @@ mod tests {
             self.is_checked[edge.0][edge.1]
         }
 
-        fn unchecked_edge_to_checker_nodes(&self, edge: (usize, usize)) -> Self::Nodes {
+        fn convert_to_checker_nodes(&self, edge: (usize, usize)) -> Self::Nodes {
             vec![edge.0, edge.1]
         }
 
