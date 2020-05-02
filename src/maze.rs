@@ -151,25 +151,43 @@ where
         (self.costs)(pattern)
     }
 
+    fn is_wall_relative_fn<'a>(
+        &'a self,
+        node: &'a Node<N>,
+        base_dir: AbsoluteDirection,
+        is_successors: bool,
+    ) -> impl Fn(i16, i16) -> bool + 'a {
+        move |x: i16, y: i16| -> bool {
+            if is_successors {
+                self.is_wall_by_position(node.relative_position(x, y, base_dir).unwrap())
+            } else {
+                self.is_wall_by_position(node.relative_position(-x, -y, base_dir).unwrap())
+            }
+        }
+    }
+
+    fn relative_node_fn<'a>(
+        node: &'a Node<N>,
+        base_dir: AbsoluteDirection,
+        is_successors: bool,
+    ) -> impl Fn(i16, i16, RelativeDirection) -> Node<N> + 'a {
+        move |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
+            if is_successors {
+                node.relative_node(x, y, direction, base_dir).unwrap()
+            } else {
+                node.relative_node(-x, -y, direction, base_dir).unwrap()
+            }
+        }
+    }
+
     fn cell_neighbors(&self, node: Node<N>, is_successors: bool) -> Vec<(Node<N>, u16), U70> {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
 
-        let is_wall_relative = |x: i16, y: i16| -> bool {
-            if is_successors {
-                self.is_wall_by_position(node.relative_position(x, y, North).unwrap())
-            } else {
-                self.is_wall_by_position(node.relative_position(-x, -y, North).unwrap())
-            }
-        };
-        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
-            if is_successors {
-                node.relative_node(x, y, direction, North).unwrap()
-            } else {
-                node.relative_node(-x, -y, direction, North).unwrap()
-            }
-        };
+        let is_wall_relative = self.is_wall_relative_fn(&node, North, is_successors);
+        let relative_node = Self::relative_node_fn(&node, North, is_successors);
+
         if is_wall_relative(0, 1) {
             return Vec::new();
         }
@@ -261,20 +279,8 @@ where
         use Pattern::*;
         use RelativeDirection::*;
 
-        let is_wall_relative = |x: i16, y: i16| -> bool {
-            if is_successors {
-                self.is_wall_by_position(node.relative_position(x, y, North).unwrap())
-            } else {
-                self.is_wall_by_position(node.relative_position(x, y, North).unwrap())
-            }
-        };
-        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
-            if is_successors {
-                node.relative_node(x, y, direction, North).unwrap()
-            } else {
-                node.relative_node(-x, -y, direction, North).unwrap()
-            }
-        };
+        let is_wall_relative = self.is_wall_relative_fn(&node, North, is_successors);
+        let relative_node = Self::relative_node_fn(&node, North, is_successors);
 
         let mut succs = Vec::new();
         succs
@@ -324,20 +330,8 @@ where
         use Pattern::*;
         use RelativeDirection::*;
 
-        let is_wall_relative = |x: i16, y: i16| -> bool {
-            if is_successors {
-                self.is_wall_by_position(node.relative_position(x, y, NorthEast).unwrap())
-            } else {
-                self.is_wall_by_position(node.relative_position(-x, -y, NorthEast).unwrap())
-            }
-        };
-        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
-            if is_successors {
-                node.relative_node(x, y, direction, NorthEast).unwrap()
-            } else {
-                node.relative_node(-x, -y, direction, NorthEast).unwrap()
-            }
-        };
+        let is_wall_relative = self.is_wall_relative_fn(&node, NorthEast, is_successors);
+        let relative_node = Self::relative_node_fn(&node, NorthEast, is_successors);
 
         let mut succs = Vec::new();
         if is_wall_relative(1, 1) {
@@ -384,20 +378,8 @@ where
         use Pattern::*;
         use RelativeDirection::*;
 
-        let is_wall_relative = |x: i16, y: i16| -> bool {
-            if is_successors {
-                self.is_wall_by_position(node.relative_position(x, y, NorthEast).unwrap())
-            } else {
-                self.is_wall_by_position(node.relative_position(-x, -y, NorthEast).unwrap())
-            }
-        };
-        let relative_node = |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
-            if is_successors {
-                node.relative_node(x, y, direction, NorthEast).unwrap()
-            } else {
-                node.relative_node(-x, -y, direction, NorthEast).unwrap()
-            }
-        };
+        let is_wall_relative = self.is_wall_relative_fn(&node, NorthEast, is_successors);
+        let relative_node = Self::relative_node_fn(&node, NorthEast, is_successors);
 
         let mut succs = Vec::new();
         if is_wall_relative(1, 1) {
