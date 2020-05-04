@@ -2,7 +2,7 @@ mod direction;
 mod node;
 
 use core::marker::PhantomData;
-use core::ops::Mul;
+use core::ops::{Add, Mul};
 
 use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
@@ -179,8 +179,23 @@ where
             }
         }
     }
+}
 
-    fn cell_neighbors(&self, node: Node<N>, is_successors: bool) -> Vec<(Node<N>, u16), U70> {
+impl<N, F> Maze<N, F>
+where
+    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
+    <N as Mul<U2>>::Output: Add<U10>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    F: Fn(Pattern) -> u16,
+    Node<N>: core::fmt::Debug,
+{
+    fn cell_neighbors(
+        &self,
+        node: Node<N>,
+        is_successors: bool,
+    ) -> Vec<(Node<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output> {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -192,29 +207,30 @@ where
             return Vec::new();
         }
 
-        let right_successors = || -> Vec<(Node<N>, u16), U70> {
-            let mut succs = Vec::new();
-            if is_wall_relative(1, 2) {
-                return succs;
-            }
-            succs
-                .push((relative_node(1, 2, FrontRight), self.cost(FastRun45)))
-                .unwrap();
-            succs
-                .push((relative_node(2, 2, Right), self.cost(FastRun90)))
-                .unwrap();
+        let right_successors =
+            || -> Vec<(Node<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output> {
+                let mut succs = Vec::new();
+                if is_wall_relative(1, 2) {
+                    return succs;
+                }
+                succs
+                    .push((relative_node(1, 2, FrontRight), self.cost(FastRun45)))
+                    .unwrap();
+                succs
+                    .push((relative_node(2, 2, Right), self.cost(FastRun90)))
+                    .unwrap();
 
-            if is_wall_relative(2, 1) {
-                return succs;
-            }
-            succs
-                .push((relative_node(2, 1, BackRight), self.cost(FastRun135)))
-                .unwrap();
-            succs
-                .push((relative_node(2, 0, Back), self.cost(FastRun180)))
-                .unwrap();
-            succs
-        };
+                if is_wall_relative(2, 1) {
+                    return succs;
+                }
+                succs
+                    .push((relative_node(2, 1, BackRight), self.cost(FastRun135)))
+                    .unwrap();
+                succs
+                    .push((relative_node(2, 0, Back), self.cost(FastRun180)))
+                    .unwrap();
+                succs
+            };
 
         let left_successors = || -> Vec<(Node<N>, u16), U4> {
             let mut succs = Vec::new();
@@ -274,7 +290,7 @@ where
         &self,
         node: Node<N>,
         is_successors: bool,
-    ) -> Vec<(Node<N>, u16), U70> {
+    ) -> Vec<(Node<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output> {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -325,7 +341,7 @@ where
         &self,
         node: Node<N>,
         is_successors: bool,
-    ) -> Vec<(Node<N>, u16), U70> {
+    ) -> Vec<(Node<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output> {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -373,7 +389,7 @@ where
         &self,
         node: Node<N>,
         is_successors: bool,
-    ) -> Vec<(Node<N>, u16), U70> {
+    ) -> Vec<(Node<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output> {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -416,7 +432,19 @@ where
 
         succs
     }
+}
 
+impl<N, F> Maze<N, F>
+where
+    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
+    <N as Mul<U2>>::Output: Add<U10>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    F: Fn(Pattern) -> u16,
+    Node<N>: core::fmt::Debug,
+{
     fn neighbors(
         &self,
         node_id: NodeId<N>,
@@ -426,7 +454,7 @@ where
         use Location::*;
 
         let node = node_id.as_node();
-        let node_neighbors: Vec<(Node<N>, u16), U70> = match node.location() {
+        let node_neighbors = match node.location() {
             Cell => match node.direction() {
                 North | East | South | West => self.cell_neighbors(node, is_successors),
                 _ => Vec::new(),
@@ -455,13 +483,16 @@ where
 
 impl<N, F> Graph<NodeId<N>, u16> for Maze<N, F>
 where
-    N: Mul<N> + Unsigned + PowerOfTwo,
+    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
+    <N as Mul<U2>>::Output: Add<U10>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
     Node<N>: core::fmt::Debug,
 {
-    type Edges = Vec<(NodeId<N>, u16), U70>;
+    type Edges = Vec<(NodeId<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output>;
 
     fn successors(&self, node_id: NodeId<N>) -> Self::Edges {
         self.neighbors(node_id, true)
