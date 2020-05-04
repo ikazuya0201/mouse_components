@@ -91,7 +91,7 @@ where
             graph,
         ) {
             let (checker, direction) =
-                find_first_checker_node_and_next_direction(&path_to_checker, graph).unwrap();
+                find_first_checker_node_and_next_direction(path_to_checker, graph).unwrap();
 
             let path = compute_checked_shortest_path(current, checker, graph).unwrap();
 
@@ -126,10 +126,8 @@ where
 {
     let mut is_checker_node = GenericArray::default();
     for i in 0..path.len() - 1 {
-        if !graph.is_checked((path[i], path[i + 1])) {
-            for node in graph.convert_to_checker_nodes((path[i], path[i + 1])) {
-                is_checker_node[node.into()] = true;
-            }
+        for node in graph.convert_to_checker_nodes((path[i], path[i + 1])) {
+            is_checker_node[node.into()] = true;
         }
     }
     is_checker_node
@@ -249,21 +247,20 @@ where
     None
 }
 
-fn find_first_checker_node_and_next_direction<Node, Cost, Direction, Graph>(
-    path: &[Node],
+fn find_first_checker_node_and_next_direction<Node, Cost, Direction, Graph, L>(
+    path: Vec<Node, L>,
     graph: &Graph,
 ) -> Option<(Node, Direction)>
 where
     Node: Clone + Copy,
     Cost: Bounded + Ord,
     Graph: operator::DirectionalGraph<Node, Cost, Direction>,
+    L: ArrayLength<Node>,
 {
-    for i in 0..path.len() - 1 {
-        if !graph.is_checked((path[i], path[i + 1])) {
-            return Some(graph.find_first_checker_node_and_next_direction((path[i], path[i + 1])));
-        }
-    }
     let last_node = path[path.len() - 1];
+    if let Some((node, direction)) = graph.find_first_checker_node_and_next_direction(path) {
+        return Some((node, direction));
+    }
     let mut next_node = None;
     let mut min_cost = Cost::max_value();
     for (succ, cost) in graph.unchecked_successors(last_node) {
@@ -435,39 +432,39 @@ mod tests {
     impl CheckableGraph<usize, usize> for IGraph {
         type Nodes = Vec<usize>;
 
-        fn is_checked(&self, edge: (usize, usize)) -> bool {
-            self.is_checked[edge.0][edge.1]
-        }
-
         fn convert_to_checker_nodes(&self, edge: (usize, usize)) -> Self::Nodes {
-            vec![edge.0, edge.1]
+            if self.is_checked[edge.0][edge.1] {
+                Vec::new()
+            } else {
+                vec![edge.0, edge.1]
+            }
         }
 
         fn checked_successors(&self, node: usize) -> Self::Edges {
             self.successors(node)
                 .into_iter()
-                .filter(|&(next, _)| self.is_checked((node, next)))
+                .filter(|&(next, _)| self.is_checked[node][next])
                 .collect()
         }
 
         fn checked_predecessors(&self, node: usize) -> Self::Edges {
             self.predecessors(node)
                 .into_iter()
-                .filter(|&(next, _)| self.is_checked((node, next)))
+                .filter(|&(next, _)| self.is_checked[node][next])
                 .collect()
         }
 
         fn unchecked_successors(&self, node: usize) -> Self::Edges {
             self.successors(node)
                 .into_iter()
-                .filter(|&(next, _)| !self.is_checked((node, next)))
+                .filter(|&(next, _)| !self.is_checked[node][next])
                 .collect()
         }
 
         fn unchecked_predecessors(&self, node: usize) -> Self::Edges {
             self.predecessors(node)
                 .into_iter()
-                .filter(|&(next, _)| !self.is_checked((node, next)))
+                .filter(|&(next, _)| !self.is_checked[node][next])
                 .collect()
         }
     }

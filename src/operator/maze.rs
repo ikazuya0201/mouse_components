@@ -24,13 +24,15 @@ pub trait DirectionalGraph<Node, Cost, Direction>: CheckableGraph<Node, Cost> {
     //block outbound edge of the given node by the direction.
     //return inbound node of updated edges
     fn block(&mut self, node: Node, direction: Direction) -> Self::Nodes;
-    fn find_first_checker_node_and_next_direction(&self, edge: (Node, Node)) -> (Node, Direction);
+    fn find_first_checker_node_and_next_direction<Nodes: IntoIterator<Item = Node>>(
+        &self,
+        path: Nodes,
+    ) -> Option<(Node, Direction)>;
 }
 
 pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {
     type Nodes: IntoIterator<Item = Node>;
 
-    fn is_checked(&self, edge: (Node, Node)) -> bool;
     fn convert_to_checker_nodes(&self, edge: (Node, Node)) -> Self::Nodes;
     fn checked_successors(&self, node: Node) -> Self::Edges;
     fn checked_predecessors(&self, node: Node) -> Self::Edges;
