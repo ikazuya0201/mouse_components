@@ -1,52 +1,64 @@
-pub mod agent;
-pub mod counter;
-pub mod maze;
+mod agent;
+mod counter;
+mod maze;
 mod mode;
-pub mod solver;
-pub mod switch;
+mod searcher;
+mod solver;
+mod switch;
 
 use core::marker::PhantomData;
 use core::sync::atomic::Ordering;
 
-use heapless::{consts::*, Vec};
-
-use agent::Agent;
-use counter::Counter;
-use maze::{Graph, GraphTranslator, Storable};
+pub use agent::Agent;
+pub use counter::Counter;
+pub use maze::{
+    CheckableGraph, DirectionalGraph, Graph, GraphTranslator, PatternInstructor, Storable,
+};
 use mode::{AtomicMode, Mode};
-use solver::Solver;
-use switch::Switch;
+use searcher::Searcher;
+pub use solver::Solver;
+pub use switch::Switch;
 
-pub struct Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
+pub struct Operator<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
 where
-    M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
-    A: Agent<Position, Direction>,
-    S: Solver<Node, Cost, Direction, M>,
+    Maze: Storable
+        + DirectionalGraph<Node, Cost, Direction>
+        + GraphTranslator<Node, Position, Pattern>
+        + PatternInstructor<Node, Direction, Pattern>,
+    IAgent: Agent<Position, Pattern>,
+    ISolver: Solver<Node, Cost, Direction, Maze>,
     SW: Switch,
     C: Counter,
 {
-    maze: M,
-    agent: A,
-    solver: S,
+    maze: Maze,
+    agent: IAgent,
+    solver: ISolver,
     mode: AtomicMode,
     switch: SW,
     counter: C,
+    searcher: Searcher<Node>,
     _node: PhantomData<fn() -> Node>,
     _cost: PhantomData<fn() -> Cost>,
     _position: PhantomData<fn() -> Position>,
     _direction: PhantomData<fn() -> Direction>,
+    _pattern: PhantomData<fn() -> Pattern>,
 }
 
-impl<Node, Cost, Position, Direction, M, A, S, SW, C>
-    Operator<Node, Cost, Position, Direction, M, A, S, SW, C>
+impl<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
+    Operator<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
 where
-    M: Storable + Graph<Node, Cost, Direction> + GraphTranslator<Node, Position>,
-    A: Agent<Position, Direction>,
-    S: Solver<Node, Cost, Direction, M>,
+    Node: Copy + Clone,
+    Maze: Storable
+        + DirectionalGraph<Node, Cost, Direction>
+        + GraphTranslator<Node, Position, Pattern>
+        + PatternInstructor<Node, Direction, Pattern>,
+    IAgent: Agent<Position, Pattern>,
+    ISolver: Solver<Node, Cost, Direction, Maze>,
     SW: Switch,
     C: Counter,
 {
-    pub fn new(maze: M, agent: A, solver: S, switch: SW, counter: C) -> Self {
+    pub fn new(maze: Maze, agent: IAgent, solver: ISolver, switch: SW, counter: C) -> Self {
+        let start = solver.start_node();
         Self {
             maze: maze,
             agent: agent,
@@ -54,10 +66,12 @@ where
             mode: AtomicMode::new(Mode::Idle),
             switch: switch,
             counter: counter,
+            searcher: Searcher::new(start),
             _node: PhantomData,
             _cost: PhantomData,
             _position: PhantomData,
             _direction: PhantomData,
+            _pattern: PhantomData,
         }
     }
 
@@ -66,10 +80,12 @@ where
         use Mode::*;
         use Ordering::Relaxed;
         match self.mode.load(Relaxed) {
-            Idle => self.store_if_switch_enabled(Select),
-            Search => self.tick_search(),
+            Idle => (),
+            Search => self.searcher.tick(&self.maze, &self.agent),
+            Select => return,
             _ => (),
         }
+        self.store_if_switch_enabled(Select);
     }
 
     fn store_if_switch_enabled(&self, mode: Mode) {
@@ -78,43 +94,25 @@ where
         }
     }
 
-    fn tick_search(&self) {
-        self.agent.track_next();
-        let obstacles = self.agent.existing_obstacles::<U10>();
-        self.maze.update_obstacles(&obstacles);
-        self.store_if_switch_enabled(Mode::Select);
-    }
-
     pub fn run(&self) {
         use Mode::*;
         loop {
             match self.mode.load(Ordering::Relaxed) {
                 Idle => (),
-                Search => self.search(),
+                Search => {
+                    if !self.searcher.search(&self.maze, &self.agent, &self.solver) {
+                        self.mode.store(FastRun, Ordering::Relaxed);
+                    }
+                }
                 FastRun => self.fast_run(),
                 Select => self.mode_select(),
             }
         }
     }
 
-    fn search(&self) {
-        if !self.agent.is_route_empty() {
-            return;
-        }
-        let current_node = self.maze.position_to_node(self.agent.position());
-        let (route, mapping) = self.solver.solve::<U1024>(current_node, &self.maze);
-        let route = route
-            .into_iter()
-            .map(|n| self.maze.node_to_position(n))
-            .collect::<Vec<Position, U1024>>();
-        self.agent.set_next_route(&route);
-        self.agent.set_direction_mapping(mapping);
-    }
-
     fn fast_run(&self) {}
 
     fn mode_select(&self) {
-        use num::FromPrimitive;
         self.counter.reset();
         let mut mode = Mode::Idle;
         //waiting for switch off
@@ -122,8 +120,10 @@ where
 
         while !self.switch.is_enabled() {
             let count = self.counter.count();
-            mode = Mode::from_u8(count % Mode::size()).unwrap();
+            mode = Mode::from(count % Mode::size());
         }
         self.mode.store(mode, Ordering::Relaxed);
+
+        while self.switch.is_enabled() {}
     }
 }

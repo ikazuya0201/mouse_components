@@ -1,10 +1,9 @@
-use heapless::{ArrayLength, Vec};
+pub trait Agent<Position, Pattern> {
+    type Positions: IntoIterator<Item = Position>;
 
-pub trait Agent<Position, Direction> {
-    fn existing_obstacles<L: ArrayLength<Position>>(&self) -> Vec<Position, L>;
-    fn position(&self) -> Position;
-    fn set_next_route(&self, route: &[Position]);
-    fn set_direction_mapping(&self, mapping: fn(fn(Direction) -> bool) -> Direction);
+    fn existing_obstacles(&self) -> Self::Positions;
+    fn set_next_path<Patterns: IntoIterator<Item = Pattern>>(&self, path: Patterns);
+    fn set_instructed_pattern(&self, pattern: Pattern);
     fn is_route_empty(&self) -> bool;
     //This method is called by interrupt.
     fn track_next(&self);
