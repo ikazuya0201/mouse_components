@@ -8,9 +8,7 @@ use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::operator::{
-    CheckableGraph, DirectionalGraph, Graph, GraphTranslator, PatternInstructor,
-};
+use crate::operator::{Graph, GraphTranslator, PatternInstructor};
 use crate::pattern::Pattern;
 use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, NodeId, Position};

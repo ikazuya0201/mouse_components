@@ -1,14 +1,10 @@
-use super::maze;
+use super::maze::{CheckerGraph, ReducedGraph};
 
-pub trait Solver<Node, Cost, Direction> {
-    type Directions: IntoIterator<Item = Direction>;
+pub trait Solver<Node, Cost> {
+    type Nodes: IntoIterator<Item = Node>;
     //return: (route, last direction candidates sequence)
     fn start_node(&self) -> Node;
-    fn next_direction_candidates<Graph>(
-        &self,
-        current: Node,
-        graph: &Graph,
-    ) -> Option<Self::Directions>
+    fn next_node_candidates<Graph>(&self, current: Node, graph: &Graph) -> Option<Self::Nodes>
     where
-        Graph: maze::Graph<Node, Cost>;
+        Graph: ReducedGraph<Node, Cost> + CheckerGraph<Node>;
 }

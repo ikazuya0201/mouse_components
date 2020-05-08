@@ -11,33 +11,26 @@ pub trait GraphTranslator<Node, Position, Pattern> {
 }
 
 pub trait PatternInstructor<Node, Direction, Pattern> {
-    fn update_direction_candidates<Directions: IntoIterator<Item = Direction>>(
+    fn update_node_candidates<Nodes: IntoIterator<Item = Node>>(
         &self,
-        node: Node,
-        directions: Directions,
+        current: Node,
+        candidates: Nodes,
     );
     fn instruct(&self) -> Option<(Pattern, Node)>;
 }
 
-pub trait DirectionalGraph<Node, Cost, Direction>: CheckableGraph<Node, Cost> {
-    fn edge_direction(&self, edge: (Node, Node)) -> Direction;
-    //block outbound edge of the given node by the direction.
-    //return inbound node of updated edges
-    fn block(&mut self, node: Node, direction: Direction) -> Self::Nodes;
-    fn find_first_checker_node_and_next_direction<Nodes: IntoIterator<Item = Node>>(
+pub trait CheckerGraph<Node> {
+    type CheckerNodes: IntoIterator<Item = Node>;
+
+    fn convert_to_checker_nodes<Nodes: IntoIterator<Item = Node>>(
         &self,
         path: Nodes,
-    ) -> Option<(Node, Direction)>;
+    ) -> Self::CheckerNodes;
 }
 
-pub trait CheckableGraph<Node, Cost>: Graph<Node, Cost> {
-    type Nodes: IntoIterator<Item = Node>;
-
-    fn convert_to_checker_nodes(&self, edge: (Node, Node)) -> Self::Nodes;
-    fn checked_successors(&self, node: Node) -> Self::Edges;
-    fn checked_predecessors(&self, node: Node) -> Self::Edges;
-    fn unchecked_successors(&self, node: Node) -> Self::Edges;
-    fn unchecked_predecessors(&self, node: Node) -> Self::Edges;
+pub trait ReducedGraph<Node, Cost>: Graph<Node, Cost> {
+    fn reduced_successors(&self, node: Node) -> Self::Edges;
+    fn reduced_predecessors(&self, node: Node) -> Self::Edges;
 }
 
 pub trait Graph<Node, Cost> {

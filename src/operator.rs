@@ -11,25 +11,13 @@ use core::sync::atomic::Ordering;
 
 pub use agent::Agent;
 pub use counter::Counter;
-pub use maze::{
-    CheckableGraph, DirectionalGraph, Graph, GraphTranslator, PatternInstructor, Storable,
-};
+pub use maze::{CheckerGraph, Graph, GraphTranslator, PatternInstructor, ReducedGraph, Storable};
 use mode::{AtomicMode, Mode};
 use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
-pub struct Operator<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
-where
-    Maze: Storable
-        + DirectionalGraph<Node, Cost, Direction>
-        + GraphTranslator<Node, Position, Pattern>
-        + PatternInstructor<Node, Direction, Pattern>,
-    IAgent: Agent<Position, Pattern>,
-    ISolver: Solver<Node, Cost, Direction>,
-    SW: Switch,
-    C: Counter,
-{
+pub struct Operator<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C> {
     maze: Maze,
     agent: IAgent,
     solver: ISolver,
@@ -49,11 +37,12 @@ impl<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
 where
     Node: Copy + Clone,
     Maze: Storable
-        + DirectionalGraph<Node, Cost, Direction>
+        + CheckerGraph<Node>
+        + ReducedGraph<Node, Cost>
         + GraphTranslator<Node, Position, Pattern>
         + PatternInstructor<Node, Direction, Pattern>,
     IAgent: Agent<Position, Pattern>,
-    ISolver: Solver<Node, Cost, Direction>,
+    ISolver: Solver<Node, Cost>,
     SW: Switch,
     C: Counter,
 {

@@ -28,7 +28,7 @@ impl<Node, Cost, Max> Solver<Node, Cost, Max> {
     }
 }
 
-impl<Node, Cost, Max, Direction> operator::Solver<Node, Cost, Direction> for Solver<Node, Cost, Max>
+impl<Node, Cost, Max> operator::Solver<Node, Cost> for Solver<Node, Cost, Max>
 where
     Max: ArrayLength<Node>
         + ArrayLength<Cost>
@@ -40,17 +40,13 @@ where
     Node: Ord + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
 {
-    type Directions = Vec<Direction, U4>;
+    type Nodes = Vec<Node, U4>;
 
     fn start_node(&self) -> Node {
         self.start
     }
 
-    fn next_direction_candidates<Graph>(
-        &self,
-        current: Node,
-        graph: &Graph,
-    ) -> Option<Self::Directions>
+    fn next_node_candidates<Graph>(&self, current: Node, graph: &Graph) -> Option<Self::Nodes>
     where
         Graph: operator::Graph<Node, Cost>,
     {
