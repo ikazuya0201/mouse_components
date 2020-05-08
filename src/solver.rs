@@ -48,10 +48,47 @@ where
 
     fn next_node_candidates<Graph>(&self, current: Node, graph: &Graph) -> Option<Self::Nodes>
     where
-        Graph: operator::Graph<Node, Cost>,
+        Graph: operator::ReducedGraph<Node, Cost> + operator::CheckerGraph<Node>,
     {
-        let shortest_path = self.compute_shortest_path(graph);
-        None
+        let shortest_path = self.compute_shortest_path(graph)?;
+        let checker_nodes = graph.convert_to_checker_nodes(shortest_path);
+
+        let candidates = graph
+            .reduced_successors(current)
+            .into_iter()
+            .collect::<Vec<(Node, Cost), U4>>();
+
+        let mut dists = repeat_n(Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
+        let mut heap = BinaryHeap::<Node, Reverse<Cost>, Max>::new();
+        for node in checker_nodes {
+            heap.push(node, Reverse(Cost::min_value())).unwrap();
+            dists[node.into()] = Cost::min_value();
+        }
+        while let Some((node, Reverse(cost))) = heap.pop() {
+            if candidates.iter().any(|&(cand, _)| cand == node) {
+                continue;
+            }
+            for (next, edge_cost) in graph.reduced_predecessors(node) {
+                let next_cost = cost.saturating_add(edge_cost);
+                if dists[next.into()] > next_cost {
+                    dists[next.into()] = next_cost;
+                    heap.push_or_update(next, Reverse(next_cost)).unwrap();
+                }
+            }
+        }
+
+        let mut candidates = candidates
+            .into_iter()
+            .map(|(node, cost)| (node, cost.saturating_add(dists[node.into()])))
+            .filter(|&(_, cost)| cost == Cost::max_value())
+            .collect::<Vec<(Node, Cost), U4>>();
+
+        if candidates.is_empty() {
+            return None;
+        }
+
+        candidates.sort_by_key(|&(_, cost)| cost);
+        Some(candidates.into_iter().map(|(node, _)| node).collect())
     }
 }
 
@@ -84,7 +121,7 @@ where
                 break;
             }
             for (next, edge_cost) in graph.successors(node) {
-                let next_cost = cost + edge_cost;
+                let next_cost = cost.saturating_add(edge_cost);
                 if next_cost < dists[next.into()] {
                     dists[next.into()] = next_cost;
                     heap.push_or_update(next, Reverse(next_cost)).unwrap();
