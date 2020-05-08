@@ -47,7 +47,7 @@ where
             + GraphTranslator<Node, Position, Pattern>
             + PatternInstructor<Node, Direction, Pattern>,
         IAgent: Agent<Position, Pattern>,
-        ISolver: Solver<Node, Direction>,
+        ISolver: Solver<Node, Cost, Direction>,
     {
         if !self
             .is_updated
