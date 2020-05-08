@@ -11,13 +11,13 @@ use core::sync::atomic::Ordering;
 
 pub use agent::Agent;
 pub use counter::Counter;
-pub use maze::{CheckerGraph, Graph, GraphTranslator, PatternInstructor, ReducedGraph, Storable};
+pub use maze::{CheckerGraph, DirectionInstructor, Graph, GraphTranslator, ReducedGraph, Storable};
 use mode::{AtomicMode, Mode};
 use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
-pub struct Operator<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C> {
+pub struct Operator<Node, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C> {
     maze: Maze,
     agent: IAgent,
     solver: ISolver,
@@ -29,19 +29,18 @@ pub struct Operator<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISol
     _cost: PhantomData<fn() -> Cost>,
     _position: PhantomData<fn() -> Position>,
     _direction: PhantomData<fn() -> Direction>,
-    _pattern: PhantomData<fn() -> Pattern>,
 }
 
-impl<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
-    Operator<Node, Cost, Position, Direction, Pattern, Maze, IAgent, ISolver, SW, C>
+impl<Node, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C>
+    Operator<Node, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C>
 where
     Node: Copy + Clone,
     Maze: Storable
         + CheckerGraph<Node>
         + ReducedGraph<Node, Cost>
-        + GraphTranslator<Node, Position, Pattern>
-        + PatternInstructor<Node, Direction, Pattern>,
-    IAgent: Agent<Position, Pattern>,
+        + GraphTranslator<Position>
+        + DirectionInstructor<Node, Direction>,
+    IAgent: Agent<Position, Direction>,
     ISolver: Solver<Node, Cost>,
     SW: Switch,
     C: Counter,
@@ -60,7 +59,6 @@ where
             _cost: PhantomData,
             _position: PhantomData,
             _direction: PhantomData,
-            _pattern: PhantomData,
         }
     }
 
@@ -89,7 +87,7 @@ where
             match self.mode.load(Ordering::Relaxed) {
                 Idle => (),
                 Search => {
-                    if !self.searcher.search(&self.maze, &self.agent, &self.solver) {
+                    if !self.searcher.search(&self.maze, &self.solver) {
                         self.mode.store(FastRun, Ordering::Relaxed);
                     }
                 }

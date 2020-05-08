@@ -3,20 +3,17 @@ pub trait Storable {
     fn restore(&self);
 }
 
-pub trait GraphTranslator<Node, Position, Pattern> {
-    type Patterns: IntoIterator<Item = Pattern>;
-
-    fn nodes_to_patterns<Nodes: IntoIterator<Item = Node>>(&self, nodes: Nodes) -> Self::Patterns;
+pub trait GraphTranslator<Position> {
     fn update_obstacles<Positions: IntoIterator<Item = Position>>(&self, states: Positions);
 }
 
-pub trait PatternInstructor<Node, Direction, Pattern> {
+pub trait DirectionInstructor<Node, Direction> {
     fn update_node_candidates<Nodes: IntoIterator<Item = Node>>(
         &self,
         current: Node,
         candidates: Nodes,
     );
-    fn instruct(&self) -> Option<(Pattern, Node)>;
+    fn instruct(&self) -> Option<(Direction, Node)>;
 }
 
 pub trait CheckerGraph<Node> {

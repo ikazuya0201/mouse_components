@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use super::{Agent, CheckerGraph, GraphTranslator, PatternInstructor, ReducedGraph, Solver};
+use super::{Agent, CheckerGraph, DirectionInstructor, GraphTranslator, ReducedGraph, Solver};
 
 pub struct Searcher<Node> {
     current: Cell<Node>,
@@ -19,16 +19,15 @@ where
         }
     }
 
-    pub fn tick<Position, Direction, Pattern, Maze, IAgent>(&self, maze: &Maze, agent: &IAgent)
+    pub fn tick<Position, Direction, Maze, IAgent>(&self, maze: &Maze, agent: &IAgent)
     where
-        Maze:
-            GraphTranslator<Node, Position, Pattern> + PatternInstructor<Node, Direction, Pattern>,
-        IAgent: Agent<Position, Pattern>,
+        Maze: GraphTranslator<Position> + DirectionInstructor<Node, Direction>,
+        IAgent: Agent<Position, Direction>,
     {
         let obstacles = agent.existing_obstacles();
         maze.update_obstacles(obstacles);
-        if let Some((pattern, node)) = maze.instruct() {
-            agent.set_instructed_pattern(pattern);
+        if let Some((direction, node)) = maze.instruct() {
+            agent.set_instructed_direction(direction);
             self.current.set(node);
             self.is_updated.store(true, Ordering::Relaxed);
         }
@@ -36,18 +35,9 @@ where
     }
 
     //return: false if search finished
-    pub fn search<Cost, Position, Direction, Pattern, Maze, IAgent, ISolver>(
-        &self,
-        maze: &Maze,
-        agent: &IAgent,
-        solver: &ISolver,
-    ) -> bool
+    pub fn search<Cost, Direction, Maze, ISolver>(&self, maze: &Maze, solver: &ISolver) -> bool
     where
-        Maze: CheckerGraph<Node>
-            + ReducedGraph<Node, Cost>
-            + GraphTranslator<Node, Position, Pattern>
-            + PatternInstructor<Node, Direction, Pattern>,
-        IAgent: Agent<Position, Pattern>,
+        Maze: CheckerGraph<Node> + ReducedGraph<Node, Cost> + DirectionInstructor<Node, Direction>,
         ISolver: Solver<Node, Cost>,
     {
         if !self
