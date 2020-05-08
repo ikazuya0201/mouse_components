@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use super::{Agent, DirectionalGraph, GraphTranslator, PatternInstructor, Solver};
+use super::{Agent, CheckerGraph, GraphTranslator, PatternInstructor, ReducedGraph, Solver};
 
 pub struct Searcher<Node> {
     current: Cell<Node>,
@@ -43,11 +43,12 @@ where
         solver: &ISolver,
     ) -> bool
     where
-        Maze: DirectionalGraph<Node, Cost, Direction>
+        Maze: CheckerGraph<Node>
+            + ReducedGraph<Node, Cost>
             + GraphTranslator<Node, Position, Pattern>
             + PatternInstructor<Node, Direction, Pattern>,
         IAgent: Agent<Position, Pattern>,
-        ISolver: Solver<Node, Cost, Direction, Maze>,
+        ISolver: Solver<Node, Cost>,
     {
         if !self
             .is_updated
@@ -56,13 +57,8 @@ where
             return true;
         }
         let current = self.current.get();
-        if let Some(path) = solver.next_path(current, maze) {
-            let path = maze.nodes_to_patterns(path);
-            agent.set_next_path(path);
-            maze.update_direction_candidates(
-                solver.last_node().unwrap(),
-                solver.next_direction_candidates(maze).unwrap(),
-            );
+        if let Some(candidates) = solver.next_node_candidates(current, maze) {
+            maze.update_node_candidates(current, candidates);
             true
         } else {
             false
