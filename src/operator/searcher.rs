@@ -47,7 +47,7 @@ where
             + GraphTranslator<Node, Position, Pattern>
             + PatternInstructor<Node, Direction, Pattern>,
         IAgent: Agent<Position, Pattern>,
-        ISolver: Solver<Node, Cost, Direction, Maze>,
+        ISolver: Solver<Node, Direction>,
     {
         if !self
             .is_updated
@@ -56,13 +56,8 @@ where
             return true;
         }
         let current = self.current.get();
-        if let Some(path) = solver.next_path(current, maze) {
-            let path = maze.nodes_to_patterns(path);
-            agent.set_next_path(path);
-            maze.update_direction_candidates(
-                solver.last_node().unwrap(),
-                solver.next_direction_candidates(maze).unwrap(),
-            );
+        if let Some(directions) = solver.next_direction_candidates(current, maze) {
+            maze.update_direction_candidates(current, directions);
             true
         } else {
             false

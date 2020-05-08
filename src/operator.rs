@@ -26,7 +26,7 @@ where
         + GraphTranslator<Node, Position, Pattern>
         + PatternInstructor<Node, Direction, Pattern>,
     IAgent: Agent<Position, Pattern>,
-    ISolver: Solver<Node, Cost, Direction, Maze>,
+    ISolver: Solver<Node, Direction>,
     SW: Switch,
     C: Counter,
 {
@@ -53,7 +53,7 @@ where
         + GraphTranslator<Node, Position, Pattern>
         + PatternInstructor<Node, Direction, Pattern>,
     IAgent: Agent<Position, Pattern>,
-    ISolver: Solver<Node, Cost, Direction, Maze>,
+    ISolver: Solver<Node, Direction>,
     SW: Switch,
     C: Counter,
 {
