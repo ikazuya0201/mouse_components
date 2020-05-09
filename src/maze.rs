@@ -516,12 +516,12 @@ where
             .unwrap();
         if !is_wall_relative(1, 1) {
             neighbors
-                .push((relative_node(1, 1, Left), self.cost(Search90)))
+                .push((relative_node(1, 1, Right), self.cost(Search90)))
                 .unwrap();
         }
         if !is_wall_relative(-1, 1) {
             neighbors
-                .push((relative_node(-1, 1, Right), self.cost(Search90)))
+                .push((relative_node(-1, 1, Left), self.cost(Search90)))
                 .unwrap();
         }
         if !is_wall_relative(0, 2) {
@@ -781,6 +781,86 @@ mod tests {
         for (src, mut expected) in test_data {
             expected.sort();
             let mut predecessors = maze.predecessors(src);
+            predecessors.sort();
+            assert_eq!(predecessors, expected.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_reduced_successors() {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+
+        let maze = Maze::<U4, _>::new(cost);
+
+        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
+            NodeId::<U4>::new(x, y, direction)
+        };
+
+        let test_data = vec![
+            (
+                new(2, 1, North),
+                vec![
+                    (new(2, 1, South), cost(SpinBack)),
+                    (new(3, 2, East), cost(Search90)),
+                    (new(1, 2, West), cost(Search90)),
+                    (new(2, 3, North), cost(Straight(2))),
+                ],
+            ),
+            (
+                new(1, 2, East),
+                vec![
+                    (new(1, 2, West), cost(SpinBack)),
+                    (new(2, 1, South), cost(Search90)),
+                    (new(2, 3, North), cost(Search90)),
+                    (new(3, 2, East), cost(Straight(2))),
+                ],
+            ),
+        ];
+
+        for (src, mut expected) in test_data {
+            expected.sort();
+            let mut successors = maze.reduced_successors(src);
+            successors.sort();
+            assert_eq!(successors, expected.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_reduced_predecessors() {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+
+        let maze = Maze::<U4, _>::new(cost);
+
+        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
+            NodeId::<U4>::new(x, y, direction)
+        };
+
+        let test_data = vec![
+            (
+                new(2, 3, North),
+                vec![
+                    (new(2, 3, South), cost(SpinBack)),
+                    (new(3, 2, West), cost(Search90)),
+                    (new(1, 2, East), cost(Search90)),
+                    (new(2, 1, North), cost(Straight(2))),
+                ],
+            ),
+            (
+                new(3, 2, East),
+                vec![
+                    (new(3, 2, West), cost(SpinBack)),
+                    (new(2, 1, North), cost(Search90)),
+                    (new(2, 3, South), cost(Search90)),
+                    (new(1, 2, East), cost(Straight(2))),
+                ],
+            ),
+        ];
+
+        for (src, mut expected) in test_data {
+            expected.sort();
+            let mut predecessors = maze.reduced_predecessors(src);
             predecessors.sort();
             assert_eq!(predecessors, expected.as_slice());
         }
