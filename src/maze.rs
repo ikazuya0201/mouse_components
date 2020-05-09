@@ -18,7 +18,7 @@ use node::{Location, Node, NodeId, Position};
 struct WallPosition<N> {
     x: u16,
     y: u16,
-    z: bool,
+    z: bool, //false: up, true: right
     _size: PhantomData<fn() -> N>,
 }
 
@@ -54,10 +54,6 @@ where
         self.x as usize
             | (self.y as usize) << Self::y_offset()
             | (self.z as usize) << Self::z_offset()
-    }
-
-    fn from_node(node: Node<N>) -> Option<Self> {
-        Self::from_position(node.position())
     }
 
     fn from_position(position: Position<N>) -> Option<Self> {
@@ -613,13 +609,20 @@ where
 
         let mut walls = Vec::new();
         walls.push(relative_wall_position(0, 1)).unwrap();
-        match src.difference(dst) {
+        match src.difference(dst, North) {
             (1, 2, FrontRight) | (2, 2, Right) => {
                 walls.push(relative_wall_position(1, 2)).unwrap();
             }
             (2, 1, BackRight) | (2, 0, Back) => {
                 walls.push(relative_wall_position(1, 2)).unwrap();
                 walls.push(relative_wall_position(2, 1)).unwrap();
+            }
+            (-1, 2, FrontLeft) | (-2, 2, Left) => {
+                walls.push(relative_wall_position(-1, 2)).unwrap();
+            }
+            (-2, 1, BackLeft) | (-2, 0, Back) => {
+                walls.push(relative_wall_position(-1, 2)).unwrap();
+                walls.push(relative_wall_position(-2, 1)).unwrap();
             }
             (0, y, Front) => {
                 for i in (3..y + 1).step_by(2) {
@@ -641,7 +644,7 @@ where
         let relative_wall_position = Self::relative_wall_position_fn(&src, North);
 
         let mut walls = Vec::new();
-        match src.difference(dst) {
+        match src.difference(dst, North) {
             (1, 1, Right) => {
                 walls.push(relative_wall_position(1, 1)).unwrap();
             }
@@ -669,7 +672,7 @@ where
 
         let mut walls = Vec::new();
         walls.push(relative_wall_position(1, 1)).unwrap();
-        match src.difference(dst) {
+        match src.difference(dst, NorthEast) {
             (1, 2, FrontLeft) => (),
             (0, 2, Left) | (0, 2, BackLeft) => {
                 walls.push(relative_wall_position(0, 2)).unwrap();
@@ -695,7 +698,7 @@ where
 
         let mut walls = Vec::new();
         walls.push(relative_wall_position(1, 1)).unwrap();
-        match src.difference(dst) {
+        match src.difference(dst, NorthEast) {
             (2, 1, FrontRight) => (),
             (2, 0, Right) | (2, 0, BackRight) => {
                 walls.push(relative_wall_position(2, 0)).unwrap();
@@ -723,6 +726,8 @@ where
 {
     type CheckerNodes = Vec<NodeId<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>;
 
+    //NOTE: Suppose that one of the cells nearest to start and goal is not need to be visited.
+    //The cells should be directly connected to the terminals of the given path.
     fn convert_to_checker_nodes<Nodes: IntoIterator<Item = NodeId<N>>>(
         &self,
         path: Nodes,
@@ -769,212 +774,74 @@ where
         }
 
         let mut checker_nodes = Vec::<Node<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>::new();
-        let mut is_added_before = false;
-        let mut before_position = positions[0];
-        if !self.is_checked_by_position(before_position) {
-            match before_position.location() {
-                VerticalBound => {
-                    checker_nodes
-                        .push(before_position.relative_node(-1, -1, North))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(-2, 0, East))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(-1, 1, South))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(1, 1, South))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(2, 0, West))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(1, -1, North))
-                        .unwrap();
-                }
-                HorizontalBound => {
-                    checker_nodes
-                        .push(before_position.relative_node(-1, -1, East))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(0, -2, North))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(1, -1, West))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(1, 1, West))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(0, 2, South))
-                        .unwrap();
-                    checker_nodes
-                        .push(before_position.relative_node(-1, 1, East))
-                        .unwrap();
-                }
-                _ => unreachable!(),
+        for (&src, &dst) in positions.iter().zip(positions.iter().skip(1)) {
+            if self.is_checked_by_position(dst) {
+                continue;
             }
-            is_added_before = true;
-        }
-        for position in positions.into_iter().skip(1) {
-            if !self.is_checked_by_position(position) {
-                match position.location() {
-                    VerticalBound => {
-                        let (x, y) = before_position.difference(&position);
-                        if x < 0 {
-                            checker_nodes
-                                .push(position.relative_node(-1, -1, North))
-                                .unwrap();
-                            checker_nodes
-                                .push(position.relative_node(-2, 0, East))
-                                .unwrap();
-                            checker_nodes
-                                .push(position.relative_node(-1, 1, South))
-                                .unwrap();
-
-                            if !is_added_before {
-                                if y > 0 {
-                                    checker_nodes
-                                        .push(position.relative_node(1, 1, South))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(2, 0, West))
-                                        .unwrap();
-                                } else if y == 0 {
-                                    checker_nodes
-                                        .push(position.relative_node(1, 1, South))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(1, -1, North))
-                                        .unwrap();
-                                } else {
-                                    checker_nodes
-                                        .push(position.relative_node(2, 0, West))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(1, -1, North))
-                                        .unwrap();
-                                }
-                            }
-                        } else {
-                            checker_nodes
-                                .push(position.relative_node(1, -1, North))
-                                .unwrap();
-                            checker_nodes
-                                .push(position.relative_node(2, 0, West))
-                                .unwrap();
-                            checker_nodes
-                                .push(position.relative_node(1, 1, South))
-                                .unwrap();
-
-                            if !is_added_before {
-                                if y > 0 {
-                                    checker_nodes
-                                        .push(position.relative_node(-1, 1, South))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(-2, 0, East))
-                                        .unwrap();
-                                } else if y == 0 {
-                                    checker_nodes
-                                        .push(position.relative_node(-1, 1, South))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(-1, -1, North))
-                                        .unwrap();
-                                } else {
-                                    checker_nodes
-                                        .push(position.relative_node(-2, 0, East))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(-1, -1, North))
-                                        .unwrap();
-                                }
-                            }
-                        }
+            let mut add_if_no_wall = |dx, dy, direction| {
+                if !self.is_wall_by_position(dst.relative_position(dx, dy)) {
+                    checker_nodes
+                        .push(dst.relative_node(dx, dy, direction))
+                        .unwrap();
+                }
+            };
+            match dst.location() {
+                VerticalBound => match dst.difference(&src) {
+                    (-1, -1) => {
+                        add_if_no_wall(-2, 0, East);
+                        add_if_no_wall(-1, 1, South);
                     }
-                    HorizontalBound => {
-                        let (x, y) = before_position.difference(&position);
-                        if y > 0 {
-                            checker_nodes
-                                .push(position.relative_node(-1, 1, East))
-                                .unwrap();
-                            checker_nodes
-                                .push(position.relative_node(0, 2, South))
-                                .unwrap();
-                            checker_nodes
-                                .push(position.relative_node(1, 1, West))
-                                .unwrap();
-
-                            if !is_added_before {
-                                if x > 0 {
-                                    checker_nodes
-                                        .push(position.relative_node(1, -1, West))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(0, -2, North))
-                                        .unwrap();
-                                } else if x == 0 {
-                                    checker_nodes
-                                        .push(position.relative_node(1, -1, West))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(-1, -1, East))
-                                        .unwrap();
-                                } else {
-                                    checker_nodes
-                                        .push(position.relative_node(0, -2, North))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(-1, -1, East))
-                                        .unwrap();
-                                }
-                            }
-                        } else {
-                            checker_nodes
-                                .push(position.relative_node(-1, -1, East))
-                                .unwrap();
-                            checker_nodes
-                                .push(position.relative_node(0, -2, North))
-                                .unwrap();
-                            checker_nodes
-                                .push(position.relative_node(1, -1, West))
-                                .unwrap();
-
-                            if !is_added_before {
-                                if x > 0 {
-                                    checker_nodes
-                                        .push(position.relative_node(1, 1, West))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(0, 2, South))
-                                        .unwrap();
-                                } else if x == 0 {
-                                    checker_nodes
-                                        .push(position.relative_node(1, 1, West))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(-1, 1, East))
-                                        .unwrap();
-                                } else {
-                                    checker_nodes
-                                        .push(position.relative_node(0, 2, South))
-                                        .unwrap();
-                                    checker_nodes
-                                        .push(position.relative_node(-1, 1, East))
-                                        .unwrap();
-                                }
-                            }
-                        }
+                    (-2, 0) => {
+                        add_if_no_wall(-1, -1, North);
+                        add_if_no_wall(-1, 1, South);
+                    }
+                    (-1, 1) => {
+                        add_if_no_wall(-1, -1, North);
+                        add_if_no_wall(-2, 0, East);
+                    }
+                    (1, 1) => {
+                        add_if_no_wall(2, 0, West);
+                        add_if_no_wall(1, -1, North);
+                    }
+                    (2, 0) => {
+                        add_if_no_wall(1, 1, South);
+                        add_if_no_wall(1, -1, North);
+                    }
+                    (1, -1) => {
+                        add_if_no_wall(2, 0, West);
+                        add_if_no_wall(1, 1, South);
                     }
                     _ => unreachable!(),
-                }
-                is_added_before = true;
-            } else {
-                is_added_before = false;
+                },
+                HorizontalBound => match dst.difference(&src) {
+                    (-1, -1) => {
+                        add_if_no_wall(0, -2, North);
+                        add_if_no_wall(1, -1, West);
+                    }
+                    (0, -2) => {
+                        add_if_no_wall(-1, -1, East);
+                        add_if_no_wall(1, -1, West);
+                    }
+                    (1, -1) => {
+                        add_if_no_wall(-1, -1, East);
+                        add_if_no_wall(0, -2, North);
+                    }
+                    (-1, 1) => {
+                        add_if_no_wall(0, 2, South);
+                        add_if_no_wall(1, 1, West);
+                    }
+                    (0, 2) => {
+                        add_if_no_wall(-1, 1, East);
+                        add_if_no_wall(1, 1, West);
+                    }
+                    (1, 1) => {
+                        add_if_no_wall(-1, 1, East);
+                        add_if_no_wall(0, 2, South);
+                    }
+                    _ => unreachable!(),
+                },
+                Cell => unreachable!(),
             }
-            before_position = position;
         }
         checker_nodes
             .into_iter()
@@ -1275,42 +1142,64 @@ mod tests {
     fn test_convert_to_checker_nodes() {
         use AbsoluteDirection::*;
 
-        let maze = Maze::<U4, _>::new(cost);
-
         let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
             NodeId::<U4>::new(x, y, direction)
         };
+        let new_wall = |x, y, z| WallPosition::new(x, y, z);
 
-        let test_data = vec![(
-            vec![
-                new(0, 0, North),
-                new(1, 2, NorthEast),
-                new(2, 4, North),
-                new(4, 4, South),
-            ],
-            vec![
-                new(1, 0, West),
-                new(0, 3, South),
-                new(1, 2, West),
-                new(2, 1, North),
-                new(3, 2, West),
-                new(2, 3, South),
-                new(1, 4, East),
-                new(3, 4, West),
-                new(2, 5, South),
-                new(1, 6, East),
-                new(2, 7, South),
-                new(3, 6, West),
-                new(4, 7, South),
-                new(5, 6, West),
-                new(4, 5, North),
-                new(3, 4, East),
-                new(5, 4, West),
-                new(4, 3, North),
-            ],
-        )];
+        let test_data = vec![
+            (
+                vec![
+                    new_wall(0, 0, true),
+                    new_wall(0, 1, true),
+                    new_wall(1, 0, false),
+                    new_wall(1, 1, false),
+                    new_wall(1, 2, true),
+                    new_wall(2, 2, false),
+                ],
+                vec![
+                    new(0, 0, North),
+                    new(0, 2, North),
+                    new(1, 4, NorthEast),
+                    new(2, 5, NorthEast),
+                    new(4, 6, East),
+                    new(5, 4, SouthWest),
+                    new(4, 2, South),
+                    new(2, 0, West),
+                ],
+                vec![
+                    new(0, 5, South),
+                    new(1, 6, East),
+                    new(6, 3, North),
+                    new(5, 2, West),
+                    new(5, 0, West),
+                    new(3, 2, East),
+                ],
+            ),
+            (
+                vec![new_wall(1, 2, true)],
+                vec![
+                    new(0, 0, North),
+                    new(1, 2, NorthEast),
+                    new(2, 4, North),
+                    new(4, 4, South),
+                ],
+                vec![
+                    new(0, 3, South),
+                    new(2, 1, North),
+                    new(3, 2, West),
+                    new(1, 4, East),
+                    new(1, 6, East),
+                    new(5, 6, West),
+                ],
+            ),
+        ];
 
-        for (path, mut expected) in test_data {
+        for (walls, path, mut expected) in test_data {
+            let mut maze = Maze::<U4, _>::new(cost);
+            for wall in walls {
+                maze.check_wall(wall, true);
+            }
             expected.sort();
             let mut checker_nodes = maze.convert_to_checker_nodes(path);
             checker_nodes.sort();

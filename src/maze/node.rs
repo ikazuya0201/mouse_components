@@ -34,6 +34,10 @@ where
         Node::new(self.x + dx, self.y + dy, direction)
     }
 
+    pub fn relative_position(&self, dx: i16, dy: i16) -> Self {
+        Self::new(self.x + dx, self.y + dy)
+    }
+
     pub fn difference(&self, to: &Self) -> (i16, i16) {
         (to.x - self.x, to.y - self.y)
     }
@@ -142,8 +146,21 @@ where
         }
     }
 
-    pub fn difference(&self, to: &Self) -> (i16, i16, RelativeDirection) {
+    pub fn difference(
+        &self,
+        to: &Self,
+        base_dir: AbsoluteDirection,
+    ) -> (i16, i16, RelativeDirection) {
+        use RelativeDirection::*;
+
         let (dx, dy) = self.position.difference(&to.position);
+        let (dx, dy) = match base_dir.relative(self.direction) {
+            Front => (dx, dy),
+            Right => (-dy, dx),
+            Back => (-dx, -dy),
+            Left => (dy, -dx),
+            _ => unreachable!(),
+        };
         let relative_direction = self.direction.relative(to.direction);
         (dx, dy, relative_direction)
     }
