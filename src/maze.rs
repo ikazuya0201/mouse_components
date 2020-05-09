@@ -8,7 +8,7 @@ use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::operator::Graph;
+use crate::operator::{Graph, ReducedGraph};
 use crate::pattern::Pattern;
 use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, NodeId, Position};
@@ -477,6 +477,63 @@ where
             .filter_map(|(node, cost)| node.to_node_id().map(|node_id| (node_id, cost)))
             .collect()
     }
+
+    fn is_on_reduced_graph(node: &Node<N>) -> bool {
+        use AbsoluteDirection::*;
+        use Location::*;
+
+        match node.location() {
+            VerticalBound => match node.direction() {
+                East | West => true,
+                _ => false,
+            },
+            HorizontalBound => match node.direction() {
+                North | South => true,
+                _ => false,
+            },
+            Cell => false,
+        }
+    }
+
+    fn reduced_neighbors(
+        &self,
+        node_id: NodeId<N>,
+        is_successors: bool,
+    ) -> <Self as Graph<NodeId<N>, u16>>::Edges {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+        use RelativeDirection::*;
+
+        let node = node_id.as_node();
+        debug_assert!(Self::is_on_reduced_graph(&node));
+
+        let is_wall_relative = self.is_wall_relative_fn(&node, North, is_successors);
+        let relative_node = Self::relative_node_fn(&node, North, is_successors);
+
+        let mut neighbors = Vec::<(Node<N>, u16), U4>::new();
+        neighbors
+            .push((relative_node(0, 0, Back), self.cost(SpinBack)))
+            .unwrap();
+        if !is_wall_relative(1, 1) {
+            neighbors
+                .push((relative_node(1, 1, Right), self.cost(Search90)))
+                .unwrap();
+        }
+        if !is_wall_relative(-1, 1) {
+            neighbors
+                .push((relative_node(-1, 1, Left), self.cost(Search90)))
+                .unwrap();
+        }
+        if !is_wall_relative(0, 2) {
+            neighbors
+                .push((relative_node(0, 2, Front), self.cost(Straight(2))))
+                .unwrap();
+        }
+        neighbors
+            .into_iter()
+            .filter_map(|(node, cost)| node.to_node_id().map(|node_id| (node_id, cost)))
+            .collect()
+    }
 }
 
 impl<N, F> Graph<NodeId<N>, u16> for Maze<N, F>
@@ -498,6 +555,26 @@ where
 
     fn predecessors(&self, node_id: NodeId<N>) -> Self::Edges {
         self.neighbors(node_id, false)
+    }
+}
+
+impl<N, F> ReducedGraph<NodeId<N>, u16> for Maze<N, F>
+where
+    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
+    <N as Mul<U2>>::Output: Add<U10>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    F: Fn(Pattern) -> u16,
+    Node<N>: core::fmt::Debug,
+{
+    fn reduced_successors(&self, node: NodeId<N>) -> Self::Edges {
+        self.reduced_neighbors(node, true)
+    }
+
+    fn reduced_predecessors(&self, node: NodeId<N>) -> Self::Edges {
+        self.reduced_neighbors(node, false)
     }
 }
 
@@ -704,6 +781,86 @@ mod tests {
         for (src, mut expected) in test_data {
             expected.sort();
             let mut predecessors = maze.predecessors(src);
+            predecessors.sort();
+            assert_eq!(predecessors, expected.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_reduced_successors() {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+
+        let maze = Maze::<U4, _>::new(cost);
+
+        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
+            NodeId::<U4>::new(x, y, direction)
+        };
+
+        let test_data = vec![
+            (
+                new(2, 1, North),
+                vec![
+                    (new(2, 1, South), cost(SpinBack)),
+                    (new(3, 2, East), cost(Search90)),
+                    (new(1, 2, West), cost(Search90)),
+                    (new(2, 3, North), cost(Straight(2))),
+                ],
+            ),
+            (
+                new(1, 2, East),
+                vec![
+                    (new(1, 2, West), cost(SpinBack)),
+                    (new(2, 1, South), cost(Search90)),
+                    (new(2, 3, North), cost(Search90)),
+                    (new(3, 2, East), cost(Straight(2))),
+                ],
+            ),
+        ];
+
+        for (src, mut expected) in test_data {
+            expected.sort();
+            let mut successors = maze.reduced_successors(src);
+            successors.sort();
+            assert_eq!(successors, expected.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_reduced_predecessors() {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+
+        let maze = Maze::<U4, _>::new(cost);
+
+        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
+            NodeId::<U4>::new(x, y, direction)
+        };
+
+        let test_data = vec![
+            (
+                new(2, 3, North),
+                vec![
+                    (new(2, 3, South), cost(SpinBack)),
+                    (new(3, 2, West), cost(Search90)),
+                    (new(1, 2, East), cost(Search90)),
+                    (new(2, 1, North), cost(Straight(2))),
+                ],
+            ),
+            (
+                new(3, 2, East),
+                vec![
+                    (new(3, 2, West), cost(SpinBack)),
+                    (new(2, 1, North), cost(Search90)),
+                    (new(2, 3, South), cost(Search90)),
+                    (new(1, 2, East), cost(Straight(2))),
+                ],
+            ),
+        ];
+
+        for (src, mut expected) in test_data {
+            expected.sort();
+            let mut predecessors = maze.reduced_predecessors(src);
             predecessors.sort();
             assert_eq!(predecessors, expected.as_slice());
         }
