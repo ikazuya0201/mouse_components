@@ -1,6 +1,7 @@
 mod direction;
 mod node;
 
+use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::ops::{Add, Mul};
 
@@ -8,7 +9,7 @@ use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::operator::{Graph, ReducedGraph};
+use crate::operator::{CheckerGraph, Graph, ReducedGraph};
 use crate::pattern::Pattern;
 use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, NodeId, Position};
@@ -17,7 +18,7 @@ use node::{Location, Node, NodeId, Position};
 struct WallPosition<N> {
     x: u16,
     y: u16,
-    z: bool,
+    z: bool, //false: up, true: right
     _size: PhantomData<fn() -> N>,
 }
 
@@ -55,10 +56,6 @@ where
             | (self.z as usize) << Self::z_offset()
     }
 
-    fn from_node(node: Node<N>) -> Option<Self> {
-        Self::from_position(node.position())
-    }
-
     fn from_position(position: Position<N>) -> Option<Self> {
         use Location::*;
         let x = position.x() / 2;
@@ -93,7 +90,7 @@ where
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
-    Node<N>: core::fmt::Debug,
+    Node<N>: Debug,
 {
     pub fn new(costs: F) -> Self {
         let mut maze = Self {
@@ -130,7 +127,6 @@ where
         self.is_wall[position.as_index()]
     }
 
-    #[inline]
     fn is_wall_by_position(&self, position: Position<N>) -> bool {
         if let Some(wall_position) = WallPosition::from_position(position) {
             self.is_wall(wall_position)
@@ -142,6 +138,14 @@ where
     #[inline]
     fn is_checked(&self, position: WallPosition<N>) -> bool {
         self.is_checked[position.as_index()]
+    }
+
+    fn is_checked_by_position(&self, position: Position<N>) -> bool {
+        if let Some(wall_position) = WallPosition::from_position(position) {
+            self.is_checked(wall_position)
+        } else {
+            true
+        }
     }
 
     #[inline]
@@ -187,7 +191,7 @@ where
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
-    Node<N>: core::fmt::Debug,
+    Node<N>: Debug,
 {
     fn cell_neighbors(
         &self,
@@ -441,7 +445,7 @@ where
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
-    Node<N>: core::fmt::Debug,
+    Node<N>: Debug,
 {
     fn neighbors(
         &self,
@@ -545,7 +549,7 @@ where
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
-    Node<N>: core::fmt::Debug,
+    Node<N>: Debug,
 {
     type Edges = Vec<(NodeId<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output>;
 
@@ -567,7 +571,7 @@ where
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
-    Node<N>: core::fmt::Debug,
+    Node<N>: Debug,
 {
     fn reduced_successors(&self, node: NodeId<N>) -> Self::Edges {
         self.reduced_neighbors(node, true)
@@ -575,6 +579,274 @@ where
 
     fn reduced_predecessors(&self, node: NodeId<N>) -> Self::Edges {
         self.reduced_neighbors(node, false)
+    }
+}
+
+impl<N, F> Maze<N, F>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo + Debug,
+    <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<NodeId<N>>,
+    <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
+    F: Fn(Pattern) -> u16,
+{
+    fn relative_wall_position_fn<'a>(
+        node: &'a Node<N>,
+        base_dir: AbsoluteDirection,
+    ) -> impl Fn(i16, i16) -> Position<N> + 'a {
+        move |x: i16, y: i16| -> Position<N> { node.relative_position(x, y, base_dir).unwrap() }
+    }
+
+    fn wall_positions_on_passage_from_cell(
+        src: &Node<N>,
+        dst: &Node<N>,
+    ) -> Vec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+
+        let relative_wall_position = Self::relative_wall_position_fn(&src, North);
+
+        let mut walls = Vec::new();
+        walls.push(relative_wall_position(0, 1)).unwrap();
+        match src.difference(dst, North) {
+            (1, 2, FrontRight) | (2, 2, Right) => {
+                walls.push(relative_wall_position(1, 2)).unwrap();
+            }
+            (2, 1, BackRight) | (2, 0, Back) => {
+                walls.push(relative_wall_position(1, 2)).unwrap();
+                walls.push(relative_wall_position(2, 1)).unwrap();
+            }
+            (-1, 2, FrontLeft) | (-2, 2, Left) => {
+                walls.push(relative_wall_position(-1, 2)).unwrap();
+            }
+            (-2, 1, BackLeft) | (-2, 0, Back) => {
+                walls.push(relative_wall_position(-1, 2)).unwrap();
+                walls.push(relative_wall_position(-2, 1)).unwrap();
+            }
+            (0, y, Front) => {
+                for i in (3..y + 1).step_by(2) {
+                    walls.push(relative_wall_position(0, i)).unwrap();
+                }
+            }
+            _ => unreachable!(),
+        }
+        walls
+    }
+
+    fn wall_positions_on_passage_from_bound_straight(
+        src: &Node<N>,
+        dst: &Node<N>,
+    ) -> Vec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+
+        let relative_wall_position = Self::relative_wall_position_fn(&src, North);
+
+        let mut walls = Vec::new();
+        match src.difference(dst, North) {
+            (1, 1, Right) => {
+                walls.push(relative_wall_position(1, 1)).unwrap();
+            }
+            (-1, 1, Left) => {
+                walls.push(relative_wall_position(-1, 1)).unwrap();
+            }
+            (0, y, Front) => {
+                for i in (2..y + 1).step_by(2) {
+                    walls.push(relative_wall_position(0, i)).unwrap();
+                }
+            }
+            _ => unreachable!(),
+        }
+        walls
+    }
+
+    fn wall_positions_on_passage_from_vertical_bound_diagonal(
+        src: &Node<N>,
+        dst: &Node<N>,
+    ) -> Vec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+
+        let relative_wall_position = Self::relative_wall_position_fn(&src, NorthEast);
+
+        let mut walls = Vec::new();
+        walls.push(relative_wall_position(1, 1)).unwrap();
+        match src.difference(dst, NorthEast) {
+            (1, 2, FrontLeft) => (),
+            (0, 2, Left) | (0, 2, BackLeft) => {
+                walls.push(relative_wall_position(0, 2)).unwrap();
+            }
+            (x, y, Front) if x == y => {
+                for i in 2..x + 1 {
+                    walls.push(relative_wall_position(i, i)).unwrap();
+                }
+            }
+            _ => unreachable!(),
+        }
+        walls
+    }
+
+    fn wall_positions_on_passage_from_horizontal_bound_diagonal(
+        src: &Node<N>,
+        dst: &Node<N>,
+    ) -> Vec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+
+        let relative_wall_position = Self::relative_wall_position_fn(&src, NorthEast);
+
+        let mut walls = Vec::new();
+        walls.push(relative_wall_position(1, 1)).unwrap();
+        match src.difference(dst, NorthEast) {
+            (2, 1, FrontRight) => (),
+            (2, 0, Right) | (2, 0, BackRight) => {
+                walls.push(relative_wall_position(2, 0)).unwrap();
+            }
+            (x, y, Front) if x == y => {
+                for i in 2..x + 1 {
+                    walls.push(relative_wall_position(i, i)).unwrap();
+                }
+            }
+            _ => unreachable!(),
+        }
+        walls
+    }
+}
+
+impl<N, F> CheckerGraph<NodeId<N>> for Maze<N, F>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo + Debug,
+    <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<NodeId<N>>,
+    <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Node<N>>,
+    <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
+    F: Fn(Pattern) -> u16,
+{
+    type CheckerNodes = Vec<NodeId<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>;
+
+    //NOTE: Suppose that one of the cells nearest to start and goal is not need to be visited.
+    //The cells should be directly connected to the terminals of the given path.
+    fn convert_to_checker_nodes<Nodes: IntoIterator<Item = NodeId<N>>>(
+        &self,
+        path: Nodes,
+    ) -> Self::CheckerNodes {
+        use AbsoluteDirection::*;
+        use Location::*;
+
+        let mut src: Option<Node<N>> = None;
+        let mut positions = Vec::<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>::new();
+        for dst in path.into_iter() {
+            let dst = dst.as_node();
+            if let Some(src) = src {
+                let positions_on_passage = match src.location() {
+                    Cell => match src.direction() {
+                        North | East | South | West => {
+                            Self::wall_positions_on_passage_from_cell(&src, &dst)
+                        }
+                        _ => unreachable!(),
+                    },
+                    VerticalBound => match src.direction() {
+                        East | West => {
+                            Self::wall_positions_on_passage_from_bound_straight(&src, &dst)
+                        }
+                        NorthEast | SouthEast | SouthWest | NorthWest => {
+                            Self::wall_positions_on_passage_from_vertical_bound_diagonal(&src, &dst)
+                        }
+                        _ => unreachable!(),
+                    },
+                    HorizontalBound => match src.direction() {
+                        North | South => {
+                            Self::wall_positions_on_passage_from_bound_straight(&src, &dst)
+                        }
+                        NorthEast | SouthEast | SouthWest | NorthWest => {
+                            Self::wall_positions_on_passage_from_horizontal_bound_diagonal(
+                                &src, &dst,
+                            )
+                        }
+                        _ => unreachable!(),
+                    },
+                };
+                positions.extend_from_slice(&positions_on_passage).unwrap();
+            }
+            src = Some(dst);
+        }
+
+        let mut checker_nodes = Vec::<Node<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>::new();
+        for (&src, &dst) in positions.iter().zip(positions.iter().skip(1)) {
+            if self.is_checked_by_position(dst) {
+                continue;
+            }
+            let mut add_if_no_wall = |dx, dy, direction| {
+                if !self.is_wall_by_position(dst.relative_position(dx, dy)) {
+                    checker_nodes
+                        .push(dst.relative_node(dx, dy, direction))
+                        .unwrap();
+                }
+            };
+            match dst.location() {
+                VerticalBound => match dst.difference(&src) {
+                    (-1, -1) => {
+                        add_if_no_wall(-2, 0, East);
+                        add_if_no_wall(-1, 1, South);
+                    }
+                    (-2, 0) => {
+                        add_if_no_wall(-1, -1, North);
+                        add_if_no_wall(-1, 1, South);
+                    }
+                    (-1, 1) => {
+                        add_if_no_wall(-1, -1, North);
+                        add_if_no_wall(-2, 0, East);
+                    }
+                    (1, 1) => {
+                        add_if_no_wall(2, 0, West);
+                        add_if_no_wall(1, -1, North);
+                    }
+                    (2, 0) => {
+                        add_if_no_wall(1, 1, South);
+                        add_if_no_wall(1, -1, North);
+                    }
+                    (1, -1) => {
+                        add_if_no_wall(2, 0, West);
+                        add_if_no_wall(1, 1, South);
+                    }
+                    _ => unreachable!(),
+                },
+                HorizontalBound => match dst.difference(&src) {
+                    (-1, -1) => {
+                        add_if_no_wall(0, -2, North);
+                        add_if_no_wall(1, -1, West);
+                    }
+                    (0, -2) => {
+                        add_if_no_wall(-1, -1, East);
+                        add_if_no_wall(1, -1, West);
+                    }
+                    (1, -1) => {
+                        add_if_no_wall(-1, -1, East);
+                        add_if_no_wall(0, -2, North);
+                    }
+                    (-1, 1) => {
+                        add_if_no_wall(0, 2, South);
+                        add_if_no_wall(1, 1, West);
+                    }
+                    (0, 2) => {
+                        add_if_no_wall(-1, 1, East);
+                        add_if_no_wall(1, 1, West);
+                    }
+                    (1, 1) => {
+                        add_if_no_wall(-1, 1, East);
+                        add_if_no_wall(0, 2, South);
+                    }
+                    _ => unreachable!(),
+                },
+                Cell => unreachable!(),
+            }
+        }
+        checker_nodes
+            .into_iter()
+            .filter_map(|node| node.to_node_id())
+            .collect()
     }
 }
 
@@ -863,6 +1135,75 @@ mod tests {
             let mut predecessors = maze.reduced_predecessors(src);
             predecessors.sort();
             assert_eq!(predecessors, expected.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_convert_to_checker_nodes() {
+        use AbsoluteDirection::*;
+
+        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
+            NodeId::<U4>::new(x, y, direction)
+        };
+        let new_wall = |x, y, z| WallPosition::new(x, y, z);
+
+        let test_data = vec![
+            (
+                vec![
+                    new_wall(0, 0, true),
+                    new_wall(0, 1, true),
+                    new_wall(1, 0, false),
+                    new_wall(1, 1, false),
+                    new_wall(1, 2, true),
+                    new_wall(2, 2, false),
+                ],
+                vec![
+                    new(0, 0, North),
+                    new(0, 2, North),
+                    new(1, 4, NorthEast),
+                    new(2, 5, NorthEast),
+                    new(4, 6, East),
+                    new(5, 4, SouthWest),
+                    new(4, 2, South),
+                    new(2, 0, West),
+                ],
+                vec![
+                    new(0, 5, South),
+                    new(1, 6, East),
+                    new(6, 3, North),
+                    new(5, 2, West),
+                    new(5, 0, West),
+                    new(3, 2, East),
+                ],
+            ),
+            (
+                vec![new_wall(1, 2, true)],
+                vec![
+                    new(0, 0, North),
+                    new(1, 2, NorthEast),
+                    new(2, 4, North),
+                    new(4, 4, South),
+                ],
+                vec![
+                    new(0, 3, South),
+                    new(2, 1, North),
+                    new(3, 2, West),
+                    new(1, 4, East),
+                    new(1, 6, East),
+                    new(5, 6, West),
+                ],
+            ),
+        ];
+
+        for (walls, path, mut expected) in test_data {
+            let mut maze = Maze::<U4, _>::new(cost);
+            for wall in walls {
+                maze.check_wall(wall, true);
+            }
+            expected.sort();
+            let mut checker_nodes = maze.convert_to_checker_nodes(path);
+            checker_nodes.sort();
+            assert_eq!(checker_nodes, expected.as_slice());
         }
     }
 }
