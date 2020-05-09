@@ -11,7 +11,7 @@ pub enum Location {
     HorizontalBound,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Position<N> {
     x: i16,
     y: i16,
@@ -28,6 +28,14 @@ where
             y,
             _size: PhantomData,
         }
+    }
+
+    pub fn relative_node(&self, dx: i16, dy: i16, direction: AbsoluteDirection) -> Node<N> {
+        Node::new(self.x + dx, self.y + dy, direction)
+    }
+
+    pub fn difference(&self, to: &Self) -> (i16, i16) {
+        (to.x - self.x, to.y - self.y)
     }
 
     #[inline]
@@ -132,6 +140,12 @@ where
             Left => Some(Position::new(self.x() - y_diff, self.y() + x_diff)),
             _ => None,
         }
+    }
+
+    pub fn difference(&self, to: &Self) -> (i16, i16, RelativeDirection) {
+        let (dx, dy) = self.position.difference(&to.position);
+        let relative_direction = self.direction.relative(to.direction);
+        (dx, dy, relative_direction)
     }
 
     pub fn location(&self) -> Location {
