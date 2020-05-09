@@ -14,7 +14,7 @@ use crate::pattern::Pattern;
 use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, NodeId, Position};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct WallPosition<N> {
     x: u16,
     y: u16,
