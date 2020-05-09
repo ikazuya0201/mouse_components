@@ -317,26 +317,6 @@ where
     }
 
     #[inline]
-    fn x_is_min(&self) -> bool {
-        self.x_raw() == Self::x_min()
-    }
-
-    #[inline]
-    fn y_is_min(&self) -> bool {
-        self.y_raw() == Self::y_min()
-    }
-
-    #[inline]
-    fn x_is_max(&self) -> bool {
-        self.x_raw() == Self::x_max()
-    }
-
-    #[inline]
-    fn y_is_max(&self) -> bool {
-        self.y_raw() == Self::y_max()
-    }
-
-    #[inline]
     fn y_offset() -> u32 {
         (N::USIZE * 2).trailing_zeros()
     }
