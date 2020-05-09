@@ -131,7 +131,6 @@ where
         self.is_wall[position.as_index()]
     }
 
-    #[inline]
     fn is_wall_by_position(&self, position: Position<N>) -> bool {
         if let Some(wall_position) = WallPosition::from_position(position) {
             self.is_wall(wall_position)
@@ -143,6 +142,14 @@ where
     #[inline]
     fn is_checked(&self, position: WallPosition<N>) -> bool {
         self.is_checked[position.as_index()]
+    }
+
+    fn is_checked_by_position(&self, position: Position<N>) -> bool {
+        if let Some(wall_position) = WallPosition::from_position(position) {
+            self.is_checked(wall_position)
+        } else {
+            true
+        }
     }
 
     #[inline]
@@ -764,8 +771,54 @@ where
         let mut checker_nodes = Vec::<Node<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>::new();
         let mut is_added_before = false;
         let mut before_position = positions[0];
+        if !self.is_checked_by_position(before_position) {
+            match before_position.location() {
+                VerticalBound => {
+                    checker_nodes
+                        .push(before_position.relative_node(-1, -1, North))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(-2, 0, East))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(-1, 1, South))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(1, 1, South))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(2, 0, West))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(1, -1, North))
+                        .unwrap();
+                }
+                HorizontalBound => {
+                    checker_nodes
+                        .push(before_position.relative_node(-1, -1, East))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(0, -2, North))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(1, -1, West))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(1, 1, West))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(0, 2, South))
+                        .unwrap();
+                    checker_nodes
+                        .push(before_position.relative_node(-1, 1, East))
+                        .unwrap();
+                }
+                _ => unreachable!(),
+            }
+            is_added_before = true;
+        }
         for position in positions.into_iter().skip(1) {
-            if self.is_wall_by_position(position) {
+            if !self.is_checked_by_position(position) {
                 match position.location() {
                     VerticalBound => {
                         let (x, y) = before_position.difference(&position);
@@ -780,31 +833,29 @@ where
                                 .push(position.relative_node(-1, 1, South))
                                 .unwrap();
 
-                            if is_added_before {
-                                continue;
-                            }
-
-                            if y > 0 {
-                                checker_nodes
-                                    .push(position.relative_node(1, 1, South))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(2, 0, West))
-                                    .unwrap();
-                            } else if y == 0 {
-                                checker_nodes
-                                    .push(position.relative_node(1, 1, South))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(1, -1, North))
-                                    .unwrap();
-                            } else {
-                                checker_nodes
-                                    .push(position.relative_node(2, 0, West))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(1, -1, North))
-                                    .unwrap();
+                            if !is_added_before {
+                                if y > 0 {
+                                    checker_nodes
+                                        .push(position.relative_node(1, 1, South))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(2, 0, West))
+                                        .unwrap();
+                                } else if y == 0 {
+                                    checker_nodes
+                                        .push(position.relative_node(1, 1, South))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(1, -1, North))
+                                        .unwrap();
+                                } else {
+                                    checker_nodes
+                                        .push(position.relative_node(2, 0, West))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(1, -1, North))
+                                        .unwrap();
+                                }
                             }
                         } else {
                             checker_nodes
@@ -817,31 +868,29 @@ where
                                 .push(position.relative_node(1, 1, South))
                                 .unwrap();
 
-                            if is_added_before {
-                                continue;
-                            }
-
-                            if y > 0 {
-                                checker_nodes
-                                    .push(position.relative_node(-1, 1, South))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(-2, 0, East))
-                                    .unwrap();
-                            } else if y == 0 {
-                                checker_nodes
-                                    .push(position.relative_node(-1, 1, South))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(-1, -1, North))
-                                    .unwrap();
-                            } else {
-                                checker_nodes
-                                    .push(position.relative_node(-2, 0, East))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(-1, -1, North))
-                                    .unwrap();
+                            if !is_added_before {
+                                if y > 0 {
+                                    checker_nodes
+                                        .push(position.relative_node(-1, 1, South))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(-2, 0, East))
+                                        .unwrap();
+                                } else if y == 0 {
+                                    checker_nodes
+                                        .push(position.relative_node(-1, 1, South))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(-1, -1, North))
+                                        .unwrap();
+                                } else {
+                                    checker_nodes
+                                        .push(position.relative_node(-2, 0, East))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(-1, -1, North))
+                                        .unwrap();
+                                }
                             }
                         }
                     }
@@ -858,31 +907,29 @@ where
                                 .push(position.relative_node(1, 1, West))
                                 .unwrap();
 
-                            if is_added_before {
-                                continue;
-                            }
-
-                            if x > 0 {
-                                checker_nodes
-                                    .push(position.relative_node(1, -1, West))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(0, -2, North))
-                                    .unwrap();
-                            } else if x == 0 {
-                                checker_nodes
-                                    .push(position.relative_node(1, -1, West))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(-1, -1, East))
-                                    .unwrap();
-                            } else {
-                                checker_nodes
-                                    .push(position.relative_node(0, -2, North))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(-1, -1, East))
-                                    .unwrap();
+                            if !is_added_before {
+                                if x > 0 {
+                                    checker_nodes
+                                        .push(position.relative_node(1, -1, West))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(0, -2, North))
+                                        .unwrap();
+                                } else if x == 0 {
+                                    checker_nodes
+                                        .push(position.relative_node(1, -1, West))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(-1, -1, East))
+                                        .unwrap();
+                                } else {
+                                    checker_nodes
+                                        .push(position.relative_node(0, -2, North))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(-1, -1, East))
+                                        .unwrap();
+                                }
                             }
                         } else {
                             checker_nodes
@@ -895,31 +942,29 @@ where
                                 .push(position.relative_node(1, -1, West))
                                 .unwrap();
 
-                            if is_added_before {
-                                continue;
-                            }
-
-                            if x > 0 {
-                                checker_nodes
-                                    .push(position.relative_node(1, 1, West))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(0, 2, South))
-                                    .unwrap();
-                            } else if x == 0 {
-                                checker_nodes
-                                    .push(position.relative_node(1, 1, West))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(-1, 1, East))
-                                    .unwrap();
-                            } else {
-                                checker_nodes
-                                    .push(position.relative_node(0, 2, South))
-                                    .unwrap();
-                                checker_nodes
-                                    .push(position.relative_node(-1, 1, East))
-                                    .unwrap();
+                            if !is_added_before {
+                                if x > 0 {
+                                    checker_nodes
+                                        .push(position.relative_node(1, 1, West))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(0, 2, South))
+                                        .unwrap();
+                                } else if x == 0 {
+                                    checker_nodes
+                                        .push(position.relative_node(1, 1, West))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(-1, 1, East))
+                                        .unwrap();
+                                } else {
+                                    checker_nodes
+                                        .push(position.relative_node(0, 2, South))
+                                        .unwrap();
+                                    checker_nodes
+                                        .push(position.relative_node(-1, 1, East))
+                                        .unwrap();
+                                }
                             }
                         }
                     }
@@ -1223,6 +1268,53 @@ mod tests {
             let mut predecessors = maze.reduced_predecessors(src);
             predecessors.sort();
             assert_eq!(predecessors, expected.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_convert_to_checker_nodes() {
+        use AbsoluteDirection::*;
+
+        let maze = Maze::<U4, _>::new(cost);
+
+        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
+            NodeId::<U4>::new(x, y, direction)
+        };
+
+        let test_data = vec![(
+            vec![
+                new(0, 0, North),
+                new(1, 2, NorthEast),
+                new(2, 4, North),
+                new(4, 4, South),
+            ],
+            vec![
+                new(1, 0, West),
+                new(0, 3, South),
+                new(1, 2, West),
+                new(2, 1, North),
+                new(3, 2, West),
+                new(2, 3, South),
+                new(1, 4, East),
+                new(3, 4, West),
+                new(2, 5, South),
+                new(1, 6, East),
+                new(2, 7, South),
+                new(3, 6, West),
+                new(4, 7, South),
+                new(5, 6, West),
+                new(4, 5, North),
+                new(3, 4, East),
+                new(5, 4, West),
+                new(4, 3, North),
+            ],
+        )];
+
+        for (path, mut expected) in test_data {
+            expected.sort();
+            let mut checker_nodes = maze.convert_to_checker_nodes(path);
+            checker_nodes.sort();
+            assert_eq!(checker_nodes, expected.as_slice());
         }
     }
 }
