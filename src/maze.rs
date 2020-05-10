@@ -462,7 +462,7 @@ where
         }
         if !is_wall_relative(0, 2) {
             neighbors
-                .push((relative_node(0, 2, Front), self.cost(Straight(2))))
+                .push((relative_node(0, 2, Front), self.cost(Straight(1))))
                 .unwrap();
         }
         neighbors
@@ -966,7 +966,7 @@ mod tests {
                     (new(2, 1, South), cost(SpinBack)),
                     (new(3, 2, East), cost(Search90)),
                     (new(1, 2, West), cost(Search90)),
-                    (new(2, 3, North), cost(Straight(2))),
+                    (new(2, 3, North), cost(Straight(1))),
                 ],
             ),
             (
@@ -975,7 +975,7 @@ mod tests {
                     (new(1, 2, West), cost(SpinBack)),
                     (new(2, 1, South), cost(Search90)),
                     (new(2, 3, North), cost(Search90)),
-                    (new(3, 2, East), cost(Straight(2))),
+                    (new(3, 2, East), cost(Straight(1))),
                 ],
             ),
         ];
@@ -1004,7 +1004,7 @@ mod tests {
                     (new(2, 3, South), cost(SpinBack)),
                     (new(3, 2, West), cost(Search90)),
                     (new(1, 2, East), cost(Search90)),
-                    (new(2, 1, North), cost(Straight(2))),
+                    (new(2, 1, North), cost(Straight(1))),
                 ],
             ),
             (
@@ -1013,7 +1013,7 @@ mod tests {
                     (new(3, 2, West), cost(SpinBack)),
                     (new(2, 1, North), cost(Search90)),
                     (new(2, 3, South), cost(Search90)),
-                    (new(1, 2, East), cost(Straight(2))),
+                    (new(1, 2, East), cost(Straight(1))),
                 ],
             ),
         ];
