@@ -11,7 +11,7 @@ use core::sync::atomic::Ordering;
 
 pub use agent::Agent;
 pub use counter::Counter;
-pub use maze::{DirectionInstructor, Graph, GraphConverter, GraphTranslator, Storable};
+pub use maze::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter, Storable};
 use mode::{AtomicMode, Mode};
 use searcher::Searcher;
 pub use solver::Solver;
@@ -37,7 +37,7 @@ impl<Node, SearchNode, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C>
 where
     SearchNode: Copy + Clone,
     Maze: Storable
-        + GraphTranslator<Position>
+        + ObstacleInterpreter<Position>
         + DirectionInstructor<SearchNode, Direction>
         + Graph<Node, Cost>
         + Graph<SearchNode, Cost>

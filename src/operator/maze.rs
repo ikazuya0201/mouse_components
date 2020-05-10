@@ -3,8 +3,8 @@ pub trait Storable {
     fn restore(&self);
 }
 
-pub trait GraphTranslator<Position> {
-    fn update_obstacles<Positions: IntoIterator<Item = Position>>(&self, states: Positions);
+pub trait ObstacleInterpreter<Position> {
+    fn interpret_obstacles<Positions: IntoIterator<Item = Position>>(&self, positions: Positions);
 }
 
 pub trait DirectionInstructor<Node, Direction> {

@@ -2,7 +2,7 @@ use core::cell::Cell;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use super::{Agent, DirectionInstructor, Graph, GraphConverter, GraphTranslator, Solver};
+use super::{Agent, DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter, Solver};
 
 pub struct Searcher<Node, SearchNode> {
     current: Cell<SearchNode>,
@@ -24,11 +24,11 @@ where
 
     pub fn tick<Position, Direction, Maze, IAgent>(&self, maze: &Maze, agent: &IAgent)
     where
-        Maze: GraphTranslator<Position> + DirectionInstructor<SearchNode, Direction>,
+        Maze: ObstacleInterpreter<Position> + DirectionInstructor<SearchNode, Direction>,
         IAgent: Agent<Position, Direction>,
     {
         let obstacles = agent.existing_obstacles();
-        maze.update_obstacles(obstacles);
+        maze.interpret_obstacles(obstacles);
         if let Some((direction, node)) = maze.instruct() {
             agent.set_instructed_direction(direction);
             self.current.set(node);
