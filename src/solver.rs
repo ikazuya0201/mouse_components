@@ -10,56 +10,64 @@ use num::{Bounded, Saturating};
 
 use super::operator;
 
-pub struct Solver<Node, Cost, Max> {
+pub struct Solver<Node, SearchNode, Cost, Max> {
     start: Node,
     goal: Node,
+    search_start: SearchNode,
     _cost: PhantomData<fn() -> Cost>,
     _max_node: PhantomData<fn() -> Max>,
 }
 
-impl<Node, Cost, Max> Solver<Node, Cost, Max> {
-    pub fn new(start: Node, goal: Node) -> Self {
+impl<Node, SearchNode, Cost, Max> Solver<Node, SearchNode, Cost, Max> {
+    pub fn new(start: Node, goal: Node, search_start: SearchNode) -> Self {
         Self {
             start,
             goal,
+            search_start,
             _cost: PhantomData,
             _max_node: PhantomData,
         }
     }
 }
 
-impl<Node, Cost, Max> operator::Solver<Node, Cost> for Solver<Node, Cost, Max>
+impl<Node, SearchNode, Cost, Graph, Max> operator::Solver<Node, SearchNode, Cost, Graph>
+    for Solver<Node, SearchNode, Cost, Max>
 where
     Max: ArrayLength<Node>
+        + ArrayLength<SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Reverse<Cost>>
         + ArrayLength<(Node, Reverse<Cost>)>
+        + ArrayLength<(SearchNode, Reverse<Cost>)>
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + typenum::Unsigned,
     Node: Ord + Copy + Debug + Into<usize>,
+    SearchNode: Ord + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Graph: operator::Graph<Node, Cost>,
 {
-    type Nodes = Vec<Node, U4>;
+    type Nodes = Vec<Node, Max>;
+    type SearchNodes = Vec<SearchNode, U4>;
 
-    fn start_node(&self) -> Node {
-        self.start
+    fn start_search_node(&self) -> SearchNode {
+        self.search_start
     }
 
-    fn next_node_candidates<Graph>(&self, current: Node, graph: &Graph) -> Option<Self::Nodes>
+    fn next_node_candidates(&self, current: SearchNode, graph: &Graph) -> Option<Self::SearchNodes>
     where
-        Graph: operator::ReducedGraph<Node, Cost> + operator::CheckerGraph<Node>,
+        Graph: operator::Graph<SearchNode, Cost> + operator::GraphConverter<Node, SearchNode>,
     {
         let shortest_path = self.compute_shortest_path(graph)?;
         let checker_nodes = graph.convert_to_checker_nodes(shortest_path);
 
         let candidates = graph
-            .reduced_successors(current)
+            .successors(current)
             .into_iter()
-            .collect::<Vec<(Node, Cost), U4>>();
+            .collect::<Vec<(SearchNode, Cost), U4>>();
 
         let mut dists = repeat_n(Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
-        let mut heap = BinaryHeap::<Node, Reverse<Cost>, Max>::new();
+        let mut heap = BinaryHeap::<SearchNode, Reverse<Cost>, Max>::new();
         for node in checker_nodes {
             heap.push(node, Reverse(Cost::min_value())).unwrap();
             dists[node.into()] = Cost::min_value();
@@ -68,7 +76,7 @@ where
             if candidates.iter().any(|&(cand, _)| cand == node) {
                 continue;
             }
-            for (next, edge_cost) in graph.reduced_predecessors(node) {
+            for (next, edge_cost) in graph.predecessors(node) {
                 let next_cost = cost.saturating_add(edge_cost);
                 if dists[next.into()] > next_cost {
                     dists[next.into()] = next_cost;
@@ -81,7 +89,7 @@ where
             .into_iter()
             .map(|(node, cost)| (node, cost.saturating_add(dists[node.into()])))
             .filter(|&(_, cost)| cost == Cost::max_value())
-            .collect::<Vec<(Node, Cost), U4>>();
+            .collect::<Vec<(SearchNode, Cost), U4>>();
 
         if candidates.is_empty() {
             return None;
@@ -90,24 +98,8 @@ where
         candidates.sort_by_key(|&(_, cost)| cost);
         Some(candidates.into_iter().map(|(node, _)| node).collect())
     }
-}
 
-impl<Node, Cost, Max> Solver<Node, Cost, Max>
-where
-    Max: ArrayLength<Node>,
-{
-    fn compute_shortest_path<Graph>(&self, graph: &Graph) -> Option<Vec<Node, Max>>
-    where
-        Max: ArrayLength<Cost>
-            + ArrayLength<Reverse<Cost>>
-            + ArrayLength<(Node, Reverse<Cost>)>
-            + ArrayLength<Option<Node>>
-            + ArrayLength<Option<usize>>
-            + typenum::Unsigned,
-        Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-        Node: Ord + Copy + Debug + Into<usize>,
-        Graph: operator::Graph<Node, Cost>,
-    {
+    fn compute_shortest_path(&self, graph: &Graph) -> Option<Self::Nodes> {
         let mut dists = repeat_n(Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
         dists[self.start.into()] = Cost::min_value();
 
@@ -211,9 +203,9 @@ mod tests {
 
         let graph = IGraph::new(n, &edges);
 
-        let solver = Solver::<_, _, U9>::new(start, goal);
+        let solver = Solver::<usize, usize, _, U9>::new(start, goal, 0);
 
-        let path = solver.compute_shortest_path(&graph);
+        let path = crate::operator::Solver::compute_shortest_path(&solver, &graph);
         let expected = [0, 1, 3, 5, 7, 8];
 
         assert!(path.is_some());

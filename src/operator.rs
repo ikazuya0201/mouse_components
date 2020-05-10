@@ -11,42 +11,47 @@ use core::sync::atomic::Ordering;
 
 pub use agent::Agent;
 pub use counter::Counter;
-pub use maze::{CheckerGraph, DirectionInstructor, Graph, GraphTranslator, ReducedGraph, Storable};
+pub use maze::{
+    CheckerGraph, DirectionInstructor, Graph, GraphConverter, GraphTranslator, ReducedGraph,
+    Storable,
+};
 use mode::{AtomicMode, Mode};
 use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
-pub struct Operator<Node, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C> {
+pub struct Operator<Node, SearchNode, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C> {
     maze: Maze,
     agent: IAgent,
     solver: ISolver,
     mode: AtomicMode,
     switch: SW,
     counter: C,
-    searcher: Searcher<Node>,
+    searcher: Searcher<Node, SearchNode>,
     _node: PhantomData<fn() -> Node>,
+    _search_node: PhantomData<fn() -> SearchNode>,
     _cost: PhantomData<fn() -> Cost>,
     _position: PhantomData<fn() -> Position>,
     _direction: PhantomData<fn() -> Direction>,
 }
 
-impl<Node, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C>
-    Operator<Node, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C>
+impl<Node, SearchNode, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C>
+    Operator<Node, SearchNode, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C>
 where
-    Node: Copy + Clone,
+    SearchNode: Copy + Clone,
     Maze: Storable
-        + CheckerGraph<Node>
-        + ReducedGraph<Node, Cost>
         + GraphTranslator<Position>
-        + DirectionInstructor<Node, Direction>,
+        + DirectionInstructor<SearchNode, Direction>
+        + Graph<Node, Cost>
+        + Graph<SearchNode, Cost>
+        + GraphConverter<Node, SearchNode>,
     IAgent: Agent<Position, Direction>,
-    ISolver: Solver<Node, Cost>,
+    ISolver: Solver<Node, SearchNode, Cost, Maze>,
     SW: Switch,
     C: Counter,
 {
     pub fn new(maze: Maze, agent: IAgent, solver: ISolver, switch: SW, counter: C) -> Self {
-        let start = solver.start_node();
+        let start = solver.start_search_node();
         Self {
             maze: maze,
             agent: agent,
@@ -56,6 +61,7 @@ where
             counter: counter,
             searcher: Searcher::new(start),
             _node: PhantomData,
+            _search_node: PhantomData,
             _cost: PhantomData,
             _position: PhantomData,
             _direction: PhantomData,

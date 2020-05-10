@@ -16,9 +16,24 @@ pub trait DirectionInstructor<Node, Direction> {
     fn instruct(&self) -> Option<(Direction, Node)>;
 }
 
+pub trait GraphConverter<Node, SearchNode> {
+    type SearchNodes: IntoIterator<Item = SearchNode>;
+
+    fn convert_to_checker_nodes<Nodes: IntoIterator<Item = Node>>(
+        &self,
+        path: Nodes,
+    ) -> Self::SearchNodes;
+}
+
+pub trait Graph<Node, Cost> {
+    type Edges: IntoIterator<Item = (Node, Cost)>;
+
+    fn successors(&self, node: Node) -> Self::Edges;
+    fn predecessors(&self, node: Node) -> Self::Edges;
+}
+
 pub trait CheckerGraph<Node> {
     type CheckerNodes: IntoIterator<Item = Node>;
-
     fn convert_to_checker_nodes<Nodes: IntoIterator<Item = Node>>(
         &self,
         path: Nodes,
@@ -28,11 +43,4 @@ pub trait CheckerGraph<Node> {
 pub trait ReducedGraph<Node, Cost>: Graph<Node, Cost> {
     fn reduced_successors(&self, node: Node) -> Self::Edges;
     fn reduced_predecessors(&self, node: Node) -> Self::Edges;
-}
-
-pub trait Graph<Node, Cost> {
-    type Edges: IntoIterator<Item = (Node, Cost)>;
-
-    fn successors(&self, node: Node) -> Self::Edges;
-    fn predecessors(&self, node: Node) -> Self::Edges;
 }
