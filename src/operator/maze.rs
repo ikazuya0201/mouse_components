@@ -7,13 +7,10 @@ pub trait ObstacleInterpreter<Position> {
     fn interpret_obstacles<Positions: IntoIterator<Item = Position>>(&self, positions: Positions);
 }
 
+//The trait method could be called by other threads.
 pub trait DirectionInstructor<Node, Direction> {
-    fn update_node_candidates<Nodes: IntoIterator<Item = Node>>(
-        &self,
-        current: Node,
-        candidates: Nodes,
-    );
-    fn instruct(&self) -> Option<(Direction, Node)>;
+    fn update_node_candidates<Nodes: IntoIterator<Item = Node>>(&self, candidates: Nodes);
+    fn instruct(&self, current: Node) -> Option<(Direction, Node)>;
 }
 
 pub trait GraphConverter<Node, SearchNode> {
