@@ -31,16 +31,3 @@ pub trait Graph<Node, Cost> {
     fn successors(&self, node: Node) -> Self::Edges;
     fn predecessors(&self, node: Node) -> Self::Edges;
 }
-
-pub trait CheckerGraph<Node> {
-    type CheckerNodes: IntoIterator<Item = Node>;
-    fn convert_to_checker_nodes<Nodes: IntoIterator<Item = Node>>(
-        &self,
-        path: Nodes,
-    ) -> Self::CheckerNodes;
-}
-
-pub trait ReducedGraph<Node, Cost>: Graph<Node, Cost> {
-    fn reduced_successors(&self, node: Node) -> Self::Edges;
-    fn reduced_predecessors(&self, node: Node) -> Self::Edges;
-}

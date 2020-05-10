@@ -168,13 +168,6 @@ where
     pub fn location(&self) -> Location {
         self.position.location()
     }
-
-    pub fn in_maze(&self) -> bool {
-        self.x() >= NodeId::<N>::x_min() as i16
-            && self.x() <= NodeId::<N>::x_max() as i16
-            && self.y() >= NodeId::<N>::y_min() as i16
-            && self.y() <= NodeId::<N>::y_max() as i16
-    }
 }
 
 impl<N> Node<N>
@@ -182,14 +175,18 @@ where
     N: Unsigned + PowerOfTwo,
 {
     pub fn to_node_id(&self) -> Option<NodeId<N>> {
-        if !self.in_maze() {
+        if self.x() < 0 || self.y() < 0 {
             None
         } else {
-            Some(NodeId::new(
-                self.x() as u16,
-                self.y() as u16,
-                self.direction(),
-            ))
+            NodeId::new(self.x() as u16, self.y() as u16, self.direction())
+        }
+    }
+
+    pub fn to_search_node_id(&self) -> Option<SearchNodeId<N>> {
+        if self.x() < 0 || self.y() < 0 {
+            None
+        } else {
+            SearchNodeId::new(self.x() as u16, self.y() as u16, self.direction())
         }
     }
 }
@@ -205,16 +202,6 @@ where
     N: Unsigned,
 {
     #[inline]
-    fn x_min() -> u16 {
-        0
-    }
-
-    #[inline]
-    fn y_min() -> u16 {
-        0
-    }
-
-    #[inline]
     fn x_max() -> u16 {
         N::U16 * 2 - 1
     }
@@ -229,10 +216,11 @@ impl<N> NodeId<N>
 where
     N: Unsigned + PowerOfTwo,
 {
-    pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Self {
+    pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Option<Self> {
         use AbsoluteDirection::*;
-        debug_assert!(x <= Self::x_max());
-        debug_assert!(y <= Self::y_max());
+        if x > Self::x_max() || y > Self::y_max() {
+            return None;
+        }
         let direction = if x & 1 == 0 {
             if y & 1 == 0 {
                 match direction {
@@ -240,38 +228,34 @@ where
                     East => 1,
                     South => 2,
                     West => 3,
-                    _ => unreachable!("x:{}, y:{}, direction:{:?}", x, y, direction),
+                    _ => return None,
                 }
             } else {
                 match direction {
-                    North => 0,
-                    NorthEast => 1,
-                    SouthEast => 2,
-                    South => 3,
-                    SouthWest => 4,
-                    NorthWest => 5,
-                    _ => unreachable!("x:{}, y:{}, direction:{:?}", x, y, direction),
+                    NorthEast => 0,
+                    SouthEast => 1,
+                    SouthWest => 2,
+                    NorthWest => 3,
+                    _ => return None,
                 }
             }
         } else {
             if y & 1 == 0 {
                 match direction {
                     NorthEast => 0,
-                    East => 1,
-                    SouthEast => 2,
-                    SouthWest => 3,
-                    West => 4,
-                    NorthWest => 5,
-                    _ => unreachable!("x:{}, y:{}, direction:{:?}", x, y, direction),
+                    SouthEast => 1,
+                    SouthWest => 2,
+                    NorthWest => 3,
+                    _ => return None,
                 }
             } else {
-                unreachable!("x:{}, y:{}, direction:{:?}", x, y, direction)
+                return None;
             }
         };
-        Self {
+        Some(Self {
             raw: x | (y << Self::y_offset()) | (direction << Self::direction_offset()),
             _size: PhantomData,
-        }
+        })
     }
 
     pub fn as_node(&self) -> Node<N> {
@@ -289,12 +273,10 @@ where
                 }
             } else {
                 match self.raw >> Self::direction_offset() {
-                    0 => North,
-                    1 => NorthEast,
-                    2 => SouthEast,
-                    3 => South,
-                    4 => SouthWest,
-                    5 => NorthWest,
+                    0 => NorthEast,
+                    1 => SouthEast,
+                    2 => SouthWest,
+                    3 => NorthWest,
                     _ => unreachable!(),
                 }
             }
@@ -302,11 +284,9 @@ where
             if y & 1 == 0 {
                 match self.raw >> Self::direction_offset() {
                     0 => NorthEast,
-                    1 => East,
-                    2 => SouthEast,
-                    3 => SouthWest,
-                    4 => West,
-                    5 => NorthWest,
+                    1 => SouthEast,
+                    2 => SouthWest,
+                    3 => NorthWest,
                     _ => unreachable!(),
                 }
             } else {
@@ -363,6 +343,120 @@ where
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SearchNodeId<N> {
+    raw: u16,
+    _size: PhantomData<fn() -> N>,
+}
+
+impl<N> SearchNodeId<N>
+where
+    N: Unsigned,
+{
+    #[inline]
+    fn x_max() -> u16 {
+        N::U16 * 2 - 1
+    }
+
+    #[inline]
+    fn y_max() -> u16 {
+        N::U16 * 2 - 1
+    }
+}
+
+impl<N> SearchNodeId<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Option<Self> {
+        use AbsoluteDirection::*;
+        if x > Self::x_max() || y > Self::y_max() {
+            return None;
+        }
+
+        let direction = if (x & 1) ^ (y & 1) == 1 {
+            match direction {
+                North => 0,
+                East => 1,
+                South => 2,
+                West => 3,
+                _ => return None,
+            }
+        } else {
+            return None;
+        };
+
+        Some(Self {
+            raw: x | (y << Self::y_offset()) | (direction << Self::direction_offset()),
+            _size: PhantomData,
+        })
+    }
+
+    pub fn as_node(&self) -> Node<N> {
+        use AbsoluteDirection::*;
+        let x = self.x_raw();
+        let y = self.y_raw();
+        let direction = if (x & 1) ^ (y & 1) == 1 {
+            match self.raw >> Self::direction_offset() {
+                0 => North,
+                1 => East,
+                2 => South,
+                3 => West,
+                _ => unreachable!(),
+            }
+        } else {
+            unreachable!()
+        };
+        Node::<N>::new(x as i16, y as i16, direction)
+    }
+
+    #[inline]
+    fn y_offset() -> u32 {
+        (N::USIZE * 2).trailing_zeros()
+    }
+
+    #[inline]
+    fn direction_offset() -> u32 {
+        2 * (N::USIZE * 2).trailing_zeros()
+    }
+
+    #[inline]
+    fn x_raw(&self) -> u16 {
+        self.raw & Self::x_max()
+    }
+
+    #[inline]
+    fn y_raw(&self) -> u16 {
+        (self.raw >> Self::y_offset()) & Self::y_max()
+    }
+}
+
+impl<N> Into<Node<N>> for SearchNodeId<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    fn into(self) -> Node<N> {
+        self.as_node()
+    }
+}
+
+impl<N> Into<usize> for SearchNodeId<N> {
+    fn into(self) -> usize {
+        self.raw.into()
+    }
+}
+
+impl<N> core::fmt::Debug for SearchNodeId<N>
+where
+    N: Unsigned + PowerOfTwo,
+    Node<N>: core::fmt::Debug,
+{
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let node: Node<N> = <SearchNodeId<N> as Into<Node<N>>>::into(*self);
+        writeln!(fmt, "{:?}", node)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,70 +466,45 @@ mod tests {
     #[test]
     fn test_base_methods() {
         let test_data = vec![
-            (0u16, 0u16, North),
-            (0, 0, East),
-            (0, 0, South),
-            (0, 0, West),
-            (0, 1, North),
-            (0, 1, NorthEast),
-            (0, 1, SouthEast),
-            (0, 1, South),
-            (0, 1, SouthWest),
-            (0, 1, NorthWest),
-            (1, 0, NorthEast),
-            (1, 0, East),
-            (1, 0, SouthEast),
-            (1, 0, SouthWest),
-            (1, 0, West),
-            (1, 0, NorthWest),
-            (4, 4, South),
-            (5, 4, West),
-            (4, 5, North),
-            (14, 14, North),
-            (15, 14, East),
-            (14, 15, South),
-            (30, 30, North),
-            (31, 30, East),
-            (30, 31, South),
+            ((0u16, 0u16, North), true),
+            ((0, 0, East), true),
+            ((0, 0, South), true),
+            ((0, 0, West), true),
+            ((0, 1, NorthEast), true),
+            ((0, 1, SouthEast), true),
+            ((0, 1, SouthWest), true),
+            ((0, 1, NorthWest), true),
+            ((1, 0, NorthEast), true),
+            ((1, 0, SouthEast), true),
+            ((1, 0, SouthWest), true),
+            ((1, 0, NorthWest), true),
+            ((4, 4, South), true),
+            ((5, 4, NorthEast), true),
+            ((4, 5, NorthWest), true),
+            ((14, 14, North), true),
+            ((15, 14, SouthEast), true),
+            ((14, 15, SouthWest), true),
+            ((30, 30, North), true),
+            ((31, 30, NorthEast), true),
+            ((30, 31, SouthEast), true),
+            ((32, 31, NorthEast), false),
+            ((31, 32, NorthEast), false),
+            ((0, 0, NorthEast), false),
+            ((0, 1, East), false),
+            ((1, 0, North), false),
         ];
 
-        for (x, y, direction) in test_data {
+        for ((x, y, direction), is_some) in test_data {
             let node = NodeId::<U16>::new(x, y, direction);
-            let node = node.as_node();
+            assert_eq!(node.is_some(), is_some);
+            if !is_some {
+                continue;
+            }
+            let node = node.unwrap().as_node();
             assert_eq!(node.x() as u16, x);
             assert_eq!(node.y() as u16, y);
             assert_eq!(node.direction(), direction);
         }
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_x_unreachable() {
-        NodeId::<U16>::new(32, 31, NorthEast);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_y_unreachable() {
-        NodeId::<U16>::new(31, 32, NorthEast);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_direction_unreachable_in_cell() {
-        NodeId::<U16>::new(0, 0, NorthEast);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_direction_unreachable_on_horizontal_bound() {
-        NodeId::<U16>::new(0, 1, East);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_direction_unreachable_on_vertical_bound() {
-        NodeId::<U16>::new(1, 0, North);
     }
 
     #[test]
@@ -444,12 +513,12 @@ mod tests {
             (-1, 0, West, false),
             (0, 100, North, false),
             (0, 0, North, true),
-            (31, 30, East, true),
+            (31, 30, SouthEast, true),
         ];
 
         for (x, y, direction, is_some) in test_data {
             let expected = if is_some {
-                Some(NodeId::<U16>::new(x as u16, y as u16, direction))
+                NodeId::<U16>::new(x as u16, y as u16, direction)
             } else {
                 None
             };

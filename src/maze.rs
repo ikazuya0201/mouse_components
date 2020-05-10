@@ -9,10 +9,10 @@ use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::operator::{CheckerGraph, Graph, ReducedGraph};
+use crate::operator::{Graph, GraphConverter};
 use crate::pattern::Pattern;
 use direction::{AbsoluteDirection, RelativeDirection};
-use node::{Location, Node, NodeId, Position};
+use node::{Location, Node, NodeId, Position, SearchNodeId};
 
 #[derive(Clone)]
 struct WallPosition<N> {
@@ -262,9 +262,6 @@ where
         succs.extend_from_slice(&left_successors()).unwrap();
 
         succs
-            .push((relative_node(0, 1, Front), self.cost(Straight(1))))
-            .unwrap();
-        succs
             .push((relative_node(0, 2, Front), self.cost(Straight(2))))
             .unwrap();
         for i in 1..N::I16 {
@@ -273,65 +270,8 @@ where
             }
             succs
                 .push((
-                    relative_node(0, 2 * i + 1, Front),
-                    self.cost(Straight((2 * i + 1) as u16)),
-                ))
-                .unwrap();
-            succs
-                .push((
                     relative_node(0, 2 * i + 2, Front),
                     self.cost(Straight((2 * i + 2) as u16)),
-                ))
-                .unwrap();
-        }
-
-        succs
-    }
-
-    fn bound_straight_neighbors(
-        &self,
-        node: Node<N>,
-        is_successors: bool,
-    ) -> Vec<(Node<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output> {
-        use AbsoluteDirection::*;
-        use Pattern::*;
-        use RelativeDirection::*;
-
-        let is_wall_relative = self.is_wall_relative_fn(&node, North, is_successors);
-        let relative_node = Self::relative_node_fn(&node, North, is_successors);
-
-        let mut succs = Vec::new();
-        succs
-            .push((relative_node(0, 0, Back), self.cost(SpinBack)))
-            .unwrap();
-        if !is_wall_relative(1, 1) {
-            succs
-                .push((relative_node(1, 1, Right), self.cost(Search90)))
-                .unwrap();
-        }
-        if !is_wall_relative(-1, 1) {
-            succs
-                .push((relative_node(-1, 1, Left), self.cost(Search90)))
-                .unwrap();
-        }
-
-        succs
-            .push((relative_node(0, 1, Front), self.cost(Straight(1))))
-            .unwrap();
-        for i in 1..N::I16 {
-            if is_wall_relative(0, 2 * i) {
-                break;
-            }
-            succs
-                .push((
-                    relative_node(0, 2 * i, Front),
-                    self.cost(Straight((2 * i) as u16)),
-                ))
-                .unwrap();
-            succs
-                .push((
-                    relative_node(0, 2 * i + 1, Front),
-                    self.cost(Straight((2 * i + 1) as u16)),
                 ))
                 .unwrap();
         }
@@ -366,7 +306,7 @@ where
             return succs;
         }
         succs
-            .push((relative_node(2, 0, BackRight), self.cost(FastRun135)))
+            .push((relative_node(2, -1, BackRight), self.cost(FastRun135)))
             .unwrap();
         succs
             .push((relative_node(2, 0, Right), self.cost(FastRunDiagonal90)))
@@ -414,7 +354,7 @@ where
             return succs;
         }
         succs
-            .push((relative_node(0, 2, BackLeft), self.cost(FastRun135)))
+            .push((relative_node(-1, 2, BackLeft), self.cost(FastRun135)))
             .unwrap();
         succs
             .push((relative_node(0, 2, Left), self.cost(FastRunDiagonal90)))
@@ -459,21 +399,19 @@ where
         let node_neighbors = match node.location() {
             Cell => match node.direction() {
                 North | East | South | West => self.cell_neighbors(node, is_successors),
-                _ => Vec::new(),
+                _ => unreachable!(),
             },
             VerticalBound => match node.direction() {
-                East | West => self.bound_straight_neighbors(node, is_successors),
                 NorthEast | SouthEast | SouthWest | NorthWest => {
                     self.vertical_bound_diagonal_neighbors(node, is_successors)
                 }
-                _ => Vec::new(),
+                _ => unreachable!(),
             },
             HorizontalBound => match node.direction() {
-                North | South => self.bound_straight_neighbors(node, is_successors),
                 NorthEast | SouthEast | SouthWest | NorthWest => {
                     self.horizontal_bound_diagonal_neighbors(node, is_successors)
                 }
-                _ => Vec::new(),
+                _ => unreachable!(),
             },
         };
         node_neighbors
@@ -481,35 +419,29 @@ where
             .filter_map(|(node, cost)| node.to_node_id().map(|node_id| (node_id, cost)))
             .collect()
     }
+}
 
-    fn is_on_reduced_graph(node: &Node<N>) -> bool {
-        use AbsoluteDirection::*;
-        use Location::*;
-
-        match node.location() {
-            VerticalBound => match node.direction() {
-                East | West => true,
-                _ => false,
-            },
-            HorizontalBound => match node.direction() {
-                North | South => true,
-                _ => false,
-            },
-            Cell => false,
-        }
-    }
-
-    fn reduced_neighbors(
+impl<N, F> Maze<N, F>
+where
+    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
+    <N as Mul<U2>>::Output: Add<U10>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(SearchNodeId<N>, u16)>,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    F: Fn(Pattern) -> u16,
+    Node<N>: Debug,
+{
+    fn search_node_neighbors(
         &self,
-        node_id: NodeId<N>,
+        node_id: SearchNodeId<N>,
         is_successors: bool,
-    ) -> <Self as Graph<NodeId<N>, u16>>::Edges {
+    ) -> <Self as Graph<SearchNodeId<N>, u16>>::Edges {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
 
         let node = node_id.as_node();
-        debug_assert!(Self::is_on_reduced_graph(&node));
 
         let is_wall_relative = self.is_wall_relative_fn(&node, North, is_successors);
         let relative_node = Self::relative_node_fn(&node, North, is_successors);
@@ -535,7 +467,7 @@ where
         }
         neighbors
             .into_iter()
-            .filter_map(|(node, cost)| node.to_node_id().map(|node_id| (node_id, cost)))
+            .filter_map(|(node, cost)| node.to_search_node_id().map(|node_id| (node_id, cost)))
             .collect()
     }
 }
@@ -562,23 +494,25 @@ where
     }
 }
 
-impl<N, F> ReducedGraph<NodeId<N>, u16> for Maze<N, F>
+impl<N, F> Graph<SearchNodeId<N>, u16> for Maze<N, F>
 where
     N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
     <N as Mul<U2>>::Output: Add<U10>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
-    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
+    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(SearchNodeId<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
-    fn reduced_successors(&self, node: NodeId<N>) -> Self::Edges {
-        self.reduced_neighbors(node, true)
+    type Edges = Vec<(SearchNodeId<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output>;
+
+    fn successors(&self, node: SearchNodeId<N>) -> Self::Edges {
+        self.search_node_neighbors(node, true)
     }
 
-    fn reduced_predecessors(&self, node: NodeId<N>) -> Self::Edges {
-        self.reduced_neighbors(node, false)
+    fn predecessors(&self, node: SearchNodeId<N>) -> Self::Edges {
+        self.search_node_neighbors(node, false)
     }
 }
 
@@ -587,7 +521,7 @@ where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
-    <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<NodeId<N>>,
+    <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<SearchNodeId<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
     F: Fn(Pattern) -> u16,
 {
@@ -714,24 +648,24 @@ where
     }
 }
 
-impl<N, F> CheckerGraph<NodeId<N>> for Maze<N, F>
+impl<N, F> GraphConverter<NodeId<N>, SearchNodeId<N>> for Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
-    <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<NodeId<N>>,
+    <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<SearchNodeId<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Node<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
     F: Fn(Pattern) -> u16,
 {
-    type CheckerNodes = Vec<NodeId<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>;
+    type SearchNodes = Vec<SearchNodeId<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>;
 
     //NOTE: Suppose that one of the cells nearest to start and goal is not need to be visited.
     //The cells should be directly connected to the terminals of the given path.
     fn convert_to_checker_nodes<Nodes: IntoIterator<Item = NodeId<N>>>(
         &self,
         path: Nodes,
-    ) -> Self::CheckerNodes {
+    ) -> Self::SearchNodes {
         use AbsoluteDirection::*;
         use Location::*;
 
@@ -845,7 +779,7 @@ where
         }
         checker_nodes
             .into_iter()
-            .filter_map(|node| node.to_node_id())
+            .filter_map(|node| node.to_search_node_id())
             .collect()
     }
 }
@@ -871,25 +805,22 @@ mod tests {
     }
 
     #[test]
-    fn test_successors() {
+    fn test_node_successors() {
         use AbsoluteDirection::*;
         use Pattern::*;
 
         let maze = Maze::<U4, _>::new(cost);
 
         let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
-            NodeId::<U4>::new(x, y, direction)
+            NodeId::<U4>::new(x, y, direction).unwrap()
         };
 
         let test_data = vec![
             (
                 new(2, 0, North),
                 vec![
-                    (new(2, 1, North), cost(Straight(1))),
                     (new(2, 2, North), cost(Straight(2))),
-                    (new(2, 3, North), cost(Straight(3))),
                     (new(2, 4, North), cost(Straight(4))),
-                    (new(2, 5, North), cost(Straight(5))),
                     (new(2, 6, North), cost(Straight(6))),
                     (new(3, 2, NorthEast), cost(FastRun45)),
                     (new(4, 2, East), cost(FastRun90)),
@@ -904,11 +835,8 @@ mod tests {
             (
                 new(0, 2, East),
                 vec![
-                    (new(1, 2, East), cost(Straight(1))),
                     (new(2, 2, East), cost(Straight(2))),
-                    (new(3, 2, East), cost(Straight(3))),
                     (new(4, 2, East), cost(Straight(4))),
-                    (new(5, 2, East), cost(Straight(5))),
                     (new(6, 2, East), cost(Straight(6))),
                     (new(2, 1, SouthEast), cost(FastRun45)),
                     (new(2, 0, South), cost(FastRun90)),
@@ -921,30 +849,6 @@ mod tests {
                 ],
             ),
             (
-                new(2, 1, North),
-                vec![
-                    (new(2, 2, North), cost(Straight(1))),
-                    (new(2, 3, North), cost(Straight(2))),
-                    (new(2, 4, North), cost(Straight(3))),
-                    (new(2, 5, North), cost(Straight(4))),
-                    (new(2, 6, North), cost(Straight(5))),
-                    (new(3, 2, East), cost(Search90)),
-                    (new(1, 2, West), cost(Search90)),
-                    (new(2, 1, South), cost(SpinBack)),
-                ],
-            ),
-            (
-                new(3, 2, West),
-                vec![
-                    (new(2, 2, West), cost(Straight(1))),
-                    (new(1, 2, West), cost(Straight(2))),
-                    (new(0, 2, West), cost(Straight(3))),
-                    (new(2, 3, North), cost(Search90)),
-                    (new(2, 1, South), cost(Search90)),
-                    (new(3, 2, East), cost(SpinBack)),
-                ],
-            ),
-            (
                 new(0, 1, NorthEast),
                 vec![
                     (new(1, 2, NorthEast), cost(StraightDiagonal(1))),
@@ -953,7 +857,7 @@ mod tests {
                     (new(4, 5, NorthEast), cost(StraightDiagonal(4))),
                     (new(5, 6, NorthEast), cost(StraightDiagonal(5))),
                     (new(2, 2, East), cost(FastRun45)),
-                    (new(2, 1, South), cost(FastRun135)),
+                    (new(2, 0, South), cost(FastRun135)),
                     (new(2, 1, SouthEast), cost(FastRunDiagonal90)),
                 ],
             ),
@@ -963,7 +867,7 @@ mod tests {
                     (new(1, 2, SouthWest), cost(StraightDiagonal(1))),
                     (new(0, 1, SouthWest), cost(StraightDiagonal(2))),
                     (new(0, 2, West), cost(FastRun45)),
-                    (new(0, 3, North), cost(FastRun135)),
+                    (new(0, 4, North), cost(FastRun135)),
                     (new(0, 3, NorthWest), cost(FastRunDiagonal90)),
                 ],
             ),
@@ -976,7 +880,7 @@ mod tests {
                     (new(5, 4, NorthEast), cost(StraightDiagonal(4))),
                     (new(6, 5, NorthEast), cost(StraightDiagonal(5))),
                     (new(2, 2, North), cost(FastRun45)),
-                    (new(1, 2, West), cost(FastRun135)),
+                    (new(0, 2, West), cost(FastRun135)),
                     (new(1, 2, NorthWest), cost(FastRunDiagonal90)),
                 ],
             ),
@@ -991,21 +895,20 @@ mod tests {
     }
 
     #[test]
-    fn test_predecessors() {
+    fn test_node_predecessors() {
         use AbsoluteDirection::*;
         use Pattern::*;
 
         let maze = Maze::<U4, _>::new(cost);
 
         let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
-            NodeId::<U4>::new(x, y, direction)
+            NodeId::<U4>::new(x, y, direction).unwrap()
         };
 
         let test_data = vec![
             (
                 new(2, 2, North),
                 vec![
-                    (new(2, 1, North), cost(Straight(1))),
                     (new(2, 0, North), cost(Straight(2))),
                     (new(3, 0, NorthWest), cost(FastRun45)),
                     (new(4, 0, West), cost(FastRun90)),
@@ -1023,7 +926,7 @@ mod tests {
                     (new(2, 1, NorthEast), cost(Straight(1))),
                     (new(1, 0, NorthEast), cost(Straight(2))),
                     (new(2, 0, North), cost(FastRun45)),
-                    (new(3, 0, West), cost(FastRun135)),
+                    (new(4, 0, West), cost(FastRun135)),
                     (new(3, 0, NorthWest), cost(FastRunDiagonal90)),
                 ],
             ),
@@ -1033,19 +936,8 @@ mod tests {
                     (new(1, 2, NorthEast), cost(Straight(1))),
                     (new(0, 1, NorthEast), cost(Straight(2))),
                     (new(0, 2, East), cost(FastRun45)),
-                    (new(0, 3, South), cost(FastRun135)),
+                    (new(0, 4, South), cost(FastRun135)),
                     (new(0, 3, SouthEast), cost(FastRunDiagonal90)),
-                ],
-            ),
-            (
-                new(2, 3, North),
-                vec![
-                    (new(2, 2, North), cost(Straight(1))),
-                    (new(2, 1, North), cost(Straight(2))),
-                    (new(2, 0, North), cost(Straight(3))),
-                    (new(3, 2, West), cost(Search90)),
-                    (new(1, 2, East), cost(Search90)),
-                    (new(2, 3, South), cost(SpinBack)),
                 ],
             ),
         ];
@@ -1059,15 +951,13 @@ mod tests {
     }
 
     #[test]
-    fn test_reduced_successors() {
+    fn test_search_node_successors() {
         use AbsoluteDirection::*;
         use Pattern::*;
 
         let maze = Maze::<U4, _>::new(cost);
 
-        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
-            NodeId::<U4>::new(x, y, direction)
-        };
+        let new = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
 
         let test_data = vec![
             (
@@ -1092,22 +982,20 @@ mod tests {
 
         for (src, mut expected) in test_data {
             expected.sort();
-            let mut successors = maze.reduced_successors(src);
+            let mut successors = maze.successors(src);
             successors.sort();
             assert_eq!(successors, expected.as_slice());
         }
     }
 
     #[test]
-    fn test_reduced_predecessors() {
+    fn test_seach_node_predecessors() {
         use AbsoluteDirection::*;
         use Pattern::*;
 
         let maze = Maze::<U4, _>::new(cost);
 
-        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
-            NodeId::<U4>::new(x, y, direction)
-        };
+        let new = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
 
         let test_data = vec![
             (
@@ -1132,7 +1020,7 @@ mod tests {
 
         for (src, mut expected) in test_data {
             expected.sort();
-            let mut predecessors = maze.reduced_predecessors(src);
+            let mut predecessors = maze.predecessors(src);
             predecessors.sort();
             assert_eq!(predecessors, expected.as_slice());
         }
@@ -1142,9 +1030,8 @@ mod tests {
     fn test_convert_to_checker_nodes() {
         use AbsoluteDirection::*;
 
-        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
-            NodeId::<U4>::new(x, y, direction)
-        };
+        let new = |x, y, direction| NodeId::<U4>::new(x, y, direction).unwrap();
+        let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
         let new_wall = |x, y, z| WallPosition::new(x, y, z);
 
         let test_data = vec![
@@ -1168,12 +1055,12 @@ mod tests {
                     new(2, 0, West),
                 ],
                 vec![
-                    new(0, 5, South),
-                    new(1, 6, East),
-                    new(6, 3, North),
-                    new(5, 2, West),
-                    new(5, 0, West),
-                    new(3, 2, East),
+                    new_search(0, 5, South),
+                    new_search(1, 6, East),
+                    new_search(6, 3, North),
+                    new_search(5, 2, West),
+                    new_search(5, 0, West),
+                    new_search(3, 2, East),
                 ],
             ),
             (
@@ -1185,12 +1072,12 @@ mod tests {
                     new(4, 4, South),
                 ],
                 vec![
-                    new(0, 3, South),
-                    new(2, 1, North),
-                    new(3, 2, West),
-                    new(1, 4, East),
-                    new(1, 6, East),
-                    new(5, 6, West),
+                    new_search(0, 3, South),
+                    new_search(2, 1, North),
+                    new_search(3, 2, West),
+                    new_search(1, 4, East),
+                    new_search(1, 6, East),
+                    new_search(5, 6, West),
                 ],
             ),
         ];

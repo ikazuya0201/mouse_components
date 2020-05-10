@@ -11,10 +11,7 @@ use core::sync::atomic::Ordering;
 
 pub use agent::Agent;
 pub use counter::Counter;
-pub use maze::{
-    CheckerGraph, DirectionInstructor, Graph, GraphConverter, GraphTranslator, ReducedGraph,
-    Storable,
-};
+pub use maze::{DirectionInstructor, Graph, GraphConverter, GraphTranslator, Storable};
 use mode::{AtomicMode, Mode};
 use searcher::Searcher;
 pub use solver::Solver;
