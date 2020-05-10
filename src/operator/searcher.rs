@@ -1,27 +1,30 @@
 use core::cell::Cell;
+use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use super::{Agent, CheckerGraph, DirectionInstructor, GraphTranslator, ReducedGraph, Solver};
+use super::{Agent, DirectionInstructor, Graph, GraphConverter, GraphTranslator, Solver};
 
-pub struct Searcher<Node> {
-    current: Cell<Node>,
+pub struct Searcher<Node, SearchNode> {
+    current: Cell<SearchNode>,
     is_updated: AtomicBool,
+    _node: PhantomData<fn() -> Node>,
 }
 
-impl<Node> Searcher<Node>
+impl<Node, SearchNode> Searcher<Node, SearchNode>
 where
-    Node: Clone + Copy,
+    SearchNode: Clone + Copy,
 {
-    pub fn new(start: Node) -> Self {
+    pub fn new(start: SearchNode) -> Self {
         Self {
             current: Cell::new(start),
             is_updated: AtomicBool::new(true),
+            _node: PhantomData,
         }
     }
 
     pub fn tick<Position, Direction, Maze, IAgent>(&self, maze: &Maze, agent: &IAgent)
     where
-        Maze: GraphTranslator<Position> + DirectionInstructor<Node, Direction>,
+        Maze: GraphTranslator<Position> + DirectionInstructor<SearchNode, Direction>,
         IAgent: Agent<Position, Direction>,
     {
         let obstacles = agent.existing_obstacles();
@@ -37,8 +40,11 @@ where
     //return: false if search finished
     pub fn search<Cost, Direction, Maze, ISolver>(&self, maze: &Maze, solver: &ISolver) -> bool
     where
-        Maze: CheckerGraph<Node> + ReducedGraph<Node, Cost> + DirectionInstructor<Node, Direction>,
-        ISolver: Solver<Node, Cost>,
+        Maze: Graph<Node, Cost>
+            + Graph<SearchNode, Cost>
+            + GraphConverter<Node, SearchNode>
+            + DirectionInstructor<SearchNode, Direction>,
+        ISolver: Solver<Node, SearchNode, Cost, Maze>,
     {
         if !self
             .is_updated
