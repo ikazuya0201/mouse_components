@@ -262,7 +262,7 @@ where
         succs.extend_from_slice(&left_successors()).unwrap();
 
         succs
-            .push((relative_node(0, 2, Front), self.cost(Straight(2))))
+            .push((relative_node(0, 2, Front), self.cost(Straight(1))))
             .unwrap();
         for i in 1..N::I16 {
             if is_wall_relative(0, 2 * i + 1) {
@@ -271,7 +271,7 @@ where
             succs
                 .push((
                     relative_node(0, 2 * i + 2, Front),
-                    self.cost(Straight((2 * i + 2) as u16)),
+                    self.cost(Straight((i + 1) as u16)),
                 ))
                 .unwrap();
         }
@@ -793,7 +793,7 @@ mod tests {
 
         match pattern {
             Straight(length) => length,
-            StraightDiagonal(length) => length,
+            StraightDiagonal(length) => 2 * length,
             Search90 => 3,
             FastRun45 => 4,
             FastRun90 => 5,
@@ -819,9 +819,9 @@ mod tests {
             (
                 new(2, 0, North),
                 vec![
-                    (new(2, 2, North), cost(Straight(2))),
-                    (new(2, 4, North), cost(Straight(4))),
-                    (new(2, 6, North), cost(Straight(6))),
+                    (new(2, 2, North), cost(Straight(1))),
+                    (new(2, 4, North), cost(Straight(2))),
+                    (new(2, 6, North), cost(Straight(3))),
                     (new(3, 2, NorthEast), cost(FastRun45)),
                     (new(4, 2, East), cost(FastRun90)),
                     (new(4, 1, SouthEast), cost(FastRun135)),
@@ -835,9 +835,9 @@ mod tests {
             (
                 new(0, 2, East),
                 vec![
-                    (new(2, 2, East), cost(Straight(2))),
-                    (new(4, 2, East), cost(Straight(4))),
-                    (new(6, 2, East), cost(Straight(6))),
+                    (new(2, 2, East), cost(Straight(1))),
+                    (new(4, 2, East), cost(Straight(2))),
+                    (new(6, 2, East), cost(Straight(3))),
                     (new(2, 1, SouthEast), cost(FastRun45)),
                     (new(2, 0, South), cost(FastRun90)),
                     (new(1, 0, SouthWest), cost(FastRun135)),
@@ -909,7 +909,7 @@ mod tests {
             (
                 new(2, 2, North),
                 vec![
-                    (new(2, 0, North), cost(Straight(2))),
+                    (new(2, 0, North), cost(Straight(1))),
                     (new(3, 0, NorthWest), cost(FastRun45)),
                     (new(4, 0, West), cost(FastRun90)),
                     (new(4, 1, SouthWest), cost(FastRun135)),
@@ -923,8 +923,8 @@ mod tests {
             (
                 new(3, 2, NorthEast),
                 vec![
-                    (new(2, 1, NorthEast), cost(Straight(1))),
-                    (new(1, 0, NorthEast), cost(Straight(2))),
+                    (new(2, 1, NorthEast), cost(StraightDiagonal(1))),
+                    (new(1, 0, NorthEast), cost(StraightDiagonal(2))),
                     (new(2, 0, North), cost(FastRun45)),
                     (new(4, 0, West), cost(FastRun135)),
                     (new(3, 0, NorthWest), cost(FastRunDiagonal90)),
@@ -933,8 +933,8 @@ mod tests {
             (
                 new(2, 3, NorthEast),
                 vec![
-                    (new(1, 2, NorthEast), cost(Straight(1))),
-                    (new(0, 1, NorthEast), cost(Straight(2))),
+                    (new(1, 2, NorthEast), cost(StraightDiagonal(1))),
+                    (new(0, 1, NorthEast), cost(StraightDiagonal(2))),
                     (new(0, 2, East), cost(FastRun45)),
                     (new(0, 4, South), cost(FastRun135)),
                     (new(0, 3, SouthEast), cost(FastRunDiagonal90)),
