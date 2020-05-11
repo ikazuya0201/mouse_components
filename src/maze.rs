@@ -9,8 +9,9 @@ use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::operator::{Graph, GraphConverter};
+use crate::operator::{DirectionInstructor, Graph, GraphConverter};
 use crate::pattern::Pattern;
+use crate::utils::mutex::Mutex;
 use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, NodeId, Position, SearchNodeId};
 
@@ -82,6 +83,7 @@ where
     is_checked: GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
     is_wall: GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
     costs: F,
+    candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
 }
 
 impl<N, F> Maze<N, F>
@@ -90,13 +92,13 @@ where
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
-    Node<N>: Debug,
 {
     pub fn new(costs: F) -> Self {
         let mut maze = Self {
             is_checked: GenericArray::default(),
             is_wall: GenericArray::default(),
             costs,
+            candidates: Mutex::new(Vec::new()),
         };
         maze.initialize();
         maze
@@ -778,6 +780,39 @@ where
     }
 }
 
+impl<N, F> DirectionInstructor<SearchNodeId<N>, RelativeDirection> for Maze<N, F>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    F: Fn(Pattern) -> u16,
+{
+    fn update_node_candidates<SearchNodes: IntoIterator<Item = SearchNodeId<N>>>(
+        &self,
+        candidates: SearchNodes,
+    ) {
+        *self.candidates.lock() = candidates.into_iter().collect();
+    }
+
+    fn instruct(&self, current: SearchNodeId<N>) -> Option<(RelativeDirection, SearchNodeId<N>)> {
+        if let Ok(candidates) = self.candidates.try_lock() {
+            for node_id in candidates.iter() {
+                let node = node_id.as_node();
+                if !self.is_checked_by_position(node.position()) {
+                    return None;
+                }
+                if self.is_wall_by_position(node.position()) {
+                    continue;
+                }
+                let current = current.as_node();
+                let direction = current.direction().relative(node.direction());
+                return Some((direction, *node_id));
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1085,6 +1120,43 @@ mod tests {
             let mut checker_nodes = maze.convert_to_checker_nodes(path);
             checker_nodes.sort();
             assert_eq!(checker_nodes, expected.as_slice());
+        }
+    }
+
+    #[test]
+    fn test_direction_instructor() {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+
+        let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
+        let new_wall = |x, y, z| WallPosition::new(x, y, z);
+
+        let test_data = vec![(
+            (
+                new_search(2, 1, North),
+                vec![
+                    new_search(3, 2, East),
+                    new_search(2, 3, North),
+                    new_search(1, 2, West),
+                    new_search(2, 1, South),
+                ],
+                vec![
+                    (new_wall(1, 1, true), true),
+                    (new_wall(1, 1, false), false),
+                    (new_wall(0, 1, true), false),
+                    (new_wall(1, 0, false), false),
+                ],
+            ),
+            Some((Front, new_search(2, 3, North))),
+        )];
+
+        for ((src, dsts, walls), expected) in test_data {
+            let mut maze = Maze::<U4, _>::new(cost);
+            maze.update_node_candidates(dsts);
+            for (wall, exists) in walls {
+                maze.check_wall(wall, exists);
+            }
+            assert_eq!(maze.instruct(src), expected);
         }
     }
 }

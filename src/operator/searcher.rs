@@ -29,7 +29,7 @@ where
     {
         let obstacles = agent.existing_obstacles();
         maze.interpret_obstacles(obstacles);
-        if let Some((direction, node)) = maze.instruct() {
+        if let Some((direction, node)) = maze.instruct(self.current.get()) {
             agent.set_instructed_direction(direction);
             self.current.set(node);
             self.is_updated.store(true, Ordering::Relaxed);
@@ -54,7 +54,7 @@ where
         }
         let current = self.current.get();
         if let Some(candidates) = solver.next_node_candidates(current, maze) {
-            maze.update_node_candidates(current, candidates);
+            maze.update_node_candidates(candidates);
             true
         } else {
             false
