@@ -1,6 +1,7 @@
 mod direction;
 mod node;
 
+use core::cell::RefCell;
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::ops::{Add, Mul};
@@ -80,8 +81,8 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
 {
-    is_checked: GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
-    is_wall: GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
+    is_checked: RefCell<GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
+    is_wall: RefCell<GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
     costs: F,
     candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
 }
@@ -94,9 +95,9 @@ where
     F: Fn(Pattern) -> u16,
 {
     pub fn new(costs: F) -> Self {
-        let mut maze = Self {
-            is_checked: GenericArray::default(),
-            is_wall: GenericArray::default(),
+        let maze = Self {
+            is_checked: RefCell::new(GenericArray::default()),
+            is_wall: RefCell::new(GenericArray::default()),
             costs,
             candidates: Mutex::new(Vec::new()),
         };
@@ -104,29 +105,29 @@ where
         maze
     }
 
-    pub fn initialize(&mut self) {
+    pub fn initialize(&self) {
         for i in 0..WallPosition::<N>::max() + 1 {
             self.check_wall(WallPosition::new(i, WallPosition::<N>::max(), false), true);
             self.check_wall(WallPosition::new(WallPosition::<N>::max(), i, true), true);
         }
     }
 
-    fn check_wall(&mut self, position: WallPosition<N>, is_wall: bool) {
+    fn check_wall(&self, position: WallPosition<N>, is_wall: bool) {
         self.update_wall(position.clone(), is_wall);
         self.update_checked(position, true);
     }
 
-    fn update_wall(&mut self, position: WallPosition<N>, is_wall: bool) {
-        self.is_wall[position.as_index()] = is_wall;
+    fn update_wall(&self, position: WallPosition<N>, is_wall: bool) {
+        self.is_wall.borrow_mut()[position.as_index()] = is_wall;
     }
 
-    fn update_checked(&mut self, position: WallPosition<N>, is_checked: bool) {
-        self.is_checked[position.as_index()] = is_checked;
+    fn update_checked(&self, position: WallPosition<N>, is_checked: bool) {
+        self.is_checked.borrow_mut()[position.as_index()] = is_checked;
     }
 
     #[inline]
     fn is_wall(&self, position: WallPosition<N>) -> bool {
-        self.is_wall[position.as_index()]
+        self.is_wall.borrow()[position.as_index()]
     }
 
     fn is_wall_by_position(&self, position: Position<N>) -> bool {
@@ -139,7 +140,7 @@ where
 
     #[inline]
     fn is_checked(&self, position: WallPosition<N>) -> bool {
-        self.is_checked[position.as_index()]
+        self.is_checked.borrow()[position.as_index()]
     }
 
     fn is_checked_by_position(&self, position: Position<N>) -> bool {
@@ -1113,7 +1114,7 @@ mod tests {
         ];
 
         for (walls, path, mut expected) in test_data {
-            let mut maze = Maze::<U4, _>::new(cost);
+            let maze = Maze::<U4, _>::new(cost);
             for wall in walls {
                 maze.check_wall(wall, true);
             }
@@ -1152,7 +1153,7 @@ mod tests {
         )];
 
         for ((src, dsts, walls), expected) in test_data {
-            let mut maze = Maze::<U4, _>::new(cost);
+            let maze = Maze::<U4, _>::new(cost);
             assert_eq!(maze.instruct(src), None);
             maze.update_node_candidates(dsts);
             for (wall, exists) in walls {
