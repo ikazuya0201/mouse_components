@@ -795,17 +795,18 @@ where
     }
 
     fn instruct(&self, current: SearchNodeId<N>) -> Option<(RelativeDirection, SearchNodeId<N>)> {
-        if let Ok(candidates) = self.candidates.try_lock() {
-            for node_id in candidates.iter() {
+        if let Ok(mut candidates) = self.candidates.try_lock() {
+            for node_id in candidates.clone().iter() {
                 let node = node_id.as_node();
                 if !self.is_checked_by_position(node.position()) {
-                    return None;
+                    break;
                 }
                 if self.is_wall_by_position(node.position()) {
                     continue;
                 }
                 let current = current.as_node();
                 let direction = current.direction().relative(node.direction());
+                *candidates = Vec::new();
                 return Some((direction, *node_id));
             }
         }
@@ -1152,11 +1153,13 @@ mod tests {
 
         for ((src, dsts, walls), expected) in test_data {
             let mut maze = Maze::<U4, _>::new(cost);
+            assert_eq!(maze.instruct(src), None);
             maze.update_node_candidates(dsts);
             for (wall, exists) in walls {
                 maze.check_wall(wall, exists);
             }
             assert_eq!(maze.instruct(src), expected);
+            assert_eq!(maze.instruct(src), None);
         }
     }
 }
