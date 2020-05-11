@@ -423,10 +423,7 @@ where
 
 impl<N, F> Maze<N, F>
 where
-    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
-    <N as Mul<U2>>::Output: Add<U10>,
-    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
-    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(SearchNodeId<N>, u16)>,
+    N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
@@ -496,16 +493,13 @@ where
 
 impl<N, F> Graph<SearchNodeId<N>, u16> for Maze<N, F>
 where
-    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
-    <N as Mul<U2>>::Output: Add<U10>,
-    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
-    <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(SearchNodeId<N>, u16)>,
+    N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
-    type Edges = Vec<(SearchNodeId<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output>;
+    type Edges = Vec<(SearchNodeId<N>, u16), U4>;
 
     fn successors(&self, node: SearchNodeId<N>) -> Self::Edges {
         self.search_node_neighbors(node, true)
