@@ -16,7 +16,7 @@ use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
-pub struct Operator<SearchNode, Maze, IAgent, ISolver, SW, C> {
+pub struct Administrator<SearchNode, Maze, IAgent, ISolver, SW, C> {
     maze: Maze,
     agent: IAgent,
     solver: ISolver,
@@ -26,7 +26,8 @@ pub struct Operator<SearchNode, Maze, IAgent, ISolver, SW, C> {
     searcher: Searcher<SearchNode>,
 }
 
-impl<SearchNode, Maze, IAgent, ISolver, SW, C> Operator<SearchNode, Maze, IAgent, ISolver, SW, C>
+impl<SearchNode, Maze, IAgent, ISolver, SW, C>
+    Administrator<SearchNode, Maze, IAgent, ISolver, SW, C>
 where
     SearchNode: Copy + Clone,
     SW: Switch,

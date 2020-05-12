@@ -8,7 +8,7 @@ use heapless::{consts::*, ArrayLength, Vec};
 use itertools::repeat_n;
 use num::{Bounded, Saturating};
 
-use super::operator;
+use super::administrator;
 
 pub struct Solver<Node, SearchNode, Max> {
     start: Node,
@@ -28,7 +28,7 @@ impl<Node, SearchNode, Max> Solver<Node, SearchNode, Max> {
     }
 }
 
-impl<Node, SearchNode, Cost, Graph, Max> operator::Solver<Node, SearchNode, Cost, Graph>
+impl<Node, SearchNode, Cost, Graph, Max> administrator::Solver<Node, SearchNode, Cost, Graph>
     for Solver<Node, SearchNode, Max>
 where
     Max: ArrayLength<Node>
@@ -43,7 +43,7 @@ where
     Node: Ord + Copy + Debug + Into<usize>,
     SearchNode: Ord + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-    Graph: operator::Graph<Node, Cost>,
+    Graph: administrator::Graph<Node, Cost>,
 {
     type Nodes = Vec<Node, Max>;
     type SearchNodes = Vec<SearchNode, U4>;
@@ -54,7 +54,8 @@ where
 
     fn next_node_candidates(&self, current: SearchNode, graph: &Graph) -> Option<Self::SearchNodes>
     where
-        Graph: operator::Graph<SearchNode, Cost> + operator::GraphConverter<Node, SearchNode>,
+        Graph: administrator::Graph<SearchNode, Cost>
+            + administrator::GraphConverter<Node, SearchNode>,
     {
         let shortest_path = self.compute_shortest_path(graph)?;
         let checker_nodes = graph.convert_to_checker_nodes(shortest_path);
@@ -138,7 +139,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::operator::Graph;
+    use super::administrator::Graph;
     use super::Solver;
     use heapless::consts::*;
 
@@ -203,7 +204,7 @@ mod tests {
 
         let solver = Solver::<usize, usize, U9>::new(start, goal, 0);
 
-        let path = crate::operator::Solver::compute_shortest_path(&solver, &graph);
+        let path = crate::administrator::Solver::compute_shortest_path(&solver, &graph);
         let expected = [0, 1, 3, 5, 7, 8];
 
         assert!(path.is_some());
