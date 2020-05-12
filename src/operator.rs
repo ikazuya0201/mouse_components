@@ -6,48 +6,42 @@ mod searcher;
 mod solver;
 mod switch;
 
-use core::marker::PhantomData;
 use core::sync::atomic::Ordering;
 
 pub use agent::Agent;
 pub use counter::Counter;
-pub use maze::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter, Storable};
+pub use maze::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter};
 use mode::{AtomicMode, Mode};
 use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
-pub struct Operator<Node, SearchNode, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C> {
+pub struct Operator<SearchNode, Maze, IAgent, ISolver, SW, C> {
     maze: Maze,
     agent: IAgent,
     solver: ISolver,
     mode: AtomicMode,
     switch: SW,
     counter: C,
-    searcher: Searcher<Node, SearchNode>,
-    _node: PhantomData<fn() -> Node>,
-    _search_node: PhantomData<fn() -> SearchNode>,
-    _cost: PhantomData<fn() -> Cost>,
-    _position: PhantomData<fn() -> Position>,
-    _direction: PhantomData<fn() -> Direction>,
+    searcher: Searcher<SearchNode>,
 }
 
-impl<Node, SearchNode, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C>
-    Operator<Node, SearchNode, Cost, Position, Direction, Maze, IAgent, ISolver, SW, C>
+impl<SearchNode, Maze, IAgent, ISolver, SW, C> Operator<SearchNode, Maze, IAgent, ISolver, SW, C>
 where
     SearchNode: Copy + Clone,
-    Maze: Storable
-        + ObstacleInterpreter<Position>
-        + DirectionInstructor<SearchNode, Direction>
-        + Graph<Node, Cost>
-        + Graph<SearchNode, Cost>
-        + GraphConverter<Node, SearchNode>,
-    IAgent: Agent<Position, Direction>,
-    ISolver: Solver<Node, SearchNode, Cost, Maze>,
     SW: Switch,
     C: Counter,
 {
-    pub fn new(maze: Maze, agent: IAgent, solver: ISolver, switch: SW, counter: C) -> Self {
+    pub fn new<Node, Cost, Direction, Position>(
+        maze: Maze,
+        agent: IAgent,
+        solver: ISolver,
+        switch: SW,
+        counter: C,
+    ) -> Self
+    where
+        ISolver: Solver<Node, SearchNode, Cost, Maze>,
+    {
         let start = solver.start_search_node();
         Self {
             maze: maze,
@@ -57,16 +51,15 @@ where
             switch: switch,
             counter: counter,
             searcher: Searcher::new(start),
-            _node: PhantomData,
-            _search_node: PhantomData,
-            _cost: PhantomData,
-            _position: PhantomData,
-            _direction: PhantomData,
         }
     }
 
     //called by periodic interrupt
-    pub fn tick(&self) {
+    pub fn tick<Node, Cost, Direction, Position>(&self)
+    where
+        Maze: ObstacleInterpreter<Position> + DirectionInstructor<SearchNode, Direction>,
+        IAgent: Agent<Position, Direction>,
+    {
         use Mode::*;
         use Ordering::Relaxed;
         match self.mode.load(Relaxed) {
@@ -84,7 +77,14 @@ where
         }
     }
 
-    pub fn run(&self) {
+    pub fn run<Node, Cost, Direction, Position>(&self)
+    where
+        Maze: DirectionInstructor<SearchNode, Direction>
+            + Graph<Node, Cost>
+            + Graph<SearchNode, Cost>
+            + GraphConverter<Node, SearchNode>,
+        ISolver: Solver<Node, SearchNode, Cost, Maze>,
+    {
         use Mode::*;
         loop {
             match self.mode.load(Ordering::Relaxed) {
