@@ -374,16 +374,26 @@ where
             return None;
         }
 
-        let direction = if (x & 1) ^ (y & 1) == 1 {
-            match direction {
-                North => 0,
-                East => 1,
-                South => 2,
-                West => 3,
-                _ => return None,
+        let direction = if x & 1 == 1 {
+            if y & 1 == 1 {
+                return None;
+            } else {
+                match direction {
+                    East => 0,
+                    West => 1,
+                    _ => return None,
+                }
             }
         } else {
-            return None;
+            if y & 1 == 1 {
+                match direction {
+                    North => 0,
+                    South => 1,
+                    _ => return None,
+                }
+            } else {
+                return None;
+            }
         };
 
         Some(Self {
@@ -396,16 +406,26 @@ where
         use AbsoluteDirection::*;
         let x = self.x_raw();
         let y = self.y_raw();
-        let direction = if (x & 1) ^ (y & 1) == 1 {
-            match self.raw >> Self::direction_offset() {
-                0 => North,
-                1 => East,
-                2 => South,
-                3 => West,
-                _ => unreachable!(),
+        let direction = if x & 1 == 1 {
+            if y & 1 == 1 {
+                unreachable!()
+            } else {
+                match self.raw >> Self::direction_offset() {
+                    0 => East,
+                    1 => West,
+                    _ => unreachable!(),
+                }
             }
         } else {
-            unreachable!()
+            if y & 1 == 1 {
+                match self.raw >> Self::direction_offset() {
+                    0 => North,
+                    1 => South,
+                    _ => unreachable!(),
+                }
+            } else {
+                unreachable!()
+            }
         };
         Node::<N>::new(x as i16, y as i16, direction)
     }
@@ -524,6 +544,36 @@ mod tests {
             };
             let node = Node::<U16>::new(x, y, direction);
             assert_eq!(node.to_node_id(), expected);
+        }
+    }
+
+    #[test]
+    fn test_to_search_node_id() {
+        let test_data = vec![
+            (-1, 0, West, false),
+            (0, 100, North, false),
+            (0, 0, North, false),
+            (31, 30, SouthEast, false),
+            (0, 1, North, true),
+            (0, 1, South, true),
+            (1, 0, East, true),
+            (1, 0, West, true),
+            (30, 31, South, true),
+            (31, 30, East, true),
+            (1, 0, North, false),
+            (1, 0, NorthEast, false),
+            (0, 1, East, false),
+            (0, 1, SouthEast, false),
+        ];
+
+        for (x, y, direction, is_some) in test_data {
+            let expected = if is_some {
+                SearchNodeId::<U16>::new(x as u16, y as u16, direction)
+            } else {
+                None
+            };
+            let node = Node::<U16>::new(x, y, direction);
+            assert_eq!(node.to_search_node_id(), expected);
         }
     }
 }
