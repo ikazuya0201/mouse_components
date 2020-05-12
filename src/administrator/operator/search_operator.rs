@@ -60,7 +60,6 @@ where
         self.agent.track_next();
     }
 
-    //return: false if search finished
     fn run(&self) -> Result<Mode, NotFinishError> {
         if !self
             .is_updated
