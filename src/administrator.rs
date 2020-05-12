@@ -2,7 +2,7 @@ mod agent;
 mod counter;
 mod maze;
 mod mode;
-mod operator;
+pub mod operator;
 mod solver;
 mod switch;
 
@@ -12,7 +12,7 @@ pub use agent::Agent;
 pub use counter::Counter;
 pub use maze::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter};
 use mode::{AtomicMode, Mode};
-pub use operator::Operator;
+use operator::Operator;
 pub use solver::Solver;
 pub use switch::Switch;
 
