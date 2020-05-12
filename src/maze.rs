@@ -10,7 +10,7 @@ use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::operator::{DirectionInstructor, Graph, GraphConverter};
+use crate::administrator::{DirectionInstructor, Graph, GraphConverter};
 use crate::pattern::Pattern;
 use crate::utils::mutex::Mutex;
 use direction::{AbsoluteDirection, RelativeDirection};
