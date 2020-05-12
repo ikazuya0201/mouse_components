@@ -1,9 +1,6 @@
 use super::maze::{Graph, GraphConverter};
 
-pub trait Solver<Node, SearchNode, Cost, IGraph>
-where
-    IGraph: Graph<Node, Cost>,
-{
+pub trait Solver<Node, SearchNode, Cost, IGraph> {
     type Nodes: IntoIterator<Item = Node>;
     type SearchNodes: IntoIterator<Item = SearchNode>;
     //return: (route, last direction candidates sequence)
@@ -14,6 +11,8 @@ where
         graph: &IGraph,
     ) -> Option<Self::SearchNodes>
     where
-        IGraph: Graph<SearchNode, Cost> + GraphConverter<Node, SearchNode>;
-    fn compute_shortest_path(&self, graph: &IGraph) -> Option<Self::Nodes>;
+        IGraph: Graph<SearchNode, Cost> + GraphConverter<Node, SearchNode> + Graph<Node, Cost>;
+    fn compute_shortest_path(&self, graph: &IGraph) -> Option<Self::Nodes>
+    where
+        IGraph: Graph<Node, Cost>;
 }

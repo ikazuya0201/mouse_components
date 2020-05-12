@@ -1,16 +1,14 @@
 use core::cell::Cell;
-use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use super::{Agent, DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter, Solver};
 
-pub struct Searcher<Node, SearchNode> {
+pub struct Searcher<SearchNode> {
     current: Cell<SearchNode>,
     is_updated: AtomicBool,
-    _node: PhantomData<fn() -> Node>,
 }
 
-impl<Node, SearchNode> Searcher<Node, SearchNode>
+impl<SearchNode> Searcher<SearchNode>
 where
     SearchNode: Clone + Copy,
 {
@@ -18,7 +16,6 @@ where
         Self {
             current: Cell::new(start),
             is_updated: AtomicBool::new(true),
-            _node: PhantomData,
         }
     }
 
@@ -38,7 +35,11 @@ where
     }
 
     //return: false if search finished
-    pub fn search<Cost, Direction, Maze, ISolver>(&self, maze: &Maze, solver: &ISolver) -> bool
+    pub fn search<Node, Cost, Direction, Maze, ISolver>(
+        &self,
+        maze: &Maze,
+        solver: &ISolver,
+    ) -> bool
     where
         Maze: Graph<Node, Cost>
             + Graph<SearchNode, Cost>
