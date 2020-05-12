@@ -7,22 +7,22 @@ use crate::administrator::{
     Operator, Solver,
 };
 
-pub struct SearchOperator<Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver> {
+pub struct SearchOperator<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver> {
     current: Cell<SearchNode>,
     is_updated: AtomicBool,
-    maze: Maze,
-    agent: IAgent,
-    solver: ISolver,
+    maze: &'a Maze,
+    agent: &'a IAgent,
+    solver: &'a ISolver,
     _node: PhantomData<fn() -> Node>,
     _cost: PhantomData<fn() -> Cost>,
     _direction: PhantomData<fn() -> Direction>,
     _position: PhantomData<fn() -> Position>,
 }
 
-impl<Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
-    SearchOperator<Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
+impl<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
+    SearchOperator<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
 {
-    pub fn new(start: SearchNode, maze: Maze, agent: IAgent, solver: ISolver) -> Self {
+    pub fn new(start: SearchNode, maze: &'a Maze, agent: &'a IAgent, solver: &'a ISolver) -> Self {
         Self {
             current: Cell::new(start),
             is_updated: AtomicBool::new(true),
@@ -37,8 +37,8 @@ impl<Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
     }
 }
 
-impl<Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver> Operator
-    for SearchOperator<Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
+impl<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver> Operator
+    for SearchOperator<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
 where
     SearchNode: Clone + Copy,
     Maze: ObstacleInterpreter<Position>
