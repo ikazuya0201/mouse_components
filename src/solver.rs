@@ -10,28 +10,26 @@ use num::{Bounded, Saturating};
 
 use super::operator;
 
-pub struct Solver<Node, SearchNode, Cost, Max> {
+pub struct Solver<Node, SearchNode, Max> {
     start: Node,
     goal: Node,
     search_start: SearchNode,
-    _cost: PhantomData<fn() -> Cost>,
     _max_node: PhantomData<fn() -> Max>,
 }
 
-impl<Node, SearchNode, Cost, Max> Solver<Node, SearchNode, Cost, Max> {
+impl<Node, SearchNode, Max> Solver<Node, SearchNode, Max> {
     pub fn new(start: Node, goal: Node, search_start: SearchNode) -> Self {
         Self {
             start,
             goal,
             search_start,
-            _cost: PhantomData,
             _max_node: PhantomData,
         }
     }
 }
 
 impl<Node, SearchNode, Cost, Graph, Max> operator::Solver<Node, SearchNode, Cost, Graph>
-    for Solver<Node, SearchNode, Cost, Max>
+    for Solver<Node, SearchNode, Max>
 where
     Max: ArrayLength<Node>
         + ArrayLength<SearchNode>
@@ -203,7 +201,7 @@ mod tests {
 
         let graph = IGraph::new(n, &edges);
 
-        let solver = Solver::<usize, usize, _, U9>::new(start, goal, 0);
+        let solver = Solver::<usize, usize, U9>::new(start, goal, 0);
 
         let path = crate::operator::Solver::compute_shortest_path(&solver, &graph);
         let expected = [0, 1, 3, 5, 7, 8];
