@@ -3,7 +3,6 @@ mod counter;
 mod maze;
 mod mode;
 mod operator;
-mod searcher;
 mod solver;
 mod switch;
 
@@ -14,60 +13,41 @@ pub use counter::Counter;
 pub use maze::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter};
 use mode::{AtomicMode, Mode};
 pub use operator::Operator;
-use searcher::Searcher;
 pub use solver::Solver;
 pub use switch::Switch;
 
-pub struct Administrator<SearchNode, Maze, IAgent, ISolver, SW, C> {
-    maze: Maze,
-    agent: IAgent,
-    solver: ISolver,
+#[derive(Debug, Clone, Copy)]
+pub struct NotFinishError;
+
+pub struct Administrator<ISwitch, ICounter, SearchOperator> {
     mode: AtomicMode,
-    switch: SW,
-    counter: C,
-    searcher: Searcher<SearchNode>,
+    switch: ISwitch,
+    counter: ICounter,
+    search_operator: SearchOperator,
 }
 
-impl<SearchNode, Maze, IAgent, ISolver, SW, C>
-    Administrator<SearchNode, Maze, IAgent, ISolver, SW, C>
+impl<ISwitch, ICounter, SearchOperator> Administrator<ISwitch, ICounter, SearchOperator>
 where
-    SearchNode: Copy + Clone,
-    SW: Switch,
-    C: Counter,
+    ISwitch: Switch,
+    ICounter: Counter,
+    SearchOperator: Operator,
 {
-    pub fn new<Node, Cost, Direction, Position>(
-        maze: Maze,
-        agent: IAgent,
-        solver: ISolver,
-        switch: SW,
-        counter: C,
-    ) -> Self
-    where
-        ISolver: Solver<Node, SearchNode, Cost, Maze>,
-    {
-        let start = solver.start_search_node();
+    pub fn new(switch: ISwitch, counter: ICounter, search_operator: SearchOperator) -> Self {
         Self {
-            maze: maze,
-            agent: agent,
-            solver: solver,
             mode: AtomicMode::new(Mode::Idle),
-            switch: switch,
-            counter: counter,
-            searcher: Searcher::new(start),
+            switch,
+            counter,
+            search_operator,
         }
     }
 
     //called by periodic interrupt
-    pub fn tick<Node, Cost, Direction, Position>(&self)
-    where
-        Maze: ObstacleInterpreter<Position> + DirectionInstructor<SearchNode, Direction>,
-        IAgent: Agent<Position, Direction>,
-    {
+    pub fn tick(&self) {
         use Mode::*;
         use Ordering::Relaxed;
         match self.mode.load(Relaxed) {
             Idle => (),
-            Search => self.searcher.tick(&self.maze, &self.agent),
+            Search => self.search_operator.tick(),
             Select => return,
             _ => (),
         }
@@ -80,32 +60,25 @@ where
         }
     }
 
-    pub fn run<Node, Cost, Direction, Position>(&self)
-    where
-        Maze: DirectionInstructor<SearchNode, Direction>
-            + Graph<Node, Cost>
-            + Graph<SearchNode, Cost>
-            + GraphConverter<Node, SearchNode>,
-        ISolver: Solver<Node, SearchNode, Cost, Maze>,
-    {
+    pub fn run(&self) {
         use Mode::*;
         loop {
-            match self.mode.load(Ordering::Relaxed) {
-                Idle => (),
-                Search => {
-                    if !self.searcher.search(&self.maze, &self.solver) {
-                        self.mode.store(FastRun, Ordering::Relaxed);
-                    }
-                }
+            if let Ok(mode) = match self.mode.load(Ordering::Relaxed) {
+                Idle => Err(NotFinishError),
+                Search => self.search_operator.run(),
                 FastRun => self.fast_run(),
                 Select => self.mode_select(),
+            } {
+                self.mode.store(mode, Ordering::Relaxed);
             }
         }
     }
 
-    fn fast_run(&self) {}
+    fn fast_run(&self) -> Result<Mode, NotFinishError> {
+        Ok(Mode::Idle)
+    }
 
-    fn mode_select(&self) {
+    fn mode_select(&self) -> Result<Mode, NotFinishError> {
         self.counter.reset();
         let mut mode = Mode::Idle;
         //waiting for switch off
@@ -115,8 +88,9 @@ where
             let count = self.counter.count();
             mode = Mode::from(count % Mode::size());
         }
-        self.mode.store(mode, Ordering::Relaxed);
 
         while self.switch.is_enabled() {}
+
+        Ok(mode)
     }
 }

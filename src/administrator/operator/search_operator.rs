@@ -3,7 +3,8 @@ use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::administrator::{
-    Agent, DirectionInstructor, Graph, GraphConverter, Mode, ObstacleInterpreter, Operator, Solver,
+    Agent, DirectionInstructor, Graph, GraphConverter, Mode, NotFinishError, ObstacleInterpreter,
+    Operator, Solver,
 };
 
 pub struct SearchOperator<Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver> {
@@ -60,19 +61,19 @@ where
     }
 
     //return: false if search finished
-    fn run(&self) -> Result<(), Mode> {
+    fn run(&self) -> Result<Mode, NotFinishError> {
         if !self
             .is_updated
             .compare_and_swap(true, false, Ordering::Relaxed)
         {
-            return Ok(());
+            return Err(NotFinishError);
         }
         let current = self.current.get();
         if let Some(candidates) = self.solver.next_node_candidates(current, &self.maze) {
             self.maze.update_node_candidates(candidates);
-            Ok(())
+            Ok(Mode::FastRun)
         } else {
-            Err(Mode::FastRun)
+            Err(NotFinishError)
         }
     }
 }
