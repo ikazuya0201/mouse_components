@@ -13,17 +13,17 @@ use super::administrator;
 pub struct Solver<Node, SearchNode, Max> {
     start: Node,
     goal: Node,
-    search_start: SearchNode,
-    _max_node: PhantomData<fn() -> Max>,
+    _node_max: PhantomData<fn() -> Max>,
+    _search_node: PhantomData<fn() -> SearchNode>,
 }
 
 impl<Node, SearchNode, Max> Solver<Node, SearchNode, Max> {
-    pub fn new(start: Node, goal: Node, search_start: SearchNode) -> Self {
+    pub fn new(start: Node, goal: Node) -> Self {
         Self {
             start,
             goal,
-            search_start,
-            _max_node: PhantomData,
+            _node_max: PhantomData,
+            _search_node: PhantomData,
         }
     }
 }
@@ -47,10 +47,6 @@ where
 {
     type Nodes = Vec<Node, Max>;
     type SearchNodes = Vec<SearchNode, U4>;
-
-    fn start_search_node(&self) -> SearchNode {
-        self.search_start
-    }
 
     fn next_node_candidates(&self, current: SearchNode, graph: &Graph) -> Option<Self::SearchNodes>
     where
@@ -202,7 +198,7 @@ mod tests {
 
         let graph = IGraph::new(n, &edges);
 
-        let solver = Solver::<usize, usize, U9>::new(start, goal, 0);
+        let solver = Solver::<usize, usize, U9>::new(start, goal);
 
         let path = crate::administrator::Solver::compute_shortest_path(&solver, &graph);
         let expected = [0, 1, 3, 5, 7, 8];
