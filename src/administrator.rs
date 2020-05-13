@@ -6,12 +6,12 @@ pub mod operator;
 mod solver;
 mod switch;
 
-use core::sync::atomic::Ordering;
+use core::sync::atomic::Ordering::Relaxed;
 
 pub use agent::Agent;
 pub use counter::Counter;
 pub use maze::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter};
-use mode::{AtomicMode, Mode};
+use mode::{AtomicMode, FastRun, Idle, Mode, Search, Select};
 use operator::Operator;
 pub use solver::Solver;
 pub use switch::Switch;
@@ -30,11 +30,11 @@ impl<ISwitch, ICounter, SearchOperator> Administrator<ISwitch, ICounter, SearchO
 where
     ISwitch: Switch,
     ICounter: Counter,
-    SearchOperator: Operator,
+    SearchOperator: Operator<Search>,
 {
     pub fn new(switch: ISwitch, counter: ICounter, search_operator: SearchOperator) -> Self {
         Self {
-            mode: AtomicMode::new(Mode::Idle),
+            mode: AtomicMode::new(Mode::Idle(Idle)),
             switch,
             counter,
             search_operator,
@@ -43,44 +43,41 @@ where
 
     //called by periodic interrupt
     pub fn tick(&self) {
-        use Mode::*;
-        use Ordering::Relaxed;
         match self.mode.load(Relaxed) {
-            Idle => (),
-            Search => self.search_operator.tick(),
-            Select => return,
+            Mode::Idle(_) => (),
+            Mode::Search(_) => self.search_operator.tick(),
+            Mode::Select(_) => return,
             _ => (),
         }
-        self.store_if_switch_enabled(Select);
+        self.store_if_switch_enabled(Mode::Select(Select));
     }
 
     fn store_if_switch_enabled(&self, mode: Mode) {
         if self.switch.is_enabled() {
-            self.mode.store(mode, Ordering::Relaxed);
+            self.mode.store(mode, Relaxed);
         }
     }
 
     pub fn run(&self) {
-        use Mode::*;
         loop {
-            if let Ok(mode) = match self.mode.load(Ordering::Relaxed) {
-                Idle => Err(NotFinishError),
-                Search => self.search_operator.run(),
-                FastRun => self.fast_run(),
-                Select => self.mode_select(),
+            if let Ok(mode) = match self.mode.load(Relaxed) {
+                Mode::Idle(_) => Err(NotFinishError),
+                Mode::Search(_) => self.search_operator.run(),
+                Mode::FastRun(_) => self.fast_run(),
+                Mode::Select(_) => self.mode_select(),
             } {
-                self.mode.store(mode, Ordering::Relaxed);
+                self.mode.store(mode, Relaxed);
             }
         }
     }
 
     fn fast_run(&self) -> Result<Mode, NotFinishError> {
-        Ok(Mode::Idle)
+        Ok(Mode::Idle(Idle))
     }
 
     fn mode_select(&self) -> Result<Mode, NotFinishError> {
         self.counter.reset();
-        let mut mode = Mode::Idle;
+        let mut mode = Mode::Idle(Idle);
         //waiting for switch off
         while self.switch.is_enabled() {}
 

@@ -2,14 +2,24 @@ mod atomic_enum;
 
 use atomic_enum::AtomicEnum;
 
-use Mode::*;
+#[derive(Debug, PartialEq, Eq)]
+pub struct Idle;
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
+pub struct Search;
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct FastRun;
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Select;
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Mode {
-    Idle,    //do nothing
-    Search,  //maze search
-    FastRun, //fast run to goal and return to start
-    Select,  //mode select
+    Idle(Idle),       //do nothing
+    Search(Search),   //maze search
+    FastRun(FastRun), //fast run to goal and return to start
+    Select(Select),   //mode select
 }
 
 impl Mode {
@@ -21,10 +31,10 @@ impl Mode {
 impl Into<u8> for Mode {
     fn into(self) -> u8 {
         match self {
-            Idle => 0,
-            Search => 1,
-            FastRun => 2,
-            Select => 3,
+            Mode::Idle(Idle) => 0,
+            Mode::Search(Search) => 1,
+            Mode::FastRun(FastRun) => 2,
+            Mode::Select(Select) => 3,
         }
     }
 }
@@ -32,10 +42,10 @@ impl Into<u8> for Mode {
 impl From<u8> for Mode {
     fn from(val: u8) -> Self {
         match val {
-            0 => Idle,
-            1 => Search,
-            2 => FastRun,
-            3 => Select,
+            0 => Mode::Idle(Idle),
+            1 => Mode::Search(Search),
+            2 => Mode::FastRun(FastRun),
+            3 => Mode::Select(Select),
             _ => unreachable!(),
         }
     }
