@@ -4,7 +4,7 @@ use typenum::{PowerOfTwo, Unsigned};
 
 use super::{Location, Position};
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum WallDirection {
     Up,
     Right,
