@@ -5,10 +5,16 @@ use typenum::{PowerOfTwo, Unsigned};
 use super::{Location, Position};
 
 #[derive(Clone)]
+pub enum WallDirection {
+    Up,
+    Right,
+}
+
+#[derive(Clone)]
 pub struct WallPosition<N> {
     x: u16,
     y: u16,
-    z: bool, //false: up, true: right
+    z: WallDirection,
     _size: PhantomData<fn() -> N>,
 }
 
@@ -16,7 +22,7 @@ impl<N> WallPosition<N>
 where
     N: Unsigned + PowerOfTwo,
 {
-    pub fn new(x: u16, y: u16, z: bool) -> Self {
+    pub fn new(x: u16, y: u16, z: WallDirection) -> Self {
         Self {
             x,
             y,
@@ -55,8 +61,8 @@ where
         }
         let z = match position.location() {
             Cell => return None,
-            HorizontalBound => false,
-            VerticalBound => true,
+            HorizontalBound => WallDirection::Up,
+            VerticalBound => WallDirection::Right,
         };
         Some(Self::new(x as u16, y as u16, z))
     }
