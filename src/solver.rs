@@ -90,7 +90,7 @@ where
         let mut candidates = candidates
             .into_iter()
             .map(|(node, cost)| (node, cost.saturating_add(dists[node.into()])))
-            .filter(|&(_, cost)| cost == Cost::max_value())
+            .filter(|&(_, cost)| cost < Cost::max_value())
             .collect::<Vec<(SearchNode, Cost), U4>>();
 
         if candidates.is_empty() {

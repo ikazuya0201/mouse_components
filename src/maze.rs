@@ -13,9 +13,10 @@ use typenum::{PowerOfTwo, Unsigned};
 use crate::administrator::{DirectionInstructor, Graph, GraphConverter};
 use crate::pattern::Pattern;
 use crate::utils::mutex::Mutex;
-use direction::{AbsoluteDirection, RelativeDirection};
-use node::{Location, Node, NodeId, Position, SearchNodeId};
-use wall::{WallDirection, WallPosition};
+pub use direction::{AbsoluteDirection, RelativeDirection};
+use node::{Location, Node, Position};
+pub use node::{NodeId, SearchNodeId};
+pub use wall::{WallDirection, WallPosition};
 
 pub struct Maze<N, F>
 where
