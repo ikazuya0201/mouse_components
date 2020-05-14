@@ -10,26 +10,32 @@ use num::{Bounded, Saturating};
 
 use super::administrator;
 
-pub struct Solver<Node, SearchNode, Max> {
+pub struct Solver<Node, SearchNode, Max, GSize>
+where
+    GSize: ArrayLength<Node>,
+{
     start: Node,
-    goal: Node,
+    goals: GenericArray<Node, GSize>,
     _node_max: PhantomData<fn() -> Max>,
     _search_node: PhantomData<fn() -> SearchNode>,
 }
 
-impl<Node, SearchNode, Max> Solver<Node, SearchNode, Max> {
-    pub fn new(start: Node, goal: Node) -> Self {
+impl<Node, SearchNode, Max, GSize> Solver<Node, SearchNode, Max, GSize>
+where
+    GSize: ArrayLength<Node>,
+{
+    pub fn new(start: Node, goals: GenericArray<Node, GSize>) -> Self {
         Self {
             start,
-            goal,
+            goals,
             _node_max: PhantomData,
             _search_node: PhantomData,
         }
     }
 }
 
-impl<Node, SearchNode, Cost, Graph, Max> administrator::Solver<Node, SearchNode, Cost, Graph>
-    for Solver<Node, SearchNode, Max>
+impl<Node, SearchNode, Cost, Graph, Max, GSize> administrator::Solver<Node, SearchNode, Cost, Graph>
+    for Solver<Node, SearchNode, Max, GSize>
 where
     Max: ArrayLength<Node>
         + ArrayLength<SearchNode>
@@ -40,6 +46,7 @@ where
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + typenum::Unsigned,
+    GSize: ArrayLength<Node>,
     Node: Ord + Copy + Debug + Into<usize>,
     SearchNode: Ord + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
@@ -103,9 +110,28 @@ where
         let mut heap = BinaryHeap::<Node, Reverse<Cost>, Max>::new();
         heap.push(self.start, Reverse(Cost::min_value())).unwrap();
 
+        let construct_path = |goal: Node, prev: GenericArray<_, _>| {
+            let mut current = prev[goal.into()]?;
+            let mut path = Vec::new();
+            path.push(goal).unwrap();
+            path.push(current).unwrap();
+            while let Some(next) = prev[current.into()] {
+                path.push(next).unwrap();
+                current = next;
+            }
+            let len = path.len();
+            //reverse
+            for i in 0..len / 2 {
+                path.swap(i, len - i - 1);
+            }
+            Some(path)
+        };
+
         while let Some((node, Reverse(cost))) = heap.pop() {
-            if node == self.goal {
-                break;
+            for &goal in &self.goals {
+                if node == goal {
+                    return construct_path(goal, prev);
+                }
             }
             for (next, edge_cost) in graph.successors(node) {
                 let next_cost = cost.saturating_add(edge_cost);
@@ -116,20 +142,7 @@ where
                 }
             }
         }
-        let mut current = prev[self.goal.into()]?;
-        let mut path = Vec::new();
-        path.push(self.goal).unwrap();
-        path.push(current).unwrap();
-        while let Some(next) = prev[current.into()] {
-            path.push(next).unwrap();
-            current = next;
-        }
-        let len = path.len();
-        //reverse
-        for i in 0..len / 2 {
-            path.swap(i, len - i - 1);
-        }
-        Some(path)
+        None
     }
 }
 
@@ -180,6 +193,8 @@ mod tests {
 
     #[test]
     fn test_compute_shortest_path() {
+        use generic_array::arr;
+
         let edges = [
             (0, 1, 2),
             (0, 2, 1),
@@ -193,12 +208,12 @@ mod tests {
             (7, 8, 1),
         ];
         let start = 0;
-        let goal = 8;
+        let goals = arr![usize; 8];
         let n = 9;
 
         let graph = IGraph::new(n, &edges);
 
-        let solver = Solver::<usize, usize, U9>::new(start, goal);
+        let solver = Solver::<usize, usize, U9, _>::new(start, goals);
 
         let path = crate::administrator::Solver::compute_shortest_path(&solver, &graph);
         let expected = [0, 1, 3, 5, 7, 8];
