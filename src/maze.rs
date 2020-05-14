@@ -48,7 +48,19 @@ where
         maze
     }
 
-    pub fn initialize(&self) {
+    pub fn from_bits(wall_bits: &[bool], checked_bits: &[bool], costs: F) -> Self {
+        let maze = Self {
+            is_checked: RefCell::new(GenericArray::default()),
+            is_wall: RefCell::new(GenericArray::default()),
+            costs,
+            candidates: Mutex::new(Vec::new()),
+        };
+        maze.initialize_wall_from(wall_bits);
+        maze.initialize_checked_from(checked_bits);
+        maze
+    }
+
+    fn initialize(&self) {
         for i in 0..WallPosition::<N>::max() + 1 {
             self.check_wall(
                 WallPosition::new(i, WallPosition::<N>::max(), WallDirection::Up),
@@ -61,17 +73,36 @@ where
         }
     }
 
-    fn check_wall(&self, position: WallPosition<N>, is_wall: bool) {
-        self.update_wall(position.clone(), is_wall);
-        self.update_checked(position, true);
+    fn initialize_wall_from(&self, bits: &[bool]) {
+        for (i, &bit) in bits.into_iter().enumerate() {
+            self.update_wall_by_index(i, bit);
+        }
     }
 
-    fn update_wall(&self, position: WallPosition<N>, is_wall: bool) {
-        self.is_wall.borrow_mut()[position.as_index()] = is_wall;
+    fn initialize_checked_from(&self, bits: &[bool]) {
+        for (i, &bit) in bits.into_iter().enumerate() {
+            self.update_checked_by_index(i, bit);
+        }
     }
 
-    fn update_checked(&self, position: WallPosition<N>, is_checked: bool) {
-        self.is_checked.borrow_mut()[position.as_index()] = is_checked;
+    pub fn check_wall(&self, position: WallPosition<N>, is_wall: bool) {
+        self.check_wall_by_index(position.as_index(), is_wall);
+    }
+
+    #[inline]
+    fn check_wall_by_index(&self, index: usize, is_wall: bool) {
+        self.update_wall_by_index(index, is_wall);
+        self.update_checked_by_index(index, true);
+    }
+
+    #[inline]
+    fn update_wall_by_index(&self, index: usize, is_wall: bool) {
+        self.is_wall.borrow_mut()[index] = is_wall;
+    }
+
+    #[inline]
+    fn update_checked_by_index(&self, index: usize, is_checked: bool) {
+        self.is_checked.borrow_mut()[index] = is_checked;
     }
 
     #[inline]
