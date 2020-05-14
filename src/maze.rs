@@ -698,56 +698,32 @@ where
             };
             match dst.location() {
                 VerticalBound => match dst.difference(&src) {
-                    (-1, -1) => {
-                        add_if_no_wall(-2, 0, East);
-                        add_if_no_wall(-1, 1, South);
-                    }
-                    (-2, 0) => {
-                        add_if_no_wall(-1, -1, North);
-                        add_if_no_wall(-1, 1, South);
-                    }
-                    (-1, 1) => {
+                    (-1, -1) | (-2, 0) | (-1, 1) => {
                         add_if_no_wall(-1, -1, North);
                         add_if_no_wall(-2, 0, East);
+                        add_if_no_wall(-1, 1, South);
+                        add_if_no_wall(0, 0, West);
                     }
-                    (1, 1) => {
+                    (1, -1) | (2, 0) | (1, 1) => {
+                        add_if_no_wall(1, 1, South);
                         add_if_no_wall(2, 0, West);
                         add_if_no_wall(1, -1, North);
-                    }
-                    (2, 0) => {
-                        add_if_no_wall(1, 1, South);
-                        add_if_no_wall(1, -1, North);
-                    }
-                    (1, -1) => {
-                        add_if_no_wall(2, 0, West);
-                        add_if_no_wall(1, 1, South);
+                        add_if_no_wall(0, 0, East);
                     }
                     _ => unreachable!(),
                 },
                 HorizontalBound => match dst.difference(&src) {
-                    (-1, -1) => {
-                        add_if_no_wall(0, -2, North);
-                        add_if_no_wall(1, -1, West);
-                    }
-                    (0, -2) => {
-                        add_if_no_wall(-1, -1, East);
-                        add_if_no_wall(1, -1, West);
-                    }
-                    (1, -1) => {
+                    (-1, -1) | (0, -2) | (1, -1) => {
                         add_if_no_wall(-1, -1, East);
                         add_if_no_wall(0, -2, North);
+                        add_if_no_wall(1, -1, West);
+                        add_if_no_wall(0, 0, South);
                     }
-                    (-1, 1) => {
-                        add_if_no_wall(0, 2, South);
-                        add_if_no_wall(1, 1, West);
-                    }
-                    (0, 2) => {
-                        add_if_no_wall(-1, 1, East);
-                        add_if_no_wall(1, 1, West);
-                    }
-                    (1, 1) => {
+                    (-1, 1) | (0, 2) | (1, 1) => {
                         add_if_no_wall(-1, 1, East);
                         add_if_no_wall(0, 2, South);
+                        add_if_no_wall(1, 1, West);
+                        add_if_no_wall(0, 0, North);
                     }
                     _ => unreachable!(),
                 },
@@ -1050,10 +1026,13 @@ mod tests {
                 vec![
                     new_wall(0, 0, WallDirection::Right),
                     new_wall(0, 1, WallDirection::Right),
+                    new_wall(0, 2, WallDirection::Up),
                     new_wall(1, 0, WallDirection::Up),
                     new_wall(1, 1, WallDirection::Up),
                     new_wall(1, 2, WallDirection::Right),
+                    new_wall(2, 1, WallDirection::Right),
                     new_wall(2, 2, WallDirection::Up),
+                    new_wall(3, 1, WallDirection::Up),
                 ],
                 vec![
                     new(0, 0, North),
@@ -1066,12 +1045,29 @@ mod tests {
                     new(2, 0, West),
                 ],
                 vec![
-                    new_search(0, 5, South),
+                    new_search(0, 1, North),
+                    new_search(0, 3, South),
+                    new_search(0, 3, North),
+                    new_search(1, 4, East),
+                    new_search(1, 4, West),
+                    new_search(2, 5, South),
+                    new_search(2, 5, North),
                     new_search(1, 6, East),
-                    new_search(6, 3, North),
-                    new_search(5, 2, West),
-                    new_search(5, 0, West),
+                    new_search(3, 6, East),
+                    new_search(3, 6, West),
+                    new_search(5, 6, East),
+                    new_search(5, 6, West),
+                    new_search(6, 5, South),
+                    new_search(6, 5, North),
+                    new_search(5, 4, East),
+                    new_search(5, 4, West),
+                    new_search(4, 3, North),
+                    new_search(4, 3, South),
+                    new_search(4, 1, North),
+                    new_search(4, 1, South),
                     new_search(3, 2, East),
+                    new_search(5, 0, West),
+                    new_search(3, 0, East),
                 ],
             ),
             (
@@ -1083,12 +1079,22 @@ mod tests {
                     new(4, 4, South),
                 ],
                 vec![
+                    new_search(0, 1, North),
                     new_search(0, 3, South),
+                    new_search(1, 2, West),
+                    new_search(1, 2, East),
                     new_search(2, 1, North),
                     new_search(3, 2, West),
+                    new_search(2, 3, South),
+                    new_search(2, 3, North),
                     new_search(1, 4, East),
+                    new_search(2, 5, South),
+                    new_search(2, 5, North),
                     new_search(1, 6, East),
+                    new_search(3, 6, West),
+                    new_search(3, 6, East),
                     new_search(5, 6, West),
+                    new_search(4, 5, North),
                 ],
             ),
         ];

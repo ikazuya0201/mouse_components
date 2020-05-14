@@ -11,7 +11,7 @@ pub enum Location {
     HorizontalBound,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Position<N> {
     x: i16,
     y: i16,
@@ -80,7 +80,7 @@ where
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Node<N> {
     position: Position<N>,
     direction: AbsoluteDirection,
