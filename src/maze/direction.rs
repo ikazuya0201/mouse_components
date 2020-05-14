@@ -1,4 +1,4 @@
-#[derive(Clone, Copy, PartialEq, Eq, core::fmt::Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub enum AbsoluteDirection {
     North,
     NorthEast,
@@ -10,7 +10,7 @@ pub enum AbsoluteDirection {
     NorthWest,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, core::fmt::Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub enum RelativeDirection {
     Front,
     FrontRight,
