@@ -777,7 +777,7 @@ where
 
     fn instruct(&self, current: SearchNodeId<N>) -> Option<(RelativeDirection, SearchNodeId<N>)> {
         if let Ok(mut candidates) = self.candidates.try_lock() {
-            for node_id in candidates.clone().iter() {
+            for &node_id in &*candidates {
                 let node = node_id.as_node();
                 if !self.is_checked_by_position(node.position()) {
                     break;
@@ -788,7 +788,7 @@ where
                 let current = current.as_node();
                 let direction = current.direction().relative(node.direction());
                 *candidates = Vec::new();
-                return Some((direction, *node_id));
+                return Some((direction, node_id));
             }
         }
         None

@@ -99,7 +99,7 @@ where
 
     #[inline]
     pub fn position(&self) -> Position<N> {
-        self.position.clone()
+        self.position
     }
 
     #[inline]
