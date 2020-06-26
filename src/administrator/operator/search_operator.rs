@@ -50,7 +50,7 @@ where
     ISolver: Solver<Node, SearchNode, Cost, Maze>,
 {
     fn tick(&self) {
-        let obstacles = self.agent.existing_obstacles();
+        let obstacles = self.agent.get_existing_obstacles();
         self.maze.interpret_obstacles(obstacles);
         if let Some((direction, node)) = self.maze.instruct(self.current.get()) {
             self.agent.set_instructed_direction(direction);
