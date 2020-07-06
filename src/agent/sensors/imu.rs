@@ -1,4 +1,4 @@
-use super::Vector3;
+use crate::utils::vector::Vector3;
 
 use quantities::{Acceleration, AngularSpeed};
 
