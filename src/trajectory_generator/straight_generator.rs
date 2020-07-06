@@ -28,15 +28,18 @@ impl StraightGenerator {
         v_end: Speed,
     ) -> impl Iterator<Item = Target> {
         let mut left = if v_start < v_end { v_end } else { v_start };
-        let mut right = self.v_max;
-        for i in 0..Self::LOOP_COUNT {
+        let mut right = self.calculate_reachable_speed(v_start, distance);
+        if left > right {
+            left = right;
+        }
+        for _ in 0..Self::LOOP_COUNT {
             let mid = (left + right) / 2.0;
             let d =
                 AccelerationTrajectory::calculate_distance(v_start, mid, self.a_max, self.j_max)
                     + AccelerationTrajectory::calculate_distance(
                         mid, v_end, self.a_max, self.j_max,
                     );
-            if d < distance {
+            if d <= distance {
                 left = mid;
             } else {
                 right = mid;
@@ -44,6 +47,7 @@ impl StraightGenerator {
         }
 
         let v_max = left;
+        let v_end = if v_end < v_max { v_end } else { v_max };
 
         let first_dist =
             AccelerationTrajectory::calculate_distance(v_start, v_max, self.a_max, self.j_max);
@@ -74,6 +78,22 @@ impl StraightGenerator {
         v: Speed,
     ) -> impl Iterator<Item = Target> {
         ConstantSpeedTrajectory::new(self.period, x_start, distance, v)
+    }
+
+    pub fn calculate_reachable_speed(&self, v_start: Speed, distance: Distance) -> Speed {
+        let mut left = v_start;
+        let mut right = self.v_max;
+        for _ in 0..Self::LOOP_COUNT {
+            let mid = (left + right) / 2.0;
+            let d =
+                AccelerationTrajectory::calculate_distance(v_start, mid, self.a_max, self.j_max);
+            if d < distance {
+                left = mid;
+            } else {
+                right = mid;
+            }
+        }
+        left
     }
 }
 
@@ -236,6 +256,7 @@ impl Iterator for ConstantSpeedTrajectory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::abs_diff_eq;
 
     const EPSILON: f32 = 1e-4; //low accuracy...
 
@@ -274,6 +295,7 @@ mod tests {
             );
             before = target;
         }
+        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -311,6 +333,7 @@ mod tests {
             );
             before = target;
         }
+        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -348,6 +371,7 @@ mod tests {
             );
             before = target;
         }
+        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -385,5 +409,44 @@ mod tests {
             );
             before = target;
         }
+        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
+    }
+
+    #[test]
+    fn test_straight_trajectory_with_no_deceleration() {
+        let period = Time::from_seconds(0.001);
+        let v_max = Speed::from_meter_per_second(1.0);
+        let a_max = Acceleration::from_meter_per_second_squared(0.5);
+        let j_max = Jerk::from_meter_per_second_cubed(1.0);
+        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let mut trajectory = generator.generate(
+            Distance::from_meters(0.0),
+            Distance::from_meters(1.0),
+            Speed::from_meter_per_second(0.0),
+            Speed::from_meter_per_second(1.0),
+        );
+        let mut before = trajectory.next().unwrap();
+        for target in trajectory {
+            assert!(
+                ((target.v - before.v) / period).abs()
+                    <= a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.v - before.v) / period).abs(),
+                a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
+            );
+            assert!(
+                ((target.a - before.a) / period).abs()
+                    <= j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.a - before.a) / period).abs(),
+                j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
+            );
+            before = target;
+        }
+        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 }
