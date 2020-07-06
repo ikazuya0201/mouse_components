@@ -5,4 +5,5 @@ pub mod agent;
 pub mod maze;
 pub mod pattern;
 pub mod solver;
+pub mod trajectory_generator;
 mod utils;
