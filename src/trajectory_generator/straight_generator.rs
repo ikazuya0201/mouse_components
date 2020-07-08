@@ -413,7 +413,7 @@ mod tests {
     }
 
     #[test]
-    fn test_straight_trajectory_with_no_deceleration() {
+    fn test_straight_trajectory_with_only_acceleration() {
         let period = Time::from_seconds(0.001);
         let v_max = Speed::from_meter_per_second(1.0);
         let a_max = Acceleration::from_meter_per_second_squared(0.5);
@@ -424,6 +424,44 @@ mod tests {
             Distance::from_meters(1.0),
             Speed::from_meter_per_second(0.0),
             Speed::from_meter_per_second(1.0),
+        );
+        let mut before = trajectory.next().unwrap();
+        for target in trajectory {
+            assert!(
+                ((target.v - before.v) / period).abs()
+                    <= a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.v - before.v) / period).abs(),
+                a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
+            );
+            assert!(
+                ((target.a - before.a) / period).abs()
+                    <= j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.a - before.a) / period).abs(),
+                j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
+            );
+            before = target;
+        }
+        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
+    }
+
+    #[test]
+    fn test_straight_trajectory_with_only_deceleration() {
+        let period = Time::from_seconds(0.001);
+        let v_max = Speed::from_meter_per_second(1.0);
+        let a_max = Acceleration::from_meter_per_second_squared(0.5);
+        let j_max = Jerk::from_meter_per_second_cubed(1.0);
+        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let mut trajectory = generator.generate(
+            Distance::from_meters(0.0),
+            Distance::from_meters(1.0),
+            Speed::from_meter_per_second(1.0),
+            Speed::from_meter_per_second(0.0),
         );
         let mut before = trajectory.next().unwrap();
         for target in trajectory {
