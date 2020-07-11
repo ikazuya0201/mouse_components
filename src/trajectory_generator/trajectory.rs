@@ -1,9 +1,17 @@
-use quantities::{Acceleration, Distance, Jerk, Speed};
+use core::ops::Div;
 
-#[derive(Clone, Debug)]
-pub struct Target {
-    pub x: Distance,
-    pub v: Speed,
-    pub a: Acceleration,
-    pub j: Jerk,
+use quantities::{Quantity, Time, TimeDifferentiable};
+
+#[derive(Debug)]
+pub struct Target<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable,
+    ddt!(T): TimeDifferentiable,
+    dddt!(T): Quantity,
+{
+    pub x: T,
+    pub v: <T as Div<Time>>::Output,
+    pub a: <<T as Div<Time>>::Output as Div<Time>>::Output,
+    pub j: <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output,
 }

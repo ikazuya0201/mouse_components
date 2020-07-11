@@ -1,17 +1,33 @@
-use super::trajectory::Target;
-use quantities::{Acceleration, Distance, Jerk, Speed, Time};
+use core::ops::{Add, Div, Mul};
 
-pub struct StraightGenerator {
+use quantities::{Quantity, Time, TimeDifferentiable};
+
+use super::trajectory::Target;
+
+pub struct StraightGenerator<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable,
+    ddt!(T): TimeDifferentiable,
+    dddt!(T): Quantity,
+{
     period: Time,
-    v_max: Speed,
-    a_max: Acceleration,
-    j_max: Jerk,
+    v_max: dt!(T),
+    a_max: ddt!(T),
+    j_max: dddt!(T),
 }
 
-impl StraightGenerator {
+impl<T> StraightGenerator<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable + Mul<Time, Output = T>,
+    ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)>,
+    dddt!(T): Quantity + Mul<Time, Output = ddt!(T)>,
+    f32: From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
+{
     const LOOP_COUNT: u8 = 30;
 
-    pub fn new(period: Time, v_max: Speed, a_max: Acceleration, j_max: Jerk) -> Self {
+    pub fn new(period: Time, v_max: dt!(T), a_max: ddt!(T), j_max: dddt!(T)) -> Self {
         Self {
             period,
             v_max,
@@ -22,11 +38,15 @@ impl StraightGenerator {
 
     pub fn generate(
         &self,
-        x_start: Distance,
-        distance: Distance,
-        v_start: Speed,
-        v_end: Speed,
-    ) -> impl Iterator<Item = Target> {
+        x_start: T,
+        distance: T,
+        v_start: dt!(T),
+        v_end: dt!(T),
+    ) -> impl Iterator<Item = Target<T>>
+    where
+        T: PartialOrd,
+        dt!(T): PartialOrd + Div<f32> + Add<Output = dt!(T)>,
+    {
         let mut left = if v_start < v_end { v_end } else { v_start };
         let mut right = self.calculate_reachable_speed(v_start, distance);
         if left > right {
@@ -35,10 +55,9 @@ impl StraightGenerator {
         for _ in 0..Self::LOOP_COUNT {
             let mid = (left + right) / 2.0;
             let d =
-                AccelerationTrajectory::calculate_distance(v_start, mid, self.a_max, self.j_max)
-                    + AccelerationTrajectory::calculate_distance(
-                        mid, v_end, self.a_max, self.j_max,
-                    );
+                AccelerationTrajectory::<T>::calculate_distance(
+                    v_start, mid, self.a_max, self.j_max,
+                ) + AccelerationTrajectory::calculate_distance(mid, v_end, self.a_max, self.j_max);
             if d <= distance {
                 left = mid;
             } else {
@@ -64,29 +83,34 @@ impl StraightGenerator {
 
     fn generate_acceleration(
         &self,
-        x_start: Distance,
-        v_start: Speed,
-        v_end: Speed,
-    ) -> impl Iterator<Item = Target> {
+        x_start: T,
+        v_start: dt!(T),
+        v_end: dt!(T),
+    ) -> impl Iterator<Item = Target<T>> {
         AccelerationTrajectory::new(self.period, x_start, v_start, v_end, self.a_max, self.j_max)
     }
 
     fn generate_constant(
         &self,
-        x_start: Distance,
-        distance: Distance,
-        v: Speed,
-    ) -> impl Iterator<Item = Target> {
+        x_start: T,
+        distance: T,
+        v: <T as Div<Time>>::Output,
+    ) -> impl Iterator<Item = Target<T>> {
         ConstantSpeedTrajectory::new(self.period, x_start, distance, v)
     }
 
-    pub fn calculate_reachable_speed(&self, v_start: Speed, distance: Distance) -> Speed {
+    pub fn calculate_reachable_speed(
+        &self,
+        v_start: <T as Div<Time>>::Output,
+        distance: T,
+    ) -> <T as Div<Time>>::Output {
         let mut left = v_start;
         let mut right = self.v_max;
         for _ in 0..Self::LOOP_COUNT {
             let mid = (left + right) / 2.0;
-            let d =
-                AccelerationTrajectory::calculate_distance(v_start, mid, self.a_max, self.j_max);
+            let d = AccelerationTrajectory::<T>::calculate_distance(
+                v_start, mid, self.a_max, self.j_max,
+            );
             if d < distance {
                 left = mid;
             } else {
@@ -97,28 +121,41 @@ impl StraightGenerator {
     }
 }
 
-struct AccelerationTrajectory {
+struct AccelerationTrajectory<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable,
+    ddt!(T): TimeDifferentiable,
+    dddt!(T): Quantity,
+{
     t: Time,
     dt: Time,
     t1: Time,
     t2: Time,
     t3: Time,
-    x_start: Distance,
-    x_end: Distance,
-    v_start: Speed,
-    v_end: Speed,
-    a_m: Acceleration,
-    j_m: Jerk,
+    x_start: T,
+    x_end: T,
+    v_start: dt!(T),
+    v_end: dt!(T),
+    a_m: ddt!(T),
+    j_m: dddt!(T),
 }
 
-impl AccelerationTrajectory {
+impl<T> AccelerationTrajectory<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable + Mul<Time, Output = T>,
+    ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)>,
+    dddt!(T): Quantity,
+    f32: From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
+{
     fn new(
         dt: Time,
-        x_start: Distance,
-        v_start: Speed,
-        v_end: Speed,
-        a_max: Acceleration,
-        j_max: Jerk,
+        x_start: T,
+        v_start: dt!(T),
+        v_end: dt!(T),
+        a_max: ddt!(T),
+        j_max: dddt!(T),
     ) -> Self {
         let tc = a_max / j_max;
         let vd = a_max * tc;
@@ -126,10 +163,8 @@ impl AccelerationTrajectory {
             let tm = (v_end - v_start).abs() / a_max - tc;
             (tc, tc + tm, 2.0 * tc + tm)
         } else {
-            let td = Time::from_seconds(
-                ((v_end - v_start).abs().as_meter_per_second() / j_max.as_meter_per_second_cubed())
-                    .sqrt(),
-            );
+            let td =
+                Time::from_seconds((f32::from((v_end - v_start).abs()) / f32::from(j_max)).sqrt());
             (td, td, 2.0 * td)
         };
 
@@ -154,29 +189,28 @@ impl AccelerationTrajectory {
         }
     }
 
-    fn calculate_distance(
-        v_start: Speed,
-        v_end: Speed,
-        a_max: Acceleration,
-        j_max: Jerk,
-    ) -> Distance {
+    fn calculate_distance(v_start: dt!(T), v_end: dt!(T), a_max: ddt!(T), j_max: dddt!(T)) -> T {
         let tc = a_max / j_max;
         let vd = a_max * tc;
         let t = if (v_end - v_start).abs() >= vd {
             let tm = (v_end - v_start).abs() / a_max - tc;
             2.0 * tc + tm
         } else {
-            2.0 * Time::from_seconds(
-                ((v_end - v_start).abs().as_meter_per_second() / j_max.as_meter_per_second_cubed())
-                    .sqrt(),
-            )
+            2.0 * Time::from_seconds((f32::from((v_end - v_start).abs()) / f32::from(j_max)).sqrt())
         };
         (v_start + v_end) * t / 2.0
     }
 }
 
-impl Iterator for AccelerationTrajectory {
-    type Item = Target;
+impl<T> Iterator for AccelerationTrajectory<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable + Mul<Time, Output = T>,
+    ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)>,
+    dddt!(T): Quantity + Mul<Time, Output = ddt!(T)>,
+    f32: From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
+{
+    type Item = Target<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let t = self.t;
@@ -194,7 +228,7 @@ impl Iterator for AccelerationTrajectory {
         } else if t <= self.t2 {
             let dt1 = t - self.t1;
             Some(Target {
-                j: Jerk::from_meter_per_second_cubed(0.0),
+                j: Default::default(),
                 a: self.a_m,
                 v: self.v_start + self.a_m * self.t1 / 2.0 + self.a_m * dt1,
                 x: self.x_start
@@ -215,16 +249,23 @@ impl Iterator for AccelerationTrajectory {
     }
 }
 
-struct ConstantSpeedTrajectory {
+struct ConstantSpeedTrajectory<T>
+where
+    T: TimeDifferentiable,
+{
     t: Time,
     dt: Time,
     t_end: Time,
-    x_start: Distance,
-    v: Speed,
+    x_start: T,
+    v: dt!(T),
 }
 
-impl ConstantSpeedTrajectory {
-    fn new(dt: Time, x_start: Distance, distance: Distance, v: Speed) -> Self {
+impl<T> ConstantSpeedTrajectory<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): Quantity,
+{
+    fn new(dt: Time, x_start: T, distance: T, v: dt!(T)) -> Self {
         Self {
             t: Time::from_seconds(0.0),
             dt,
@@ -235,8 +276,14 @@ impl ConstantSpeedTrajectory {
     }
 }
 
-impl Iterator for ConstantSpeedTrajectory {
-    type Item = Target;
+impl<T> Iterator for ConstantSpeedTrajectory<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable + Mul<Time, Output = T>,
+    ddt!(T): TimeDifferentiable,
+    dddt!(T): Quantity,
+{
+    type Item = Target<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let t = self.t;
@@ -245,8 +292,8 @@ impl Iterator for ConstantSpeedTrajectory {
         }
         self.t += self.dt;
         Some(Target {
-            j: Jerk::from_meter_per_second_cubed(0.0),
-            a: Acceleration::from_meter_per_second_squared(0.0),
+            j: Default::default(),
+            a: Default::default(),
             v: self.v,
             x: self.x_start + self.v * self.t,
         })
@@ -257,6 +304,9 @@ impl Iterator for ConstantSpeedTrajectory {
 mod tests {
     use super::*;
     use approx::abs_diff_eq;
+    use quantities::{
+        Acceleration, Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Jerk, Speed,
+    };
 
     const EPSILON: f32 = 1e-4; //low accuracy...
 
@@ -372,6 +422,44 @@ mod tests {
             before = target;
         }
         abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
+    }
+
+    #[test]
+    fn test_straight_trajectory_with_angle() {
+        let period = Time::from_seconds(0.001);
+        let v_max = AngularSpeed::from_radian_per_second(1.0);
+        let a_max = AngularAcceleration::from_radian_per_second_squared(1.0);
+        let j_max = AngularJerk::from_radian_per_second_cubed(1.0);
+        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let mut trajectory = generator.generate(
+            Angle::from_radian(0.0),
+            Angle::from_radian(3.0),
+            AngularSpeed::from_radian_per_second(0.0),
+            AngularSpeed::from_radian_per_second(0.0),
+        );
+        let mut before = trajectory.next().unwrap();
+        for target in trajectory {
+            assert!(
+                ((target.v - before.v) / period).abs()
+                    <= a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.v - before.v) / period).abs(),
+                a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
+            );
+            assert!(
+                ((target.a - before.a) / period).abs()
+                    <= j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.a - before.a) / period).abs(),
+                j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
+            );
+            before = target;
+        }
+        abs_diff_eq!(Angle::from_radian(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
