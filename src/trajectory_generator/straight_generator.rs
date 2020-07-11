@@ -490,7 +490,6 @@ mod tests {
         while current < t_end {
             current += period;
             let target = trajectory_fn(current);
-            println!("{}", target.x.as_degree());
             assert!(
                 ((target.v - before.v) / period).abs()
                     <= a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
