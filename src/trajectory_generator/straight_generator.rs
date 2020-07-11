@@ -47,6 +47,13 @@ where
         T: PartialOrd,
         dt!(T): PartialOrd + Div<f32> + Add<Output = dt!(T)>,
     {
+        let is_negative = distance.is_negative();
+        let (x_start, distance, v_start, v_end) = if is_negative {
+            (-x_start, -distance, -v_start, -v_end)
+        } else {
+            (x_start, distance, v_start, v_end)
+        };
+
         let mut left = if v_start < v_end { v_end } else { v_start };
         let mut right = self.calculate_reachable_speed(v_start, distance);
         if left > right {
@@ -79,6 +86,18 @@ where
                 v_max,
             ))
             .chain(self.generate_acceleration(distance - second_dist, v_max, v_end))
+            .map(move |target| {
+                if is_negative {
+                    Target {
+                        x: -target.x,
+                        v: -target.v,
+                        a: -target.a,
+                        j: -target.j,
+                    }
+                } else {
+                    target
+                }
+            })
     }
 
     fn generate_acceleration(
@@ -574,5 +593,43 @@ mod tests {
             before = target;
         }
         abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
+    }
+
+    #[test]
+    fn test_straight_trajectory_with_minus_value() {
+        let period = Time::from_seconds(0.001);
+        let v_max = AngularSpeed::from_radian_per_second(1.0);
+        let a_max = AngularAcceleration::from_radian_per_second_squared(1.0);
+        let j_max = AngularJerk::from_radian_per_second_cubed(1.0);
+        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let mut trajectory = generator.generate(
+            Angle::from_radian(0.0),
+            Angle::from_radian(-3.0),
+            AngularSpeed::from_radian_per_second(0.0),
+            AngularSpeed::from_radian_per_second(0.0),
+        );
+        let mut before = trajectory.next().unwrap();
+        for target in trajectory {
+            assert!(
+                ((target.v - before.v) / period).abs()
+                    <= a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.v - before.v) / period).abs(),
+                a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
+            );
+            assert!(
+                ((target.a - before.a) / period).abs()
+                    <= j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.a - before.a) / period).abs(),
+                j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
+            );
+            before = target;
+        }
+        abs_diff_eq!(Angle::from_radian(-3.0), before.x, epsilon = EPSILON);
     }
 }
