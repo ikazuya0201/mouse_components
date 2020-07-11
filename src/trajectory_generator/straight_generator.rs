@@ -1,4 +1,4 @@
-use core::ops::{Add, Div, Mul};
+use core::ops::{Div, Mul};
 
 use quantities::{Quantity, Time, TimeDifferentiable};
 
@@ -11,7 +11,6 @@ where
     ddt!(T): TimeDifferentiable,
     dddt!(T): Quantity,
 {
-    period: Time,
     v_max: dt!(T),
     a_max: ddt!(T),
     j_max: dddt!(T),
@@ -27,9 +26,8 @@ where
 {
     const LOOP_COUNT: u8 = 30;
 
-    pub fn new(period: Time, v_max: dt!(T), a_max: ddt!(T), j_max: dddt!(T)) -> Self {
+    pub fn new(v_max: dt!(T), a_max: ddt!(T), j_max: dddt!(T)) -> Self {
         Self {
-            period,
             v_max,
             a_max,
             j_max,
@@ -237,11 +235,7 @@ where
         )
     }
 
-    pub fn calculate_reachable_speed(
-        &self,
-        v_start: <T as Div<Time>>::Output,
-        distance: T,
-    ) -> <T as Div<Time>>::Output {
+    pub fn calculate_reachable_speed(&self, v_start: dt!(T), distance: T) -> dt!(T) {
         let mut left = v_start;
         let mut right = self.v_max;
         for _ in 0..Self::LOOP_COUNT {
@@ -273,7 +267,7 @@ mod tests {
         let v_max = Speed::from_meter_per_second(1.0);
         let a_max = Acceleration::from_meter_per_second_squared(1.0);
         let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let generator = StraightGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(3.0),
@@ -314,7 +308,7 @@ mod tests {
         let v_max = AngularSpeed::from_radian_per_second(1.0);
         let a_max = AngularAcceleration::from_radian_per_second_squared(1.0);
         let j_max = AngularJerk::from_radian_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let generator = StraightGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Angle::from_radian(0.0),
             Angle::from_radian(3.0),
@@ -355,7 +349,7 @@ mod tests {
         let v_max = Speed::from_meter_per_second(1.0);
         let a_max = Acceleration::from_meter_per_second_squared(1.0);
         let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let generator = StraightGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(1.0),
@@ -396,7 +390,7 @@ mod tests {
         let v_max = Speed::from_meter_per_second(1.0);
         let a_max = Acceleration::from_meter_per_second_squared(0.5);
         let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let generator = StraightGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(1.0),
@@ -437,7 +431,7 @@ mod tests {
         let v_max = Speed::from_meter_per_second(1.0);
         let a_max = Acceleration::from_meter_per_second_squared(0.5);
         let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let generator = StraightGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(1.0),
@@ -478,7 +472,7 @@ mod tests {
         let v_max = AngularSpeed::from_radian_per_second(1.0);
         let a_max = AngularAcceleration::from_radian_per_second_squared(1.0);
         let j_max = AngularJerk::from_radian_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(period, v_max, a_max, j_max);
+        let generator = StraightGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Angle::from_radian(0.0),
             Angle::from_radian(-3.0),
