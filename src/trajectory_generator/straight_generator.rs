@@ -1,6 +1,6 @@
 use core::ops::{Div, Mul};
 
-use quantities::{Quantity, Time, TimeDifferentiable};
+use quantities::{Quantity, SquaredTime, Time, TimeDifferentiable};
 
 use super::trajectory::Target;
 
@@ -19,7 +19,7 @@ where
 impl<T> StraightGenerator<T>
 where
     T: TimeDifferentiable,
-    dt!(T): TimeDifferentiable + Mul<Time, Output = T>,
+    dt!(T): TimeDifferentiable + Mul<Time, Output = T> + Div<dddt!(T), Output = SquaredTime>,
     ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)>,
     dddt!(T): Quantity + Mul<Time, Output = ddt!(T)>,
     f32: From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
@@ -73,7 +73,7 @@ where
 
         let (accel_fn, dt1) = self.generate_acceleration(x_start, v_start, v_max);
         let (const_fn, dt2) = Self::generate_constant(x_start + dist1, dist2, v_max);
-        let (decel_fn, dt3) = self.generate_acceleration(distance - dist3, v_max, v_end);
+        let (decel_fn, dt3) = self.generate_acceleration(x_start + distance - dist3, v_max, v_end);
 
         let t1 = dt1;
         let t2 = t1 + dt2;
@@ -129,9 +129,7 @@ where
             let tm = (v_end - v_start).abs() / self.a_max - tc;
             (tc, tc + tm, 2.0 * tc + tm)
         } else {
-            let td = Time::from_seconds(
-                (f32::from((v_end - v_start).abs()) / f32::from(self.j_max)).sqrt(),
-            );
+            let td = ((v_end - v_start).abs() / self.j_max).sqrt();
             (td, td, 2.0 * td)
         };
 
@@ -200,9 +198,7 @@ where
             let tm = (v_end - v_start).abs() / self.a_max - tc;
             2.0 * tc + tm
         } else {
-            2.0 * Time::from_seconds(
-                (f32::from((v_end - v_start).abs()) / f32::from(self.j_max)).sqrt(),
-            )
+            2.0 * ((v_end - v_start).abs() / self.j_max).sqrt()
         };
         (v_start + v_end) * t / 2.0
     }
@@ -259,7 +255,7 @@ mod tests {
         Acceleration, Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Jerk, Speed,
     };
 
-    const EPSILON: f32 = 1e-4; //low accuracy...
+    const EPSILON: f32 = 5e-4; //low accuracy...
 
     #[test]
     fn test_straight_trajectory_long() {
@@ -484,6 +480,56 @@ mod tests {
         while current < t_end {
             current += period;
             let target = trajectory_fn(current);
+            assert!(
+                ((target.v - before.v) / period).abs()
+                    <= a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.v - before.v) / period).abs(),
+                a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
+            );
+            assert!(
+                ((target.a - before.a) / period).abs()
+                    <= j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.a - before.a) / period).abs(),
+                j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
+            );
+            before = target;
+        }
+        abs_diff_eq!(Angle::from_radian(-3.0), before.x, epsilon = EPSILON);
+    }
+
+    #[test]
+    fn test_straight_trajectory_with_corner_case1() {
+        let period = Time::from_seconds(0.001);
+        let v_max = AngularSpeed::from_degree_per_second(90.0);
+        let a_max = AngularAcceleration::from_degree_per_second_squared(45.0);
+        let j_max = AngularJerk::from_radian_per_second_cubed(10.0);
+        let generator = StraightGenerator::new(v_max, a_max, j_max);
+        let (trajectory_fn, t_end) = generator.generate(
+            Angle::from_degree(90.0),
+            Angle::from_degree(90.0),
+            AngularSpeed::from_radian_per_second(0.0),
+            AngularSpeed::from_radian_per_second(0.0),
+        );
+        let mut current = Time::from_seconds(0.0);
+        let mut before = trajectory_fn(current);
+        while current < t_end {
+            current += period;
+            let target = trajectory_fn(current);
+            assert!(
+                ((target.x - before.x) / period).abs()
+                    <= v_max.abs() + AngularSpeed::from_radian_per_second(EPSILON),
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.x - before.x) / period).abs(),
+                v_max.abs() + AngularSpeed::from_radian_per_second(EPSILON),
+            );
             assert!(
                 ((target.v - before.v) / period).abs()
                     <= a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),

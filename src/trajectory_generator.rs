@@ -1,7 +1,9 @@
 #[macro_use]
 mod macros;
 
-mod straight_generator;
+pub mod slalom_generator;
+pub mod straight_generator;
+
 mod trajectory;
 
 use quantities::Distance;
