@@ -2,7 +2,7 @@ use core::ops::Div;
 
 use quantities::{Quantity, Time, TimeDifferentiable};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Target<T>
 where
     T: TimeDifferentiable,
