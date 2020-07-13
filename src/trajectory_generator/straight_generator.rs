@@ -304,6 +304,7 @@ impl StraightTrajectoryGenerator {
         )
     }
 
+    #[allow(unused)]
     pub fn generate_constant(
         &self,
         x_start: Distance,
