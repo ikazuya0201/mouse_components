@@ -6,15 +6,13 @@ pub mod straight_generator;
 
 mod trajectory;
 
-use quantities::{
-    Acceleration, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Jerk, Speed, Time,
-};
+use quantities::{Acceleration, AngularAcceleration, AngularJerk, AngularSpeed, Jerk, Speed, Time};
 
 use slalom_generator::SlalomGenerator;
-use straight_generator::StraightFunctionGenerator;
+use straight_generator::StraightTrajectoryGenerator;
 
 pub struct TrajectoryGenerator {
-    straight_generator: StraightFunctionGenerator<Distance>,
+    straight_generator: StraightTrajectoryGenerator,
     slalom_generator: SlalomGenerator,
 }
 
@@ -58,10 +56,11 @@ impl
 {
     pub fn build(self) -> TrajectoryGenerator {
         TrajectoryGenerator {
-            straight_generator: StraightFunctionGenerator::new(
+            straight_generator: StraightTrajectoryGenerator::new(
                 self.max_speed,
                 self.max_acceleration,
                 self.max_jerk,
+                self.period,
             ),
             slalom_generator: SlalomGenerator::new(
                 self.max_angular_speed,

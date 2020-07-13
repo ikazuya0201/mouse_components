@@ -4,7 +4,7 @@ use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance
 use super::trajectory::Target;
 use crate::utils::vector::Vector2;
 
-use super::StraightFunctionGenerator;
+use super::straight_generator::StraightFunctionGenerator;
 
 pub struct SlalomGenerator {
     dtheta: AngularSpeed,
