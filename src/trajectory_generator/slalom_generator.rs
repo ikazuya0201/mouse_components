@@ -4,7 +4,7 @@ use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance
 use super::trajectory::Target;
 use crate::utils::vector::Vector2;
 
-use super::StraightGenerator;
+use super::straight_generator::StraightFunctionGenerator;
 
 pub struct SlalomGenerator {
     dtheta: AngularSpeed,
@@ -40,7 +40,7 @@ impl SlalomGenerator {
         v: Speed,
     ) -> impl Iterator<Item = Vector2<Target<Distance>>> {
         let k = v / self.v_ref;
-        let angle_generator = StraightGenerator::<Angle>::new(
+        let angle_generator = StraightFunctionGenerator::<Angle>::new(
             k * self.dtheta,
             k * k * self.ddtheta,
             k * k * k * self.dddtheta,
@@ -154,6 +154,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_relative_eq;
 
     #[test]
     fn test_slalom_generator_search90() {
@@ -166,16 +167,20 @@ mod tests {
         let period = Time::from_seconds(0.001);
 
         let generator = SlalomGenerator::new(dtheta, ddtheta, dddtheta, v_ref, period);
+        let v_target = Speed::from_meter_per_second(0.6);
         let trajectory = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(0.0),
             Angle::from_degree(180.0),
             Angle::from_degree(90.0),
-            Speed::from_meter_per_second(0.6),
+            v_target,
         );
 
-        for targets in trajectory {
-            println!("{},{}", targets.x.x.as_meters(), targets.y.x.as_meters());
+        for target in trajectory {
+            let vx = target.x.v.as_meter_per_second();
+            let vy = target.y.v.as_meter_per_second();
+            let v = Speed::from_meter_per_second((vx * vx + vy * vy).sqrt());
+            assert_relative_eq!(v, v_target);
         }
     }
 
@@ -190,16 +195,20 @@ mod tests {
         let period = Time::from_seconds(0.001);
 
         let generator = SlalomGenerator::new(dtheta, ddtheta, dddtheta, v_ref, period);
+        let v_target = Speed::from_meter_per_second(0.6);
         let trajectory = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(0.0),
             Angle::from_degree(90.0),
             Angle::from_degree(180.0),
-            Speed::from_meter_per_second(0.6),
+            v_target,
         );
 
-        for targets in trajectory {
-            println!("{},{}", targets.x.x.as_meters(), targets.y.x.as_meters());
+        for target in trajectory {
+            let vx = target.x.v.as_meter_per_second();
+            let vy = target.y.v.as_meter_per_second();
+            let v = Speed::from_meter_per_second((vx * vx + vy * vy).sqrt());
+            assert_relative_eq!(v, v_target);
         }
     }
 
@@ -214,16 +223,20 @@ mod tests {
         let period = Time::from_seconds(0.001);
 
         let generator = SlalomGenerator::new(dtheta, ddtheta, dddtheta, v_ref, period);
+        let v_target = Speed::from_meter_per_second(0.6);
         let trajectory = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(0.0),
             Angle::from_degree(0.0),
             Angle::from_degree(45.0),
-            Speed::from_meter_per_second(0.6),
+            v_target,
         );
 
-        for targets in trajectory {
-            println!("{},{}", targets.x.x.as_meters(), targets.y.x.as_meters());
+        for target in trajectory {
+            let vx = target.x.v.as_meter_per_second();
+            let vy = target.y.v.as_meter_per_second();
+            let v = Speed::from_meter_per_second((vx * vx + vy * vy).sqrt());
+            assert_relative_eq!(v, v_target);
         }
     }
 }

@@ -1,6 +1,8 @@
 use core::ops::Div;
 
-use quantities::{Quantity, Time, TimeDifferentiable};
+use quantities::{Angle, Distance, Quantity, Time, TimeDifferentiable};
+
+use crate::utils::vector::Vector2;
 
 #[derive(Clone, Debug)]
 pub struct Target<T>
@@ -14,4 +16,9 @@ where
     pub v: <T as Div<Time>>::Output,
     pub a: <<T as Div<Time>>::Output as Div<Time>>::Output,
     pub j: <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output,
+}
+
+pub enum Trajectory {
+    Move(Vector2<Target<Distance>>),
+    Spin(Target<Angle>),
 }

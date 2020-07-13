@@ -1,10 +1,13 @@
 use core::ops::{Div, Mul};
 
-use quantities::{Quantity, SquaredTime, Time, TimeDifferentiable};
+use quantities::{
+    Acceleration, Distance, Jerk, Quantity, Speed, SquaredTime, Time, TimeDifferentiable,
+};
 
 use super::trajectory::Target;
+use crate::utils::vector::Vector2;
 
-pub struct StraightGenerator<T>
+pub struct StraightFunctionGenerator<T>
 where
     T: TimeDifferentiable,
     dt!(T): TimeDifferentiable,
@@ -16,7 +19,7 @@ where
     j_max: dddt!(T),
 }
 
-impl<T> StraightGenerator<T>
+impl<T> StraightFunctionGenerator<T>
 where
     T: TimeDifferentiable,
     dt!(T): TimeDifferentiable + Mul<Time, Output = T> + Div<dddt!(T), Output = SquaredTime>,
@@ -214,7 +217,7 @@ where
                 if t > t_end || t < Default::default() {
                     Target {
                         x: x_start + v * t_end,
-                        v: v,
+                        v,
                         a: Default::default(),
                         j: Default::default(),
                     }
@@ -222,7 +225,7 @@ where
                     Target {
                         j: Default::default(),
                         a: Default::default(),
-                        v: v,
+                        v,
                         x: x_start + v * t,
                     }
                 }
@@ -247,10 +250,161 @@ where
     }
 }
 
+pub struct StraightTrajectoryGenerator {
+    function_generator: StraightFunctionGenerator<Distance>,
+    period: Time,
+}
+
+impl StraightTrajectoryGenerator {
+    pub fn new(v_max: Speed, a_max: Acceleration, j_max: Jerk, period: Time) -> Self {
+        Self {
+            function_generator: StraightFunctionGenerator::new(v_max, a_max, j_max),
+            period,
+        }
+    }
+}
+
+impl StraightTrajectoryGenerator {
+    fn calculate_distance(x_dist: Distance, y_dist: Distance) -> Distance {
+        let x_dist_raw = f32::from(x_dist);
+        let y_dist_raw = f32::from(y_dist);
+
+        Distance::from_meters((x_dist_raw * x_dist_raw + y_dist_raw * y_dist_raw).sqrt())
+    }
+
+    pub fn generate(
+        &self,
+        x_start: Distance,
+        y_start: Distance,
+        x_end: Distance,
+        y_end: Distance,
+        v_start: Speed,
+        v_end: Speed,
+    ) -> impl Iterator<Item = Vector2<Target<Distance>>> {
+        let x_dist = x_end - x_start;
+        let y_dist = y_end - y_start;
+
+        let dist = Self::calculate_distance(x_dist, y_dist);
+
+        let (trajectory_fn, t_end) =
+            self.function_generator
+                .generate(Default::default(), dist, v_start, v_end);
+
+        let x_ratio = x_dist / dist;
+        let y_ratio = y_dist / dist;
+
+        StraightTrajectory::new(
+            trajectory_fn,
+            t_end,
+            self.period,
+            x_ratio,
+            y_ratio,
+            x_start,
+            y_start,
+        )
+    }
+
+    #[allow(unused)]
+    pub fn generate_constant(
+        &self,
+        x_start: Distance,
+        y_start: Distance,
+        x_end: Distance,
+        y_end: Distance,
+        v: Speed,
+        period: Time,
+    ) -> impl Iterator<Item = Vector2<Target<Distance>>> {
+        let x_dist = x_end - x_start;
+        let y_dist = y_end - y_start;
+
+        let dist = Self::calculate_distance(x_dist, y_dist);
+
+        let (trajectory_fn, t_end) =
+            StraightFunctionGenerator::<Distance>::generate_constant(Default::default(), dist, v);
+
+        let x_ratio = x_dist / dist;
+        let y_ratio = y_dist / dist;
+
+        StraightTrajectory::new(
+            trajectory_fn,
+            t_end,
+            period,
+            x_ratio,
+            y_ratio,
+            x_start,
+            y_start,
+        )
+    }
+}
+
+pub struct StraightTrajectory<F> {
+    trajectory_fn: F,
+    t: Time,
+    t_end: Time,
+    period: Time,
+    x_ratio: f32,
+    y_ratio: f32,
+    x_start: Distance,
+    y_start: Distance,
+}
+
+impl<F> StraightTrajectory<F> {
+    fn new(
+        trajectory_fn: F,
+        t_end: Time,
+        period: Time,
+        x_ratio: f32,
+        y_ratio: f32,
+        x_start: Distance,
+        y_start: Distance,
+    ) -> Self {
+        Self {
+            trajectory_fn,
+            t: Time::from_seconds(0.0),
+            t_end,
+            period,
+            x_ratio,
+            y_ratio,
+            x_start,
+            y_start,
+        }
+    }
+}
+
+impl<F> Iterator for StraightTrajectory<F>
+where
+    F: Fn(Time) -> Target<Distance>,
+{
+    type Item = Vector2<Target<Distance>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.t > self.t_end {
+            return None;
+        }
+        let t = self.t;
+        self.t += self.period;
+        let target = (self.trajectory_fn)(t);
+        Some(Vector2 {
+            x: Target {
+                x: self.x_start + target.x * self.x_ratio,
+                v: target.v * self.x_ratio,
+                a: target.a * self.x_ratio,
+                j: target.j * self.x_ratio,
+            },
+            y: Target {
+                x: self.y_start + target.x * self.y_ratio,
+                v: target.v * self.y_ratio,
+                a: target.a * self.y_ratio,
+                j: target.j * self.y_ratio,
+            },
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use approx::abs_diff_eq;
+    use approx::assert_relative_eq;
     use quantities::{
         Acceleration, Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Jerk, Speed,
     };
@@ -263,7 +417,7 @@ mod tests {
         let v_max = Speed::from_meter_per_second(1.0);
         let a_max = Acceleration::from_meter_per_second_squared(1.0);
         let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(v_max, a_max, j_max);
+        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(3.0),
@@ -295,7 +449,7 @@ mod tests {
             );
             before = target;
         }
-        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
+        assert_relative_eq!(Distance::from_meters(3.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -304,7 +458,7 @@ mod tests {
         let v_max = AngularSpeed::from_radian_per_second(1.0);
         let a_max = AngularAcceleration::from_radian_per_second_squared(1.0);
         let j_max = AngularJerk::from_radian_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(v_max, a_max, j_max);
+        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Angle::from_radian(0.0),
             Angle::from_radian(3.0),
@@ -336,7 +490,7 @@ mod tests {
             );
             before = target;
         }
-        abs_diff_eq!(Angle::from_radian(1.0), before.x, epsilon = EPSILON);
+        assert_relative_eq!(Angle::from_radian(3.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -345,7 +499,7 @@ mod tests {
         let v_max = Speed::from_meter_per_second(1.0);
         let a_max = Acceleration::from_meter_per_second_squared(1.0);
         let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(v_max, a_max, j_max);
+        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(1.0),
@@ -377,7 +531,7 @@ mod tests {
             );
             before = target;
         }
-        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
+        assert_relative_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -386,7 +540,7 @@ mod tests {
         let v_max = Speed::from_meter_per_second(1.0);
         let a_max = Acceleration::from_meter_per_second_squared(0.5);
         let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(v_max, a_max, j_max);
+        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(1.0),
@@ -418,7 +572,7 @@ mod tests {
             );
             before = target;
         }
-        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
+        assert_relative_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -427,7 +581,7 @@ mod tests {
         let v_max = Speed::from_meter_per_second(1.0);
         let a_max = Acceleration::from_meter_per_second_squared(0.5);
         let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(v_max, a_max, j_max);
+        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(1.0),
@@ -459,7 +613,7 @@ mod tests {
             );
             before = target;
         }
-        abs_diff_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
+        assert_relative_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -468,7 +622,7 @@ mod tests {
         let v_max = AngularSpeed::from_radian_per_second(1.0);
         let a_max = AngularAcceleration::from_radian_per_second_squared(1.0);
         let j_max = AngularJerk::from_radian_per_second_cubed(1.0);
-        let generator = StraightGenerator::new(v_max, a_max, j_max);
+        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Angle::from_radian(0.0),
             Angle::from_radian(-3.0),
@@ -500,7 +654,7 @@ mod tests {
             );
             before = target;
         }
-        abs_diff_eq!(Angle::from_radian(-3.0), before.x, epsilon = EPSILON);
+        assert_relative_eq!(Angle::from_radian(-3.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -509,7 +663,7 @@ mod tests {
         let v_max = AngularSpeed::from_degree_per_second(90.0);
         let a_max = AngularAcceleration::from_degree_per_second_squared(45.0);
         let j_max = AngularJerk::from_radian_per_second_cubed(10.0);
-        let generator = StraightGenerator::new(v_max, a_max, j_max);
+        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
         let (trajectory_fn, t_end) = generator.generate(
             Angle::from_degree(90.0),
             Angle::from_degree(90.0),
@@ -550,6 +704,28 @@ mod tests {
             );
             before = target;
         }
-        abs_diff_eq!(Angle::from_radian(-3.0), before.x, epsilon = EPSILON);
+        assert_relative_eq!(Angle::from_degree(180.0), before.x, epsilon = EPSILON);
+    }
+
+    #[test]
+    fn test_straight_trajectory_2d() {
+        let period = Time::from_seconds(0.001);
+        let v_max = Speed::from_meter_per_second(1.0);
+        let a_max = Acceleration::from_meter_per_second_squared(0.5);
+        let j_max = Jerk::from_meter_per_second_cubed(1.0);
+        let generator = StraightTrajectoryGenerator::new(v_max, a_max, j_max, period);
+        let x_end = Distance::from_meters(1.0);
+        let y_end = Distance::from_meters(1.0);
+        let trajectory = generator.generate(
+            Distance::from_meters(0.0),
+            Distance::from_meters(0.0),
+            Distance::from_meters(1.0),
+            Distance::from_meters(1.0),
+            Speed::from_meter_per_second(0.0),
+            Speed::from_meter_per_second(0.0),
+        );
+        let last = trajectory.last().unwrap();
+        assert_relative_eq!(last.x.x, x_end, epsilon = EPSILON);
+        assert_relative_eq!(last.y.x, y_end, epsilon = EPSILON);
     }
 }
