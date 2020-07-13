@@ -11,10 +11,10 @@ use quantities::{
 };
 
 use slalom_generator::SlalomGenerator;
-use straight_generator::StraightGenerator;
+use straight_generator::StraightFunctionGenerator;
 
 pub struct TrajectoryGenerator {
-    straight_generator: StraightGenerator<Distance>,
+    straight_generator: StraightFunctionGenerator<Distance>,
     slalom_generator: SlalomGenerator,
 }
 
@@ -58,7 +58,7 @@ impl
 {
     pub fn build(self) -> TrajectoryGenerator {
         TrajectoryGenerator {
-            straight_generator: StraightGenerator::new(
+            straight_generator: StraightFunctionGenerator::new(
                 self.max_speed,
                 self.max_acceleration,
                 self.max_jerk,

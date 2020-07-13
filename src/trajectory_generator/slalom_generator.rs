@@ -4,7 +4,7 @@ use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance
 use super::trajectory::Target;
 use crate::utils::vector::Vector2;
 
-use super::StraightGenerator;
+use super::StraightFunctionGenerator;
 
 pub struct SlalomGenerator {
     dtheta: AngularSpeed,
@@ -40,7 +40,7 @@ impl SlalomGenerator {
         v: Speed,
     ) -> impl Iterator<Item = Vector2<Target<Distance>>> {
         let k = v / self.v_ref;
-        let angle_generator = StraightGenerator::<Angle>::new(
+        let angle_generator = StraightFunctionGenerator::<Angle>::new(
             k * self.dtheta,
             k * k * self.ddtheta,
             k * k * k * self.dddtheta,
