@@ -3,11 +3,22 @@ use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::administrator::{
-    Agent, DirectionInstructor, FastRun, Graph, GraphConverter, Mode, NotFinishError,
-    ObstacleInterpreter, Operator, Search, Solver,
+    Agent, DirectionInstructor, FastRun, Graph, GraphConverter, Mode, NodeConverter,
+    NotFinishError, ObstacleInterpreter, Operator, Search, Solver,
 };
 
-pub struct SearchOperator<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver> {
+pub struct SearchOperator<
+    'a,
+    Node,
+    SearchNode,
+    Cost,
+    Direction,
+    Obstacle,
+    Pose,
+    Maze,
+    IAgent,
+    ISolver,
+> {
     current: Cell<SearchNode>,
     is_updated: AtomicBool,
     maze: &'a Maze,
@@ -16,11 +27,12 @@ pub struct SearchOperator<'a, Node, SearchNode, Cost, Direction, Position, Maze,
     _node: PhantomData<fn() -> Node>,
     _cost: PhantomData<fn() -> Cost>,
     _direction: PhantomData<fn() -> Direction>,
-    _position: PhantomData<fn() -> Position>,
+    _obstacle: PhantomData<fn() -> Obstacle>,
+    _pose: PhantomData<fn() -> Pose>,
 }
 
-impl<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
-    SearchOperator<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
+impl<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+    SearchOperator<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
 {
     pub fn new(start: SearchNode, maze: &'a Maze, agent: &'a IAgent, solver: &'a ISolver) -> Self {
         Self {
@@ -32,28 +44,32 @@ impl<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
             _node: PhantomData,
             _cost: PhantomData,
             _direction: PhantomData,
-            _position: PhantomData,
+            _obstacle: PhantomData,
+            _pose: PhantomData,
         }
     }
 }
 
-impl<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver> Operator<Search>
-    for SearchOperator<'a, Node, SearchNode, Cost, Direction, Position, Maze, IAgent, ISolver>
+impl<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver> Operator<Search>
+    for SearchOperator<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
 where
     SearchNode: Clone + Copy,
-    Maze: ObstacleInterpreter<Position>
+    Maze: ObstacleInterpreter<Obstacle>
         + Graph<Node, Cost>
         + Graph<SearchNode, Cost>
         + GraphConverter<Node, SearchNode>
-        + DirectionInstructor<SearchNode, Direction>,
-    IAgent: Agent<Position, Direction>,
+        + DirectionInstructor<SearchNode, Direction>
+        + NodeConverter<SearchNode, Pose>,
+    IAgent: Agent<Obstacle, Pose, Direction>,
     ISolver: Solver<Node, SearchNode, Cost, Maze>,
 {
     fn tick(&self) {
         let obstacles = self.agent.get_existing_obstacles();
         self.maze.interpret_obstacles(obstacles);
-        if let Some((direction, node)) = self.maze.instruct(self.current.get()) {
-            self.agent.set_instructed_direction(direction);
+        let current = self.current.get();
+        if let Some((direction, node)) = self.maze.instruct(current) {
+            self.agent
+                .set_instructed_direction(self.maze.convert(current), direction);
             self.current.set(node);
             self.is_updated.store(true, Ordering::Relaxed);
         }
