@@ -1,6 +1,3 @@
-#[macro_use]
-mod macros;
-
 mod slalom_generator;
 mod spin_generator;
 mod straight_generator;

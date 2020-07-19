@@ -3,6 +3,7 @@ use core::ops::Div;
 use quantities::{Angle, Distance, Quantity, Time, TimeDifferentiable};
 
 use crate::utils::vector::Vector2;
+use crate::{dddt, ddt, dt};
 
 #[derive(Clone, Debug)]
 pub struct Target<T>

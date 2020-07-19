@@ -6,6 +6,7 @@ use quantities::{
 
 use super::trajectory::Target;
 use crate::utils::vector::Vector2;
+use crate::{dddt, ddt, dt};
 
 pub struct StraightFunctionGenerator<T>
 where
