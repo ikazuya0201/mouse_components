@@ -4,39 +4,21 @@ use quantities::{Fraction, Quantity, Time, TimeDifferentiable, Voltage};
 
 use crate::{ddt, dt};
 
-struct Model<T>
-where
-    T: TimeDifferentiable,
-{
-    gain: Fraction<dt!(T), Voltage>,
-    time_constant: Time,
-}
-
-impl<T> Model<T>
-where
-    T: TimeDifferentiable,
-    dt!(T): TimeDifferentiable + Mul<Time, Output = T>,
-    ddt!(T): Mul<Time, Output = dt!(T)>,
-    f32: From<dt!(T)>,
-{
-    fn reverse(&self, r: dt!(T), dr: ddt!(T)) -> Voltage {
-        self.gain.reverse() * (dr * self.time_constant + r)
-    }
-}
-
 pub struct Controller<T>
 where
     T: TimeDifferentiable,
     dt!(T): TimeDifferentiable,
 {
     error_sum: T,
-    model: Model<T>,
+    rev_gain: Fraction<Voltage, dt!(T)>,
+    time_constant: Time,
     kp: Fraction<Voltage, dt!(T)>,
     ki: Fraction<Voltage, T>,
     kd: Fraction<Voltage, ddt!(T)>,
     period: Time,
 }
 
+///Model is first-order delay system
 impl<T> Controller<T>
 where
     T: TimeDifferentiable,
@@ -52,10 +34,8 @@ where
     ) -> Self {
         Self {
             error_sum: Default::default(),
-            model: Model {
-                gain: Fraction::from_raw(model_gain),
-                time_constant: model_time_constant,
-            },
+            rev_gain: Fraction::from_raw(1.0 / model_gain),
+            time_constant: model_time_constant,
             kp: Fraction::from_raw(kp),
             ki: Fraction::from_raw(ki),
             kd: Fraction::from_raw(kd),
@@ -72,7 +52,7 @@ where
     f32: From<T> + From<dt!(T)> + From<ddt!(T)>,
 {
     pub fn calculate(&mut self, r: dt!(T), dr: ddt!(T), y: dt!(T), dy: ddt!(T)) -> Voltage {
-        let vol_f = self.model.reverse(r, dr);
+        let vol_f = self.rev_gain * (dr * self.time_constant + r);
         let vol_p = self.kp * (r - y);
         let vol_i = self.ki * self.error_sum;
         let vol_d = self.kd * (dr - dy);
