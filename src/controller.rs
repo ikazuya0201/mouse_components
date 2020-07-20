@@ -2,8 +2,10 @@ use core::ops::{Div, Mul};
 
 use quantities::{Fraction, Quantity, Time, TimeDifferentiable, Voltage};
 
+use crate::tracker;
 use crate::{ddt, dt};
 
+///the model is a first-order delay system
 pub struct Controller<T>
 where
     T: TimeDifferentiable,
@@ -18,7 +20,6 @@ where
     period: Time,
 }
 
-///Model is first-order delay system
 impl<T> Controller<T>
 where
     T: TimeDifferentiable,
@@ -44,14 +45,14 @@ where
     }
 }
 
-impl<T> Controller<T>
+impl<T> tracker::Controller<T> for Controller<T>
 where
     T: TimeDifferentiable,
     dt!(T): TimeDifferentiable + Mul<Time, Output = T>,
     ddt!(T): Quantity + Mul<Time, Output = dt!(T)>,
     f32: From<T> + From<dt!(T)> + From<ddt!(T)>,
 {
-    pub fn calculate(&mut self, r: dt!(T), dr: ddt!(T), y: dt!(T), dy: ddt!(T)) -> Voltage {
+    fn calculate(&mut self, r: dt!(T), dr: ddt!(T), y: dt!(T), dy: ddt!(T)) -> Voltage {
         let vol_f = self.rev_gain * (dr * self.time_constant + r);
         let vol_p = self.kp * (r - y);
         let vol_i = self.ki * self.error_sum;
