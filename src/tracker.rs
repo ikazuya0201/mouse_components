@@ -120,7 +120,7 @@ where
     }
 }
 
-pub struct TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P> {
+pub struct TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI> {
     kx: KX,
     kdx: KDX,
     ky: KY,
@@ -131,9 +131,10 @@ pub struct TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P> {
     left_motor: LM,
     right_motor: RM,
     period: P,
+    xi: XI,
 }
 
-impl TrackerBuilder<(), (), (), (), (), (), (), (), (), ()> {
+impl TrackerBuilder<(), (), (), (), (), (), (), (), (), (), ()> {
     pub fn new() -> Self {
         Self {
             kx: (),
@@ -146,11 +147,12 @@ impl TrackerBuilder<(), (), (), (), (), (), (), (), (), ()> {
             left_motor: (),
             right_motor: (),
             period: (),
+            xi: (),
         }
     }
 }
 
-impl<TC, RC, LM, RM> TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time>
+impl<TC, RC, LM, RM> TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, ()>
 where
     LM: Motor,
     RM: Motor,
@@ -174,10 +176,34 @@ where
     }
 }
 
-impl<KDX, KY, KDY, XIT, TC, RC, LM, RM, P>
-    TrackerBuilder<(), KDX, KY, KDY, XIT, TC, RC, LM, RM, P>
+impl<TC, RC, LM, RM> TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, Speed>
+where
+    LM: Motor,
+    RM: Motor,
+    TC: Controller<Distance>,
+    RC: Controller<Angle>,
 {
-    pub fn kx(self, kx: f32) -> TrackerBuilder<f32, KDX, KY, KDY, XIT, TC, RC, LM, RM, P> {
+    pub fn build(self) -> Tracker<LM, RM, TC, RC> {
+        Tracker {
+            kx: Frequency::from_hertz(self.kx),
+            kdx: SquaredFrequency::from_squared_hertz(self.kdx),
+            ky: Frequency::from_hertz(self.ky),
+            kdy: SquaredFrequency::from_squared_hertz(self.kdy),
+            xi_threshold: self.xi_threshold,
+            translation_controller: self.translation_controller,
+            rotation_controller: self.rotation_controller,
+            left_motor: self.left_motor,
+            right_motor: self.right_motor,
+            period: self.period,
+            xi: self.xi,
+        }
+    }
+}
+
+impl<KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI>
+    TrackerBuilder<(), KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI>
+{
+    pub fn kx(self, kx: f32) -> TrackerBuilder<f32, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI> {
         TrackerBuilder {
             kx,
             kdx: self.kdx,
@@ -189,12 +215,15 @@ impl<KDX, KY, KDY, XIT, TC, RC, LM, RM, P>
             left_motor: self.left_motor,
             right_motor: self.right_motor,
             period: self.period,
+            xi: self.xi,
         }
     }
 }
 
-impl<KX, KY, KDY, XIT, TC, RC, LM, RM, P> TrackerBuilder<KX, (), KY, KDY, XIT, TC, RC, LM, RM, P> {
-    pub fn kdx(self, kdx: f32) -> TrackerBuilder<KX, f32, KY, KDY, XIT, TC, RC, LM, RM, P> {
+impl<KX, KY, KDY, XIT, TC, RC, LM, RM, P, XI>
+    TrackerBuilder<KX, (), KY, KDY, XIT, TC, RC, LM, RM, P, XI>
+{
+    pub fn kdx(self, kdx: f32) -> TrackerBuilder<KX, f32, KY, KDY, XIT, TC, RC, LM, RM, P, XI> {
         TrackerBuilder {
             kx: self.kx,
             kdx,
@@ -206,14 +235,15 @@ impl<KX, KY, KDY, XIT, TC, RC, LM, RM, P> TrackerBuilder<KX, (), KY, KDY, XIT, T
             left_motor: self.left_motor,
             right_motor: self.right_motor,
             period: self.period,
+            xi: self.xi,
         }
     }
 }
 
-impl<KX, KDX, KDY, XIT, TC, RC, LM, RM, P>
-    TrackerBuilder<KX, KDX, (), KDY, XIT, TC, RC, LM, RM, P>
+impl<KX, KDX, KDY, XIT, TC, RC, LM, RM, P, XI>
+    TrackerBuilder<KX, KDX, (), KDY, XIT, TC, RC, LM, RM, P, XI>
 {
-    pub fn ky(self, ky: f32) -> TrackerBuilder<KX, KDX, f32, KDY, XIT, TC, RC, LM, RM, P> {
+    pub fn ky(self, ky: f32) -> TrackerBuilder<KX, KDX, f32, KDY, XIT, TC, RC, LM, RM, P, XI> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
@@ -225,12 +255,15 @@ impl<KX, KDX, KDY, XIT, TC, RC, LM, RM, P>
             left_motor: self.left_motor,
             right_motor: self.right_motor,
             period: self.period,
+            xi: self.xi,
         }
     }
 }
 
-impl<KX, KDX, KY, XIT, TC, RC, LM, RM, P> TrackerBuilder<KX, KDX, KY, (), XIT, TC, RC, LM, RM, P> {
-    pub fn kdy(self, kdy: f32) -> TrackerBuilder<KX, KDX, KY, f32, XIT, TC, RC, LM, RM, P> {
+impl<KX, KDX, KY, XIT, TC, RC, LM, RM, P, XI>
+    TrackerBuilder<KX, KDX, KY, (), XIT, TC, RC, LM, RM, P, XI>
+{
+    pub fn kdy(self, kdy: f32) -> TrackerBuilder<KX, KDX, KY, f32, XIT, TC, RC, LM, RM, P, XI> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
@@ -242,15 +275,18 @@ impl<KX, KDX, KY, XIT, TC, RC, LM, RM, P> TrackerBuilder<KX, KDX, KY, (), XIT, T
             left_motor: self.left_motor,
             right_motor: self.right_motor,
             period: self.period,
+            xi: self.xi,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, TC, RC, LM, RM, P> TrackerBuilder<KX, KDX, KY, KDY, (), TC, RC, LM, RM, P> {
-    pub fn xi_threshold(
+impl<KX, KDX, KY, KDY, TC, RC, LM, RM, P, XI>
+    TrackerBuilder<KX, KDX, KY, KDY, (), TC, RC, LM, RM, P, XI>
+{
+    pub fn valid_control_lower_bound(
         self,
         xi_threshold: Speed,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, Speed, TC, RC, LM, RM, P> {
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, Speed, TC, RC, LM, RM, P, XI> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
@@ -262,17 +298,18 @@ impl<KX, KDX, KY, KDY, TC, RC, LM, RM, P> TrackerBuilder<KX, KDX, KY, KDY, (), T
             left_motor: self.left_motor,
             right_motor: self.right_motor,
             period: self.period,
+            xi: self.xi,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, RC, LM, RM, P>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, (), RC, LM, RM, P>
+impl<KX, KDX, KY, KDY, XIT, RC, LM, RM, P, XI>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, (), RC, LM, RM, P, XI>
 {
     pub fn translation_controller<TC>(
         self,
         translation_controller: TC,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P>
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI>
     where
         TC: Controller<Distance>,
     {
@@ -287,17 +324,18 @@ impl<KX, KDX, KY, KDY, XIT, RC, LM, RM, P>
             left_motor: self.left_motor,
             right_motor: self.right_motor,
             period: self.period,
+            xi: self.xi,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, LM, RM, P>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, (), LM, RM, P>
+impl<KX, KDX, KY, KDY, XIT, TC, LM, RM, P, XI>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, (), LM, RM, P, XI>
 {
     pub fn rotation_controller<RC>(
         self,
         rotation_controller: RC,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P>
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI>
     where
         RC: Controller<Angle>,
     {
@@ -312,17 +350,18 @@ impl<KX, KDX, KY, KDY, XIT, TC, LM, RM, P>
             left_motor: self.left_motor,
             right_motor: self.right_motor,
             period: self.period,
+            xi: self.xi,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, RM, P>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, (), RM, P>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, RM, P, XI>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, (), RM, P, XI>
 {
     pub fn left_motor<LM>(
         self,
         left_motor: LM,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P>
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI>
     where
         LM: Motor,
     {
@@ -337,17 +376,18 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, RM, P>
             left_motor,
             right_motor: self.right_motor,
             period: self.period,
+            xi: self.xi,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, P>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, (), P>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, P, XI>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, (), P, XI>
 {
     pub fn right_motor<RM>(
         self,
         right_motor: RM,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P>
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI>
     where
         RM: Motor,
     {
@@ -362,17 +402,18 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, P>
             left_motor: self.left_motor,
             right_motor,
             period: self.period,
+            xi: self.xi,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, ()>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, XI>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, (), XI>
 {
     pub fn period(
         self,
         period: Time,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, Time> {
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, Time, XI> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
@@ -384,6 +425,30 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM>
             left_motor: self.left_motor,
             right_motor: self.right_motor,
             period,
+            xi: self.xi,
+        }
+    }
+}
+
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, ()>
+{
+    pub fn initial_speed(
+        self,
+        xi: Speed,
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, Speed> {
+        TrackerBuilder {
+            kx: self.kx,
+            kdx: self.kdx,
+            ky: self.ky,
+            kdy: self.kdy,
+            xi_threshold: self.xi_threshold,
+            translation_controller: self.translation_controller,
+            rotation_controller: self.rotation_controller,
+            left_motor: self.left_motor,
+            right_motor: self.right_motor,
+            period: self.period,
+            xi,
         }
     }
 }
@@ -427,7 +492,8 @@ mod tests {
             .kdx(1.0)
             .ky(1.0)
             .kdy(1.0)
-            .xi_threshold(Speed::from_meter_per_second(0.001))
+            .initial_speed(Speed::from_meter_per_second(0.0))
+            .valid_control_lower_bound(Speed::from_meter_per_second(0.001))
             .right_motor(IMotor)
             .left_motor(IMotor)
             .period(Time::from_seconds(0.001))
