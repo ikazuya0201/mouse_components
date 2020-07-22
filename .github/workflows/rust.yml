@@ -17,9 +17,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-    - uses: actions/checkout@v2
-      with:
         repository: ikazuya0201/quantities
         token: ${{ secrets.ACCESS_TOKEN }}
     - name: Build
