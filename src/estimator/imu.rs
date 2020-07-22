@@ -5,6 +5,8 @@ use quantities::{Acceleration, AngularSpeed};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IMUError;
 
+///The y axis should directed to the front of the robot.
+///The ground should be the x-y plane.
 pub trait IMU {
     fn get_angular_speed_x(&mut self) -> nb::Result<AngularSpeed, IMUError>;
     fn get_angular_speed_y(&mut self) -> nb::Result<AngularSpeed, IMUError>;

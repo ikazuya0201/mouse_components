@@ -1,8 +1,8 @@
-use quantities::Angle;
+use quantities::Distance;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EncoderError;
 
 pub trait Encoder {
-    fn get_absolute_angle(&mut self) -> nb::Result<Angle, EncoderError>;
+    fn get_relative_distance(&mut self) -> nb::Result<Distance, EncoderError>;
 }

@@ -11,8 +11,8 @@ use super::agent;
 use super::trajectory_generator::{Target, Trajectory};
 use crate::utils::vector::Vector2;
 use crate::{ddt, dt};
-use motor::Motor;
-use state::State;
+pub use motor::Motor;
+pub use state::{State, SubState};
 
 pub trait Controller<T>
 where
