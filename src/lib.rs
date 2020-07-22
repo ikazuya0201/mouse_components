@@ -3,6 +3,7 @@
 pub mod administrator;
 pub mod agent;
 pub mod controller;
+pub mod estimator;
 pub mod maze;
 pub mod pattern;
 pub mod solver;
