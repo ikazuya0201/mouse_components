@@ -19,7 +19,10 @@ jobs:
       with:
         repository: ikazuya0201/quantities
         token: ${{ secrets.ACCESS_TOKEN }}
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
     - name: Build
-      run: cargo build --verbose
+      run: cargo +nightly build --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo +nightly test --verbose
