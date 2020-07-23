@@ -5,7 +5,6 @@ use core::marker::PhantomData;
 use generic_array::GenericArray;
 use heap::BinaryHeap;
 use heapless::{consts::*, ArrayLength, Vec};
-use itertools::repeat_n;
 use num::{Bounded, Saturating};
 
 use super::administrator;
@@ -32,6 +31,13 @@ where
             _search_node: PhantomData,
         }
     }
+}
+
+fn repeat_n<T>(val: T, count: usize) -> impl Iterator<Item = T>
+where
+    T: Clone,
+{
+    core::iter::repeat(val).take(count)
 }
 
 impl<Node, SearchNode, Cost, Graph, Max, GSize> administrator::Solver<Node, SearchNode, Cost, Graph>
