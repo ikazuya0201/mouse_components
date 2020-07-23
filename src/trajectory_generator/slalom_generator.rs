@@ -154,7 +154,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use approx::assert_relative_eq;
+    use core::f32::EPSILON;
+    use quantities::Quantity;
 
     #[test]
     fn test_slalom_generator_search90() {
@@ -180,7 +181,7 @@ mod tests {
             let vx = target.x.v.as_meter_per_second();
             let vy = target.y.v.as_meter_per_second();
             let v = Speed::from_meter_per_second((vx * vx + vy * vy).sqrt());
-            assert_relative_eq!(v, v_target);
+            assert!((v - v_target).abs().as_meter_per_second() < EPSILON);
         }
     }
 
@@ -208,7 +209,7 @@ mod tests {
             let vx = target.x.v.as_meter_per_second();
             let vy = target.y.v.as_meter_per_second();
             let v = Speed::from_meter_per_second((vx * vx + vy * vy).sqrt());
-            assert_relative_eq!(v, v_target);
+            assert!((v - v_target).abs().as_meter_per_second() < EPSILON);
         }
     }
 
@@ -236,7 +237,7 @@ mod tests {
             let vx = target.x.v.as_meter_per_second();
             let vy = target.y.v.as_meter_per_second();
             let v = Speed::from_meter_per_second((vx * vx + vy * vy).sqrt());
-            assert_relative_eq!(v, v_target);
+            assert!((v - v_target).abs().as_meter_per_second() < EPSILON);
         }
     }
 }
