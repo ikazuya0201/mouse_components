@@ -9,6 +9,7 @@ use quantities::{
     Time,
 };
 
+use super::agent;
 use crate::agent::pose::Pose;
 use crate::maze::RelativeDirection;
 use slalom_generator::SlalomGenerator;
@@ -21,6 +22,14 @@ pub struct TrajectoryGenerator {
     slalom_generator: SlalomGenerator,
     spin_generator: SpinGenerator,
     search_speed: Speed,
+}
+
+impl agent::TrajectoryGenerator<Pose, Trajectory, RelativeDirection> for TrajectoryGenerator {
+    type Trajectory = impl Iterator<Item = Trajectory>;
+
+    fn generate_search(&self, pose: Pose, direction: RelativeDirection) -> Self::Trajectory {
+        self.generate_search_trajectory(pose, direction)
+    }
 }
 
 impl TrajectoryGenerator {
