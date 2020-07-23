@@ -25,4 +25,4 @@ git = "https://github.com/ikazuya0201/heap"
 
 [dependencies.quantities]
 version = "0.1.1"
-git = "https://github.com/ikazuya0201/quantities"
+path = "../quantities"
