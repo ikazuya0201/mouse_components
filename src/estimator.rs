@@ -1,13 +1,13 @@
-pub mod encoder;
-pub mod imu;
+mod encoder;
+mod imu;
 
 use nb::block;
 use quantities::{Angle, AngularSpeed, Distance, Frequency, Speed, Time};
 
 use crate::agent::StateEstimator;
 use crate::tracker::{State, SubState};
-use encoder::Encoder;
-use imu::IMU;
+pub use encoder::Encoder;
+pub use imu::IMU;
 
 pub struct Estimator<LE, RE, I> {
     x: Distance,

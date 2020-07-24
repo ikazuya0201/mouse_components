@@ -11,3 +11,8 @@ pub mod solver;
 pub mod tracker;
 pub mod trajectory_generator;
 mod utils;
+
+pub mod sensors {
+    pub use super::estimator::{Encoder, IMU};
+    pub use super::tracker::Motor;
+}
