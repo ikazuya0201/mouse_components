@@ -6,6 +6,10 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+path = "../src/lib.rs"
+test = true
+
 [dependencies]
 heapless = "0.5.3"
 generic-array = "0.13.2"
@@ -25,4 +29,4 @@ git = "https://github.com/ikazuya0201/heap"
 
 [dependencies.quantities]
 version = "0.1.1"
-git = "https://github.com/ikazuya0201/quantities"
+path = "../../quantities"
