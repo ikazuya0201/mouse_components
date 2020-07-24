@@ -6,8 +6,8 @@ use quantities::{Angle, AngularSpeed, Distance, Frequency, Speed, Time};
 
 use crate::agent::StateEstimator;
 use crate::tracker::{State, SubState};
-pub use encoder::Encoder;
-pub use imu::IMU;
+pub use encoder::{Encoder, EncoderError};
+pub use imu::{IMUError, IMU};
 
 pub struct Estimator<LE, RE, I> {
     x: Distance,
