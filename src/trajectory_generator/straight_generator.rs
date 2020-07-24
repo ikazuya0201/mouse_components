@@ -270,7 +270,9 @@ impl StraightTrajectoryGenerator {
         let x_dist_raw = f32::from(x_dist);
         let y_dist_raw = f32::from(y_dist);
 
-        Distance::from_meters((x_dist_raw * x_dist_raw + y_dist_raw * y_dist_raw).sqrt())
+        Distance::from_meters(libm::sqrtf(
+            x_dist_raw * x_dist_raw + y_dist_raw * y_dist_raw,
+        ))
     }
 
     pub fn generate(
