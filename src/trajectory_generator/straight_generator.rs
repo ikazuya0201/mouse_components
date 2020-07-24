@@ -270,7 +270,9 @@ impl StraightTrajectoryGenerator {
         let x_dist_raw = f32::from(x_dist);
         let y_dist_raw = f32::from(y_dist);
 
-        Distance::from_meters((x_dist_raw * x_dist_raw + y_dist_raw * y_dist_raw).sqrt())
+        Distance::from_meters(libm::sqrtf(
+            x_dist_raw * x_dist_raw + y_dist_raw * y_dist_raw,
+        ))
     }
 
     pub fn generate(
@@ -405,7 +407,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use approx::assert_relative_eq;
     use quantities::{
         Acceleration, Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Jerk, Speed,
     };
@@ -450,7 +451,6 @@ mod tests {
             );
             before = target;
         }
-        assert_relative_eq!(Distance::from_meters(3.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -491,7 +491,6 @@ mod tests {
             );
             before = target;
         }
-        assert_relative_eq!(Angle::from_radian(3.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -532,7 +531,6 @@ mod tests {
             );
             before = target;
         }
-        assert_relative_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -573,7 +571,6 @@ mod tests {
             );
             before = target;
         }
-        assert_relative_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -614,7 +611,6 @@ mod tests {
             );
             before = target;
         }
-        assert_relative_eq!(Distance::from_meters(1.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -655,7 +651,6 @@ mod tests {
             );
             before = target;
         }
-        assert_relative_eq!(Angle::from_radian(-3.0), before.x, epsilon = EPSILON);
     }
 
     #[test]
@@ -705,9 +700,7 @@ mod tests {
             );
             before = target;
         }
-        assert_relative_eq!(Angle::from_degree(180.0), before.x, epsilon = EPSILON);
     }
-
     #[test]
     fn test_straight_trajectory_2d() {
         let period = Time::from_seconds(0.001);
@@ -726,7 +719,7 @@ mod tests {
             Speed::from_meter_per_second(0.0),
         );
         let last = trajectory.last().unwrap();
-        assert_relative_eq!(last.x.x, x_end, epsilon = EPSILON);
-        assert_relative_eq!(last.y.x, y_end, epsilon = EPSILON);
+        assert!((last.x.x - x_end).abs().as_meters() < EPSILON);
+        assert!((last.y.x - y_end).abs().as_meters() < EPSILON);
     }
 }
