@@ -6,8 +6,8 @@ use quantities::{Angle, AngularSpeed, Distance, Frequency, Speed, Time};
 
 use crate::agent::StateEstimator;
 use crate::tracker::{State, SubState};
-pub use encoder::{Encoder, EncoderError};
-pub use imu::{IMUError, IMU};
+pub use encoder::Encoder;
+pub use imu::IMU;
 
 pub struct Estimator<LE, RE, I> {
     x: Distance,
@@ -27,6 +27,9 @@ where
     LE: Encoder,
     RE: Encoder,
     I: IMU,
+    <LE as Encoder>::Error: core::fmt::Debug,
+    <RE as Encoder>::Error: core::fmt::Debug,
+    <I as IMU>::Error: core::fmt::Debug,
 {
     fn estimate(&mut self) -> State {
         //velocity estimation
