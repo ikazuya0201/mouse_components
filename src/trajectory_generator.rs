@@ -17,6 +17,9 @@ use spin_generator::SpinGenerator;
 use straight_generator::StraightTrajectoryGenerator;
 pub use trajectory::{Target, Trajectory};
 
+#[cfg(feature = "debug")]
+use crate::utils::vector::Vector2;
+
 pub struct TrajectoryGenerator {
     straight_generator: StraightTrajectoryGenerator,
     slalom_generator: SlalomGenerator,
@@ -112,6 +115,20 @@ impl TrajectoryGenerator {
             }
             _ => unreachable!(),
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn generate_straight(
+        &self,
+        x_start: Distance,
+        y_start: Distance,
+        x_end: Distance,
+        y_end: Distance,
+        v_start: Speed,
+        v_end: Speed,
+    ) -> impl Iterator<Item = Vector2<Target<Distance>>> {
+        self.straight_generator
+            .generate(x_start, y_start, x_end, y_end, v_start, v_end)
     }
 }
 
