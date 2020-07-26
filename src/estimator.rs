@@ -137,6 +137,30 @@ where
     }
 }
 
+impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, ()>
+where
+    LE: Encoder,
+    RE: Encoder,
+    I: IMU,
+{
+    pub fn build(self) -> Estimator<LE, RE, I> {
+        let alpha =
+            1.0 / (2.0 * core::f32::consts::PI * self.period * self.cut_off_frequency + 1.0);
+        Estimator {
+            x: Default::default(),
+            y: Default::default(),
+            theta: Default::default(),
+            period: self.period,
+            alpha,
+            trans_speed: Default::default(),
+            angular_speed: Default::default(),
+            left_encoder: self.left_encoder,
+            right_encoder: self.right_encoder,
+            imu: self.imu,
+        }
+    }
+}
+
 impl<RE, I, P, COF, POS> EstimatorBuilder<(), RE, I, P, COF, POS> {
     pub fn left_encoder<LE>(self, left_encoder: LE) -> EstimatorBuilder<LE, RE, I, P, COF, POS>
     where
