@@ -19,6 +19,7 @@ where
     pub j: <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output,
 }
 
+#[derive(Clone, Debug)]
 pub enum Trajectory {
     Move(Vector2<Target<Distance>>),
     Spin(Target<Angle>),
