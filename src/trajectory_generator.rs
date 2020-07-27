@@ -52,7 +52,7 @@ impl TrajectoryGenerator {
                     pose.x,
                     pose.y,
                     pose.theta,
-                    Angle::from_degree(90.0),
+                    Angle::from_degree(-90.0),
                     self.search_speed,
                 )
                 .map(|target| Trajectory::Move(target)),
@@ -62,7 +62,7 @@ impl TrajectoryGenerator {
                     pose.x,
                     pose.y,
                     pose.theta,
-                    Angle::from_degree(-90.0),
+                    Angle::from_degree(90.0),
                     self.search_speed,
                 )
                 .map(|target| Trajectory::Move(target)),
