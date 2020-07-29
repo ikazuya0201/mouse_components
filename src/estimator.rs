@@ -15,6 +15,7 @@ pub struct Estimator<LE, RE, I> {
     theta: Angle,
     period: Time,
     alpha: f32,
+    wheel_interval: Distance,
     trans_speed: Speed,
     angular_speed: AngularSpeed,
     left_encoder: LE,
@@ -42,12 +43,18 @@ where
         let average_trans_speed = (average_left_speed + average_right_speed) / 2.0;
 
         let trans_acceleration = block!(self.imu.get_acceleration_y()).unwrap();
-        let angular_speed = block!(self.imu.get_angular_speed_z()).unwrap();
+        let imu_angular_speed = block!(self.imu.get_angular_speed_z()).unwrap();
 
         //complementary filter
         let trans_speed = self.alpha * (self.trans_speed + trans_acceleration * self.period)
             + (1.0 - self.alpha) * average_trans_speed;
         //------
+
+        let encoder_angular_speed =
+            (right_distance - left_distance) / self.period / self.wheel_interval;
+
+        let angular_speed = self.alpha * (self.angular_speed + imu_angular_speed)
+            + (1.0 - self.alpha) * encoder_angular_speed;
 
         //pose estimation
         let trans_distance = trans_speed * self.period;
@@ -91,16 +98,17 @@ where
     }
 }
 
-pub struct EstimatorBuilder<LE, RE, I, P, COF, POS> {
+pub struct EstimatorBuilder<LE, RE, I, P, COF, POS, WI> {
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
     period: P,
     cut_off_frequency: COF,
     initial_posture: POS,
+    wheel_interval: WI,
 }
 
-impl EstimatorBuilder<(), (), (), (), (), ()> {
+impl EstimatorBuilder<(), (), (), (), (), (), ()> {
     pub fn new() -> Self {
         Self {
             left_encoder: (),
@@ -109,11 +117,12 @@ impl EstimatorBuilder<(), (), (), (), (), ()> {
             period: (),
             cut_off_frequency: (),
             initial_posture: (),
+            wheel_interval: (),
         }
     }
 }
 
-impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, Angle>
+impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, Angle, Distance>
 where
     LE: Encoder,
     RE: Encoder,
@@ -127,6 +136,7 @@ where
             y: Default::default(),
             theta: self.initial_posture,
             period: self.period,
+            wheel_interval: self.wheel_interval,
             alpha,
             trans_speed: Default::default(),
             angular_speed: Default::default(),
@@ -137,7 +147,7 @@ where
     }
 }
 
-impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, ()>
+impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, (), Distance>
 where
     LE: Encoder,
     RE: Encoder,
@@ -151,6 +161,7 @@ where
             y: Default::default(),
             theta: Default::default(),
             period: self.period,
+            wheel_interval: self.wheel_interval,
             alpha,
             trans_speed: Default::default(),
             angular_speed: Default::default(),
@@ -161,8 +172,8 @@ where
     }
 }
 
-impl<RE, I, P, COF, POS> EstimatorBuilder<(), RE, I, P, COF, POS> {
-    pub fn left_encoder<LE>(self, left_encoder: LE) -> EstimatorBuilder<LE, RE, I, P, COF, POS>
+impl<RE, I, P, COF, POS, WI> EstimatorBuilder<(), RE, I, P, COF, POS, WI> {
+    pub fn left_encoder<LE>(self, left_encoder: LE) -> EstimatorBuilder<LE, RE, I, P, COF, POS, WI>
     where
         LE: Encoder,
     {
@@ -173,12 +184,16 @@ impl<RE, I, P, COF, POS> EstimatorBuilder<(), RE, I, P, COF, POS> {
             period: self.period,
             cut_off_frequency: self.cut_off_frequency,
             initial_posture: self.initial_posture,
+            wheel_interval: self.wheel_interval,
         }
     }
 }
 
-impl<LE, I, P, COF, POS> EstimatorBuilder<LE, (), I, P, COF, POS> {
-    pub fn right_encoder<RE>(self, right_encoder: RE) -> EstimatorBuilder<LE, RE, I, P, COF, POS>
+impl<LE, I, P, COF, POS, WI> EstimatorBuilder<LE, (), I, P, COF, POS, WI> {
+    pub fn right_encoder<RE>(
+        self,
+        right_encoder: RE,
+    ) -> EstimatorBuilder<LE, RE, I, P, COF, POS, WI>
     where
         RE: Encoder,
     {
@@ -189,12 +204,13 @@ impl<LE, I, P, COF, POS> EstimatorBuilder<LE, (), I, P, COF, POS> {
             period: self.period,
             cut_off_frequency: self.cut_off_frequency,
             initial_posture: self.initial_posture,
+            wheel_interval: self.wheel_interval,
         }
     }
 }
 
-impl<LE, RE, P, COF, POS> EstimatorBuilder<LE, RE, (), P, COF, POS> {
-    pub fn imu<I>(self, imu: I) -> EstimatorBuilder<LE, RE, I, P, COF, POS>
+impl<LE, RE, P, COF, POS, WI> EstimatorBuilder<LE, RE, (), P, COF, POS, WI> {
+    pub fn imu<I>(self, imu: I) -> EstimatorBuilder<LE, RE, I, P, COF, POS, WI>
     where
         I: IMU,
     {
@@ -205,12 +221,13 @@ impl<LE, RE, P, COF, POS> EstimatorBuilder<LE, RE, (), P, COF, POS> {
             period: self.period,
             cut_off_frequency: self.cut_off_frequency,
             initial_posture: self.initial_posture,
+            wheel_interval: self.wheel_interval,
         }
     }
 }
 
-impl<LE, RE, I, COF, POS> EstimatorBuilder<LE, RE, I, (), COF, POS> {
-    pub fn period(self, period: Time) -> EstimatorBuilder<LE, RE, I, Time, COF, POS> {
+impl<LE, RE, I, COF, POS, WI> EstimatorBuilder<LE, RE, I, (), COF, POS, WI> {
+    pub fn period(self, period: Time) -> EstimatorBuilder<LE, RE, I, Time, COF, POS, WI> {
         EstimatorBuilder {
             left_encoder: self.left_encoder,
             right_encoder: self.right_encoder,
@@ -218,15 +235,16 @@ impl<LE, RE, I, COF, POS> EstimatorBuilder<LE, RE, I, (), COF, POS> {
             period,
             cut_off_frequency: self.cut_off_frequency,
             initial_posture: self.initial_posture,
+            wheel_interval: self.wheel_interval,
         }
     }
 }
 
-impl<LE, RE, I, P, POS> EstimatorBuilder<LE, RE, I, P, (), POS> {
+impl<LE, RE, I, P, POS, WI> EstimatorBuilder<LE, RE, I, P, (), POS, WI> {
     pub fn cut_off_frequency(
         self,
         cut_off_frequency: Frequency,
-    ) -> EstimatorBuilder<LE, RE, I, P, Frequency, POS> {
+    ) -> EstimatorBuilder<LE, RE, I, P, Frequency, POS, WI> {
         EstimatorBuilder {
             left_encoder: self.left_encoder,
             right_encoder: self.right_encoder,
@@ -234,15 +252,16 @@ impl<LE, RE, I, P, POS> EstimatorBuilder<LE, RE, I, P, (), POS> {
             period: self.period,
             cut_off_frequency,
             initial_posture: self.initial_posture,
+            wheel_interval: self.wheel_interval,
         }
     }
 }
 
-impl<LE, RE, I, P, COF> EstimatorBuilder<LE, RE, I, P, COF, ()> {
+impl<LE, RE, I, P, COF, WI> EstimatorBuilder<LE, RE, I, P, COF, (), WI> {
     pub fn initial_posture(
         self,
         initial_posture: Angle,
-    ) -> EstimatorBuilder<LE, RE, I, P, COF, Angle> {
+    ) -> EstimatorBuilder<LE, RE, I, P, COF, Angle, WI> {
         EstimatorBuilder {
             left_encoder: self.left_encoder,
             right_encoder: self.right_encoder,
@@ -250,6 +269,24 @@ impl<LE, RE, I, P, COF> EstimatorBuilder<LE, RE, I, P, COF, ()> {
             period: self.period,
             cut_off_frequency: self.cut_off_frequency,
             initial_posture,
+            wheel_interval: self.wheel_interval,
+        }
+    }
+}
+
+impl<LE, RE, I, P, COF, POS> EstimatorBuilder<LE, RE, I, P, COF, POS, ()> {
+    pub fn wheel_interval(
+        self,
+        wheel_interval: Distance,
+    ) -> EstimatorBuilder<LE, RE, I, P, COF, POS, Distance> {
+        EstimatorBuilder {
+            left_encoder: self.left_encoder,
+            right_encoder: self.right_encoder,
+            imu: self.imu,
+            period: self.period,
+            cut_off_frequency: self.cut_off_frequency,
+            initial_posture: self.initial_posture,
+            wheel_interval,
         }
     }
 }
