@@ -2,11 +2,10 @@ use core::ops::Div;
 
 use quantities::{Angle, Distance, Quantity, Time, TimeDifferentiable};
 
-use crate::utils::vector::Vector2;
 use crate::{dddt, ddt, dt};
 
-#[derive(Clone, Debug)]
-pub struct Target<T>
+#[derive(Clone, Debug, Default)]
+pub struct SubTarget<T>
 where
     T: TimeDifferentiable,
     dt!(T): TimeDifferentiable,
@@ -20,7 +19,8 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub enum Trajectory {
-    Move(Vector2<Target<Distance>>),
-    Spin(Target<Angle>),
+pub struct Target {
+    pub x: SubTarget<Distance>,
+    pub y: SubTarget<Distance>,
+    pub theta: SubTarget<Angle>,
 }

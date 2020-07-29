@@ -1,11 +1,10 @@
 use core::ops::{Div, Mul};
 
 use quantities::{
-    Acceleration, Distance, Jerk, Quantity, Speed, SquaredTime, Time, TimeDifferentiable,
+    Acceleration, Angle, Distance, Jerk, Quantity, Speed, SquaredTime, Time, TimeDifferentiable,
 };
 
-use super::trajectory::Target;
-use crate::utils::vector::Vector2;
+use super::trajectory::{SubTarget, Target};
 use crate::{dddt, ddt, dt};
 
 pub struct StraightFunctionGenerator<T>
@@ -44,7 +43,7 @@ where
         distance: T,
         v_start: dt!(T),
         v_end: dt!(T),
-    ) -> (impl Fn(Time) -> Target<T>, Time) {
+    ) -> (impl Fn(Time) -> SubTarget<T>, Time) {
         let is_negative = distance.is_negative();
         let (x_start, distance, v_start, v_end) = if is_negative {
             (-x_start, -distance, -v_start, -v_end)
@@ -86,7 +85,7 @@ where
         (
             move |t: Time| {
                 let target = if t < Default::default() {
-                    Target {
+                    SubTarget {
                         x: x_start,
                         v: v_start,
                         a: Default::default(),
@@ -99,7 +98,7 @@ where
                 } else if t <= t3 {
                     decel_fn(t - t2)
                 } else {
-                    Target {
+                    SubTarget {
                         x: x_start + distance,
                         v: v_end,
                         a: Default::default(),
@@ -107,7 +106,7 @@ where
                     }
                 };
                 if is_negative {
-                    Target {
+                    SubTarget {
                         x: -target.x,
                         v: -target.v,
                         a: -target.a,
@@ -126,7 +125,7 @@ where
         x_start: T,
         v_start: dt!(T),
         v_end: dt!(T),
-    ) -> (impl Fn(Time) -> Target<T>, Time) {
+    ) -> (impl Fn(Time) -> SubTarget<T>, Time) {
         let tc = self.a_max / self.j_max;
         let vd = self.a_max * tc;
         let (t1, t2, t3) = if (v_end - v_start).abs() >= vd {
@@ -147,16 +146,16 @@ where
         let x_end = x_start + distance;
 
         (
-            move |t: Time| -> Target<T> {
+            move |t: Time| -> SubTarget<T> {
                 if t < Default::default() {
-                    Target {
+                    SubTarget {
                         x: x_start,
                         v: v_start,
                         a: Default::default(),
                         j: Default::default(),
                     }
                 } else if t <= t1 {
-                    Target {
+                    SubTarget {
                         j: j_m,
                         a: j_m * t,
                         v: v_start + j_m * t * t / 2.0,
@@ -164,7 +163,7 @@ where
                     }
                 } else if t <= t2 {
                     let dt1 = t - t1;
-                    Target {
+                    SubTarget {
                         j: Default::default(),
                         a: a_m,
                         v: v_start + a_m * t1 / 2.0 + a_m * dt1,
@@ -176,14 +175,14 @@ where
                     }
                 } else if t <= t3 {
                     let dt3 = t3 - t;
-                    Target {
+                    SubTarget {
                         j: -j_m,
                         a: j_m * dt3,
                         v: v_end - j_m * dt3 * dt3 / 2.0,
                         x: x_end - v_end * dt3 + j_m * dt3 * dt3 * dt3 / 6.0,
                     }
                 } else {
-                    Target {
+                    SubTarget {
                         x: x_end,
                         v: v_end,
                         a: Default::default(),
@@ -207,7 +206,11 @@ where
         (v_start + v_end) * t / 2.0
     }
 
-    fn generate_constant(x_start: T, distance: T, v: dt!(T)) -> (impl Fn(Time) -> Target<T>, Time) {
+    fn generate_constant(
+        x_start: T,
+        distance: T,
+        v: dt!(T),
+    ) -> (impl Fn(Time) -> SubTarget<T>, Time) {
         let t_end = if (distance / v).is_negative() {
             Default::default()
         } else {
@@ -216,14 +219,14 @@ where
         (
             move |t: Time| {
                 if t > t_end || t < Default::default() {
-                    Target {
+                    SubTarget {
                         x: x_start + v * t_end,
                         v,
                         a: Default::default(),
                         j: Default::default(),
                     }
                 } else {
-                    Target {
+                    SubTarget {
                         j: Default::default(),
                         a: Default::default(),
                         v,
@@ -283,7 +286,7 @@ impl StraightTrajectoryGenerator {
         y_end: Distance,
         v_start: Speed,
         v_end: Speed,
-    ) -> impl Iterator<Item = Vector2<Target<Distance>>> {
+    ) -> impl Iterator<Item = Target> {
         let x_dist = x_end - x_start;
         let y_dist = y_end - y_start;
 
@@ -296,6 +299,8 @@ impl StraightTrajectoryGenerator {
         let x_ratio = x_dist / dist;
         let y_ratio = y_dist / dist;
 
+        let theta = Angle::from_radian(libm::atan2f(y_dist.as_meters(), x_dist.as_meters()));
+
         StraightTrajectory::new(
             trajectory_fn,
             t_end,
@@ -304,6 +309,7 @@ impl StraightTrajectoryGenerator {
             y_ratio,
             x_start,
             y_start,
+            theta,
         )
     }
 
@@ -316,7 +322,7 @@ impl StraightTrajectoryGenerator {
         y_end: Distance,
         v: Speed,
         period: Time,
-    ) -> impl Iterator<Item = Vector2<Target<Distance>>> {
+    ) -> impl Iterator<Item = Target> {
         let x_dist = x_end - x_start;
         let y_dist = y_end - y_start;
 
@@ -328,6 +334,8 @@ impl StraightTrajectoryGenerator {
         let x_ratio = x_dist / dist;
         let y_ratio = y_dist / dist;
 
+        let theta = Angle::from_radian(libm::atan2f(y_dist.as_meters(), x_dist.as_meters()));
+
         StraightTrajectory::new(
             trajectory_fn,
             t_end,
@@ -336,6 +344,7 @@ impl StraightTrajectoryGenerator {
             y_ratio,
             x_start,
             y_start,
+            theta,
         )
     }
 }
@@ -349,6 +358,7 @@ pub struct StraightTrajectory<F> {
     y_ratio: f32,
     x_start: Distance,
     y_start: Distance,
+    theta: Angle,
 }
 
 impl<F> StraightTrajectory<F> {
@@ -360,6 +370,7 @@ impl<F> StraightTrajectory<F> {
         y_ratio: f32,
         x_start: Distance,
         y_start: Distance,
+        theta: Angle,
     ) -> Self {
         Self {
             trajectory_fn,
@@ -370,15 +381,16 @@ impl<F> StraightTrajectory<F> {
             y_ratio,
             x_start,
             y_start,
+            theta,
         }
     }
 }
 
 impl<F> Iterator for StraightTrajectory<F>
 where
-    F: Fn(Time) -> Target<Distance>,
+    F: Fn(Time) -> SubTarget<Distance>,
 {
-    type Item = Vector2<Target<Distance>>;
+    type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.t > self.t_end {
@@ -387,18 +399,24 @@ where
         let t = self.t;
         self.t += self.period;
         let target = (self.trajectory_fn)(t);
-        Some(Vector2 {
-            x: Target {
+        Some(Target {
+            x: SubTarget {
                 x: self.x_start + target.x * self.x_ratio,
                 v: target.v * self.x_ratio,
                 a: target.a * self.x_ratio,
                 j: target.j * self.x_ratio,
             },
-            y: Target {
+            y: SubTarget {
                 x: self.y_start + target.x * self.y_ratio,
                 v: target.v * self.y_ratio,
                 a: target.a * self.y_ratio,
                 j: target.j * self.y_ratio,
+            },
+            theta: SubTarget {
+                x: self.theta,
+                v: Default::default(),
+                a: Default::default(),
+                j: Default::default(),
             },
         })
     }

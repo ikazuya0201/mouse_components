@@ -1,7 +1,7 @@
 use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Time};
 
 use super::straight_generator::StraightFunctionGenerator;
-use super::trajectory::Target;
+use super::trajectory::{SubTarget, Target};
 
 pub struct SpinGenerator {
     function_generator: StraightFunctionGenerator<Angle>,
@@ -29,7 +29,7 @@ impl SpinGenerator {
         &self,
         theta_start: Angle,
         theta_distance: Angle,
-    ) -> impl Iterator<Item = Target<Angle>> {
+    ) -> impl Iterator<Item = Target> {
         let (trajectory_fn, t_end) = self.function_generator.generate(
             theta_start,
             theta_distance,
@@ -60,9 +60,9 @@ impl<F> SpinTrajectory<F> {
 
 impl<F> Iterator for SpinTrajectory<F>
 where
-    F: Fn(Time) -> Target<Angle>,
+    F: Fn(Time) -> SubTarget<Angle>,
 {
-    type Item = Target<Angle>;
+    type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.t > self.t_end {
@@ -70,6 +70,10 @@ where
         }
         let t = self.t;
         self.t += self.period;
-        Some((self.trajectory_fn)(t))
+        Some(Target {
+            x: Default::default(),
+            y: Default::default(),
+            theta: (self.trajectory_fn)(t),
+        })
     }
 }
