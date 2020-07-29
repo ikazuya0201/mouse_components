@@ -15,10 +15,7 @@ use crate::maze::RelativeDirection;
 use slalom_generator::SlalomGenerator;
 use spin_generator::SpinGenerator;
 use straight_generator::StraightTrajectoryGenerator;
-pub use trajectory::{Target, Trajectory};
-
-#[cfg(feature = "debug")]
-use crate::utils::vector::Vector2;
+pub use trajectory::{SubTarget, Target};
 
 pub struct TrajectoryGenerator {
     straight_generator: StraightTrajectoryGenerator,
@@ -27,8 +24,8 @@ pub struct TrajectoryGenerator {
     search_speed: Speed,
 }
 
-impl agent::TrajectoryGenerator<Pose, Trajectory, RelativeDirection> for TrajectoryGenerator {
-    type Trajectory = impl Iterator<Item = Trajectory>;
+impl agent::TrajectoryGenerator<Pose, Target, RelativeDirection> for TrajectoryGenerator {
+    type Trajectory = impl Iterator<Item = Target>;
 
     fn generate_search(&self, pose: Pose, direction: RelativeDirection) -> Self::Trajectory {
         self.generate_search_trajectory(pose, direction)
@@ -41,45 +38,37 @@ impl TrajectoryGenerator {
         &self,
         pose: Pose,
         direction: RelativeDirection,
-    ) -> impl Iterator<Item = Trajectory> {
+    ) -> impl Iterator<Item = Target> {
         use RelativeDirection::*;
 
         #[auto_enum(Iterator)]
         match direction {
-            Right => self
-                .slalom_generator
-                .generate(
-                    pose.x,
-                    pose.y,
-                    pose.theta,
-                    Angle::from_degree(-90.0),
-                    self.search_speed,
-                )
-                .map(|target| Trajectory::Move(target)),
-            Left => self
-                .slalom_generator
-                .generate(
-                    pose.x,
-                    pose.y,
-                    pose.theta,
-                    Angle::from_degree(90.0),
-                    self.search_speed,
-                )
-                .map(|target| Trajectory::Move(target)),
+            Right => self.slalom_generator.generate(
+                pose.x,
+                pose.y,
+                pose.theta,
+                Angle::from_degree(-90.0),
+                self.search_speed,
+            ),
+            Left => self.slalom_generator.generate(
+                pose.x,
+                pose.y,
+                pose.theta,
+                Angle::from_degree(90.0),
+                self.search_speed,
+            ),
             Front => {
                 let distance = Distance::from_meters(0.09); //TODO: use configurable value
                 let x_end = pose.x + distance * pose.theta.cos();
                 let y_end = pose.y + distance * pose.theta.sin();
-                self.straight_generator
-                    .generate(
-                        pose.x,
-                        pose.y,
-                        x_end,
-                        y_end,
-                        self.search_speed,
-                        self.search_speed,
-                    )
-                    .map(|target| Trajectory::Move(target))
+                self.straight_generator.generate(
+                    pose.x,
+                    pose.y,
+                    x_end,
+                    y_end,
+                    self.search_speed,
+                    self.search_speed,
+                )
             }
             Back => {
                 let distance = Distance::from_meters(0.045); //TODO: use configurable value
@@ -94,24 +83,18 @@ impl TrajectoryGenerator {
                         self.search_speed,
                         Default::default(),
                     )
-                    .map(|target| Trajectory::Move(target))
                     .chain(
                         self.spin_generator
-                            .generate(pose.theta, Angle::from_degree(180.0))
-                            .map(|target| Trajectory::Spin(target)),
+                            .generate(pose.theta, Angle::from_degree(180.0)),
                     )
-                    .chain(
-                        self.straight_generator
-                            .generate(
-                                x_end,
-                                y_end,
-                                pose.x,
-                                pose.y,
-                                Default::default(),
-                                self.search_speed,
-                            )
-                            .map(|target| Trajectory::Move(target)),
-                    )
+                    .chain(self.straight_generator.generate(
+                        x_end,
+                        y_end,
+                        pose.x,
+                        pose.y,
+                        Default::default(),
+                        self.search_speed,
+                    ))
             }
             _ => unreachable!(),
         }
@@ -126,7 +109,7 @@ impl TrajectoryGenerator {
         y_end: Distance,
         v_start: Speed,
         v_end: Speed,
-    ) -> impl Iterator<Item = Vector2<Target<Distance>>> {
+    ) -> impl Iterator<Item = Target> {
         self.straight_generator
             .generate(x_start, y_start, x_end, y_end, v_start, v_end)
     }

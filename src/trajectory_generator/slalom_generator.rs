@@ -1,8 +1,7 @@
 use libm::{cosf, sinf};
 use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Speed, Time};
 
-use super::trajectory::Target;
-use crate::utils::vector::Vector2;
+use super::trajectory::{SubTarget, Target};
 
 use super::straight_generator::StraightFunctionGenerator;
 
@@ -38,7 +37,7 @@ impl SlalomGenerator {
         theta: Angle,
         theta_distance: Angle,
         v: Speed,
-    ) -> impl Iterator<Item = Vector2<Target<Distance>>> {
+    ) -> impl Iterator<Item = Target> {
         let k = v / self.v_ref;
         let angle_generator = StraightFunctionGenerator::<Angle>::new(
             k * self.dtheta,
@@ -57,7 +56,7 @@ impl SlalomGenerator {
 
 struct SlalomTrajectory<F>
 where
-    F: Fn(Time) -> Target<Angle>,
+    F: Fn(Time) -> SubTarget<Angle>,
 {
     angle_fn: F,
     t: Time,
@@ -70,7 +69,7 @@ where
 
 impl<F> SlalomTrajectory<F>
 where
-    F: Fn(Time) -> Target<Angle>,
+    F: Fn(Time) -> SubTarget<Angle>,
 {
     pub fn new(
         angle_fn: F,
@@ -94,9 +93,9 @@ where
 
 impl<F> Iterator for SlalomTrajectory<F>
 where
-    F: Fn(Time) -> Target<Angle>,
+    F: Fn(Time) -> SubTarget<Angle>,
 {
-    type Item = Vector2<Target<Distance>>;
+    type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.t > self.t_end {
@@ -134,19 +133,20 @@ where
         let ay = self.v * cos_theta * target.v;
         let jy = self.v * (-sin_theta * target.v * target.v + cos_theta * target.a);
 
-        Some(Vector2 {
-            x: Target {
+        Some(Target {
+            x: SubTarget {
                 x,
                 v: vx,
                 a: ax,
                 j: jx,
             },
-            y: Target {
+            y: SubTarget {
                 x: y,
                 v: vy,
                 a: ay,
                 j: jy,
             },
+            theta: target,
         })
     }
 }
