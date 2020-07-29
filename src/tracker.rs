@@ -8,8 +8,7 @@ use quantities::{
 };
 
 use super::agent;
-use super::trajectory_generator::{Target, Trajectory};
-use crate::utils::vector::Vector2;
+use super::trajectory_generator::Target;
 use crate::{ddt, dt};
 pub use motor::Motor;
 pub use state::{State, SubState};
@@ -36,18 +35,15 @@ pub struct Tracker<LM, RM, TC, RC> {
     right_motor: RM,
 }
 
-impl<LM, RM, TC, RC> agent::Tracker<State, Trajectory> for Tracker<LM, RM, TC, RC>
+impl<LM, RM, TC, RC> agent::Tracker<State, Target> for Tracker<LM, RM, TC, RC>
 where
     LM: Motor,
     RM: Motor,
     TC: Controller<Distance>,
     RC: Controller<Angle>,
 {
-    fn track(&mut self, state: State, target: Trajectory) {
-        let (left, right) = match target {
-            Trajectory::Move(target) => self.track_move(state, target),
-            Trajectory::Spin(target) => self.track_spin(state, target),
-        };
+    fn track(&mut self, state: State, target: Target) {
+        let (left, right) = self.track_move(state, target);
         self.left_motor.apply(left);
         self.right_motor.apply(right);
     }
@@ -58,28 +54,7 @@ where
     TC: Controller<Distance>,
     RC: Controller<Angle>,
 {
-    fn track_spin(&mut self, state: State, target: Target<Angle>) -> (Voltage, Voltage) {
-        self.xi = Default::default();
-
-        let cos_theta = state.theta.x.cos();
-        let sin_theta = state.theta.x.sin();
-        let vv = state.x.v * cos_theta + state.y.v * sin_theta;
-        let va = state.x.a * cos_theta + state.y.a * sin_theta;
-
-        let vol_v =
-            self.translation_controller
-                .calculate(Default::default(), Default::default(), vv, va);
-        let vol_w =
-            self.rotation_controller
-                .calculate(target.v, target.a, state.theta.v, state.theta.a);
-        (vol_v - vol_w, vol_v + vol_w)
-    }
-
-    fn track_move(
-        &mut self,
-        state: State,
-        target: Vector2<Target<Distance>>,
-    ) -> (Voltage, Voltage) {
+    fn track_move(&mut self, state: State, target: Target) -> (Voltage, Voltage) {
         let cos_theta = state.theta.x.cos();
         let sin_theta = state.theta.x.sin();
 
