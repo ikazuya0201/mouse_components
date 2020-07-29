@@ -539,7 +539,7 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, KKX, KKY, KKT>
 impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKY, KKT>
     TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, (), KKY, KKT>
 {
-    pub fn kaneyama_kx(
+    pub fn kanayama_kx(
         self,
         kn_kx: f32,
     ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, f32, KKY, KKT> {
@@ -565,7 +565,7 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKY, KKT>
 impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKT>
     TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, (), KKT>
 {
-    pub fn kaneyama_ky(
+    pub fn kanayama_ky(
         self,
         kn_ky: f32,
     ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, f32, KKT> {
@@ -591,7 +591,7 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKT>
 impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY>
     TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, ()>
 {
-    pub fn kaneyama_ktheta(
+    pub fn kanayama_ktheta(
         self,
         kn_ktheta: f32,
     ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, f32> {
@@ -660,9 +660,9 @@ mod tests {
             .period(Time::from_seconds(0.001))
             .translation_controller(IController::<Distance>::new())
             .rotation_controller(IController::<Angle>::new())
-            .kaneyama_kx(1.0)
-            .kaneyama_ky(1.0)
-            .kaneyama_ktheta(1.0)
+            .kanayama_kx(1.0)
+            .kanayama_ky(1.0)
+            .kanayama_ktheta(1.0)
             .build()
     }
 
