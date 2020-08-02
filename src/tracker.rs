@@ -4,8 +4,8 @@ mod state;
 use core::ops::Div;
 
 use quantities::{
-    Acceleration, Angle, AngularAcceleration, AngularSpeed, Distance, Frequency, Speed,
-    SquaredFrequency, Time, TimeDifferentiable, Voltage,
+    Angle, AngularAcceleration, AngularSpeed, Distance, Frequency, Speed, SquaredFrequency, Time,
+    TimeDifferentiable, Voltage,
 };
 
 use super::agent;
@@ -93,15 +93,11 @@ where
             let duw = -(2.0 * dxi * uw + dux * sin_theta - duy * cos_theta) / self.xi;
             (uv, uw, duv, duw)
         } else {
-            let vx_raw = target.x.v.as_meter_per_second();
-            let vy_raw = target.y.v.as_meter_per_second();
-            let vr = Speed::from_meter_per_second(libm::sqrtf(vx_raw * vx_raw + vy_raw * vy_raw));
+            let sin_theta_r = target.theta.x.sin();
+            let cos_theta_r = target.theta.x.cos();
 
-            let ax_raw = target.x.a.as_meter_per_second_squared();
-            let ay_raw = target.y.a.as_meter_per_second_squared();
-            let ar = Acceleration::from_meter_per_second_squared(libm::sqrtf(
-                ax_raw * ax_raw + ay_raw * ay_raw,
-            ));
+            let vr = target.x.v * cos_theta_r + target.y.v * sin_theta_r;
+            let ar = target.x.a * cos_theta_r + target.y.a * sin_theta_r;
 
             let theta_e = target.theta.x - state.theta.x;
             let x_e = target.x.x - state.x.x;
