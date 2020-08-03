@@ -672,7 +672,7 @@ mod tests {
             Distance::from_meters(0.06),
             Speed::from_meter_per_second(0.6),
             Speed::from_meter_per_second(0.0),
-            true,
+            false,
         )
     }
 

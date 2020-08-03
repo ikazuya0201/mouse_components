@@ -164,24 +164,22 @@ mod tests {
         let dtheta = AngularSpeed::from_radian_per_second(3.0 * PI);
         let ddtheta = AngularAcceleration::from_radian_per_second_squared(36.0 * PI);
         let dddtheta = AngularJerk::from_radian_per_second_cubed(1200.0 * PI);
-        let v_ref = Speed::from_meter_per_second(0.24);
+        let v_ref = Speed::from_meter_per_second(0.24159);
         let period = Time::from_seconds(0.001);
 
         let generator = SlalomGenerator::new(dtheta, ddtheta, dddtheta, v_ref, period);
-        let v_target = Speed::from_meter_per_second(0.6);
+        let v_target = Speed::from_meter_per_second(0.2);
         let trajectory = generator.generate(
             Distance::from_meters(0.0),
             Distance::from_meters(0.0),
-            Angle::from_degree(180.0),
+            Angle::from_degree(90.0),
             Angle::from_degree(90.0),
             v_target,
         );
 
         for target in trajectory {
-            let vx = target.x.v.as_meter_per_second();
-            let vy = target.y.v.as_meter_per_second();
-            let v = Speed::from_meter_per_second((vx * vx + vy * vy).sqrt());
-            assert!((v - v_target).abs().as_meter_per_second() < EPSILON);
+            let v = target.x.v * target.theta.x.cos() + target.y.v * target.theta.x.sin();
+            assert!((v.abs() - v_target).abs().as_meter_per_second() < EPSILON);
         }
     }
 
