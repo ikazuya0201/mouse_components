@@ -21,6 +21,9 @@ pub struct Estimator<LE, RE, I> {
     wheel_interval: Distance,
     trans_speed: Speed,
     angular_speed: AngularSpeed,
+    imu_angular_speed: AngularSpeed,
+    filtered_imu_angular_speed: AngularSpeed,
+    filtered_encoder_angular_speed: AngularSpeed,
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
@@ -41,6 +44,9 @@ where
         self.theta = self.initial_theta;
         self.trans_speed = Default::default();
         self.angular_speed = Default::default();
+        self.imu_angular_speed = Default::default();
+        self.filtered_imu_angular_speed = Default::default();
+        self.filtered_encoder_angular_speed = Default::default();
     }
 
     fn estimate(&mut self) -> State {
@@ -61,11 +67,21 @@ where
             + (1.0 - self.alpha) * average_trans_speed;
         //------
 
+        let filtered_imu_angular_speed = self.alpha * self.filtered_imu_angular_speed
+            + self.alpha * (imu_angular_speed - self.imu_angular_speed);
+
         let encoder_angular_speed =
             (right_distance - left_distance) / self.period / self.wheel_interval;
 
-        let angular_speed =
-            self.alpha * imu_angular_speed + (1.0 - self.alpha) * encoder_angular_speed;
+        let filtered_encoder_angular_speed = self.alpha * self.filtered_encoder_angular_speed
+            + (1.0 - self.alpha) * encoder_angular_speed;
+
+        let angular_speed = filtered_encoder_angular_speed + filtered_imu_angular_speed
+            - self.filtered_imu_angular_speed;
+
+        self.filtered_imu_angular_speed = filtered_imu_angular_speed;
+        self.filtered_encoder_angular_speed = filtered_encoder_angular_speed;
+        self.imu_angular_speed = imu_angular_speed;
 
         //pose estimation
         let trans_distance = trans_speed * self.period;
@@ -156,6 +172,9 @@ where
             period: self.period,
             wheel_interval: self.wheel_interval,
             alpha,
+            filtered_encoder_angular_speed: Default::default(),
+            filtered_imu_angular_speed: Default::default(),
+            imu_angular_speed: Default::default(),
             trans_speed: Default::default(),
             angular_speed: Default::default(),
             left_encoder: self.left_encoder,
@@ -184,6 +203,9 @@ where
             period: self.period,
             wheel_interval: self.wheel_interval,
             alpha,
+            filtered_encoder_angular_speed: Default::default(),
+            filtered_imu_angular_speed: Default::default(),
+            imu_angular_speed: Default::default(),
             trans_speed: Default::default(),
             angular_speed: Default::default(),
             left_encoder: self.left_encoder,
@@ -212,6 +234,9 @@ where
             period: self.period,
             wheel_interval: self.wheel_interval,
             alpha,
+            filtered_encoder_angular_speed: Default::default(),
+            filtered_imu_angular_speed: Default::default(),
+            imu_angular_speed: Default::default(),
             trans_speed: Default::default(),
             angular_speed: Default::default(),
             left_encoder: self.left_encoder,
