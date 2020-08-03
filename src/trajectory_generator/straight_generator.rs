@@ -37,7 +37,7 @@ where
         }
     }
 
-    //NOTO: all given values should not be negative
+    //NOTO: v_start and v_end should not be negative
     pub fn generate(
         &self,
         x_start: T,
@@ -45,6 +45,11 @@ where
         v_start: dt!(T),
         v_end: dt!(T),
     ) -> (impl Fn(Time) -> SubTarget<T>, Time) {
+        let (distance, sign) = if distance.is_negative() {
+            (-distance, -1.0f32)
+        } else {
+            (distance, 1.0f32)
+        };
         let v_reach = self.calculate_reachable_speed(v_start, v_end, distance);
         let v_end = if v_start < v_end {
             if v_reach < v_end {
@@ -87,7 +92,7 @@ where
 
         (
             move |t: Time| {
-                if t < Default::default() {
+                let target = if t < Default::default() {
                     SubTarget {
                         x: x_start,
                         v: v_start,
@@ -107,6 +112,12 @@ where
                         a: Default::default(),
                         j: Default::default(),
                     }
+                };
+                SubTarget {
+                    x: (target.x - x_start) * sign + x_start,
+                    v: target.v * sign,
+                    a: target.a * sign,
+                    j: target.j * sign,
                 }
             },
             t3,
