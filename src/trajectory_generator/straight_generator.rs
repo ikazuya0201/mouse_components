@@ -21,13 +21,13 @@ where
 
 impl<T> StraightFunctionGenerator<T>
 where
-    T: TimeDifferentiable,
+    T: TimeDifferentiable + Div<T, Output = f32>,
     dt!(T): TimeDifferentiable + Mul<Time, Output = T> + Div<dddt!(T), Output = SquaredTime>,
     ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)>,
     dddt!(T): Quantity + Mul<Time, Output = ddt!(T)>,
-    f32: From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
+    f32: From<T> + From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
 {
-    const LOOP_COUNT: u8 = 30;
+    const LOOP_COUNT: u8 = 25;
 
     pub fn new(v_max: dt!(T), a_max: ddt!(T), j_max: dddt!(T)) -> Self {
         Self {
@@ -37,6 +37,7 @@ where
         }
     }
 
+    //NOTO: all given values should not be negative
     pub fn generate(
         &self,
         x_start: T,
@@ -44,30 +45,32 @@ where
         v_start: dt!(T),
         v_end: dt!(T),
     ) -> (impl Fn(Time) -> SubTarget<T>, Time) {
-        let is_negative = distance.is_negative();
-        let (x_start, distance, v_start, v_end) = if is_negative {
-            (-x_start, -distance, -v_start, -v_end)
+        let v_reach = self.calculate_reachable_speed(v_start, v_end, distance);
+        let v_end = if v_start < v_end {
+            if v_reach < v_end {
+                v_reach
+            } else {
+                v_end
+            }
+        } else if v_reach > v_end {
+            v_reach
         } else {
-            (x_start, distance, v_start, v_end)
+            v_end
         };
-
-        let mut left = if v_start < v_end { v_end } else { v_start };
-        let mut right = self.calculate_reachable_speed(v_start, distance);
-        if left > right {
-            left = right;
-        }
+        let mut low = if v_start < v_end { v_end } else { v_start };
+        let mut high = self.v_max;
         for _ in 0..Self::LOOP_COUNT {
-            let mid = (left + right) / 2.0;
+            let mid = (low + high) / 2.0;
             let d = self.calculate_acceleration_distance(v_start, mid)
                 + self.calculate_acceleration_distance(mid, v_end);
             if d <= distance {
-                left = mid;
+                low = mid;
             } else {
-                right = mid;
+                high = mid;
             }
         }
 
-        let v_max = left;
+        let v_max = low;
         let v_end = if v_end < v_max { v_end } else { v_max };
 
         let dist1 = self.calculate_acceleration_distance(v_start, v_max);
@@ -84,7 +87,7 @@ where
 
         (
             move |t: Time| {
-                let target = if t < Default::default() {
+                if t < Default::default() {
                     SubTarget {
                         x: x_start,
                         v: v_start,
@@ -104,16 +107,6 @@ where
                         a: Default::default(),
                         j: Default::default(),
                     }
-                };
-                if is_negative {
-                    SubTarget {
-                        x: -target.x,
-                        v: -target.v,
-                        a: -target.a,
-                        j: -target.j,
-                    }
-                } else {
-                    target
                 }
             },
             t3,
@@ -238,19 +231,88 @@ where
         )
     }
 
-    pub fn calculate_reachable_speed(&self, v_start: dt!(T), distance: T) -> dt!(T) {
-        let mut left = v_start;
-        let mut right = self.v_max;
-        for _ in 0..Self::LOOP_COUNT {
-            let mid = (left + right) / 2.0;
-            let d = self.calculate_acceleration_distance(v_start, mid);
-            if d < distance {
-                left = mid;
+    //TODO: devise faster algorithm
+    pub fn calculate_reachable_speed(&self, v_start: dt!(T), v_end: dt!(T), distance: T) -> dt!(T) {
+        if v_start < v_end {
+            let mut low = v_start;
+            let mut high = self.v_max;
+            for _ in 0..Self::LOOP_COUNT {
+                let mid = (low + high) / 2.0;
+                let d = self.calculate_acceleration_distance(v_start, mid);
+                if d < distance {
+                    low = mid;
+                } else {
+                    high = mid;
+                }
+            }
+            low
+        } else {
+            let mut low3 = Default::default();
+            let mut high3 = v_start;
+            for _ in 0..Self::LOOP_COUNT {
+                let low_mid = (low3 * 2.0 + high3) / 3.0;
+                let high_mid = high3 - low_mid;
+                let low_d = self.calculate_acceleration_distance(v_start, low_mid);
+                let high_d = self.calculate_acceleration_distance(v_start, high_mid);
+                if low_d < high_d {
+                    low3 = low_mid;
+                } else {
+                    high3 = high_mid;
+                }
+            }
+            let mut low = Default::default();
+            let mut high = low3;
+            for _ in 0..Self::LOOP_COUNT {
+                let mid = (low + high) / 2.0;
+                let d = self.calculate_acceleration_distance(v_start, mid);
+                if d < distance {
+                    low = mid;
+                } else {
+                    high = mid;
+                }
+            }
+            let cand1 = low;
+
+            let mut low = low3;
+            let mut high = v_start;
+            for _ in 0..Self::LOOP_COUNT {
+                let mid = (low + high) / 2.0;
+                let d = self.calculate_acceleration_distance(v_start, mid);
+                if d < distance {
+                    high = mid;
+                } else {
+                    low = mid;
+                }
+            }
+            let cand2 = low;
+
+            let d_cand1 = self.calculate_acceleration_distance(v_start, cand1);
+            let d_cand2 = self.calculate_acceleration_distance(v_start, cand2);
+
+            //admissible 1% relative error
+            const EPSILON: f32 = 0.01;
+
+            let diff_cand1: f32 = (distance - d_cand1).abs() / distance;
+            let diff_cand2: f32 = (distance - d_cand2).abs() / distance;
+
+            if diff_cand1 < EPSILON {
+                if diff_cand2 < EPSILON {
+                    if (v_end - cand1).abs() < (v_end - cand2).abs() {
+                        cand1
+                    } else {
+                        cand2
+                    }
+                } else {
+                    cand1
+                }
+            } else if diff_cand2 < EPSILON {
+                cand2
+            } else if diff_cand1 < diff_cand2 {
+                cand1
             } else {
-                right = mid;
+                cand2
             }
         }
-        left
     }
 }
 
@@ -278,6 +340,7 @@ impl StraightTrajectoryGenerator {
         ))
     }
 
+    //NOTO: v_start and v_end should not be negative
     pub fn generate(
         &self,
         x_start: Distance,
@@ -414,9 +477,7 @@ where
             },
             theta: SubTarget {
                 x: self.theta,
-                v: Default::default(),
-                a: Default::default(),
-                j: Default::default(),
+                ..Default::default()
             },
         })
     }
@@ -431,313 +492,204 @@ mod tests {
 
     const EPSILON: f32 = 5e-4; //low accuracy...
 
+    fn test_trajectory_fn<T>(
+        period: Time,
+        v_max: dt!(T),
+        a_max: ddt!(T),
+        j_max: dddt!(T),
+        x_start: T,
+        x_end: T,
+        v_start: dt!(T),
+        v_end: dt!(T),
+        output: bool,
+    ) where
+        T: TimeDifferentiable + From<f32> + Div<T, Output = f32>,
+        dt!(T): TimeDifferentiable
+            + Mul<Time, Output = T>
+            + Div<dddt!(T), Output = SquaredTime>
+            + From<f32>,
+        ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)> + From<f32>,
+        dddt!(T): Quantity + Mul<Time, Output = ddt!(T)> + From<f32>,
+        f32: From<T> + From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
+    {
+        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
+        let (trajectory_fn, t_end) = generator.generate(x_start, x_end, v_start, v_end);
+        let mut current = Time::from_seconds(0.0);
+        let mut before = trajectory_fn(current);
+        let t_eps = T::from(EPSILON);
+        let ddt_eps = <<T as Div<Time>>::Output as Div<Time>>::Output::from(EPSILON);
+        let dddt_eps =
+            <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output::from(EPSILON);
+        assert!(
+            (trajectory_fn(Default::default()).x - x_start).abs() < t_eps,
+            "lhs: {:?}, rhs: {:?}",
+            trajectory_fn(Default::default()).x,
+            x_start
+        );
+        while current < t_end {
+            let target = trajectory_fn(current);
+            if output {
+                let x_raw: f32 = target.x.into();
+                let v_raw: f32 = target.v.into();
+                let a_raw: f32 = target.a.into();
+                let j_raw: f32 = target.j.into();
+                println!("{}, {}, {}, {}", x_raw, v_raw, a_raw, j_raw,);
+            }
+            assert!(
+                ((target.v - before.v) / period).abs() <= a_max.abs() + ddt_eps,
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.v - before.v) / period).abs(),
+                a_max.abs() + ddt_eps,
+            );
+            assert!(
+                ((target.a - before.a) / period).abs() <= j_max.abs() + dddt_eps,
+                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
+                target,
+                before,
+                ((target.a - before.a) / period).abs(),
+                j_max.abs() + dddt_eps,
+            );
+            before = target;
+            current += period;
+        }
+    }
+
     #[test]
     fn test_straight_trajectory_long() {
-        let period = Time::from_seconds(0.001);
-        let v_max = Speed::from_meter_per_second(1.0);
-        let a_max = Acceleration::from_meter_per_second_squared(1.0);
-        let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
-        let (trajectory_fn, t_end) = generator.generate(
+        test_trajectory_fn(
+            Time::from_seconds(0.001),
+            Speed::from_meter_per_second(1.0),
+            Acceleration::from_meter_per_second_squared(1.0),
+            Jerk::from_meter_per_second_cubed(1.0),
             Distance::from_meters(0.0),
             Distance::from_meters(3.0),
             Speed::from_meter_per_second(0.0),
             Speed::from_meter_per_second(0.0),
+            false,
         );
-        let mut current = Time::from_seconds(0.0);
-        let mut before = trajectory_fn(current);
-        while current < t_end {
-            current += period;
-            let target = trajectory_fn(current);
-            assert!(
-                ((target.v - before.v) / period).abs()
-                    <= a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.v - before.v) / period).abs(),
-                a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
-            );
-            assert!(
-                ((target.a - before.a) / period).abs()
-                    <= j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.a - before.a) / period).abs(),
-                j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
-            );
-            before = target;
-        }
     }
 
     #[test]
     fn test_straight_trajectory_with_angle() {
-        let period = Time::from_seconds(0.001);
-        let v_max = AngularSpeed::from_radian_per_second(1.0);
-        let a_max = AngularAcceleration::from_radian_per_second_squared(1.0);
-        let j_max = AngularJerk::from_radian_per_second_cubed(1.0);
-        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
-        let (trajectory_fn, t_end) = generator.generate(
+        test_trajectory_fn(
+            Time::from_seconds(0.001),
+            AngularSpeed::from_radian_per_second(1.0),
+            AngularAcceleration::from_radian_per_second_squared(1.0),
+            AngularJerk::from_radian_per_second_cubed(1.0),
             Angle::from_radian(0.0),
             Angle::from_radian(3.0),
             AngularSpeed::from_radian_per_second(0.0),
             AngularSpeed::from_radian_per_second(0.0),
+            false,
         );
-        let mut current = Time::from_seconds(0.0);
-        let mut before = trajectory_fn(current);
-        while current < t_end {
-            current += period;
-            let target = trajectory_fn(current);
-            assert!(
-                ((target.v - before.v) / period).abs()
-                    <= a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.v - before.v) / period).abs(),
-                a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
-            );
-            assert!(
-                ((target.a - before.a) / period).abs()
-                    <= j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.a - before.a) / period).abs(),
-                j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
-            );
-            before = target;
-        }
     }
 
     #[test]
     fn test_straight_trajectory_short() {
-        let period = Time::from_seconds(0.001);
-        let v_max = Speed::from_meter_per_second(1.0);
-        let a_max = Acceleration::from_meter_per_second_squared(1.0);
-        let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
-        let (trajectory_fn, t_end) = generator.generate(
+        test_trajectory_fn(
+            Time::from_seconds(0.001),
+            Speed::from_meter_per_second(1.0),
+            Acceleration::from_meter_per_second_squared(1.0),
+            Jerk::from_meter_per_second_cubed(1.0),
             Distance::from_meters(0.0),
             Distance::from_meters(1.0),
             Speed::from_meter_per_second(0.0),
             Speed::from_meter_per_second(0.0),
+            false,
         );
-        let mut current = Time::from_seconds(0.0);
-        let mut before = trajectory_fn(current);
-        while current < t_end {
-            current += period;
-            let target = trajectory_fn(current);
-            assert!(
-                ((target.v - before.v) / period).abs()
-                    <= a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.v - before.v) / period).abs(),
-                a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
-            );
-            assert!(
-                ((target.a - before.a) / period).abs()
-                    <= j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.a - before.a) / period).abs(),
-                j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
-            );
-            before = target;
-        }
     }
 
     #[test]
     fn test_straight_trajectory_with_only_acceleration() {
-        let period = Time::from_seconds(0.001);
-        let v_max = Speed::from_meter_per_second(1.0);
-        let a_max = Acceleration::from_meter_per_second_squared(0.5);
-        let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
-        let (trajectory_fn, t_end) = generator.generate(
+        test_trajectory_fn(
+            Time::from_seconds(0.001),
+            Speed::from_meter_per_second(1.0),
+            Acceleration::from_meter_per_second_squared(0.5),
+            Jerk::from_meter_per_second_cubed(1.0),
             Distance::from_meters(0.0),
             Distance::from_meters(1.0),
             Speed::from_meter_per_second(0.0),
             Speed::from_meter_per_second(1.0),
+            false,
         );
-        let mut current = Time::from_seconds(0.0);
-        let mut before = trajectory_fn(current);
-        while current < t_end {
-            current += period;
-            let target = trajectory_fn(current);
-            assert!(
-                ((target.v - before.v) / period).abs()
-                    <= a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.v - before.v) / period).abs(),
-                a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
-            );
-            assert!(
-                ((target.a - before.a) / period).abs()
-                    <= j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.a - before.a) / period).abs(),
-                j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
-            );
-            before = target;
-        }
     }
 
     #[test]
     fn test_straight_trajectory_with_only_deceleration() {
-        let period = Time::from_seconds(0.001);
-        let v_max = Speed::from_meter_per_second(1.0);
-        let a_max = Acceleration::from_meter_per_second_squared(0.5);
-        let j_max = Jerk::from_meter_per_second_cubed(1.0);
-        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
-        let (trajectory_fn, t_end) = generator.generate(
+        test_trajectory_fn(
+            Time::from_seconds(0.001),
+            Speed::from_meter_per_second(1.0),
+            Acceleration::from_meter_per_second_squared(0.5),
+            Jerk::from_meter_per_second_cubed(1.0),
             Distance::from_meters(0.0),
             Distance::from_meters(1.0),
             Speed::from_meter_per_second(1.0),
             Speed::from_meter_per_second(0.0),
+            false,
         );
-        let mut current = Time::from_seconds(0.0);
-        let mut before = trajectory_fn(current);
-        while current < t_end {
-            current += period;
-            let target = trajectory_fn(current);
-            assert!(
-                ((target.v - before.v) / period).abs()
-                    <= a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.v - before.v) / period).abs(),
-                a_max.abs() + Acceleration::from_meter_per_second_squared(EPSILON),
-            );
-            assert!(
-                ((target.a - before.a) / period).abs()
-                    <= j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.a - before.a) / period).abs(),
-                j_max.abs() + Jerk::from_meter_per_second_cubed(EPSILON),
-            );
-            before = target;
-        }
     }
 
     #[test]
     fn test_straight_trajectory_with_minus_value() {
-        let period = Time::from_seconds(0.001);
-        let v_max = AngularSpeed::from_radian_per_second(1.0);
-        let a_max = AngularAcceleration::from_radian_per_second_squared(1.0);
-        let j_max = AngularJerk::from_radian_per_second_cubed(1.0);
-        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
-        let (trajectory_fn, t_end) = generator.generate(
-            Angle::from_radian(0.0),
-            Angle::from_radian(-3.0),
-            AngularSpeed::from_radian_per_second(0.0),
-            AngularSpeed::from_radian_per_second(0.0),
+        test_trajectory_fn(
+            Time::from_seconds(0.001),
+            Speed::from_meter_per_second(1.0),
+            Acceleration::from_meter_per_second_squared(1.0),
+            Jerk::from_meter_per_second_cubed(1.0),
+            Distance::from_meters(0.0),
+            Distance::from_meters(-3.0),
+            Speed::from_meter_per_second(1.0),
+            Speed::from_meter_per_second(0.0),
+            false,
         );
-        let mut current = Time::from_seconds(0.0);
-        let mut before = trajectory_fn(current);
-        while current < t_end {
-            current += period;
-            let target = trajectory_fn(current);
-            assert!(
-                ((target.v - before.v) / period).abs()
-                    <= a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.v - before.v) / period).abs(),
-                a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
-            );
-            assert!(
-                ((target.a - before.a) / period).abs()
-                    <= j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.a - before.a) / period).abs(),
-                j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
-            );
-            before = target;
-        }
     }
 
     #[test]
     fn test_straight_trajectory_with_corner_case1() {
-        let period = Time::from_seconds(0.001);
-        let v_max = AngularSpeed::from_degree_per_second(90.0);
-        let a_max = AngularAcceleration::from_degree_per_second_squared(45.0);
-        let j_max = AngularJerk::from_radian_per_second_cubed(10.0);
-        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
-        let (trajectory_fn, t_end) = generator.generate(
+        test_trajectory_fn(
+            Time::from_seconds(0.001),
+            AngularSpeed::from_degree_per_second(90.0),
+            AngularAcceleration::from_degree_per_second_squared(45.0),
+            AngularJerk::from_radian_per_second_cubed(10.0),
             Angle::from_degree(90.0),
             Angle::from_degree(90.0),
             AngularSpeed::from_radian_per_second(0.0),
             AngularSpeed::from_radian_per_second(0.0),
+            false,
         );
-        let mut current = Time::from_seconds(0.0);
-        let mut before = trajectory_fn(current);
-        while current < t_end {
-            current += period;
-            let target = trajectory_fn(current);
-            assert!(
-                ((target.x - before.x) / period).abs()
-                    <= v_max.abs() + AngularSpeed::from_radian_per_second(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.x - before.x) / period).abs(),
-                v_max.abs() + AngularSpeed::from_radian_per_second(EPSILON),
-            );
-            assert!(
-                ((target.v - before.v) / period).abs()
-                    <= a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.v - before.v) / period).abs(),
-                a_max.abs() + AngularAcceleration::from_radian_per_second_squared(EPSILON),
-            );
-            assert!(
-                ((target.a - before.a) / period).abs()
-                    <= j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.a - before.a) / period).abs(),
-                j_max.abs() + AngularJerk::from_radian_per_second_cubed(EPSILON),
-            );
-            before = target;
-        }
     }
+
+    #[test]
+    fn test_straight_trajectory_with_corner_case2() {
+        test_trajectory_fn(
+            Time::from_seconds(0.001),
+            Speed::from_meter_per_second(2.0),
+            Acceleration::from_meter_per_second_squared(1.0),
+            Jerk::from_meter_per_second_cubed(0.5),
+            Distance::from_meters(0.0),
+            Distance::from_meters(0.06),
+            Speed::from_meter_per_second(0.6),
+            Speed::from_meter_per_second(0.0),
+            true,
+        )
+    }
+
     #[test]
     fn test_straight_trajectory_2d() {
         let period = Time::from_seconds(0.001);
-        let v_max = Speed::from_meter_per_second(1.0);
-        let a_max = Acceleration::from_meter_per_second_squared(0.5);
-        let j_max = Jerk::from_meter_per_second_cubed(1.0);
+        let v_max = Speed::from_meter_per_second(2.0);
+        let a_max = Acceleration::from_meter_per_second_squared(1.0);
+        let j_max = Jerk::from_meter_per_second_cubed(0.5);
         let generator = StraightTrajectoryGenerator::new(v_max, a_max, j_max, period);
-        let x_end = Distance::from_meters(1.0);
-        let y_end = Distance::from_meters(1.0);
-        let trajectory = generator.generate(
-            Distance::from_meters(0.0),
-            Distance::from_meters(0.0),
-            Distance::from_meters(1.0),
-            Distance::from_meters(1.0),
-            Speed::from_meter_per_second(0.0),
+        let _trajectory = generator.generate(
+            Distance::from_meters(-0.06),
+            Distance::from_meters(0.16),
+            Distance::from_meters(-0.12),
+            Distance::from_meters(0.16),
+            Speed::from_meter_per_second(0.6),
             Speed::from_meter_per_second(0.0),
         );
-        let last = trajectory.last().unwrap();
-        assert!((last.x.x - x_end).abs().as_meters() < EPSILON);
-        assert!((last.y.x - y_end).abs().as_meters() < EPSILON);
     }
 }
