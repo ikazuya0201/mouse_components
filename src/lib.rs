@@ -6,6 +6,7 @@ pub mod agent;
 pub mod controller;
 pub mod estimator;
 pub mod maze;
+pub mod obstacle_detector;
 pub mod pattern;
 pub mod prelude;
 pub mod solver;

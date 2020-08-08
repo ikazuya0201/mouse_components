@@ -7,7 +7,7 @@ pub use crate::administrator::ObstacleInterpreter as _components_administrator_O
 pub use crate::administrator::Operator as _components_administrator_Operator;
 pub use crate::administrator::Solver as _components_administrator_Graph;
 
-pub use crate::agent::ObstacleCalculator as _components_agent_ObstacleCalculator;
+pub use crate::agent::ObstacleDetector as _components_agent_ObstacleDetector;
 pub use crate::agent::StateEstimator as _components_agent_StateEstimator;
 pub use crate::agent::Tracker as _components_agent_Tracker;
 pub use crate::agent::TrajectoryGenerator as _components_agent_TrajectoryGenerator;
