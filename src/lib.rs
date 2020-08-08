@@ -7,6 +7,7 @@ pub mod controller;
 pub mod estimator;
 pub mod maze;
 pub mod pattern;
+pub mod prelude;
 pub mod solver;
 pub mod tracker;
 pub mod trajectory_generator;
