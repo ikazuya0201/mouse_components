@@ -12,7 +12,7 @@ pub use agent::Agent;
 pub use counter::Counter;
 pub use maze::{DirectionInstructor, Graph, GraphConverter, NodeConverter, ObstacleInterpreter};
 use mode::{AtomicMode, FastRun, Idle, Mode, Search, Select};
-use operator::Operator;
+pub use operator::Operator;
 pub use solver::Solver;
 pub use switch::Switch;
 
