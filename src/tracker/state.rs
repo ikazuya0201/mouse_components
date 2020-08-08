@@ -4,14 +4,14 @@ use quantities::{Angle, Distance, Quantity, Time, TimeDifferentiable};
 
 use crate::{ddt, dt};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct State {
     pub x: SubState<Distance>,
     pub y: SubState<Distance>,
     pub theta: SubState<Angle>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SubState<T>
 where
     T: TimeDifferentiable + core::fmt::Debug,
