@@ -9,10 +9,10 @@ use heapless::{consts::*, spsc::Queue};
 use super::administrator;
 use crate::utils::mutex::Mutex;
 
-pub trait ObstacleCalculator<Obstacle, State> {
+pub trait ObstacleDetector<Obstacle, State> {
     type Obstacles: IntoIterator<Item = Obstacle>;
 
-    fn calculate(&self, state: State) -> Self::Obstacles;
+    fn detect(&self, state: State) -> Self::Obstacles;
 }
 
 pub trait StateEstimator<State> {
@@ -35,17 +35,17 @@ pub struct Agent<
     Pose,
     Obstacle,
     Direction,
-    IObstacleCalculator,
+    IObstacleDetector,
     IStateEstimator,
     ITracker,
     ITrajectoryGenerator,
 > where
-    IObstacleCalculator: ObstacleCalculator<Obstacle, State>,
+    IObstacleDetector: ObstacleDetector<Obstacle, State>,
     IStateEstimator: StateEstimator<State>,
     ITracker: Tracker<State, Target>,
     ITrajectoryGenerator: TrajectoryGenerator<Pose, Target, Direction>,
 {
-    obstacle_calculator: IObstacleCalculator,
+    obstacle_detector: IObstacleDetector,
     state_estimator: RefCell<IStateEstimator>,
     tracker: RefCell<ITracker>,
     trajectory_generator: ITrajectoryGenerator,
@@ -63,7 +63,7 @@ impl<
         Pose,
         Obstacle,
         Direction,
-        IObstacleCalculator,
+        IObstacleDetector,
         IStateEstimator,
         ITracker,
         ITrajectoryGenerator,
@@ -74,23 +74,23 @@ impl<
         Pose,
         Obstacle,
         Direction,
-        IObstacleCalculator,
+        IObstacleDetector,
         IStateEstimator,
         ITracker,
         ITrajectoryGenerator,
     >
 where
     Pose: Copy,
-    IObstacleCalculator: ObstacleCalculator<Obstacle, State>,
+    IObstacleDetector: ObstacleDetector<Obstacle, State>,
     IStateEstimator: StateEstimator<State>,
     ITracker: Tracker<State, Target>,
     ITrajectoryGenerator: TrajectoryGenerator<Pose, Target, Direction>,
 {
-    type Obstacles = IObstacleCalculator::Obstacles;
+    type Obstacles = IObstacleDetector::Obstacles;
 
     fn get_existing_obstacles(&self) -> Self::Obstacles {
         let state = self.state_estimator.borrow_mut().estimate();
-        self.obstacle_calculator.calculate(state)
+        self.obstacle_detector.detect(state)
     }
 
     fn set_instructed_direction(&self, pose: Pose, direction: Direction) {
