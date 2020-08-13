@@ -14,6 +14,7 @@ use typenum::{PowerOfTwo, Unsigned};
 use crate::administrator::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter};
 use crate::obstacle_detector::Obstacle;
 use crate::pattern::Pattern;
+use crate::utils::itertools::repeat_n;
 use crate::utils::mutex::Mutex;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, Position};
@@ -24,11 +25,10 @@ pub struct Maze<N, F>
 where
     N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    is_checked: RefCell<GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
-    is_wall: RefCell<GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
+    wall_existence_probs: RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
     costs: F,
     candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
 }
@@ -37,13 +37,16 @@ impl<N, F> Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
+    const CHECK_PROB_THRESHOLD: f32 = 0.05; //significance level
+
     pub fn new(costs: F) -> Self {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
         let maze = Self {
-            is_checked: RefCell::new(GenericArray::default()),
-            is_wall: RefCell::new(GenericArray::default()),
+            wall_existence_probs: RefCell::new(probs),
             costs,
             candidates: Mutex::new(Vec::new()),
         };
@@ -51,15 +54,9 @@ where
         maze
     }
 
-    pub fn from_bits(wall_bits: &[bool], checked_bits: &[bool], costs: F) -> Self {
-        let maze = Self {
-            is_checked: RefCell::new(GenericArray::default()),
-            is_wall: RefCell::new(GenericArray::default()),
-            costs,
-            candidates: Mutex::new(Vec::new()),
-        };
+    pub fn from_bits(wall_bits: &[bool], costs: F) -> Self {
+        let maze = Self::new(costs);
         maze.initialize_wall_from(wall_bits);
-        maze.initialize_checked_from(checked_bits);
         maze
     }
 
@@ -82,12 +79,6 @@ where
         }
     }
 
-    fn initialize_checked_from(&self, bits: &[bool]) {
-        for (i, &bit) in bits.into_iter().enumerate() {
-            self.update_checked_by_index(i, bit);
-        }
-    }
-
     pub fn check_wall(&self, position: WallPosition<N>, is_wall: bool) {
         self.check_wall_by_index(position.as_index(), is_wall);
     }
@@ -95,22 +86,17 @@ where
     #[inline]
     fn check_wall_by_index(&self, index: usize, is_wall: bool) {
         self.update_wall_by_index(index, is_wall);
-        self.update_checked_by_index(index, true);
     }
 
     #[inline]
     fn update_wall_by_index(&self, index: usize, is_wall: bool) {
-        self.is_wall.borrow_mut()[index] = is_wall;
-    }
-
-    #[inline]
-    fn update_checked_by_index(&self, index: usize, is_checked: bool) {
-        self.is_checked.borrow_mut()[index] = is_checked;
+        self.wall_existence_probs.borrow_mut()[index] = if is_wall { 1.0 } else { 0.0 };
     }
 
     #[inline]
     fn is_wall(&self, position: WallPosition<N>) -> bool {
-        self.is_wall.borrow()[position.as_index()]
+        let prob = self.wall_existence_probs.borrow()[position.as_index()];
+        return prob > 1.0 - Self::CHECK_PROB_THRESHOLD;
     }
 
     fn is_wall_by_position(&self, position: Position<N>) -> bool {
@@ -123,7 +109,8 @@ where
 
     #[inline]
     fn is_checked(&self, position: WallPosition<N>) -> bool {
-        self.is_checked.borrow()[position.as_index()]
+        let prob = self.wall_existence_probs.borrow()[position.as_index()];
+        return prob < Self::CHECK_PROB_THRESHOLD || prob > 1.0 - Self::CHECK_PROB_THRESHOLD;
     }
 
     fn is_checked_by_position(&self, position: Position<N>) -> bool {
@@ -175,7 +162,7 @@ where
     <N as Mul<U2>>::Output: Add<U10>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -369,7 +356,7 @@ where
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -411,7 +398,7 @@ impl<N, F> Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -462,7 +449,7 @@ where
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -481,7 +468,7 @@ impl<N, F> Graph<SearchNodeId<N>, u16> for Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -500,7 +487,7 @@ impl<N, F> Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<SearchNodeId<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
     F: Fn(Pattern) -> u16,
@@ -632,7 +619,7 @@ impl<N, F> GraphConverter<NodeId<N>, SearchNodeId<N>> for Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<SearchNodeId<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Node<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
@@ -744,7 +731,7 @@ impl<N, F> DirectionInstructor<SearchNodeId<N>, RelativeDirection> for Maze<N, F
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
     fn update_node_candidates<SearchNodes: IntoIterator<Item = SearchNodeId<N>>>(
@@ -778,7 +765,7 @@ impl<N, F> Maze<N, F>
 where
     N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
     const SQUARE_WIDTH: i32 = 9; //TODO: use configurable value
@@ -800,7 +787,7 @@ impl<N, F> ObstacleInterpreter<Obstacle> for Maze<N, F>
 where
     N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {

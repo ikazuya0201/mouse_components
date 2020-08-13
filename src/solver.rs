@@ -8,6 +8,7 @@ use heapless::{consts::*, ArrayLength, Vec};
 use num::{Bounded, Saturating};
 
 use super::administrator;
+use crate::utils::itertools::repeat_n;
 
 pub struct Solver<Node, SearchNode, Max, GSize>
 where
@@ -31,13 +32,6 @@ where
             _search_node: PhantomData,
         }
     }
-}
-
-fn repeat_n<T>(val: T, count: usize) -> impl Iterator<Item = T>
-where
-    T: Clone,
-{
-    core::iter::repeat(val).take(count)
 }
 
 impl<Node, SearchNode, Cost, Graph, Max, GSize> administrator::Solver<Node, SearchNode, Cost, Graph>
