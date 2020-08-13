@@ -8,9 +8,11 @@ use core::ops::{Add, Mul};
 
 use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
+use quantities::Distance;
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::administrator::{DirectionInstructor, Graph, GraphConverter};
+use crate::administrator::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter};
+use crate::obstacle_detector::Obstacle;
 use crate::pattern::Pattern;
 use crate::utils::mutex::Mutex;
 pub use direction::{AbsoluteDirection, RelativeDirection};
@@ -769,6 +771,42 @@ where
             }
         }
         None
+    }
+}
+
+impl<N, F> Maze<N, F>
+where
+    N: Mul<N>,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    F: Fn(Pattern) -> u16,
+{
+    const SQUARE_WIDTH: i32 = 9; //TODO: use configurable value
+
+    //(remainder, quotient)
+    fn remquof_with_width(val: f32) -> (f32, i32) {
+        let quo = val as i32 / Self::SQUARE_WIDTH;
+        let rem = val - (quo * Self::SQUARE_WIDTH) as f32;
+        (rem, quo)
+    }
+
+    fn interpret_obstacle(&self, obstacle: Obstacle) {
+        let (x_rem, x_quo) = Self::remquof_with_width(obstacle.x.as_meters());
+        let (y_rem, y_quo) = Self::remquof_with_width(obstacle.y.as_meters());
+    }
+}
+
+impl<N, F> ObstacleInterpreter<Obstacle> for Maze<N, F>
+where
+    N: Mul<N>,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    F: Fn(Pattern) -> u16,
+{
+    fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
+        for obstacle in obstacles {
+            self.interpret_obstacle(obstacle);
+        }
     }
 }
 
