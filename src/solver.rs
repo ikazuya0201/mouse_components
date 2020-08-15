@@ -103,14 +103,7 @@ where
             return None;
         }
 
-        //bubble sort
-        for i in 0..candidates.len() {
-            for j in 0..candidates.len() - i - 1 {
-                if candidates[j].1 > candidates[j + 1].1 {
-                    candidates.swap(j, j + 1);
-                }
-            }
-        }
+        candidates.sort_unstable();
         Some(candidates.into_iter().map(|(node, _)| node).collect())
     }
 
