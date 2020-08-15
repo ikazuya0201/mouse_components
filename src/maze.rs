@@ -1,5 +1,6 @@
 mod direction;
 mod node;
+mod obstacle_converter;
 mod wall;
 
 use core::cell::RefCell;
@@ -19,11 +20,12 @@ use crate::utils::mutex::Mutex;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, Position};
 pub use node::{NodeId, SearchNodeId};
+pub use obstacle_converter::{ObstacleConverter, WallInfo};
 pub use wall::{WallDirection, WallPosition};
 
 pub struct Maze<N, F>
 where
-    N: Mul<N>,
+    N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
@@ -31,6 +33,7 @@ where
     wall_existence_probs: RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
     costs: F,
     candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
+    converter: ObstacleConverter<N>,
 }
 
 impl<N, F> Maze<N, F>
@@ -49,6 +52,7 @@ where
             wall_existence_probs: RefCell::new(probs),
             costs,
             candidates: Mutex::new(Vec::new()),
+            converter: ObstacleConverter::new(),
         };
         maze.initialize();
         maze
@@ -63,11 +67,11 @@ where
     fn initialize(&self) {
         for i in 0..WallPosition::<N>::max() + 1 {
             self.check_wall(
-                WallPosition::new(i, WallPosition::<N>::max(), WallDirection::Up),
+                WallPosition::new(i, WallPosition::<N>::max(), WallDirection::Up).unwrap(),
                 true,
             );
             self.check_wall(
-                WallPosition::new(WallPosition::<N>::max(), i, WallDirection::Right),
+                WallPosition::new(WallPosition::<N>::max(), i, WallDirection::Right).unwrap(),
                 true,
             );
         }
@@ -761,38 +765,38 @@ where
     }
 }
 
-impl<N, F> Maze<N, F>
-where
-    N: Mul<N>,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
-{
-    const SQUARE_WIDTH: i32 = 9; //TODO: use configurable value
-
-    //(remainder, quotient)
-    fn remquof_with_width(val: f32) -> (f32, i32) {
-        let quo = val as i32 / Self::SQUARE_WIDTH;
-        let rem = val - (quo * Self::SQUARE_WIDTH) as f32;
-        (rem, quo)
-    }
-
-    fn interpret_obstacle(&self, obstacle: Obstacle) {
-        let (x_rem, x_quo) = Self::remquof_with_width(obstacle.x.as_meters());
-        let (y_rem, y_quo) = Self::remquof_with_width(obstacle.y.as_meters());
-    }
-}
-
 impl<N, F> ObstacleInterpreter<Obstacle> for Maze<N, F>
 where
-    N: Mul<N>,
+    N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
+        fn calculate_likelihood(expected: Distance, observed: Distance, sigma: Distance) -> f32 {
+            let base = (expected - observed) / sigma;
+            libm::expf(-base * base / 2.0) / sigma.as_meters()
+        }
+
+        let mut probs = self.wall_existence_probs.borrow_mut();
         for obstacle in obstacles {
-            self.interpret_obstacle(obstacle);
+            if let Ok(wall_info) = self.converter.convert(obstacle.source) {
+                let index = wall_info.position.as_index();
+                let existence_prob = probs[index];
+                let exist_val = existence_prob
+                    * calculate_likelihood(
+                        wall_info.existing_distance,
+                        obstacle.distance.mean,
+                        obstacle.distance.standard_deviation,
+                    );
+                let not_exist_val = (1.0 - existence_prob)
+                    * calculate_likelihood(
+                        wall_info.not_existing_distance,
+                        obstacle.distance.mean,
+                        obstacle.distance.standard_deviation,
+                    );
+                probs[index] = exist_val / (exist_val + not_exist_val);
+            }
         }
     }
 }
@@ -1045,7 +1049,7 @@ mod tests {
 
         let new = |x, y, direction| NodeId::<U4>::new(x, y, direction).unwrap();
         let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
-        let new_wall = |x, y, z| WallPosition::new(x, y, z);
+        let new_wall = |x, y, z| WallPosition::new(x, y, z).unwrap();
 
         let test_data = vec![
             (
@@ -1143,7 +1147,7 @@ mod tests {
         use RelativeDirection::*;
 
         let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
-        let new_wall = |x, y, z| WallPosition::new(x, y, z);
+        let new_wall = |x, y, z| WallPosition::new(x, y, z).unwrap();
 
         let test_data = vec![(
             (

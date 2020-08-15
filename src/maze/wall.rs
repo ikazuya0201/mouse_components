@@ -4,13 +4,13 @@ use typenum::{PowerOfTwo, Unsigned};
 
 use super::{Location, Position};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum WallDirection {
     Up,
     Right,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WallPosition<N> {
     x: u16,
     y: u16,
@@ -22,7 +22,15 @@ impl<N> WallPosition<N>
 where
     N: Unsigned + PowerOfTwo,
 {
-    pub fn new(x: u16, y: u16, z: WallDirection) -> Self {
+    pub fn new(x: u16, y: u16, z: WallDirection) -> Option<Self> {
+        if x > Self::max() || y > Self::max() {
+            None
+        } else {
+            Some(Self::new_unchecked(x, y, z))
+        }
+    }
+
+    fn new_unchecked(x: u16, y: u16, z: WallDirection) -> Self {
         Self {
             x,
             y,
@@ -64,6 +72,6 @@ where
             HorizontalBound => WallDirection::Up,
             VerticalBound => WallDirection::Right,
         };
-        Some(Self::new(x as u16, y as u16, z))
+        Some(Self::new_unchecked(x as u16, y as u16, z))
     }
 }

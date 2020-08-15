@@ -4,14 +4,15 @@ use generic_array::{ArrayLength, GenericArray};
 use heapless::Vec;
 use quantities::Distance;
 
-use crate::agent;
+use crate::agent::{self, Pose};
 use crate::tracker::State;
+use crate::utils::sample::Sample;
 use distance_sensor::DistanceSensor;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Obstacle {
-    pub x: Distance,
-    pub y: Distance,
+    pub source: Pose,
+    pub distance: Sample<Distance>,
 }
 
 pub struct ObstacleDetector<D, N>
@@ -48,8 +49,8 @@ where
                 let y = state.y.x + pose.y;
                 let theta = state.theta.x + pose.theta;
                 let obstacle = Obstacle {
-                    x: x + distance * theta.cos(),
-                    y: y + distance * theta.sin(),
+                    source: Pose { x, y, theta },
+                    distance,
                 };
                 obstacles.push(obstacle).unwrap();
             }
@@ -68,11 +69,11 @@ mod tests {
 
     struct IDistanceSensor {
         pose: Pose,
-        distance: Option<Distance>,
+        distance: Option<Sample<Distance>>,
     }
 
     impl IDistanceSensor {
-        fn new(pose: Pose, distance: Option<Distance>) -> Self {
+        fn new(pose: Pose, distance: Option<Sample<Distance>>) -> Self {
             Self { pose, distance }
         }
     }
@@ -84,8 +85,8 @@ mod tests {
             self.pose
         }
 
-        fn get_distance(&mut self) -> nb::Result<Distance, Self::Error> {
-            self.distance.ok_or(nb::Error::Other(()))
+        fn get_distance(&mut self) -> nb::Result<Sample<Distance>, Self::Error> {
+            self.distance.clone().ok_or(nb::Error::Other(()))
         }
     }
 
@@ -93,6 +94,7 @@ mod tests {
     fn test_detect() {
         use generic_array::arr;
 
+        let standard_deviation = Distance::from_meters(0.001);
         let sensors = arr![
             IDistanceSensor;
             IDistanceSensor::new(
@@ -101,7 +103,10 @@ mod tests {
                     y: Distance::from_meters(0.015),
                     theta: Angle::from_degree(0.0),
                 },
-                Some(Distance::from_meters(0.03)),
+                Some( Sample{
+                    mean: Distance::from_meters(0.03),
+                    standard_deviation,
+                }),
             ),
             IDistanceSensor::new(
                 Pose {
@@ -117,25 +122,35 @@ mod tests {
                     y: Distance::from_meters(0.025),
                     theta: Angle::from_degree(90.0),
                 },
-                Some(Distance::from_meters(0.02)),
+                Some(Sample{
+                    mean:Distance::from_meters(0.02),
+                    standard_deviation,
+                }
+                    ),
             ),
         ];
         let expected = vec![
-            Obstacle {
-                x: Distance::from_meters(0.045),
+            Pose {
+                x: Distance::from_meters(0.015),
                 y: Distance::from_meters(0.015),
+                theta: Angle::from_degree(0.0),
             },
-            Obstacle {
+            Pose {
                 x: Distance::from_meters(0.0),
-                y: Distance::from_meters(0.045),
+                y: Distance::from_meters(0.025),
+                theta: Angle::from_degree(90.0),
             },
         ];
 
         let mut detector = ObstacleDetector::new(sensors);
         let obstacles = agent::ObstacleDetector::detect(&mut detector, Default::default());
         for (obstacle, expected) in obstacles.into_iter().zip(expected.into_iter()) {
-            assert_relative_eq!(obstacle.x.as_meters(), expected.x.as_meters());
-            assert_relative_eq!(obstacle.y.as_meters(), expected.y.as_meters());
+            assert_relative_eq!(obstacle.source.x.as_meters(), expected.x.as_meters());
+            assert_relative_eq!(obstacle.source.y.as_meters(), expected.y.as_meters());
+            assert_relative_eq!(
+                obstacle.source.theta.as_radian(),
+                expected.theta.as_radian()
+            );
         }
     }
 }

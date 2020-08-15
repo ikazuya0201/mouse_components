@@ -31,7 +31,7 @@ fn test_compute_shortest_path_u4() {
     use AbsoluteDirection::*;
 
     let new = |x, y, dir| NodeId::<U4>::new(x, y, dir).unwrap();
-    let new_wall = |x, y, z| WallPosition::<U4>::new(x, y, z);
+    let new_wall = |x, y, z| WallPosition::<U4>::new(x, y, z).unwrap();
 
     let start = new(0, 0, North);
     let goals = arr![NodeId<U4>; new(2,0,West), new(2,0,South)];
@@ -85,7 +85,7 @@ fn test_next_node_candidates_u4() {
 
     let new = |x, y, dir| NodeId::<U4>::new(x, y, dir).unwrap();
     let new_search = |x, y, dir| SearchNodeId::<U4>::new(x, y, dir).unwrap();
-    let new_wall = |x, y, z| WallPosition::<U4>::new(x, y, z);
+    let new_wall = |x, y, z| WallPosition::<U4>::new(x, y, z).unwrap();
 
     let start = new(0, 0, North);
     let goals = arr![NodeId<U4>; new(2,0,West), new(2,0,South)];
