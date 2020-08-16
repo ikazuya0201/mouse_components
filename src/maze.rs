@@ -20,7 +20,7 @@ use crate::utils::mutex::Mutex;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, Position};
 pub use node::{NodeId, SearchNodeId};
-pub use pose_converter::{PoseConverter, WallInfo};
+use pose_converter::PoseConverter;
 pub use wall::{WallDirection, WallPosition};
 
 pub struct Maze<N, F>
