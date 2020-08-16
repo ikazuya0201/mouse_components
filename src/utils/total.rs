@@ -1,4 +1,4 @@
-#[derive(PartialEq, PartialOrd, Copy, Clone)]
+#[derive(PartialEq, PartialOrd, Copy, Clone, Debug)]
 pub struct Total<T>(pub T);
 
 impl<T: PartialEq> Eq for Total<T> {}
