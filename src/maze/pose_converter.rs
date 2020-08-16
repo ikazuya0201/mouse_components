@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use generic_array::GenericArray;
 use quantities::{Distance, Quantity};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
@@ -27,49 +25,73 @@ enum Axis {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OutOfBoundError;
 
-pub struct ObstacleConverter<N> {
-    _phantom: PhantomData<fn() -> N>,
+pub struct PoseConverter {
+    i_square_width: i32, //[mm]
+    p1: Distance,
+    p2: Distance,
+    n1: Distance,
+    n2: Distance,
 }
 
-impl<N> ObstacleConverter<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
-    const I_SQUARE_WIDTH: i32 = 9; //TODO: use configurable value
-    const SQUARE_WIDTH: Distance = Distance::from_meters(0.09);
-    const WALL_WIDTH_HALF: Distance = Distance::from_meters(0.003);
-
-    pub fn new() -> Self {
+impl PoseConverter {
+    pub fn new(square_width: Distance, wall_width: Distance) -> Self {
+        let p1 = square_width - wall_width / 2.0;
+        let p2 = p1 + square_width;
+        let n1 = wall_width / 2.0;
+        let n2 = n1 - square_width;
         Self {
-            _phantom: PhantomData,
+            i_square_width: (square_width.as_meters() * 1000.0) as i32,
+            p1,
+            p2,
+            n1,
+            n2,
         }
     }
 
     //(remainder, quotient)
-    fn remquof_with_width(val: Distance) -> (Distance, i32) {
-        let quo = (val.as_meters() * 1000.0) as i32 / Self::I_SQUARE_WIDTH;
-        let rem = val - Distance::from_meters((quo * Self::I_SQUARE_WIDTH) as f32 * 0.001);
+    fn remquof_with_width(&self, val: Distance) -> (Distance, i32) {
+        let quo = (val.as_meters() * 1000.0) as i32 / self.i_square_width;
+        let rem = val - Distance::from_meters((quo * self.i_square_width) as f32 * 0.001);
         (rem, quo)
     }
 
-    pub fn convert(&self, pose: Pose) -> Result<WallInfo<N>, OutOfBoundError> {
-        let (x_rem, x_quo) = Self::remquof_with_width(pose.x);
-        let (y_rem, y_quo) = Self::remquof_with_width(pose.y);
+    pub fn convert<N>(&self, pose: Pose) -> Result<WallInfo<N>, OutOfBoundError>
+    where
+        N: Unsigned + PowerOfTwo,
+    {
+        let (x_rem, x_quo) = self.remquof_with_width(pose.x);
+        let (y_rem, y_quo) = self.remquof_with_width(pose.y);
+
         let rot = pose.theta.as_bounded_rotation();
 
-        let p1 = Self::SQUARE_WIDTH - Self::WALL_WIDTH_HALF;
-        let p2 = p1 + Self::SQUARE_WIDTH;
-        let n1 = Self::WALL_WIDTH_HALF;
-        let n2 = n1 - Self::SQUARE_WIDTH;
-
         let axes = if rot < 0.25 {
-            [Axis::X(p1), Axis::X(p2), Axis::Y(p1), Axis::Y(p2)]
+            [
+                Axis::X(self.p1),
+                Axis::X(self.p2),
+                Axis::Y(self.p1),
+                Axis::Y(self.p2),
+            ]
         } else if rot < 0.5 {
-            [Axis::X(n1), Axis::X(n2), Axis::Y(p1), Axis::Y(p2)]
+            [
+                Axis::X(self.n1),
+                Axis::X(self.n2),
+                Axis::Y(self.p1),
+                Axis::Y(self.p2),
+            ]
         } else if rot < 0.75 {
-            [Axis::X(n1), Axis::X(n2), Axis::Y(n1), Axis::Y(n2)]
+            [
+                Axis::X(self.n1),
+                Axis::X(self.n2),
+                Axis::Y(self.n1),
+                Axis::Y(self.n2),
+            ]
         } else {
-            [Axis::X(p1), Axis::X(p2), Axis::Y(n1), Axis::Y(n2)]
+            [
+                Axis::X(self.p1),
+                Axis::X(self.p2),
+                Axis::Y(self.n1),
+                Axis::Y(self.n2),
+            ]
         };
 
         let (sin_th, cos_th) = libm::sincosf(pose.theta.as_radian());

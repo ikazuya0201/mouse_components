@@ -4,7 +4,7 @@ use heapless::consts::*;
 
 use components::{
     administrator,
-    maze::{AbsoluteDirection, Maze, NodeId, SearchNodeId, WallDirection, WallPosition},
+    maze::{AbsoluteDirection, MazeBuilder, NodeId, SearchNodeId, WallDirection, WallPosition},
     pattern::Pattern,
     solver::Solver,
 };
@@ -69,7 +69,7 @@ fn test_compute_shortest_path_u4() {
     ];
 
     for (walls, expected) in test_data {
-        let maze = Maze::<U4, _>::new(cost);
+        let maze = MazeBuilder::new().costs(cost).build::<U4>();
         for wall in walls {
             maze.check_wall(wall, true);
         }
@@ -106,7 +106,7 @@ fn test_next_node_candidates_u4() {
     )];
 
     for (current, walls, expected) in test_data {
-        let maze = Maze::<U4, _>::new(cost);
+        let maze = MazeBuilder::new().costs(cost).build::<U4>();
         for (wall, exists) in walls {
             maze.check_wall(wall, exists);
         }
