@@ -3,10 +3,9 @@ extern crate components;
 use heapless::consts::*;
 
 use components::{
-    administrator,
-    maze::{AbsoluteDirection, MazeBuilder, NodeId, SearchNodeId, WallDirection, WallPosition},
-    pattern::Pattern,
-    solver::Solver,
+    data_types::{AbsoluteDirection, NodeId, Pattern, SearchNodeId, WallDirection, WallPosition},
+    impls::{MazeBuilder, Solver},
+    prelude::*,
 };
 
 fn cost(pattern: Pattern) -> u16 {
@@ -73,7 +72,7 @@ fn test_compute_shortest_path_u4() {
         for wall in walls {
             maze.check_wall(wall, true);
         }
-        let path = administrator::Solver::compute_shortest_path(&solver, &maze);
+        let path = solver.compute_shortest_path(&maze);
         assert_eq!(path.unwrap(), expected.as_slice());
     }
 }
@@ -110,7 +109,7 @@ fn test_next_node_candidates_u4() {
         for (wall, exists) in walls {
             maze.check_wall(wall, exists);
         }
-        let candidates = administrator::Solver::next_node_candidates(&solver, current, &maze);
+        let candidates = solver.next_node_candidates(current, &maze);
         assert_eq!(candidates.unwrap(), expected.as_slice());
     }
 }
