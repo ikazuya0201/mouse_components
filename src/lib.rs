@@ -18,6 +18,7 @@ pub mod sensors {
     use super::*;
 
     pub use estimator::{Encoder, IMU};
+    pub use obstacle_detector::distance_sensor::DistanceSensor;
     pub use tracker::Motor;
 }
 
@@ -47,4 +48,69 @@ pub mod impls {
     pub use solver::Solver;
     pub use tracker::{Tracker, TrackerBuilder};
     pub use trajectory_generator::{TrajectoryGenerator, TrajectoryGeneratorBuilder};
+}
+
+pub mod defaults {
+    use super::{data_types::*, impls::*};
+    use quantities::{Angle, Distance};
+
+    pub type DefaultTracker<LeftMotor, RightMotor> =
+        Tracker<LeftMotor, RightMotor, Controller<Distance>, Controller<Angle>>;
+
+    pub type DefaultAgent<
+        LeftMotor,
+        RightMotor,
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        DistanceSensor,
+        DistanceSensorNum,
+    > = Agent<
+        State,
+        Target,
+        Pose,
+        Obstacle,
+        RelativeDirection,
+        ObstacleDetector<DistanceSensor, DistanceSensorNum>,
+        Estimator<LeftEncoder, RightEncoder, Imu>,
+        DefaultTracker<LeftMotor, RightMotor>,
+        TrajectoryGenerator,
+    >;
+
+    pub type DefaultMaze<MazeWidth> = Maze<MazeWidth, fn(Pattern) -> u16>;
+
+    pub type DefaultSolver<MazeWidth, MaxSize, GoalSize> =
+        Solver<NodeId<MazeWidth>, SearchNodeId<MazeWidth>, MaxSize, GoalSize>;
+
+    pub type DefaultSearchOperator<
+        LeftMotor,
+        RightMotor,
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        DistanceSensor,
+        DistanceSensorNum,
+        MazeWidth,
+        MaxSize,
+        GoalSize,
+    > = SearchOperator<
+        'static,
+        NodeId<MazeWidth>,
+        SearchNodeId<MazeWidth>,
+        u16,
+        RelativeDirection,
+        Obstacle,
+        Pose,
+        DefaultMaze<MazeWidth>,
+        DefaultAgent<
+            LeftMotor,
+            RightMotor,
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            DistanceSensor,
+            DistanceSensorNum,
+        >,
+        DefaultSolver<MazeWidth, MaxSize, GoalSize>,
+    >;
 }
