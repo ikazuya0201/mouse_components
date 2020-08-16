@@ -1,5 +1,6 @@
 mod direction;
 mod node;
+mod pose_converter;
 mod wall;
 
 use core::cell::RefCell;
@@ -8,81 +9,52 @@ use core::ops::{Add, Mul};
 
 use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
+use quantities::Distance;
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::administrator::{DirectionInstructor, Graph, GraphConverter};
+use crate::administrator::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter};
+use crate::obstacle_detector::Obstacle;
 use crate::pattern::Pattern;
+use crate::utils::itertools::repeat_n;
 use crate::utils::mutex::Mutex;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, Position};
 pub use node::{NodeId, SearchNodeId};
+pub use pose_converter::{PoseConverter, WallInfo};
 pub use wall::{WallDirection, WallPosition};
 
 pub struct Maze<N, F>
 where
-    N: Mul<N>,
+    N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    is_checked: RefCell<GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
-    is_wall: RefCell<GenericArray<bool, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
+    wall_existence_probs: RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
     costs: F,
     candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
+    converter: PoseConverter,
 }
 
 impl<N, F> Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    pub fn new(costs: F) -> Self {
-        let maze = Self {
-            is_checked: RefCell::new(GenericArray::default()),
-            is_wall: RefCell::new(GenericArray::default()),
-            costs,
-            candidates: Mutex::new(Vec::new()),
-        };
-        maze.initialize();
-        maze
-    }
-
-    pub fn from_bits(wall_bits: &[bool], checked_bits: &[bool], costs: F) -> Self {
-        let maze = Self {
-            is_checked: RefCell::new(GenericArray::default()),
-            is_wall: RefCell::new(GenericArray::default()),
-            costs,
-            candidates: Mutex::new(Vec::new()),
-        };
-        maze.initialize_wall_from(wall_bits);
-        maze.initialize_checked_from(checked_bits);
-        maze
-    }
+    const CHECK_PROB_THRESHOLD: f32 = 0.05; //significance level
 
     fn initialize(&self) {
         for i in 0..WallPosition::<N>::max() + 1 {
             self.check_wall(
-                WallPosition::new(i, WallPosition::<N>::max(), WallDirection::Up),
+                WallPosition::new(i, WallPosition::<N>::max(), WallDirection::Up).unwrap(),
                 true,
             );
             self.check_wall(
-                WallPosition::new(WallPosition::<N>::max(), i, WallDirection::Right),
+                WallPosition::new(WallPosition::<N>::max(), i, WallDirection::Right).unwrap(),
                 true,
             );
-        }
-    }
-
-    fn initialize_wall_from(&self, bits: &[bool]) {
-        for (i, &bit) in bits.into_iter().enumerate() {
-            self.update_wall_by_index(i, bit);
-        }
-    }
-
-    fn initialize_checked_from(&self, bits: &[bool]) {
-        for (i, &bit) in bits.into_iter().enumerate() {
-            self.update_checked_by_index(i, bit);
         }
     }
 
@@ -93,22 +65,17 @@ where
     #[inline]
     fn check_wall_by_index(&self, index: usize, is_wall: bool) {
         self.update_wall_by_index(index, is_wall);
-        self.update_checked_by_index(index, true);
     }
 
     #[inline]
     fn update_wall_by_index(&self, index: usize, is_wall: bool) {
-        self.is_wall.borrow_mut()[index] = is_wall;
-    }
-
-    #[inline]
-    fn update_checked_by_index(&self, index: usize, is_checked: bool) {
-        self.is_checked.borrow_mut()[index] = is_checked;
+        self.wall_existence_probs.borrow_mut()[index] = if is_wall { 1.0 } else { 0.0 };
     }
 
     #[inline]
     fn is_wall(&self, position: WallPosition<N>) -> bool {
-        self.is_wall.borrow()[position.as_index()]
+        let prob = self.wall_existence_probs.borrow()[position.as_index()];
+        return prob > 1.0 - Self::CHECK_PROB_THRESHOLD;
     }
 
     fn is_wall_by_position(&self, position: Position<N>) -> bool {
@@ -121,7 +88,8 @@ where
 
     #[inline]
     fn is_checked(&self, position: WallPosition<N>) -> bool {
-        self.is_checked.borrow()[position.as_index()]
+        let prob = self.wall_existence_probs.borrow()[position.as_index()];
+        return prob < Self::CHECK_PROB_THRESHOLD || prob > 1.0 - Self::CHECK_PROB_THRESHOLD;
     }
 
     fn is_checked_by_position(&self, position: Position<N>) -> bool {
@@ -173,7 +141,7 @@ where
     <N as Mul<U2>>::Output: Add<U10>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -367,7 +335,7 @@ where
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -409,7 +377,7 @@ impl<N, F> Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -460,7 +428,7 @@ where
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -479,7 +447,7 @@ impl<N, F> Graph<SearchNodeId<N>, u16> for Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
@@ -498,7 +466,7 @@ impl<N, F> Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<SearchNodeId<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
     F: Fn(Pattern) -> u16,
@@ -630,7 +598,7 @@ impl<N, F> GraphConverter<NodeId<N>, SearchNodeId<N>> for Maze<N, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<SearchNodeId<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Node<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
@@ -742,7 +710,7 @@ impl<N, F> DirectionInstructor<SearchNodeId<N>, RelativeDirection> for Maze<N, F
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<bool>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
     fn update_node_candidates<SearchNodes: IntoIterator<Item = SearchNodeId<N>>>(
@@ -772,6 +740,140 @@ where
     }
 }
 
+impl<N, F> ObstacleInterpreter<Obstacle> for Maze<N, F>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    F: Fn(Pattern) -> u16,
+{
+    fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
+        fn calculate_likelihood(expected: Distance, observed: Distance, sigma: Distance) -> f32 {
+            let base = (expected - observed) / sigma;
+            libm::expf(-base * base / 2.0) / sigma.as_meters()
+        }
+
+        let mut probs = self.wall_existence_probs.borrow_mut();
+        for obstacle in obstacles {
+            if let Ok(wall_info) = self.converter.convert::<N>(obstacle.source) {
+                let index = wall_info.position.as_index();
+                let existence_prob = probs[index];
+                let exist_val = existence_prob
+                    * calculate_likelihood(
+                        wall_info.existing_distance,
+                        obstacle.distance.mean,
+                        obstacle.distance.standard_deviation,
+                    );
+                let not_exist_val = (1.0 - existence_prob)
+                    * calculate_likelihood(
+                        wall_info.not_existing_distance,
+                        obstacle.distance.mean,
+                        obstacle.distance.standard_deviation,
+                    );
+                probs[index] = exist_val / (exist_val + not_exist_val);
+            }
+        }
+    }
+}
+
+pub struct MazeBuilder<C, SW, WW> {
+    costs: C,
+    square_width: SW,
+    wall_width: WW,
+}
+
+impl MazeBuilder<(), (), ()> {
+    pub fn new() -> Self {
+        Self {
+            costs: (),
+            square_width: (),
+            wall_width: (),
+        }
+    }
+}
+
+impl<C> MazeBuilder<C, (), ()>
+where
+    C: Fn(Pattern) -> u16,
+{
+    const DEFAULT_SQUARE_WIDTH: Distance = Distance::from_meters(0.09);
+    const DEFAULT_WALL_WIDTH: Distance = Distance::from_meters(0.006);
+
+    pub fn build<N>(self) -> Maze<N, C>
+    where
+        N: Mul<N> + Unsigned + PowerOfTwo,
+        <N as Mul<N>>::Output: Mul<U2>,
+        <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
+        let maze = Maze {
+            wall_existence_probs: RefCell::new(probs),
+            costs: self.costs,
+            candidates: Mutex::new(Vec::new()),
+            converter: PoseConverter::new(Self::DEFAULT_SQUARE_WIDTH, Self::DEFAULT_WALL_WIDTH),
+        };
+        maze.initialize();
+        maze
+    }
+}
+
+impl<C> MazeBuilder<C, Distance, Distance>
+where
+    C: Fn(Pattern) -> u16,
+{
+    pub fn build<N>(self) -> Maze<N, C>
+    where
+        N: Mul<N> + Unsigned + PowerOfTwo,
+        <N as Mul<N>>::Output: Mul<U2>,
+        <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
+        let maze = Maze {
+            wall_existence_probs: RefCell::new(probs),
+            costs: self.costs,
+            candidates: Mutex::new(Vec::new()),
+            converter: PoseConverter::new(self.square_width, self.wall_width),
+        };
+        maze.initialize();
+        maze
+    }
+}
+
+impl<SW, WW> MazeBuilder<(), SW, WW> {
+    pub fn costs<C>(self, costs: C) -> MazeBuilder<C, SW, WW>
+    where
+        C: Fn(Pattern) -> u16,
+    {
+        MazeBuilder {
+            costs,
+            square_width: self.square_width,
+            wall_width: self.wall_width,
+        }
+    }
+}
+
+impl<C, WW> MazeBuilder<C, (), WW> {
+    pub fn square_width(self, square_width: Distance) -> MazeBuilder<C, Distance, WW> {
+        MazeBuilder {
+            costs: self.costs,
+            square_width,
+            wall_width: self.wall_width,
+        }
+    }
+}
+
+impl<C, SW> MazeBuilder<C, SW, ()> {
+    pub fn wall_width(self, wall_width: Distance) -> MazeBuilder<C, SW, Distance> {
+        MazeBuilder {
+            costs: self.costs,
+            square_width: self.square_width,
+            wall_width,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -797,7 +899,7 @@ mod tests {
         use AbsoluteDirection::*;
         use Pattern::*;
 
-        let maze = Maze::<U4, _>::new(cost);
+        let maze = MazeBuilder::new().costs(cost).build::<U4>();
 
         let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
             NodeId::<U4>::new(x, y, direction).unwrap()
@@ -887,7 +989,7 @@ mod tests {
         use AbsoluteDirection::*;
         use Pattern::*;
 
-        let maze = Maze::<U4, _>::new(cost);
+        let maze = MazeBuilder::new().costs(cost).build::<U4>();
 
         let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
             NodeId::<U4>::new(x, y, direction).unwrap()
@@ -943,7 +1045,7 @@ mod tests {
         use AbsoluteDirection::*;
         use Pattern::*;
 
-        let maze = Maze::<U4, _>::new(cost);
+        let maze = MazeBuilder::new().costs(cost).build::<U4>();
 
         let new = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
 
@@ -981,7 +1083,7 @@ mod tests {
         use AbsoluteDirection::*;
         use Pattern::*;
 
-        let maze = Maze::<U4, _>::new(cost);
+        let maze = MazeBuilder::new().costs(cost).build::<U4>();
 
         let new = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
 
@@ -1020,7 +1122,7 @@ mod tests {
 
         let new = |x, y, direction| NodeId::<U4>::new(x, y, direction).unwrap();
         let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
-        let new_wall = |x, y, z| WallPosition::new(x, y, z);
+        let new_wall = |x, y, z| WallPosition::new(x, y, z).unwrap();
 
         let test_data = vec![
             (
@@ -1101,7 +1203,7 @@ mod tests {
         ];
 
         for (walls, path, mut expected) in test_data {
-            let maze = Maze::<U4, _>::new(cost);
+            let maze = MazeBuilder::new().costs(cost).build::<U4>();
             for wall in walls {
                 maze.check_wall(wall, true);
             }
@@ -1118,7 +1220,7 @@ mod tests {
         use RelativeDirection::*;
 
         let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
-        let new_wall = |x, y, z| WallPosition::new(x, y, z);
+        let new_wall = |x, y, z| WallPosition::new(x, y, z).unwrap();
 
         let test_data = vec![(
             (
@@ -1140,7 +1242,7 @@ mod tests {
         )];
 
         for ((src, dsts, walls), expected) in test_data {
-            let maze = Maze::<U4, _>::new(cost);
+            let maze = MazeBuilder::new().costs(cost).build::<U4>();
             assert_eq!(maze.instruct(src), None);
             maze.update_node_candidates(dsts);
             for (wall, exists) in walls {
