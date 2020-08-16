@@ -53,8 +53,57 @@ pub struct Agent<
     _state: PhantomData<fn() -> State>,
     _target: PhantomData<fn() -> Target>,
     _pose: PhantomData<fn() -> Pose>,
-    _position: PhantomData<fn() -> Obstacle>,
+    _obstacle: PhantomData<fn() -> Obstacle>,
     _direction: PhantomData<fn() -> Direction>,
+}
+
+impl<
+        State,
+        Target,
+        Pose,
+        Obstacle,
+        Direction,
+        IObstacleDetector,
+        IStateEstimator,
+        ITracker,
+        ITrajectoryGenerator,
+    >
+    Agent<
+        State,
+        Target,
+        Pose,
+        Obstacle,
+        Direction,
+        IObstacleDetector,
+        IStateEstimator,
+        ITracker,
+        ITrajectoryGenerator,
+    >
+where
+    IObstacleDetector: ObstacleDetector<Obstacle, State>,
+    IStateEstimator: StateEstimator<State>,
+    ITracker: Tracker<State, Target>,
+    ITrajectoryGenerator: TrajectoryGenerator<Pose, Target, Direction>,
+{
+    pub fn new(
+        obstacle_detector: IObstacleDetector,
+        state_estimator: IStateEstimator,
+        tracker: ITracker,
+        trajectory_generator: ITrajectoryGenerator,
+    ) -> Self {
+        Self {
+            obstacle_detector: RefCell::new(obstacle_detector),
+            state_estimator: RefCell::new(state_estimator),
+            tracker: RefCell::new(tracker),
+            trajectory_generator,
+            trajectories: Mutex::new(Queue::new()),
+            _state: PhantomData,
+            _target: PhantomData,
+            _pose: PhantomData,
+            _obstacle: PhantomData,
+            _direction: PhantomData,
+        }
+    }
 }
 
 impl<
