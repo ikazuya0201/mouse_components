@@ -1,8 +1,8 @@
 use generic_array::GenericArray;
-use quantities::{Distance, Quantity};
+use quantities::{Angle, Distance, Quantity};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use super::{WallDirection, WallPosition};
+use super::{AbsoluteDirection, SearchNodeId, WallDirection, WallPosition};
 use crate::agent::Pose;
 use crate::utils::total::Total;
 
@@ -21,6 +21,7 @@ pub struct OutOfBoundError;
 
 pub struct PoseConverter {
     i_square_width: i32, //[mm]
+    square_width_half: Distance,
     p1: Distance,
     p2: Distance,
     n1: Distance,
@@ -35,6 +36,7 @@ impl PoseConverter {
         let n2 = n1 - square_width;
         Self {
             i_square_width: (square_width.as_meters() * 1000.0) as i32,
+            square_width_half: square_width / 2.0,
             p1,
             p2,
             n1,
@@ -164,6 +166,29 @@ impl PoseConverter {
             })
         } else {
             Err(OutOfBoundError)
+        }
+    }
+
+    pub fn convert_node<N>(&self, node: SearchNodeId<N>) -> Pose
+    where
+        N: Unsigned + PowerOfTwo,
+    {
+        use AbsoluteDirection::*;
+
+        let node = node.as_node();
+        let x = node.x();
+        let y = node.y();
+        let direction = node.direction();
+        Pose {
+            x: (x + 1) as f32 * self.square_width_half,
+            y: (y + 1) as f32 * self.square_width_half,
+            theta: match direction {
+                East => Angle::from_degree(0.0),
+                North => Angle::from_degree(90.0),
+                West => Angle::from_degree(180.0),
+                South => Angle::from_degree(270.0),
+                _ => unreachable!(),
+            },
         }
     }
 }
