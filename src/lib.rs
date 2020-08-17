@@ -83,6 +83,7 @@ pub mod defaults {
         Solver<NodeId<MazeWidth>, SearchNodeId<MazeWidth>, MaxSize, GoalSize>;
 
     pub type DefaultSearchOperator<
+        'a,
         LeftMotor,
         RightMotor,
         LeftEncoder,
@@ -94,7 +95,7 @@ pub mod defaults {
         MaxSize,
         GoalSize,
     > = SearchOperator<
-        'static,
+        'a,
         NodeId<MazeWidth>,
         SearchNodeId<MazeWidth>,
         u16,
