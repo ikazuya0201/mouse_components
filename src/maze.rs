@@ -12,7 +12,10 @@ use heapless::{consts::*, Vec};
 use quantities::Distance;
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::administrator::{DirectionInstructor, Graph, GraphConverter, ObstacleInterpreter};
+use crate::administrator::{
+    DirectionInstructor, Graph, GraphConverter, NodeConverter, ObstacleInterpreter,
+};
+use crate::agent::Pose;
 use crate::obstacle_detector::Obstacle;
 use crate::pattern::Pattern;
 use crate::utils::itertools::repeat_n;
@@ -773,6 +776,18 @@ where
                 probs[index] = exist_val / (exist_val + not_exist_val);
             }
         }
+    }
+}
+
+impl<N, F> NodeConverter<SearchNodeId<N>, Pose> for Maze<N, F>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    F: Fn(Pattern) -> u16,
+{
+    fn convert(&self, node: SearchNodeId<N>) -> Pose {
+        self.converter.convert_node(node)
     }
 }
 
