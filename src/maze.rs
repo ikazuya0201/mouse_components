@@ -34,6 +34,7 @@ where
     F: Fn(Pattern) -> u16,
 {
     wall_existence_probs: RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
+    wall_prob_threshold: f32,
     costs: F,
     candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
     converter: PoseConverter,
@@ -46,8 +47,6 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    const CHECK_PROB_THRESHOLD: f32 = 0.05; //significance level
-
     fn initialize(&self) {
         for i in 0..WallPosition::<N>::max() + 1 {
             self.check_wall(
@@ -79,7 +78,7 @@ where
     #[inline]
     fn is_wall(&self, position: WallPosition<N>) -> bool {
         let prob = self.wall_existence_probs.borrow()[position.as_index()];
-        return prob > 1.0 - Self::CHECK_PROB_THRESHOLD;
+        return prob > 1.0 - self.wall_prob_threshold;
     }
 
     fn is_wall_by_position(&self, position: Position<N>) -> bool {
@@ -93,7 +92,7 @@ where
     #[inline]
     fn is_checked(&self, position: WallPosition<N>) -> bool {
         let prob = self.wall_existence_probs.borrow()[position.as_index()];
-        return prob < Self::CHECK_PROB_THRESHOLD || prob > 1.0 - Self::CHECK_PROB_THRESHOLD;
+        return prob < self.wall_prob_threshold || prob > 1.0 - self.wall_prob_threshold;
     }
 
     fn is_checked_by_position(&self, position: Position<N>) -> bool {
@@ -792,29 +791,34 @@ where
     }
 }
 
-pub struct MazeBuilder<C, SW, WW> {
+pub struct MazeBuilder<C, SW, WW, WPT> {
     costs: C,
     square_width: SW,
     wall_width: WW,
+    wall_prob_threshold: WPT,
 }
 
-impl MazeBuilder<(), (), ()> {
+impl<C, SW, WW, WPT> MazeBuilder<C, SW, WW, WPT> {
+    const DEFAULT_SQUARE_WIDTH: Distance = Distance::from_meters(0.09);
+    const DEFAULT_WALL_WIDTH: Distance = Distance::from_meters(0.006);
+    const DEFAULT_PROB_THRESHOLD: f32 = 0.05;
+}
+
+impl MazeBuilder<(), (), (), ()> {
     pub fn new() -> Self {
         Self {
             costs: (),
             square_width: (),
             wall_width: (),
+            wall_prob_threshold: (),
         }
     }
 }
 
-impl<C> MazeBuilder<C, (), ()>
+impl<C> MazeBuilder<C, (), (), ()>
 where
     C: Fn(Pattern) -> u16,
 {
-    const DEFAULT_SQUARE_WIDTH: Distance = Distance::from_meters(0.09);
-    const DEFAULT_WALL_WIDTH: Distance = Distance::from_meters(0.006);
-
     pub fn build<N>(self) -> Maze<N, C>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
@@ -824,6 +828,7 @@ where
         let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
             .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
         let maze = Maze {
+            wall_prob_threshold: Self::DEFAULT_PROB_THRESHOLD,
             wall_existence_probs: RefCell::new(probs),
             costs: self.costs,
             candidates: Mutex::new(Vec::new()),
@@ -834,7 +839,7 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, Distance, Distance>
+impl<C> MazeBuilder<C, Distance, Distance, ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -847,6 +852,7 @@ where
         let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
             .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
         let maze = Maze {
+            wall_prob_threshold: Self::DEFAULT_PROB_THRESHOLD,
             wall_existence_probs: RefCell::new(probs),
             costs: self.costs,
             candidates: Mutex::new(Vec::new()),
@@ -857,12 +863,61 @@ where
     }
 }
 
-impl<SW, WW> MazeBuilder<(), SW, WW> {
-    pub fn costs<C>(self, costs: C) -> MazeBuilder<C, SW, WW>
+impl<C> MazeBuilder<C, (), (), f32>
+where
+    C: Fn(Pattern) -> u16,
+{
+    pub fn build<N>(self) -> Maze<N, C>
+    where
+        N: Mul<N> + Unsigned + PowerOfTwo,
+        <N as Mul<N>>::Output: Mul<U2>,
+        <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
+        let maze = Maze {
+            wall_prob_threshold: self.wall_prob_threshold,
+            wall_existence_probs: RefCell::new(probs),
+            costs: self.costs,
+            candidates: Mutex::new(Vec::new()),
+            converter: PoseConverter::new(Self::DEFAULT_SQUARE_WIDTH, Self::DEFAULT_WALL_WIDTH),
+        };
+        maze.initialize();
+        maze
+    }
+}
+
+impl<C> MazeBuilder<C, Distance, Distance, f32>
+where
+    C: Fn(Pattern) -> u16,
+{
+    pub fn build<N>(self) -> Maze<N, C>
+    where
+        N: Mul<N> + Unsigned + PowerOfTwo,
+        <N as Mul<N>>::Output: Mul<U2>,
+        <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
+        let maze = Maze {
+            wall_prob_threshold: self.wall_prob_threshold,
+            wall_existence_probs: RefCell::new(probs),
+            costs: self.costs,
+            candidates: Mutex::new(Vec::new()),
+            converter: PoseConverter::new(self.square_width, self.wall_width),
+        };
+        maze.initialize();
+        maze
+    }
+}
+
+impl<SW, WW, WPT> MazeBuilder<(), SW, WW, WPT> {
+    pub fn costs<C>(self, costs: C) -> MazeBuilder<C, SW, WW, WPT>
     where
         C: Fn(Pattern) -> u16,
     {
         MazeBuilder {
+            wall_prob_threshold: self.wall_prob_threshold,
             costs,
             square_width: self.square_width,
             wall_width: self.wall_width,
@@ -870,9 +925,10 @@ impl<SW, WW> MazeBuilder<(), SW, WW> {
     }
 }
 
-impl<C, WW> MazeBuilder<C, (), WW> {
-    pub fn square_width(self, square_width: Distance) -> MazeBuilder<C, Distance, WW> {
+impl<C, WW, WPT> MazeBuilder<C, (), WW, WPT> {
+    pub fn square_width(self, square_width: Distance) -> MazeBuilder<C, Distance, WW, WPT> {
         MazeBuilder {
+            wall_prob_threshold: self.wall_prob_threshold,
             costs: self.costs,
             square_width,
             wall_width: self.wall_width,
@@ -880,12 +936,28 @@ impl<C, WW> MazeBuilder<C, (), WW> {
     }
 }
 
-impl<C, SW> MazeBuilder<C, SW, ()> {
-    pub fn wall_width(self, wall_width: Distance) -> MazeBuilder<C, SW, Distance> {
+impl<C, SW, WPT> MazeBuilder<C, SW, (), WPT> {
+    pub fn wall_width(self, wall_width: Distance) -> MazeBuilder<C, SW, Distance, WPT> {
         MazeBuilder {
+            wall_prob_threshold: self.wall_prob_threshold,
             costs: self.costs,
             square_width: self.square_width,
             wall_width,
+        }
+    }
+}
+
+impl<C, SW, WW> MazeBuilder<C, SW, WW, ()> {
+    pub fn wall_existence_probability_threshold(
+        self,
+        wall_prob_threshold: f32,
+    ) -> MazeBuilder<C, SW, WW, f32> {
+        assert!(wall_prob_threshold >= 0.0 && wall_prob_threshold <= 1.0);
+        MazeBuilder {
+            wall_prob_threshold,
+            costs: self.costs,
+            square_width: self.square_width,
+            wall_width: self.wall_width,
         }
     }
 }
