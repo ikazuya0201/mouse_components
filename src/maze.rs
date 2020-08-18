@@ -948,11 +948,12 @@ impl<C, SW, WPT> MazeBuilder<C, SW, (), WPT> {
 }
 
 impl<C, SW, WW> MazeBuilder<C, SW, WW, ()> {
+    ///NOTE: This value should be in [0.0,0.5].
     pub fn wall_existence_probability_threshold(
         self,
         wall_prob_threshold: f32,
     ) -> MazeBuilder<C, SW, WW, f32> {
-        assert!(wall_prob_threshold >= 0.0 && wall_prob_threshold <= 1.0);
+        assert!(wall_prob_threshold >= 0.0 && wall_prob_threshold <= 0.5);
         MazeBuilder {
             wall_prob_threshold,
             costs: self.costs,
