@@ -47,6 +47,15 @@ where
     TC: Controller<Distance>,
     RC: Controller<Angle>,
 {
+    fn stop(&mut self)
+    where
+        LM: Motor,
+        RM: Motor,
+    {
+        self.left_motor.apply(Default::default());
+        self.right_motor.apply(Default::default());
+    }
+
     fn init(&mut self) {
         self.translation_controller.init();
         self.rotation_controller.init();
@@ -64,16 +73,6 @@ where
     TC: Controller<Distance>,
     RC: Controller<Angle>,
 {
-    #[cfg(feature = "debug")]
-    pub fn stop(&mut self)
-    where
-        LM: Motor,
-        RM: Motor,
-    {
-        self.left_motor.apply(Default::default());
-        self.right_motor.apply(Default::default());
-    }
-
     fn track_move(&mut self, state: State, target: Target) -> (Voltage, Voltage) {
         let cos_theta = state.theta.x.cos();
         let sin_theta = state.theta.x.sin();

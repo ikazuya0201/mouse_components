@@ -791,6 +791,23 @@ where
     }
 }
 
+impl<N, F> core::fmt::Debug for Maze<N, F>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo + core::fmt::Debug,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    F: Fn(Pattern) -> u16,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "Maze{{ probs: {:?}, cands: {:?} }}",
+            self.wall_existence_probs.borrow(),
+            self.candidates.lock(),
+        )
+    }
+}
+
 pub struct MazeBuilder<C, SW, WW, WPT> {
     costs: C,
     square_width: SW,
