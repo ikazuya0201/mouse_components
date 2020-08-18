@@ -768,7 +768,11 @@ where
                     -tmp * tmp / 2.0
                 };
 
-                let min = exist_val.min(not_exist_val);
+                let min = if exist_val < not_exist_val {
+                    exist_val
+                } else {
+                    not_exist_val
+                };
                 let exist_val = libm::sqrtf(exist_val - min) * existence_prob;
                 let not_exist_val = libm::sqrtf(not_exist_val - min) * (1.0 - existence_prob);
 
