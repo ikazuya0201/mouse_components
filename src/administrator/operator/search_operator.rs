@@ -86,9 +86,9 @@ where
         let current = self.current.get();
         if let Some(candidates) = self.solver.next_node_candidates(current, &self.maze) {
             self.maze.update_node_candidates(candidates);
-            Ok(Mode::FastRun(FastRun))
-        } else {
             Err(NotFinishError)
+        } else {
+            Ok(Mode::FastRun(FastRun))
         }
     }
 }
