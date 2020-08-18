@@ -70,10 +70,29 @@ where
 
 impl<LM, RM, TC, RC> Tracker<LM, RM, TC, RC>
 where
+    LM: Motor,
+    RM: Motor,
     TC: Controller<Distance>,
     RC: Controller<Angle>,
 {
+    const SAFE_THRESHOLD: Distance = Distance::from_meters(0.02);
+
+    fn fail_safe(&mut self, state: &State, target: &Target) {
+        use agent::Tracker;
+
+        let x_diff = (state.x.x - target.x.x).as_meters();
+        let y_diff = (state.y.x - target.y.x).as_meters();
+
+        let d = Distance::from_meters(libm::sqrtf(x_diff * x_diff + y_diff * y_diff));
+        if d >= Self::SAFE_THRESHOLD {
+            self.stop();
+            panic!("state: {:?}, target: {:?}", state, target);
+        }
+    }
+
     fn track_move(&mut self, state: State, target: Target) -> (Voltage, Voltage) {
+        self.fail_safe(&state, &target);
+
         let cos_theta = state.theta.x.cos();
         let sin_theta = state.theta.x.sin();
 
