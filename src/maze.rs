@@ -773,8 +773,8 @@ where
                 } else {
                     not_exist_val
                 };
-                let exist_val = libm::sqrtf(exist_val - min) * existence_prob;
-                let not_exist_val = libm::sqrtf(not_exist_val - min) * (1.0 - existence_prob);
+                let exist_val = libm::expf(exist_val - min) * existence_prob;
+                let not_exist_val = libm::expf(not_exist_val - min) * (1.0 - existence_prob);
 
                 probs[index] = if exist_val.is_infinite() {
                     1.0
