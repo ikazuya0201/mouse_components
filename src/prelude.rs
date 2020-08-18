@@ -14,6 +14,7 @@ pub use crate::agent::TrajectoryGenerator as _components_agent_TrajectoryGenerat
 
 pub use crate::tracker::Controller as _components_tracker_Controller;
 
+pub use crate::sensors::DistanceSensor as _components_sensors_DistanceSensor;
 pub use crate::sensors::Encoder as _components_sensors_Encoder;
 pub use crate::sensors::Motor as _components_sensors_Motor;
 pub use crate::sensors::IMU as _components_sensors_IMU;
