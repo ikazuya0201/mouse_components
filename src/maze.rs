@@ -800,12 +800,34 @@ where
     F: Fn(Pattern) -> u16,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "Maze{{ probs: {:?}, cands: {:?} }}",
-            self.wall_existence_probs.borrow(),
-            self.candidates.lock(),
-        )
+        use WallDirection::*;
+
+        writeln!(f, "Maze {{")?;
+        writeln!(f, "walls:")?;
+
+        let prob = self.wall_existence_probs.borrow();
+        for y in (0..N::U16).rev() {
+            for x in 0..N::U16 {
+                let index = WallPosition::<N>::new(x, y, Up).unwrap().as_index();
+                write!(f, " {:1.1} --+--", prob[index])?;
+            }
+            writeln!(f, "")?;
+            for x in 0..N::U16 {
+                write!(f, "       |  ")?;
+            }
+            writeln!(f, "")?;
+            for x in 0..N::U16 {
+                let index = WallPosition::<N>::new(x, y, Right).unwrap().as_index();
+                write!(f, "      {:1.1} ", prob[index])?;
+            }
+            writeln!(f, "")?;
+            for x in 0..N::U16 {
+                write!(f, "       |  ")?;
+            }
+            writeln!(f, "")?;
+        }
+
+        writeln!(f, "candidates: {:?}", self.candidates.lock())
     }
 }
 
