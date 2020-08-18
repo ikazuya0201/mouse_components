@@ -19,7 +19,8 @@ pub struct SearchOperator<
     IAgent,
     ISolver,
 > {
-    start: SearchNode,
+    start_pose: Pose,
+    start_node: SearchNode,
     current: Cell<SearchNode>,
     is_updated: AtomicBool,
     maze: &'a Maze,
@@ -37,10 +38,17 @@ impl<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolve
 where
     SearchNode: Copy,
 {
-    pub fn new(start: SearchNode, maze: &'a Maze, agent: &'a IAgent, solver: &'a ISolver) -> Self {
+    pub fn new(
+        start_pose: Pose,
+        start_node: SearchNode,
+        maze: &'a Maze,
+        agent: &'a IAgent,
+        solver: &'a ISolver,
+    ) -> Self {
         Self {
-            start,
-            current: Cell::new(start),
+            start_pose,
+            start_node,
+            current: Cell::new(start_node),
             is_updated: AtomicBool::new(true),
             maze,
             agent,
@@ -58,6 +66,7 @@ impl<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolve
     for SearchOperator<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
 where
     SearchNode: Copy,
+    Pose: Copy,
     Maze: ObstacleInterpreter<Obstacle>
         + Graph<Node, Cost>
         + Graph<SearchNode, Cost>
@@ -68,9 +77,8 @@ where
     ISolver: Solver<Node, SearchNode, Cost, Maze>,
 {
     fn init(&self) {
-        self.current.set(self.start);
-        let pose = self.maze.convert(self.start);
-        self.agent.init(pose);
+        self.current.set(self.start_node);
+        self.agent.init(self.start_pose);
     }
 
     fn tick(&self) {
