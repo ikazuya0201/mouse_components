@@ -30,6 +30,7 @@ pub trait TrajectoryGenerator<Pose, Target, Direction> {
 pub trait Tracker<State, Target> {
     fn init(&mut self);
     fn track(&mut self, state: State, target: Target);
+    fn stop(&mut self);
 }
 
 pub struct Agent<
@@ -106,6 +107,10 @@ where
             _obstacle: PhantomData,
             _direction: PhantomData,
         }
+    }
+
+    pub fn stop(&self) {
+        self.tracker.borrow_mut().stop();
     }
 }
 
