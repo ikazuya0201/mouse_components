@@ -59,6 +59,7 @@ where
                 true,
             );
         }
+        self.check_wall(WallPosition::new(0, 0, WallDirection::Right).unwrap(), true);
     }
 
     pub fn check_wall(&self, position: WallPosition<N>, is_wall: bool) {
@@ -909,19 +910,62 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_node_successors() {
-        use AbsoluteDirection::*;
-        use Pattern::*;
+    mod successors_predecessors_tests {
+        macro_rules! node_tests {
+            ($($name:ident: ($method: ident, $value: expr),)*) => {
+                $(
+                    #[test]
+                    fn $name() {
+                        use super::*;
+                        use AbsoluteDirection::*;
+                        use Pattern::*;
 
-        let maze = MazeBuilder::new().costs(cost).build::<U4>();
+                        fn new(x: u16, y: u16, direction: AbsoluteDirection) -> NodeId<U4> {
+                            NodeId::<U4>::new(x, y, direction).unwrap()
+                        }
 
-        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
-            NodeId::<U4>::new(x, y, direction).unwrap()
-        };
+                        let maze = MazeBuilder::new().costs(cost).build::<U4>();
+                        let (input, mut expected) = $value;
+                        expected.sort();
+                        let mut nodes = maze.$method(input);
+                        nodes.sort();
+                        assert_eq!(nodes, expected.as_slice());
+                    }
+                )*
+            }
+        }
 
-        let test_data = vec![
-            (
+        node_tests! {
+            test_node_predecessors1: (predecessors, (
+                new(2, 2, North),
+                vec![
+                    (new(2, 0, North), cost(Straight(1))),
+                    (new(3, 0, NorthWest), cost(FastRun45)),
+                    (new(4, 0, West), cost(FastRun90)),
+                    (new(4, 1, SouthWest), cost(FastRun135)),
+                    (new(4, 2, South), cost(FastRun180)),
+                ],
+            )),
+            test_node_predecessors2: (predecessors, (
+                new(3, 2, NorthEast),
+                vec![
+                    (new(2, 1, NorthEast), cost(StraightDiagonal(1))),
+                    (new(2, 0, North), cost(FastRun45)),
+                    (new(4, 0, West), cost(FastRun135)),
+                    (new(3, 0, NorthWest), cost(FastRunDiagonal90)),
+                ],
+            )),
+            test_node_predecessors3: (predecessors, (
+                new(2, 3, NorthEast),
+                vec![
+                    (new(1, 2, NorthEast), cost(StraightDiagonal(1))),
+                    (new(0, 1, NorthEast), cost(StraightDiagonal(2))),
+                    (new(0, 2, East), cost(FastRun45)),
+                    (new(0, 4, South), cost(FastRun135)),
+                    (new(0, 3, SouthEast), cost(FastRunDiagonal90)),
+                ],
+            )),
+            test_node_successors1: (successors, (
                 new(2, 0, North),
                 vec![
                     (new(2, 2, North), cost(Straight(1))),
@@ -936,8 +980,8 @@ mod tests {
                     (new(0, 1, SouthWest), cost(FastRun135)),
                     (new(0, 0, South), cost(FastRun180)),
                 ],
-            ),
-            (
+            )),
+            test_node_successors2: (successors, (
                 new(0, 2, East),
                 vec![
                     (new(2, 2, East), cost(Straight(1))),
@@ -945,15 +989,13 @@ mod tests {
                     (new(6, 2, East), cost(Straight(3))),
                     (new(2, 1, SouthEast), cost(FastRun45)),
                     (new(2, 0, South), cost(FastRun90)),
-                    (new(1, 0, SouthWest), cost(FastRun135)),
-                    (new(0, 0, West), cost(FastRun180)),
                     (new(2, 3, NorthEast), cost(FastRun45)),
                     (new(2, 4, North), cost(FastRun90)),
                     (new(1, 4, NorthWest), cost(FastRun135)),
                     (new(0, 4, West), cost(FastRun180)),
                 ],
-            ),
-            (
+            )),
+            test_node_successors3: (successors, (
                 new(0, 1, NorthEast),
                 vec![
                     (new(1, 2, NorthEast), cost(StraightDiagonal(1))),
@@ -965,8 +1007,8 @@ mod tests {
                     (new(2, 0, South), cost(FastRun135)),
                     (new(2, 1, SouthEast), cost(FastRunDiagonal90)),
                 ],
-            ),
-            (
+            )),
+            test_node_successors4: (successors, (
                 new(2, 3, SouthWest),
                 vec![
                     (new(1, 2, SouthWest), cost(StraightDiagonal(1))),
@@ -975,8 +1017,8 @@ mod tests {
                     (new(0, 4, North), cost(FastRun135)),
                     (new(0, 3, NorthWest), cost(FastRunDiagonal90)),
                 ],
-            ),
-            (
+            )),
+            test_node_successors5: (successors, (
                 new(1, 0, NorthEast),
                 vec![
                     (new(2, 1, NorthEast), cost(StraightDiagonal(1))),
@@ -988,70 +1030,7 @@ mod tests {
                     (new(0, 2, West), cost(FastRun135)),
                     (new(1, 2, NorthWest), cost(FastRunDiagonal90)),
                 ],
-            ),
-        ];
-
-        for (src, mut expected) in test_data {
-            expected.sort();
-            let mut successors = maze.successors(src);
-            successors.sort();
-            assert_eq!(successors, expected.as_slice());
-        }
-    }
-
-    #[test]
-    fn test_node_predecessors() {
-        use AbsoluteDirection::*;
-        use Pattern::*;
-
-        let maze = MazeBuilder::new().costs(cost).build::<U4>();
-
-        let new = |x: u16, y: u16, direction: AbsoluteDirection| -> NodeId<U4> {
-            NodeId::<U4>::new(x, y, direction).unwrap()
-        };
-
-        let test_data = vec![
-            (
-                new(2, 2, North),
-                vec![
-                    (new(2, 0, North), cost(Straight(1))),
-                    (new(3, 0, NorthWest), cost(FastRun45)),
-                    (new(4, 0, West), cost(FastRun90)),
-                    (new(4, 1, SouthWest), cost(FastRun135)),
-                    (new(4, 2, South), cost(FastRun180)),
-                    (new(1, 0, NorthEast), cost(FastRun45)),
-                    (new(0, 0, East), cost(FastRun90)),
-                    (new(0, 1, SouthEast), cost(FastRun135)),
-                    (new(0, 2, South), cost(FastRun180)),
-                ],
-            ),
-            (
-                new(3, 2, NorthEast),
-                vec![
-                    (new(2, 1, NorthEast), cost(StraightDiagonal(1))),
-                    (new(1, 0, NorthEast), cost(StraightDiagonal(2))),
-                    (new(2, 0, North), cost(FastRun45)),
-                    (new(4, 0, West), cost(FastRun135)),
-                    (new(3, 0, NorthWest), cost(FastRunDiagonal90)),
-                ],
-            ),
-            (
-                new(2, 3, NorthEast),
-                vec![
-                    (new(1, 2, NorthEast), cost(StraightDiagonal(1))),
-                    (new(0, 1, NorthEast), cost(StraightDiagonal(2))),
-                    (new(0, 2, East), cost(FastRun45)),
-                    (new(0, 4, South), cost(FastRun135)),
-                    (new(0, 3, SouthEast), cost(FastRunDiagonal90)),
-                ],
-            ),
-        ];
-
-        for (src, mut expected) in test_data {
-            expected.sort();
-            let mut predecessors = maze.predecessors(src);
-            predecessors.sort();
-            assert_eq!(predecessors, expected.as_slice());
+            )),
         }
     }
 
