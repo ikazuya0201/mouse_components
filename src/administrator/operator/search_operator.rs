@@ -19,6 +19,7 @@ pub struct SearchOperator<
     IAgent,
     ISolver,
 > {
+    start: SearchNode,
     current: Cell<SearchNode>,
     is_updated: AtomicBool,
     maze: &'a Maze,
@@ -33,9 +34,12 @@ pub struct SearchOperator<
 
 impl<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
     SearchOperator<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+where
+    SearchNode: Copy,
 {
     pub fn new(start: SearchNode, maze: &'a Maze, agent: &'a IAgent, solver: &'a ISolver) -> Self {
         Self {
+            start,
             current: Cell::new(start),
             is_updated: AtomicBool::new(true),
             maze,
@@ -53,7 +57,7 @@ impl<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolve
 impl<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver> Operator<Search>
     for SearchOperator<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
 where
-    SearchNode: Clone + Copy,
+    SearchNode: Copy,
     Maze: ObstacleInterpreter<Obstacle>
         + Graph<Node, Cost>
         + Graph<SearchNode, Cost>
@@ -63,6 +67,12 @@ where
     IAgent: Agent<Obstacle, Pose, Direction>,
     ISolver: Solver<Node, SearchNode, Cost, Maze>,
 {
+    fn init(&self) {
+        self.current.set(self.start);
+        let pose = self.maze.convert(self.start);
+        self.agent.init(pose);
+    }
+
     fn tick(&self) {
         let obstacles = self.agent.get_existing_obstacles();
         self.maze.interpret_obstacles(obstacles);

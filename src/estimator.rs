@@ -10,6 +10,9 @@ pub use encoder::Encoder;
 pub use imu::IMU;
 
 pub struct Estimator<LE, RE, I> {
+    initial_x: Distance,
+    initial_y: Distance,
+    initial_theta: Angle,
     x: Distance,
     y: Distance,
     theta: Angle,
@@ -31,6 +34,14 @@ where
     <RE as Encoder>::Error: core::fmt::Debug,
     <I as IMU>::Error: core::fmt::Debug,
 {
+    fn init(&mut self) {
+        self.x = self.initial_x;
+        self.y = self.initial_y;
+        self.theta = self.initial_theta;
+        self.trans_speed = Default::default();
+        self.angular_speed = Default::default();
+    }
+
     fn estimate(&mut self) -> State {
         //velocity estimation
         let left_distance = block!(self.left_encoder.get_relative_distance()).unwrap();
@@ -127,6 +138,9 @@ where
         let alpha =
             1.0 / (2.0 * core::f32::consts::PI * self.period * self.cut_off_frequency + 1.0);
         Estimator {
+            initial_x: Default::default(),
+            initial_y: Default::default(),
+            initial_theta: self.initial_posture,
             x: Default::default(),
             y: Default::default(),
             theta: self.initial_posture,
@@ -151,6 +165,9 @@ where
         let alpha =
             1.0 / (2.0 * core::f32::consts::PI * self.period * self.cut_off_frequency + 1.0);
         Estimator {
+            initial_x: self.initial_x,
+            initial_y: self.initial_y,
+            initial_theta: self.initial_posture,
             x: self.initial_x,
             y: self.initial_y,
             theta: self.initial_posture,
@@ -175,6 +192,9 @@ where
         let alpha =
             1.0 / (2.0 * core::f32::consts::PI * self.period * self.cut_off_frequency + 1.0);
         Estimator {
+            initial_x: Default::default(),
+            initial_y: Default::default(),
+            initial_theta: Default::default(),
             x: Default::default(),
             y: Default::default(),
             theta: Default::default(),
