@@ -6,8 +6,8 @@ use super::{Location, Position};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum WallDirection {
-    Up,
-    Right,
+    Up = 1,
+    Right = 0,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,18 +46,18 @@ where
 
     #[inline]
     fn y_offset() -> u32 {
-        N::USIZE.trailing_zeros()
+        N::USIZE.trailing_zeros() + 1
     }
 
     #[inline]
-    fn z_offset() -> u32 {
-        2 * N::USIZE.trailing_zeros()
+    fn x_offset() -> u32 {
+        1
     }
 
     pub fn as_index(self) -> usize {
-        self.x as usize
+        self.z as usize
+            | (self.x as usize) << Self::x_offset()
             | (self.y as usize) << Self::y_offset()
-            | (self.z as usize) << Self::z_offset()
     }
 
     pub fn from_position(position: Position<N>) -> Option<Self> {
