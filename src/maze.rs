@@ -812,7 +812,7 @@ where
                 write!(f, " {:1.1} --+--", prob[index])?;
             }
             writeln!(f, "")?;
-            for x in 0..N::U16 {
+            for _ in 0..N::U16 {
                 write!(f, "       |  ")?;
             }
             writeln!(f, "")?;
@@ -821,7 +821,7 @@ where
                 write!(f, "      {:1.1} ", prob[index])?;
             }
             writeln!(f, "")?;
-            for x in 0..N::U16 {
+            for _ in 0..N::U16 {
                 write!(f, "       |  ")?;
             }
             writeln!(f, "")?;
