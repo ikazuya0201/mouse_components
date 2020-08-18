@@ -2,6 +2,7 @@ use super::Mode;
 use super::NotFinishError;
 
 pub trait Operator<T> {
+    fn init(&self);
     fn tick(&self);
     fn run(&self) -> Result<Mode, NotFinishError>;
 }

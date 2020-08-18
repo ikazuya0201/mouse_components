@@ -16,16 +16,19 @@ pub trait ObstacleDetector<Obstacle, State> {
 }
 
 pub trait StateEstimator<State> {
+    fn init(&mut self);
     fn estimate(&mut self) -> State;
 }
 
 pub trait TrajectoryGenerator<Pose, Target, Direction> {
     type Trajectory: Iterator<Item = Target>;
 
+    fn generate_search_init(&self, pose: Pose) -> Self::Trajectory;
     fn generate_search(&self, pose: Pose, direction: Direction) -> Self::Trajectory;
 }
 
 pub trait Tracker<State, Target> {
+    fn init(&mut self);
     fn track(&mut self, state: State, target: Target);
 }
 
@@ -136,6 +139,15 @@ where
     ITrajectoryGenerator: TrajectoryGenerator<Pose, Target, Direction>,
 {
     type Obstacles = IObstacleDetector::Obstacles;
+
+    fn init(&self, pose: Pose) {
+        self.state_estimator.borrow_mut().init();
+        self.tracker.borrow_mut().init();
+        let trajectory = self.trajectory_generator.generate_search_init(pose);
+        let mut trajectories = self.trajectories.lock();
+        *trajectories = Queue::new();
+        trajectories.enqueue(trajectory).ok();
+    }
 
     fn get_existing_obstacles(&self) -> Self::Obstacles {
         let state = self.state_estimator.borrow_mut().estimate();

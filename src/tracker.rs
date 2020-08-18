@@ -19,6 +19,7 @@ where
     T: TimeDifferentiable,
     dt!(T): TimeDifferentiable,
 {
+    fn init(&mut self);
     fn calculate(&mut self, r: dt!(T), dr: ddt!(T), y: dt!(T), dy: ddt!(T)) -> Voltage;
 }
 
@@ -46,6 +47,11 @@ where
     TC: Controller<Distance>,
     RC: Controller<Angle>,
 {
+    fn init(&mut self) {
+        self.translation_controller.init();
+        self.rotation_controller.init();
+    }
+
     fn track(&mut self, state: State, target: Target) {
         let (left, right) = self.track_move(state, target);
         self.left_motor.apply(left);
@@ -638,6 +644,8 @@ mod tests {
         T: TimeDifferentiable,
         dt!(T): TimeDifferentiable,
     {
+        fn init(&mut self) {}
+
         fn calculate(&mut self, _r: dt!(T), _dr: ddt!(T), _y: dt!(T), _dy: ddt!(T)) -> Voltage {
             Voltage::from_volts(1.0)
         }

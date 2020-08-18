@@ -53,6 +53,10 @@ where
     ddt!(T): Quantity + Mul<Time, Output = dt!(T)>,
     f32: From<T> + From<dt!(T)> + From<ddt!(T)>,
 {
+    fn init(&mut self) {
+        self.error_sum = Default::default();
+    }
+
     fn calculate(&mut self, r: dt!(T), dr: ddt!(T), y: dt!(T), dy: ddt!(T)) -> Voltage {
         let vol_f = self.rev_gain * (dr * self.time_constant + r);
         let vol_p = self.kp * (r - y);

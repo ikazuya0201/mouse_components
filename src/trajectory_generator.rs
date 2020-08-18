@@ -17,6 +17,11 @@ use spin_generator::SpinGenerator;
 use straight_generator::StraightTrajectoryGenerator;
 pub use trajectory::{SubTarget, Target};
 
+enum Kind {
+    Init,
+    Search(RelativeDirection),
+}
+
 pub struct TrajectoryGenerator {
     straight_generator: StraightTrajectoryGenerator,
     slalom_generator: SlalomGenerator,
@@ -27,38 +32,25 @@ pub struct TrajectoryGenerator {
 impl agent::TrajectoryGenerator<Pose, Target, RelativeDirection> for TrajectoryGenerator {
     type Trajectory = impl Iterator<Item = Target>;
 
+    fn generate_search_init(&self, pose: Pose) -> Self::Trajectory {
+        self.generate_trajectory(pose, Kind::Init)
+    }
+
     fn generate_search(&self, pose: Pose, direction: RelativeDirection) -> Self::Trajectory {
-        self.generate_search_trajectory(pose, direction)
+        self.generate_trajectory(pose, Kind::Search(direction))
     }
 }
 
 impl TrajectoryGenerator {
     #[auto_enum]
-    pub fn generate_search_trajectory(
-        &self,
-        pose: Pose,
-        direction: RelativeDirection,
-    ) -> impl Iterator<Item = Target> {
+    fn generate_trajectory(&self, pose: Pose, kind: Kind) -> impl Iterator<Item = Target> {
+        use Kind::*;
         use RelativeDirection::*;
 
         #[auto_enum(Iterator)]
-        match direction {
-            Right => self.slalom_generator.generate(
-                pose.x,
-                pose.y,
-                pose.theta,
-                Angle::from_degree(-90.0),
-                self.search_speed,
-            ),
-            Left => self.slalom_generator.generate(
-                pose.x,
-                pose.y,
-                pose.theta,
-                Angle::from_degree(90.0),
-                self.search_speed,
-            ),
-            Front => {
-                let distance = Distance::from_meters(0.09); //TODO: use configurable value
+        match kind {
+            Init => {
+                let distance = Distance::from_meters(0.045);
                 let x_end = pose.x + distance * pose.theta.cos();
                 let y_end = pose.y + distance * pose.theta.sin();
                 self.straight_generator.generate(
@@ -66,37 +58,69 @@ impl TrajectoryGenerator {
                     pose.y,
                     x_end,
                     y_end,
-                    self.search_speed,
+                    Default::default(),
                     self.search_speed,
                 )
             }
-            Back => {
-                let distance = Distance::from_meters(0.045); //TODO: use configurable value
-                let x_end = pose.x + distance * pose.theta.cos();
-                let y_end = pose.y + distance * pose.theta.sin();
-                self.straight_generator
-                    .generate(
+            Search(direction) => {
+                #[auto_enum(Iterator)]
+                match direction {
+                    Right => self.slalom_generator.generate(
                         pose.x,
                         pose.y,
-                        x_end,
-                        y_end,
+                        pose.theta,
+                        Angle::from_degree(-90.0),
                         self.search_speed,
-                        Default::default(),
-                    )
-                    .chain(
-                        self.spin_generator
-                            .generate(pose.theta, Angle::from_degree(180.0)),
-                    )
-                    .chain(self.straight_generator.generate(
-                        x_end,
-                        y_end,
+                    ),
+                    Left => self.slalom_generator.generate(
                         pose.x,
                         pose.y,
-                        Default::default(),
+                        pose.theta,
+                        Angle::from_degree(90.0),
                         self.search_speed,
-                    ))
+                    ),
+                    Front => {
+                        let distance = Distance::from_meters(0.09); //TODO: use configurable value
+                        let x_end = pose.x + distance * pose.theta.cos();
+                        let y_end = pose.y + distance * pose.theta.sin();
+                        self.straight_generator.generate(
+                            pose.x,
+                            pose.y,
+                            x_end,
+                            y_end,
+                            self.search_speed,
+                            self.search_speed,
+                        )
+                    }
+                    Back => {
+                        let distance = Distance::from_meters(0.045); //TODO: use configurable value
+                        let x_end = pose.x + distance * pose.theta.cos();
+                        let y_end = pose.y + distance * pose.theta.sin();
+                        self.straight_generator
+                            .generate(
+                                pose.x,
+                                pose.y,
+                                x_end,
+                                y_end,
+                                self.search_speed,
+                                Default::default(),
+                            )
+                            .chain(
+                                self.spin_generator
+                                    .generate(pose.theta, Angle::from_degree(180.0)),
+                            )
+                            .chain(self.straight_generator.generate(
+                                x_end,
+                                y_end,
+                                pose.x,
+                                pose.y,
+                                Default::default(),
+                                self.search_speed,
+                            ))
+                    }
+                    _ => unreachable!(),
+                }
             }
-            _ => unreachable!(),
         }
     }
 
