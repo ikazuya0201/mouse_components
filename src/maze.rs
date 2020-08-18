@@ -757,6 +757,9 @@ where
             if let Ok(wall_info) = self.converter.convert::<N>(obstacle.source) {
                 let index = wall_info.position.as_index();
                 let existence_prob = probs[index];
+                if existence_prob == 0.0 || existence_prob == 1.0 {
+                    continue;
+                }
                 let exist_val = {
                     let tmp = (wall_info.existing_distance - obstacle.distance.mean)
                         / obstacle.distance.standard_deviation;
