@@ -59,6 +59,7 @@ where
             );
         }
         self.check_wall(WallPosition::new(0, 0, WallDirection::Right).unwrap(), true);
+        self.check_wall(WallPosition::new(0, 0, WallDirection::Up).unwrap(), false);
     }
 
     pub fn check_wall(&self, position: WallPosition<N>, is_wall: bool) {
