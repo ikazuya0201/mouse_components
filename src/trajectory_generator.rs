@@ -54,11 +54,38 @@ impl agent::TrajectoryGenerator<Pose, Target, RelativeDirection> for TrajectoryG
 }
 
 impl TrajectoryGenerator {
+    fn get_shift(pose: Pose) -> impl Fn(Target) -> Target {
+        let cos_th = pose.theta.cos();
+        let sin_th = pose.theta.sin();
+
+        move |target: Target| Target {
+            x: SubTarget {
+                x: target.x.x * cos_th - target.y.x * sin_th + pose.x,
+                v: target.x.v * cos_th - target.y.v * sin_th,
+                a: target.x.a * cos_th - target.y.a * sin_th,
+                j: target.x.j * cos_th - target.y.j * sin_th,
+            },
+            y: SubTarget {
+                x: target.x.x * sin_th + target.y.x * cos_th + pose.y,
+                v: target.x.v * sin_th + target.y.v * cos_th,
+                a: target.x.a * sin_th + target.y.a * cos_th,
+                j: target.x.j * sin_th + target.y.j * cos_th,
+            },
+            theta: SubTarget {
+                x: target.theta.x + pose.theta,
+                v: target.theta.v,
+                a: target.theta.a,
+                j: target.theta.j,
+            },
+        }
+    }
+
     #[auto_enum]
     fn generate_trajectory(&self, pose: Pose, kind: Kind) -> impl Iterator<Item = Target> {
         use Kind::*;
         use RelativeDirection::*;
 
+        let shift = Self::get_shift(pose);
         #[auto_enum(Iterator)]
         match kind {
             Init => {
@@ -74,8 +101,7 @@ impl TrajectoryGenerator {
                     self.search_speed,
                 )
             }
-            Search(direction) =>
-            {
+            Search(direction) => {
                 #[auto_enum(Iterator)]
                 match direction {
                     Front => self.front_trajectory.clone(),
@@ -85,6 +111,7 @@ impl TrajectoryGenerator {
                     _ => unreachable!(),
                 }
             }
+            .map(shift),
         }
     }
 
@@ -413,6 +440,7 @@ impl<TV, TA, TJ, VR, V, A, J, T> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_relative_eq;
 
     fn build_generator() -> TrajectoryGenerator {
         TrajectoryGeneratorBuilder::new()
@@ -431,5 +459,43 @@ mod tests {
     #[test]
     fn test_build() {
         build_generator();
+    }
+
+    #[test]
+    fn test_search_trajectory() {
+        use agent::TrajectoryGenerator;
+        use core::f32::consts::PI;
+
+        const EPSILON: f32 = 0.001;
+
+        let period = Time::from_seconds(0.001);
+        let search_speed = Speed::from_meter_per_second(0.2);
+
+        let generator = TrajectoryGeneratorBuilder::new()
+            .period(period)
+            .max_speed(Speed::from_meter_per_second(2.0))
+            .max_acceleration(Acceleration::from_meter_per_second_squared(0.7))
+            .max_jerk(Jerk::from_meter_per_second_cubed(1.0))
+            .search_speed(search_speed)
+            .slalom_speed_ref(Speed::from_meter_per_second(0.27178875))
+            .angular_speed_ref(AngularSpeed::from_radian_per_second(3.0 * PI))
+            .angular_acceleration_ref(AngularAcceleration::from_radian_per_second_squared(
+                36.0 * PI,
+            ))
+            .angular_jerk_ref(AngularJerk::from_radian_per_second_cubed(1200.0 * PI))
+            .build();
+
+        let trajectory = generator.generate_search(
+            Pose::new(
+                Distance::from_meters(0.045),
+                Distance::from_meters(0.09),
+                Angle::from_degree(90.0),
+            ),
+            RelativeDirection::Front,
+        );
+
+        let last = trajectory.last().unwrap();
+        assert_relative_eq!(last.x.x.as_meters(), 0.045, epsilon = EPSILON);
+        assert_relative_eq!(last.y.x.as_meters(), 0.18, epsilon = EPSILON);
     }
 }
