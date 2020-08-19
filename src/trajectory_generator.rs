@@ -3,6 +3,8 @@ mod spin_generator;
 mod straight_generator;
 mod trajectory;
 
+use core::iter::Chain;
+
 use auto_enums::auto_enum;
 use quantities::{
     Acceleration, Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Jerk, Speed,
@@ -12,9 +14,9 @@ use quantities::{
 use super::agent;
 use crate::agent::pose::Pose;
 use crate::maze::RelativeDirection;
-use slalom_generator::SlalomGenerator;
-use spin_generator::SpinGenerator;
-use straight_generator::StraightTrajectoryGenerator;
+use slalom_generator::{SlalomGenerator, SlalomTrajectory};
+use spin_generator::{SpinGenerator, SpinTrajectory};
+use straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 pub use trajectory::{SubTarget, Target};
 
 enum Kind {
@@ -22,11 +24,21 @@ enum Kind {
     Search(RelativeDirection),
 }
 
+pub type BackTrajectory = Chain<Chain<StraightTrajectory, SpinTrajectory>, StraightTrajectory>;
+
 pub struct TrajectoryGenerator {
     straight_generator: StraightTrajectoryGenerator,
+
+    #[allow(unused)]
     slalom_generator: SlalomGenerator,
+    #[allow(unused)]
     spin_generator: SpinGenerator,
+
     search_speed: Speed,
+    front_trajectory: StraightTrajectory,
+    right_trajectory: SlalomTrajectory,
+    left_trajectory: SlalomTrajectory,
+    back_trajectory: BackTrajectory,
 }
 
 impl agent::TrajectoryGenerator<Pose, Target, RelativeDirection> for TrajectoryGenerator {
@@ -62,62 +74,14 @@ impl TrajectoryGenerator {
                     self.search_speed,
                 )
             }
-            Search(direction) => {
+            Search(direction) =>
+            {
                 #[auto_enum(Iterator)]
                 match direction {
-                    Right => self.slalom_generator.generate(
-                        pose.x,
-                        pose.y,
-                        pose.theta,
-                        Angle::from_degree(-90.0),
-                        self.search_speed,
-                    ),
-                    Left => self.slalom_generator.generate(
-                        pose.x,
-                        pose.y,
-                        pose.theta,
-                        Angle::from_degree(90.0),
-                        self.search_speed,
-                    ),
-                    Front => {
-                        let distance = Distance::from_meters(0.09); //TODO: use configurable value
-                        let x_end = pose.x + distance * pose.theta.cos();
-                        let y_end = pose.y + distance * pose.theta.sin();
-                        self.straight_generator.generate(
-                            pose.x,
-                            pose.y,
-                            x_end,
-                            y_end,
-                            self.search_speed,
-                            self.search_speed,
-                        )
-                    }
-                    Back => {
-                        let distance = Distance::from_meters(0.045); //TODO: use configurable value
-                        let x_end = pose.x + distance * pose.theta.cos();
-                        let y_end = pose.y + distance * pose.theta.sin();
-                        self.straight_generator
-                            .generate(
-                                pose.x,
-                                pose.y,
-                                x_end,
-                                y_end,
-                                self.search_speed,
-                                Default::default(),
-                            )
-                            .chain(
-                                self.spin_generator
-                                    .generate(pose.theta, Angle::from_degree(180.0)),
-                            )
-                            .chain(self.straight_generator.generate(
-                                x_end,
-                                y_end,
-                                pose.x,
-                                pose.y,
-                                Default::default(),
-                                self.search_speed,
-                            ))
-                    }
+                    Front => self.front_trajectory.clone(),
+                    Right => self.right_trajectory.clone(),
+                    Left => self.left_trajectory.clone(),
+                    Back => self.back_trajectory.clone(),
                     _ => unreachable!(),
                 }
             }
@@ -190,27 +154,87 @@ impl
     >
 {
     pub fn build(self) -> TrajectoryGenerator {
+        let straight_generator = StraightTrajectoryGenerator::new(
+            self.max_speed,
+            self.max_acceleration,
+            self.max_jerk,
+            self.period,
+        );
+        let slalom_generator = SlalomGenerator::new(
+            self.angular_speed_ref,
+            self.angular_acceleration_ref,
+            self.angular_jerk_ref,
+            self.slalom_speed_ref,
+            self.period,
+        );
+        let spin_generator = SpinGenerator::new(
+            self.angular_speed_ref,
+            self.angular_acceleration_ref,
+            self.angular_jerk_ref,
+            self.period,
+        );
+
+        let pose = Pose::default();
+        let right_trajectory = slalom_generator.generate(
+            pose.x,
+            pose.y,
+            pose.theta,
+            Angle::from_degree(-90.0),
+            self.search_speed,
+        );
+        let left_trajectory = slalom_generator.generate(
+            pose.x,
+            pose.y,
+            pose.theta,
+            Angle::from_degree(90.0),
+            self.search_speed,
+        );
+        let front_trajectory = {
+            let distance = Distance::from_meters(0.09); //TODO: use configurable value
+            let x_end = pose.x + distance * pose.theta.cos();
+            let y_end = pose.y + distance * pose.theta.sin();
+            straight_generator.generate(
+                pose.x,
+                pose.y,
+                x_end,
+                y_end,
+                self.search_speed,
+                self.search_speed,
+            )
+        };
+        let back_trajectory = {
+            let distance = Distance::from_meters(0.045); //TODO: use configurable value
+            let x_end = pose.x + distance * pose.theta.cos();
+            let y_end = pose.y + distance * pose.theta.sin();
+            straight_generator
+                .generate(
+                    pose.x,
+                    pose.y,
+                    x_end,
+                    y_end,
+                    self.search_speed,
+                    Default::default(),
+                )
+                .chain(spin_generator.generate(pose.theta, Angle::from_degree(180.0)))
+                .chain(straight_generator.generate(
+                    x_end,
+                    y_end,
+                    pose.x,
+                    pose.y,
+                    Default::default(),
+                    self.search_speed,
+                ))
+        };
+
         TrajectoryGenerator {
-            straight_generator: StraightTrajectoryGenerator::new(
-                self.max_speed,
-                self.max_acceleration,
-                self.max_jerk,
-                self.period,
-            ),
-            slalom_generator: SlalomGenerator::new(
-                self.angular_speed_ref,
-                self.angular_acceleration_ref,
-                self.angular_jerk_ref,
-                self.slalom_speed_ref,
-                self.period,
-            ),
-            spin_generator: SpinGenerator::new(
-                self.angular_speed_ref,
-                self.angular_acceleration_ref,
-                self.angular_jerk_ref,
-                self.period,
-            ),
+            straight_generator,
+            slalom_generator,
+            spin_generator,
             search_speed: self.search_speed,
+            front_trajectory,
+            right_trajectory,
+            left_trajectory,
+            back_trajectory,
         }
     }
 }

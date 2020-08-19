@@ -25,11 +25,7 @@ impl SpinGenerator {
         }
     }
 
-    pub fn generate(
-        &self,
-        theta_start: Angle,
-        theta_distance: Angle,
-    ) -> impl Iterator<Item = Target> {
+    pub fn generate(&self, theta_start: Angle, theta_distance: Angle) -> SpinTrajectory {
         let (trajectory_fn, t_end) = self.function_generator.generate(
             theta_start,
             theta_distance,
@@ -40,6 +36,7 @@ impl SpinGenerator {
     }
 }
 
+#[derive(Clone)]
 pub struct SpinTrajectory {
     angle_calculator: OverallCalculator<Angle>,
     t: Time,
