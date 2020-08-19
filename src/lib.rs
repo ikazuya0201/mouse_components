@@ -14,6 +14,17 @@ mod tracker;
 mod trajectory_generator;
 pub mod utils;
 
+pub mod traits {
+    use super::*;
+
+    pub use administrator::{
+        Agent, DirectionInstructor, Graph, GraphConverter, NodeConverter, ObstacleInterpreter,
+        Operator, Solver,
+    };
+    pub use agent::{ObstacleDetector, StateEstimator, Tracker, TrajectoryGenerator};
+    pub use tracker::Controller;
+}
+
 pub mod sensors {
     use super::*;
 
