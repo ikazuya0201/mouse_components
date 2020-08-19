@@ -752,29 +752,40 @@ where
     F: Fn(Pattern) -> u16,
 {
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
-        fn calculate_likelihood(expected: Distance, observed: Distance, sigma: Distance) -> f32 {
-            let base = (expected - observed) / sigma;
-            libm::expf(-base * base / 2.0) / sigma.as_meters()
-        }
-
         let mut probs = self.wall_existence_probs.borrow_mut();
         for obstacle in obstacles {
             if let Ok(wall_info) = self.converter.convert::<N>(obstacle.source) {
                 let index = wall_info.position.as_index();
                 let existence_prob = probs[index];
-                let exist_val = existence_prob
-                    * calculate_likelihood(
-                        wall_info.existing_distance,
-                        obstacle.distance.mean,
-                        obstacle.distance.standard_deviation,
-                    );
-                let not_exist_val = (1.0 - existence_prob)
-                    * calculate_likelihood(
-                        wall_info.not_existing_distance,
-                        obstacle.distance.mean,
-                        obstacle.distance.standard_deviation,
-                    );
-                probs[index] = exist_val / (exist_val + not_exist_val);
+                if existence_prob == 0.0 || existence_prob == 1.0 {
+                    continue;
+                }
+                let exist_val = {
+                    let tmp = (wall_info.existing_distance - obstacle.distance.mean)
+                        / obstacle.distance.standard_deviation;
+                    -tmp * tmp / 2.0
+                };
+                let not_exist_val = {
+                    let tmp = (wall_info.not_existing_distance - obstacle.distance.mean)
+                        / obstacle.distance.standard_deviation;
+                    -tmp * tmp / 2.0
+                };
+
+                let min = if exist_val < not_exist_val {
+                    exist_val
+                } else {
+                    not_exist_val
+                };
+                let exist_val = libm::expf(exist_val - min) * existence_prob;
+                let not_exist_val = libm::expf(not_exist_val - min) * (1.0 - existence_prob);
+
+                probs[index] = if exist_val.is_infinite() {
+                    1.0
+                } else if not_exist_val.is_infinite() {
+                    0.0
+                } else {
+                    exist_val / (exist_val + not_exist_val)
+                }
             }
         }
     }
