@@ -44,7 +44,7 @@ where
         distance: T,
         v_start: dt!(T),
         v_end: dt!(T),
-    ) -> (impl Fn(Time) -> SubTarget<T>, Time) {
+    ) -> (OverallCalculator<T>, Time) {
         let (distance, sign) = if distance.is_negative() {
             (-distance, -1.0f32)
         } else {
@@ -82,43 +82,28 @@ where
         let dist3 = self.calculate_acceleration_distance(v_max, v_end);
         let dist2 = distance - dist1 - dist3;
 
-        let (accel_fn, dt1) = self.generate_acceleration(x_start, v_start, v_max);
-        let (const_fn, dt2) = Self::generate_constant(x_start + dist1, dist2, v_max);
-        let (decel_fn, dt3) = self.generate_acceleration(x_start + distance - dist3, v_max, v_end);
+        let (accel_calculator, dt1) = self.generate_acceleration(x_start, v_start, v_max);
+        let (const_calculator, dt2) = Self::generate_constant(x_start + dist1, dist2, v_max);
+        let (decel_calculator, dt3) =
+            self.generate_acceleration(x_start + distance - dist3, v_max, v_end);
 
         let t1 = dt1;
         let t2 = t1 + dt2;
         let t3 = t2 + dt3;
 
         (
-            move |t: Time| {
-                let target = if t < Default::default() {
-                    SubTarget {
-                        x: x_start,
-                        v: v_start,
-                        a: Default::default(),
-                        j: Default::default(),
-                    }
-                } else if t <= t1 {
-                    accel_fn(t)
-                } else if t <= t2 {
-                    const_fn(t - t1)
-                } else if t <= t3 {
-                    decel_fn(t - t2)
-                } else {
-                    SubTarget {
-                        x: x_start + distance,
-                        v: v_end,
-                        a: Default::default(),
-                        j: Default::default(),
-                    }
-                };
-                SubTarget {
-                    x: (target.x - x_start) * sign + x_start,
-                    v: target.v * sign,
-                    a: target.a * sign,
-                    j: target.j * sign,
-                }
+            OverallCalculator {
+                x_start,
+                v_start,
+                t1,
+                t2,
+                t3,
+                distance,
+                v_end,
+                accel_calculator,
+                const_calculator,
+                decel_calculator,
+                sign,
             },
             t3,
         )
@@ -129,7 +114,7 @@ where
         x_start: T,
         v_start: dt!(T),
         v_end: dt!(T),
-    ) -> (impl Fn(Time) -> SubTarget<T>, Time) {
+    ) -> (AccelerationCalculator<T>, Time) {
         let tc = self.a_max / self.j_max;
         let vd = self.a_max * tc;
         let (t1, t2, t3) = if (v_end - v_start).abs() >= vd {
@@ -150,49 +135,16 @@ where
         let x_end = x_start + distance;
 
         (
-            move |t: Time| -> SubTarget<T> {
-                if t < Default::default() {
-                    SubTarget {
-                        x: x_start,
-                        v: v_start,
-                        a: Default::default(),
-                        j: Default::default(),
-                    }
-                } else if t <= t1 {
-                    SubTarget {
-                        j: j_m,
-                        a: j_m * t,
-                        v: v_start + j_m * t * t / 2.0,
-                        x: x_start + v_start * t + j_m * t * t * t / 6.0,
-                    }
-                } else if t <= t2 {
-                    let dt1 = t - t1;
-                    SubTarget {
-                        j: Default::default(),
-                        a: a_m,
-                        v: v_start + a_m * t1 / 2.0 + a_m * dt1,
-                        x: x_start
-                            + v_start * t1
-                            + j_m * t1 * t1 * t1 / 6.0
-                            + (v_start + a_m * t1 / 2.0) * dt1
-                            + a_m * dt1 * dt1 / 2.0,
-                    }
-                } else if t <= t3 {
-                    let dt3 = t3 - t;
-                    SubTarget {
-                        j: -j_m,
-                        a: j_m * dt3,
-                        v: v_end - j_m * dt3 * dt3 / 2.0,
-                        x: x_end - v_end * dt3 + j_m * dt3 * dt3 * dt3 / 6.0,
-                    }
-                } else {
-                    SubTarget {
-                        x: x_end,
-                        v: v_end,
-                        a: Default::default(),
-                        j: Default::default(),
-                    }
-                }
+            AccelerationCalculator {
+                x_start,
+                v_start,
+                x_end,
+                v_end,
+                a_m,
+                j_m,
+                t1,
+                t2,
+                t3,
             },
             t3,
         )
@@ -210,36 +162,13 @@ where
         (v_start + v_end) * t / 2.0
     }
 
-    fn generate_constant(
-        x_start: T,
-        distance: T,
-        v: dt!(T),
-    ) -> (impl Fn(Time) -> SubTarget<T>, Time) {
+    fn generate_constant(x_start: T, distance: T, v: dt!(T)) -> (ConstantCalculator<T>, Time) {
         let t_end = if (distance / v).is_negative() {
             Default::default()
         } else {
             distance / v
         };
-        (
-            move |t: Time| {
-                if t > t_end || t < Default::default() {
-                    SubTarget {
-                        x: x_start + v * t_end,
-                        v,
-                        a: Default::default(),
-                        j: Default::default(),
-                    }
-                } else {
-                    SubTarget {
-                        j: Default::default(),
-                        a: Default::default(),
-                        v,
-                        x: x_start + v * t,
-                    }
-                }
-            },
-            t_end,
-        )
+        (ConstantCalculator { t_end, x_start, v }, t_end)
     }
 
     //TODO: devise faster algorithm
@@ -327,6 +256,174 @@ where
     }
 }
 
+struct AccelerationCalculator<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable,
+    ddt!(T): TimeDifferentiable,
+    dddt!(T): Quantity,
+{
+    x_start: T,
+    v_start: dt!(T),
+    x_end: T,
+    v_end: dt!(T),
+    a_m: ddt!(T),
+    j_m: dddt!(T),
+    t1: Time,
+    t2: Time,
+    t3: Time,
+}
+
+impl<T> AccelerationCalculator<T>
+where
+    T: TimeDifferentiable + Div<T, Output = f32>,
+    dt!(T): TimeDifferentiable + Mul<Time, Output = T> + Div<dddt!(T), Output = SquaredTime>,
+    ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)>,
+    dddt!(T): Quantity + Mul<Time, Output = ddt!(T)>,
+    f32: From<T> + From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
+{
+    fn calculate(&self, t: Time) -> SubTarget<T> {
+        if t < Default::default() {
+            SubTarget {
+                x: self.x_start,
+                v: self.v_start,
+                a: Default::default(),
+                j: Default::default(),
+            }
+        } else if t <= self.t1 {
+            SubTarget {
+                j: self.j_m,
+                a: self.j_m * t,
+                v: self.v_start + self.j_m * t * t / 2.0,
+                x: self.x_start + self.v_start * t + self.j_m * t * t * t / 6.0,
+            }
+        } else if t <= self.t2 {
+            let dt1 = t - self.t1;
+            SubTarget {
+                j: Default::default(),
+                a: self.a_m,
+                v: self.v_start + self.a_m * self.t1 / 2.0 + self.a_m * dt1,
+                x: self.x_start
+                    + self.v_start * self.t1
+                    + self.j_m * self.t1 * self.t1 * self.t1 / 6.0
+                    + (self.v_start + self.a_m * self.t1 / 2.0) * dt1
+                    + self.a_m * dt1 * dt1 / 2.0,
+            }
+        } else if t <= self.t3 {
+            let dt3 = self.t3 - t;
+            SubTarget {
+                j: -self.j_m,
+                a: self.j_m * dt3,
+                v: self.v_end - self.j_m * dt3 * dt3 / 2.0,
+                x: self.x_end - self.v_end * dt3 + self.j_m * dt3 * dt3 * dt3 / 6.0,
+            }
+        } else {
+            SubTarget {
+                x: self.x_end,
+                v: self.v_end,
+                a: Default::default(),
+                j: Default::default(),
+            }
+        }
+    }
+}
+
+struct ConstantCalculator<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable,
+{
+    t_end: Time,
+    x_start: T,
+    v: dt!(T),
+}
+
+impl<T> ConstantCalculator<T>
+where
+    T: TimeDifferentiable + Div<T, Output = f32>,
+    dt!(T): TimeDifferentiable + Mul<Time, Output = T> + Div<dddt!(T), Output = SquaredTime>,
+    ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)>,
+    dddt!(T): Quantity + Mul<Time, Output = ddt!(T)>,
+    f32: From<T> + From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
+{
+    fn calculate(&self, t: Time) -> SubTarget<T> {
+        if t > self.t_end || t < Default::default() {
+            SubTarget {
+                x: self.x_start + self.v * self.t_end,
+                v: self.v,
+                a: Default::default(),
+                j: Default::default(),
+            }
+        } else {
+            SubTarget {
+                j: Default::default(),
+                a: Default::default(),
+                v: self.v,
+                x: self.x_start + self.v * t,
+            }
+        }
+    }
+}
+
+pub struct OverallCalculator<T>
+where
+    T: TimeDifferentiable,
+    dt!(T): TimeDifferentiable,
+    ddt!(T): TimeDifferentiable,
+    dddt!(T): Quantity,
+{
+    x_start: T,
+    v_start: dt!(T),
+    t1: Time,
+    t2: Time,
+    t3: Time,
+    distance: T,
+    v_end: dt!(T),
+    accel_calculator: AccelerationCalculator<T>,
+    const_calculator: ConstantCalculator<T>,
+    decel_calculator: AccelerationCalculator<T>,
+    sign: f32,
+}
+
+impl<T> OverallCalculator<T>
+where
+    T: TimeDifferentiable + Div<T, Output = f32>,
+    dt!(T): TimeDifferentiable + Mul<Time, Output = T> + Div<dddt!(T), Output = SquaredTime>,
+    ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)>,
+    dddt!(T): Quantity + Mul<Time, Output = ddt!(T)>,
+    f32: From<T> + From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
+{
+    pub fn calculate(&self, t: Time) -> SubTarget<T> {
+        let target = if t < Default::default() {
+            SubTarget {
+                x: self.x_start,
+                v: self.v_start,
+                a: Default::default(),
+                j: Default::default(),
+            }
+        } else if t <= self.t1 {
+            self.accel_calculator.calculate(t)
+        } else if t <= self.t2 {
+            self.const_calculator.calculate(t - self.t1)
+        } else if t <= self.t3 {
+            self.decel_calculator.calculate(t - self.t2)
+        } else {
+            SubTarget {
+                x: self.x_start + self.distance,
+                v: self.v_end,
+                a: Default::default(),
+                j: Default::default(),
+            }
+        };
+        SubTarget {
+            x: (target.x - self.x_start) * self.sign + self.x_start,
+            v: target.v * self.sign,
+            a: target.a * self.sign,
+            j: target.j * self.sign,
+        }
+    }
+}
+
 pub struct StraightTrajectoryGenerator {
     function_generator: StraightFunctionGenerator<Distance>,
     period: Time,
@@ -386,45 +483,10 @@ impl StraightTrajectoryGenerator {
             theta,
         )
     }
-
-    #[allow(unused)]
-    pub fn generate_constant(
-        &self,
-        x_start: Distance,
-        y_start: Distance,
-        x_end: Distance,
-        y_end: Distance,
-        v: Speed,
-        period: Time,
-    ) -> impl Iterator<Item = Target> {
-        let x_dist = x_end - x_start;
-        let y_dist = y_end - y_start;
-
-        let dist = Self::calculate_distance(x_dist, y_dist);
-
-        let (trajectory_fn, t_end) =
-            StraightFunctionGenerator::<Distance>::generate_constant(Default::default(), dist, v);
-
-        let x_ratio = x_dist / dist;
-        let y_ratio = y_dist / dist;
-
-        let theta = Angle::from_radian(libm::atan2f(y_dist.as_meters(), x_dist.as_meters()));
-
-        StraightTrajectory::new(
-            trajectory_fn,
-            t_end,
-            period,
-            x_ratio,
-            y_ratio,
-            x_start,
-            y_start,
-            theta,
-        )
-    }
 }
 
-pub struct StraightTrajectory<F> {
-    trajectory_fn: F,
+pub struct StraightTrajectory {
+    trajectory_calculator: OverallCalculator<Distance>,
     t: Time,
     t_end: Time,
     period: Time,
@@ -435,9 +497,9 @@ pub struct StraightTrajectory<F> {
     theta: Angle,
 }
 
-impl<F> StraightTrajectory<F> {
+impl StraightTrajectory {
     fn new(
-        trajectory_fn: F,
+        trajectory_calculator: OverallCalculator<Distance>,
         t_end: Time,
         period: Time,
         x_ratio: f32,
@@ -447,7 +509,7 @@ impl<F> StraightTrajectory<F> {
         theta: Angle,
     ) -> Self {
         Self {
-            trajectory_fn,
+            trajectory_calculator,
             t: Time::from_seconds(0.0),
             t_end,
             period,
@@ -460,10 +522,7 @@ impl<F> StraightTrajectory<F> {
     }
 }
 
-impl<F> Iterator for StraightTrajectory<F>
-where
-    F: Fn(Time) -> SubTarget<Distance>,
-{
+impl Iterator for StraightTrajectory {
     type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -472,7 +531,7 @@ where
         }
         let t = self.t;
         self.t += self.period;
-        let target = (self.trajectory_fn)(t);
+        let target = self.trajectory_calculator.calculate(t);
         Some(Target {
             x: SubTarget {
                 x: self.x_start + target.x * self.x_ratio,
@@ -503,7 +562,7 @@ mod tests {
 
     const EPSILON: f32 = 5e-4; //low accuracy...
 
-    fn test_trajectory_fn<T>(
+    fn test_trajectory_calculator<T>(
         period: Time,
         v_max: dt!(T),
         a_max: ddt!(T),
@@ -524,21 +583,21 @@ mod tests {
         f32: From<T> + From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
     {
         let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
-        let (trajectory_fn, t_end) = generator.generate(x_start, x_end, v_start, v_end);
+        let (trajectory_calculator, t_end) = generator.generate(x_start, x_end, v_start, v_end);
         let mut current = Time::from_seconds(0.0);
-        let mut before = trajectory_fn(current);
+        let mut before = trajectory_calculator.calculate(current);
         let t_eps = T::from(EPSILON);
         let ddt_eps = <<T as Div<Time>>::Output as Div<Time>>::Output::from(EPSILON);
         let dddt_eps =
             <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output::from(EPSILON);
         assert!(
-            (trajectory_fn(Default::default()).x - x_start).abs() < t_eps,
+            (trajectory_calculator.calculate(Default::default()).x - x_start).abs() < t_eps,
             "lhs: {:?}, rhs: {:?}",
-            trajectory_fn(Default::default()).x,
+            trajectory_calculator.calculate(Default::default()).x,
             x_start
         );
         while current < t_end {
-            let target = trajectory_fn(current);
+            let target = trajectory_calculator.calculate(current);
             if output {
                 let x_raw: f32 = target.x.into();
                 let v_raw: f32 = target.v.into();
@@ -569,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_straight_trajectory_long() {
-        test_trajectory_fn(
+        test_trajectory_calculator(
             Time::from_seconds(0.001),
             Speed::from_meter_per_second(1.0),
             Acceleration::from_meter_per_second_squared(1.0),
@@ -584,7 +643,7 @@ mod tests {
 
     #[test]
     fn test_straight_trajectory_with_angle() {
-        test_trajectory_fn(
+        test_trajectory_calculator(
             Time::from_seconds(0.001),
             AngularSpeed::from_radian_per_second(1.0),
             AngularAcceleration::from_radian_per_second_squared(1.0),
@@ -599,7 +658,7 @@ mod tests {
 
     #[test]
     fn test_straight_trajectory_short() {
-        test_trajectory_fn(
+        test_trajectory_calculator(
             Time::from_seconds(0.001),
             Speed::from_meter_per_second(1.0),
             Acceleration::from_meter_per_second_squared(1.0),
@@ -614,7 +673,7 @@ mod tests {
 
     #[test]
     fn test_straight_trajectory_with_only_acceleration() {
-        test_trajectory_fn(
+        test_trajectory_calculator(
             Time::from_seconds(0.001),
             Speed::from_meter_per_second(1.0),
             Acceleration::from_meter_per_second_squared(0.5),
@@ -629,7 +688,7 @@ mod tests {
 
     #[test]
     fn test_straight_trajectory_with_only_deceleration() {
-        test_trajectory_fn(
+        test_trajectory_calculator(
             Time::from_seconds(0.001),
             Speed::from_meter_per_second(1.0),
             Acceleration::from_meter_per_second_squared(0.5),
@@ -644,7 +703,7 @@ mod tests {
 
     #[test]
     fn test_straight_trajectory_with_minus_value() {
-        test_trajectory_fn(
+        test_trajectory_calculator(
             Time::from_seconds(0.001),
             Speed::from_meter_per_second(1.0),
             Acceleration::from_meter_per_second_squared(1.0),
@@ -659,7 +718,7 @@ mod tests {
 
     #[test]
     fn test_straight_trajectory_with_corner_case1() {
-        test_trajectory_fn(
+        test_trajectory_calculator(
             Time::from_seconds(0.001),
             AngularSpeed::from_degree_per_second(90.0),
             AngularAcceleration::from_degree_per_second_squared(45.0),
@@ -674,7 +733,7 @@ mod tests {
 
     #[test]
     fn test_straight_trajectory_with_corner_case2() {
-        test_trajectory_fn(
+        test_trajectory_calculator(
             Time::from_seconds(0.001),
             Speed::from_meter_per_second(2.0),
             Acceleration::from_meter_per_second_squared(1.0),

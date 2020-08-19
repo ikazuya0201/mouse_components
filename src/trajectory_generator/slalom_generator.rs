@@ -3,7 +3,7 @@ use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance
 
 use super::trajectory::{SubTarget, Target};
 
-use super::straight_generator::StraightFunctionGenerator;
+use super::straight_generator::{OverallCalculator, StraightFunctionGenerator};
 
 pub struct SlalomGenerator {
     dtheta: AngularSpeed,
@@ -54,11 +54,8 @@ impl SlalomGenerator {
     }
 }
 
-struct SlalomTrajectory<F>
-where
-    F: Fn(Time) -> SubTarget<Angle>,
-{
-    angle_fn: F,
+struct SlalomTrajectory {
+    angle_calculator: OverallCalculator<Angle>,
     t: Time,
     t_end: Time,
     period: Time,
@@ -67,12 +64,9 @@ where
     v: Speed,
 }
 
-impl<F> SlalomTrajectory<F>
-where
-    F: Fn(Time) -> SubTarget<Angle>,
-{
+impl SlalomTrajectory {
     pub fn new(
-        angle_fn: F,
+        angle_calculator: OverallCalculator<Angle>,
         t_end: Time,
         period: Time,
         x_start: Distance,
@@ -80,7 +74,7 @@ where
         v: Speed,
     ) -> Self {
         Self {
-            angle_fn,
+            angle_calculator,
             t: Default::default(),
             t_end,
             period,
@@ -91,10 +85,7 @@ where
     }
 }
 
-impl<F> Iterator for SlalomTrajectory<F>
-where
-    F: Fn(Time) -> SubTarget<Angle>,
-{
+impl Iterator for SlalomTrajectory {
     type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -104,9 +95,9 @@ where
         let t = self.t;
         self.t += self.period;
         let targets = [
-            (self.angle_fn)(t),
-            (self.angle_fn)(t + self.period / 2.0),
-            (self.angle_fn)(t + self.period),
+            self.angle_calculator.calculate(t),
+            self.angle_calculator.calculate(t + self.period / 2.0),
+            self.angle_calculator.calculate(t + self.period),
         ];
 
         let mut sin_theta = [0.0; 3];
