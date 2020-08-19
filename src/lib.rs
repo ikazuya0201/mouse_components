@@ -25,6 +25,7 @@ pub mod sensors {
 pub mod data_types {
     use super::*;
 
+    pub use administrator::{FastRun, Idle, Search, Select};
     pub use agent::Pose;
     pub use maze::{
         AbsoluteDirection, NodeId, RelativeDirection, SearchNodeId, WallDirection, WallPosition,
