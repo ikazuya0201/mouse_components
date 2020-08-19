@@ -256,6 +256,7 @@ where
     }
 }
 
+#[derive(Clone)]
 struct AccelerationCalculator<T>
 where
     T: TimeDifferentiable,
@@ -264,11 +265,11 @@ where
     dddt!(T): Quantity,
 {
     x_start: T,
-    v_start: dt!(T),
+    v_start: <T as Div<Time>>::Output,
     x_end: T,
-    v_end: dt!(T),
-    a_m: ddt!(T),
-    j_m: dddt!(T),
+    v_end: <T as Div<Time>>::Output,
+    a_m: <<T as Div<Time>>::Output as Div<Time>>::Output,
+    j_m: <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output,
     t1: Time,
     t2: Time,
     t3: Time,
@@ -328,6 +329,7 @@ where
     }
 }
 
+#[derive(Clone)]
 struct ConstantCalculator<T>
 where
     T: TimeDifferentiable,
@@ -335,7 +337,7 @@ where
 {
     t_end: Time,
     x_start: T,
-    v: dt!(T),
+    v: <T as Div<Time>>::Output,
 }
 
 impl<T> ConstantCalculator<T>
@@ -365,20 +367,21 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct OverallCalculator<T>
 where
     T: TimeDifferentiable,
-    dt!(T): TimeDifferentiable,
+    dt!(T): TimeDifferentiable + Clone,
     ddt!(T): TimeDifferentiable,
     dddt!(T): Quantity,
 {
     x_start: T,
-    v_start: dt!(T),
+    v_start: <T as Div<Time>>::Output,
     t1: Time,
     t2: Time,
     t3: Time,
     distance: T,
-    v_end: dt!(T),
+    v_end: <T as Div<Time>>::Output,
     accel_calculator: AccelerationCalculator<T>,
     const_calculator: ConstantCalculator<T>,
     decel_calculator: AccelerationCalculator<T>,
@@ -457,7 +460,7 @@ impl StraightTrajectoryGenerator {
         y_end: Distance,
         v_start: Speed,
         v_end: Speed,
-    ) -> impl Iterator<Item = Target> {
+    ) -> StraightTrajectory {
         let x_dist = x_end - x_start;
         let y_dist = y_end - y_start;
 
@@ -485,6 +488,7 @@ impl StraightTrajectoryGenerator {
     }
 }
 
+#[derive(Clone)]
 pub struct StraightTrajectory {
     trajectory_calculator: OverallCalculator<Distance>,
     t: Time,

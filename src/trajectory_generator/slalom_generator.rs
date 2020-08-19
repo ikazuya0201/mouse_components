@@ -37,7 +37,7 @@ impl SlalomGenerator {
         theta: Angle,
         theta_distance: Angle,
         v: Speed,
-    ) -> impl Iterator<Item = Target> {
+    ) -> SlalomTrajectory {
         let k = v / self.v_ref;
         let angle_generator = StraightFunctionGenerator::<Angle>::new(
             k * self.dtheta,
@@ -54,7 +54,8 @@ impl SlalomGenerator {
     }
 }
 
-struct SlalomTrajectory {
+#[derive(Clone)]
+pub struct SlalomTrajectory {
     angle_calculator: OverallCalculator<Angle>,
     t: Time,
     t_end: Time,
