@@ -1,3 +1,4 @@
+use alloc::rc::Rc;
 use core::cell::Cell;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -7,25 +8,15 @@ use crate::administrator::{
     NotFinishError, ObstacleInterpreter, Operator, Search, Solver,
 };
 
-pub struct SearchOperator<
-    'a,
-    Node,
-    SearchNode,
-    Cost,
-    Direction,
-    Obstacle,
-    Pose,
-    Maze,
-    IAgent,
-    ISolver,
-> {
+pub struct SearchOperator<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+{
     start_pose: Pose,
     start_node: SearchNode,
     current: Cell<SearchNode>,
     is_updated: AtomicBool,
-    maze: &'a Maze,
-    agent: &'a IAgent,
-    solver: &'a ISolver,
+    maze: Rc<Maze>,
+    agent: Rc<IAgent>,
+    solver: Rc<ISolver>,
     _node: PhantomData<fn() -> Node>,
     _cost: PhantomData<fn() -> Cost>,
     _direction: PhantomData<fn() -> Direction>,
@@ -33,17 +24,17 @@ pub struct SearchOperator<
     _pose: PhantomData<fn() -> Pose>,
 }
 
-impl<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
-    SearchOperator<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+impl<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+    SearchOperator<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
 where
     SearchNode: Copy,
 {
     pub fn new(
         start_pose: Pose,
         start_node: SearchNode,
-        maze: &'a Maze,
-        agent: &'a IAgent,
-        solver: &'a ISolver,
+        maze: Rc<Maze>,
+        agent: Rc<IAgent>,
+        solver: Rc<ISolver>,
     ) -> Self {
         Self {
             start_pose,
@@ -62,8 +53,8 @@ where
     }
 }
 
-impl<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver> Operator<Search>
-    for SearchOperator<'a, Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+impl<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver> Operator<Search>
+    for SearchOperator<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
 where
     SearchNode: Copy,
     Pose: Copy,
@@ -109,4 +100,14 @@ where
             Ok(Mode::FastRun(FastRun))
         }
     }
+}
+
+unsafe impl<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver> Sync
+    for SearchOperator<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+{
+}
+
+unsafe impl<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver> Send
+    for SearchOperator<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+{
 }

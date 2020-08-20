@@ -1,6 +1,8 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(type_alias_impl_trait)]
 
+extern crate alloc;
+
 mod administrator;
 mod agent;
 mod controller;
@@ -95,7 +97,6 @@ pub mod defaults {
         Solver<NodeId<MazeWidth>, SearchNodeId<MazeWidth>, MaxSize, GoalSize>;
 
     pub type DefaultSearchOperator<
-        'a,
         LeftMotor,
         RightMotor,
         LeftEncoder,
@@ -107,7 +108,6 @@ pub mod defaults {
         MaxSize,
         GoalSize,
     > = SearchOperator<
-        'a,
         NodeId<MazeWidth>,
         SearchNodeId<MazeWidth>,
         u16,
