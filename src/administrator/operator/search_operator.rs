@@ -101,3 +101,8 @@ where
         }
     }
 }
+
+unsafe impl<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver> Sync
+    for SearchOperator<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+{
+}
