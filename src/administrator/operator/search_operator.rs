@@ -106,3 +106,8 @@ unsafe impl<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISo
     for SearchOperator<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
 {
 }
+
+unsafe impl<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver> Send
+    for SearchOperator<Node, SearchNode, Cost, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+{
+}
