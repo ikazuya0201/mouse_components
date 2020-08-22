@@ -34,10 +34,10 @@ impl Logger for NullLogger {
 }
 
 pub struct Tracker<LM, RM, TC, RC, L> {
-    kx: Frequency,
-    kdx: SquaredFrequency,
-    ky: Frequency,
-    kdy: SquaredFrequency,
+    kx: SquaredFrequency,
+    kdx: Frequency,
+    ky: SquaredFrequency,
+    kdy: Frequency,
     xi: Speed,
     period: Time,
     xi_threshold: Speed,
@@ -115,13 +115,13 @@ where
 
         //calculate control input for (x,y)
         let ux =
-            target.x.a + self.kx * (target.x.v - state.x.v) + self.kdx * (target.x.x - state.x.x);
+            target.x.a + self.kdx * (target.x.v - state.x.v) + self.kx * (target.x.x - state.x.x);
         let uy =
-            target.y.a + self.ky * (target.y.v - state.y.v) + self.kdy * (target.y.x - state.y.x);
+            target.y.a + self.kdy * (target.y.v - state.y.v) + self.ky * (target.y.x - state.y.x);
         let dux =
-            target.x.j + self.kx * (target.x.a - state.x.a) + self.kdx * (target.x.v - state.x.v);
+            target.x.j + self.kdx * (target.x.a - state.x.a) + self.kx * (target.x.v - state.x.v);
         let duy =
-            target.y.j + self.ky * (target.y.a - state.y.a) + self.kdy * (target.y.v - state.y.v);
+            target.y.j + self.kdy * (target.y.a - state.y.a) + self.ky * (target.y.v - state.y.v);
 
         let dxi = ux * cos_theta + uy * sin_theta;
         let (uv, uw, duv, duw) = if self.xi > self.xi_threshold {
@@ -232,10 +232,10 @@ where
 {
     pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
         Tracker {
-            kx: Frequency::from_hertz(self.kx),
-            kdx: SquaredFrequency::from_squared_hertz(self.kdx),
-            ky: Frequency::from_hertz(self.ky),
-            kdy: SquaredFrequency::from_squared_hertz(self.kdy),
+            kx: SquaredFrequency::from_squared_hertz(self.kx),
+            kdx: Frequency::from_hertz(self.kdx),
+            ky: SquaredFrequency::from_squared_hertz(self.ky),
+            kdy: Frequency::from_hertz(self.kdy),
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -262,10 +262,10 @@ where
 {
     pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
         Tracker {
-            kx: Frequency::from_hertz(self.kx),
-            kdx: SquaredFrequency::from_squared_hertz(self.kdx),
-            ky: Frequency::from_hertz(self.ky),
-            kdy: SquaredFrequency::from_squared_hertz(self.kdy),
+            kx: SquaredFrequency::from_squared_hertz(self.kx),
+            kdx: Frequency::from_hertz(self.kdx),
+            ky: SquaredFrequency::from_squared_hertz(self.ky),
+            kdy: Frequency::from_hertz(self.kdy),
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -291,10 +291,10 @@ where
 {
     pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
         Tracker {
-            kx: Frequency::from_hertz(self.kx),
-            kdx: SquaredFrequency::from_squared_hertz(self.kdx),
-            ky: Frequency::from_hertz(self.ky),
-            kdy: SquaredFrequency::from_squared_hertz(self.kdy),
+            kx: SquaredFrequency::from_squared_hertz(self.kx),
+            kdx: Frequency::from_hertz(self.kdx),
+            ky: SquaredFrequency::from_squared_hertz(self.ky),
+            kdy: Frequency::from_hertz(self.kdy),
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -321,10 +321,10 @@ where
 {
     pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
         Tracker {
-            kx: Frequency::from_hertz(self.kx),
-            kdx: SquaredFrequency::from_squared_hertz(self.kdx),
-            ky: Frequency::from_hertz(self.ky),
-            kdy: SquaredFrequency::from_squared_hertz(self.kdy),
+            kx: SquaredFrequency::from_squared_hertz(self.kx),
+            kdx: Frequency::from_hertz(self.kdx),
+            ky: SquaredFrequency::from_squared_hertz(self.ky),
+            kdy: Frequency::from_hertz(self.kdy),
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
