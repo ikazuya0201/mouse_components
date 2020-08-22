@@ -1,6 +1,6 @@
 pub mod pose;
 
-use core::cell::RefCell;
+use core::cell::{Cell, RefCell};
 use core::marker::PhantomData;
 
 use heapless::{consts::*, spsc::Queue};
@@ -54,8 +54,8 @@ pub struct Agent<
     tracker: RefCell<ITracker>,
     trajectory_generator: ITrajectoryGenerator,
     trajectories: Mutex<Queue<ITrajectoryGenerator::Trajectory, U3>>,
+    last_target: Cell<Option<Target>>,
     _state: PhantomData<fn() -> State>,
-    _target: PhantomData<fn() -> Target>,
     _pose: PhantomData<fn() -> Pose>,
     _obstacle: PhantomData<fn() -> Obstacle>,
     _direction: PhantomData<fn() -> Direction>,
@@ -101,8 +101,8 @@ where
             tracker: RefCell::new(tracker),
             trajectory_generator,
             trajectories: Mutex::new(Queue::new()),
+            last_target: Cell::new(None),
             _state: PhantomData,
-            _target: PhantomData,
             _pose: PhantomData,
             _obstacle: PhantomData,
             _direction: PhantomData,
@@ -138,6 +138,7 @@ impl<
     >
 where
     Pose: Copy,
+    Target: Copy,
     IObstacleDetector: ObstacleDetector<Obstacle, State>,
     IStateEstimator: StateEstimator<State>,
     ITracker: Tracker<State, Target>,
@@ -148,6 +149,7 @@ where
     fn init(&self, pose: Pose) {
         self.state_estimator.borrow_mut().init();
         self.tracker.borrow_mut().init();
+        self.last_target.set(None);
         let trajectory = self.trajectory_generator.generate_search_init(pose);
         let mut trajectories = self.trajectories.lock();
         *trajectories = Queue::new();
@@ -167,16 +169,25 @@ where
 
     fn track_next(&self) {
         let state = self.state_estimator.borrow_mut().estimate();
-        while let Ok(mut trajectories) = self.trajectories.try_lock() {
-            if let Some(trajectory) = trajectories.iter_mut().next() {
-                if let Some(target) = trajectory.next() {
-                    self.tracker.borrow_mut().track(state, target);
-                    return;
+        let target = {
+            if let Ok(mut trajectories) = self.trajectories.try_lock() {
+                loop {
+                    if let Some(trajectory) = trajectories.iter_mut().next() {
+                        if let Some(target) = trajectory.next() {
+                            break Some(target);
+                        }
+                    } else {
+                        break self.last_target.get();
+                    }
+                    trajectories.dequeue();
                 }
             } else {
-                return;
+                self.last_target.get()
             }
-            trajectories.dequeue();
+        };
+        if let Some(target) = target {
+            self.tracker.borrow_mut().track(state, target);
+            self.last_target.set(Some(target));
         }
     }
 }
