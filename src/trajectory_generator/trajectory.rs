@@ -18,7 +18,7 @@ where
     pub j: <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Target {
     pub x: SubTarget<Distance>,
     pub y: SubTarget<Distance>,
