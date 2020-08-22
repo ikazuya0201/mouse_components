@@ -45,7 +45,7 @@ pub mod data_types {
     };
     pub use obstacle_detector::Obstacle;
     pub use pattern::Pattern;
-    pub use tracker::{NullLogger, State, SubState};
+    pub use tracker::{State, SubState};
     pub use trajectory_generator::{SubTarget, Target};
 }
 
@@ -60,7 +60,7 @@ pub mod impls {
     pub use maze::{Maze, MazeBuilder};
     pub use obstacle_detector::ObstacleDetector;
     pub use solver::Solver;
-    pub use tracker::{Tracker, TrackerBuilder};
+    pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{TrajectoryGenerator, TrajectoryGeneratorBuilder};
 }
 
