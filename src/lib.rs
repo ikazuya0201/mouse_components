@@ -24,7 +24,7 @@ pub mod traits {
         Operator, Solver,
     };
     pub use agent::{ObstacleDetector, StateEstimator, Tracker, TrajectoryGenerator};
-    pub use tracker::Controller;
+    pub use tracker::{Controller, Logger};
 }
 
 pub mod sensors {
@@ -68,8 +68,8 @@ pub mod defaults {
     use super::{data_types::*, impls::*};
     use quantities::{Angle, Distance};
 
-    pub type DefaultTracker<LeftMotor, RightMotor> =
-        Tracker<LeftMotor, RightMotor, Controller<Distance>, Controller<Angle>>;
+    pub type DefaultTracker<LeftMotor, RightMotor, Logger> =
+        Tracker<LeftMotor, RightMotor, Controller<Distance>, Controller<Angle>, Logger>;
 
     pub type DefaultAgent<
         LeftMotor,
@@ -79,6 +79,7 @@ pub mod defaults {
         Imu,
         DistanceSensor,
         DistanceSensorNum,
+        Logger,
     > = Agent<
         State,
         Target,
@@ -87,7 +88,7 @@ pub mod defaults {
         RelativeDirection,
         ObstacleDetector<DistanceSensor, DistanceSensorNum>,
         Estimator<LeftEncoder, RightEncoder, Imu>,
-        DefaultTracker<LeftMotor, RightMotor>,
+        DefaultTracker<LeftMotor, RightMotor, Logger>,
         TrajectoryGenerator,
     >;
 
@@ -107,6 +108,7 @@ pub mod defaults {
         MazeWidth,
         MaxSize,
         GoalSize,
+        Logger,
     > = SearchOperator<
         NodeId<MazeWidth>,
         SearchNodeId<MazeWidth>,
@@ -123,6 +125,7 @@ pub mod defaults {
             Imu,
             DistanceSensor,
             DistanceSensorNum,
+            Logger,
         >,
         DefaultSolver<MazeWidth, MaxSize, GoalSize>,
     >;
