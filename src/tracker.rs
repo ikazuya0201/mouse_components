@@ -107,11 +107,11 @@ where
     fn track_move(&mut self, state: State, target: Target) -> (Voltage, Voltage) {
         self.fail_safe(&state, &target);
 
-        let cos_theta = state.theta.x.cos();
-        let sin_theta = state.theta.x.sin();
+        let cos_th = state.theta.x.cos();
+        let sin_th = state.theta.x.sin();
 
-        let vv = state.x.v * cos_theta + state.y.v * sin_theta;
-        let va = state.x.a * cos_theta + state.y.a * sin_theta;
+        let vv = state.x.v * cos_th + state.y.v * sin_th;
+        let va = state.x.a * cos_th + state.y.a * sin_th;
 
         //calculate control input for (x,y)
         let ux =
@@ -123,18 +123,16 @@ where
         let duy =
             target.y.j + self.kdy * (target.y.a - state.y.a) + self.ky * (target.y.v - state.y.v);
 
-        let dxi = ux * cos_theta + uy * sin_theta;
+        let dxi = ux * cos_th + uy * sin_th;
         let (uv, uw, duv, duw) = if self.xi > self.xi_threshold {
             let uv = self.xi;
-            let uw = (uy * cos_theta - ux * sin_theta) / self.xi;
+            let uw = (uy * cos_th - ux * sin_th) / self.xi;
             let duv = dxi;
-            let duw = -(2.0 * dxi * uw + dux * sin_theta - duy * cos_theta) / self.xi;
+            let duw = -(2.0 * dxi * uw + dux * sin_th - duy * cos_th) / self.xi;
             (uv, uw, duv, duw)
         } else {
             let sin_th_r = target.theta.x.sin();
             let cos_th_r = target.theta.x.cos();
-            let sin_th = state.theta.x.sin();
-            let cos_th = state.theta.x.cos();
             let theta_d = target.theta.x - state.theta.x;
             let sin_th_d = theta_d.sin();
             let cos_th_d = theta_d.cos();
