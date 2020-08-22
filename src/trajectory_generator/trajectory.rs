@@ -4,7 +4,7 @@ use quantities::{Angle, Distance, Quantity, Time, TimeDifferentiable};
 
 use crate::{dddt, ddt, dt};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct SubTarget<T>
 where
     T: TimeDifferentiable,
@@ -18,7 +18,7 @@ where
     pub j: <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Target {
     pub x: SubTarget<Distance>,
     pub y: SubTarget<Distance>,
