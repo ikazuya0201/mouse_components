@@ -45,7 +45,7 @@ pub mod data_types {
     };
     pub use obstacle_detector::Obstacle;
     pub use pattern::Pattern;
-    pub use tracker::{State, SubState};
+    pub use tracker::{NullLogger, State, SubState};
     pub use trajectory_generator::{SubTarget, Target};
 }
 
