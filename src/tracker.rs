@@ -4,8 +4,8 @@ mod state;
 use core::ops::Div;
 
 use quantities::{
-    Angle, AngularAcceleration, AngularSpeed, Distance, Frequency, Speed, SquaredFrequency, Time,
-    TimeDifferentiable, Voltage,
+    Angle, AngularSpeed, Distance, Frequency, Speed, SquaredFrequency, Time, TimeDifferentiable,
+    Voltage,
 };
 
 use super::agent;
@@ -38,9 +38,6 @@ pub struct Tracker<LM, RM, TC, RC, L> {
     kdx: SquaredFrequency,
     ky: Frequency,
     kdy: SquaredFrequency,
-    kn_kx: Frequency,
-    kn_ky: f32,
-    kn_ktheta: f32,
     xi: Speed,
     period: Time,
     xi_threshold: Speed,
@@ -51,6 +48,8 @@ pub struct Tracker<LM, RM, TC, RC, L> {
     right_motor: RM,
     #[allow(unused)]
     logger: L,
+    zeta: f32,
+    b: f32,
 }
 
 impl<LM, RM, TC, RC, L> agent::Tracker<State, Target> for Tracker<LM, RM, TC, RC, L>
@@ -132,41 +131,30 @@ where
             let duw = -(2.0 * dxi * uw + dux * sin_theta - duy * cos_theta) / self.xi;
             (uv, uw, duv, duw)
         } else {
-            let sin_theta_r = target.theta.x.sin();
-            let cos_theta_r = target.theta.x.cos();
+            let sin_th_r = target.theta.x.sin();
+            let cos_th_r = target.theta.x.cos();
+            let sin_th = state.theta.x.sin();
+            let cos_th = state.theta.x.cos();
+            let theta_d = target.theta.x - state.theta.x;
+            let sin_th_d = theta_d.sin();
+            let cos_th_d = theta_d.cos();
+            let xd = target.x.x - state.x.x;
+            let yd = target.y.x - state.y.x;
 
-            let vr = target.x.v * cos_theta_r + target.y.v * sin_theta_r;
-            let ar = target.x.a * cos_theta_r + target.y.a * sin_theta_r;
+            let vr = target.x.v * cos_th_r + target.y.v * sin_th_r;
+            let wr = target.theta.v;
 
-            let theta_e = target.theta.x - state.theta.x;
-            let x_e = target.x.x - state.x.x;
-            let y_e = target.y.x - state.y.x;
+            let k1 = self.calculate_k1(wr, vr);
+            let k2 = self.b;
+            let k3 = k1;
 
-            let w_e = target.theta.v - state.theta.v;
-            let vx_e = target.x.v - state.x.v;
-            let vy_e = target.y.v - state.y.v;
-
-            let sin_th_e = theta_e.sin();
-            let cos_th_e = theta_e.cos();
-
-            let uv = vr * cos_th_e + self.kn_kx * x_e;
-            let uw = target.theta.v
-                + AngularSpeed::from_radian_per_second(
-                    vr.as_meter_per_second()
-                        * (self.kn_ky * y_e.as_meters() + self.kn_ktheta * sin_th_e),
-                );
-
-            let duv = ar * cos_th_e - vr * sin_th_e * w_e + self.kn_kx * vx_e;
-            let duw = target.theta.a
-                + AngularAcceleration::from_radian_per_second_squared(
-                    ar.as_meter_per_second_squared()
-                        * (self.kn_ky * y_e.as_meters() + self.kn_ktheta * sin_th_e)
-                        + vr.as_meter_per_second()
-                            * (self.kn_ky * vy_e.as_meter_per_second()
-                                + self.kn_ktheta * cos_th_e * w_e.as_radian_per_second()),
-                );
-
-            (uv, uw, duv, duw)
+            let e = xd * cos_th + yd * sin_th;
+            let uv = vr * cos_th_d + k1 * e;
+            let uw =
+                wr + AngularSpeed::from_radian_per_second(
+                    k2 * vr.as_meter_per_second() * sin_th_d * e.as_meters() / theta_d.as_radian(),
+                ) + k3 * theta_d;
+            (uv, uw, Default::default(), Default::default())
         };
 
         self.xi += self.period * dxi;
@@ -177,16 +165,21 @@ where
             .calculate(uw, duw, state.theta.v, state.theta.a);
         (vol_v - vol_w, vol_v + vol_w)
     }
+
+    fn calculate_k1(&self, wr: AngularSpeed, vr: Speed) -> Frequency {
+        let wr_raw = wr.as_radian_per_second();
+        let vr_raw = vr.as_meter_per_second();
+        Frequency::from_hertz(
+            2.0 * self.zeta * libm::sqrtf(wr_raw * wr_raw + self.b * vr_raw * vr_raw),
+        )
+    }
 }
 
-pub struct TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L> {
+pub struct TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
     kx: KX,
     kdx: KDX,
     ky: KY,
     kdy: KDY,
-    kn_kx: KKX,
-    kn_ky: KKY,
-    kn_ktheta: KKT,
     xi_threshold: XIT,
     translation_controller: TC,
     rotation_controller: RC,
@@ -196,24 +189,23 @@ pub struct TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY
     xi: XI,
     fail_safe_distance: FS,
     logger: L,
+    zeta: Z,
+    b: B,
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
 {
     const DEFAULT_FAIL_SAFE_DISTANCE: Distance = Distance::from_meters(0.02);
 }
 
-impl TrackerBuilder<(), (), (), (), (), (), (), (), (), (), (), (), (), (), (), NullLogger> {
+impl TrackerBuilder<(), (), (), (), (), (), (), (), (), (), (), (), NullLogger, (), ()> {
     pub fn new() -> Self {
         Self {
             kx: (),
             kdx: (),
             ky: (),
             kdy: (),
-            kn_kx: (),
-            kn_ky: (),
-            kn_ktheta: (),
             xi_threshold: (),
             translation_controller: (),
             rotation_controller: (),
@@ -223,12 +215,14 @@ impl TrackerBuilder<(), (), (), (), (), (), (), (), (), (), (), (), (), (), (), 
             xi: (),
             fail_safe_distance: (),
             logger: NullLogger,
+            zeta: (),
+            b: (),
         }
     }
 }
 
 impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, (), f32, f32, f32, (), L>
+    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, (), (), L, f32, f32>
 where
     LM: Motor,
     RM: Motor,
@@ -242,9 +236,6 @@ where
             kdx: SquaredFrequency::from_squared_hertz(self.kdx),
             ky: Frequency::from_hertz(self.ky),
             kdy: SquaredFrequency::from_squared_hertz(self.kdy),
-            kn_kx: Frequency::from_hertz(self.kn_kx),
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -254,12 +245,14 @@ where
             xi: Default::default(),
             fail_safe_distance: Self::DEFAULT_FAIL_SAFE_DISTANCE,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
 impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, (), f32, f32, f32, Distance, L>
+    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, (), Distance, L, f32, f32>
 where
     LM: Motor,
     RM: Motor,
@@ -273,9 +266,6 @@ where
             kdx: SquaredFrequency::from_squared_hertz(self.kdx),
             ky: Frequency::from_hertz(self.ky),
             kdy: SquaredFrequency::from_squared_hertz(self.kdy),
-            kn_kx: Frequency::from_hertz(self.kn_kx),
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -285,12 +275,14 @@ where
             xi: Default::default(),
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
 impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, Speed, f32, f32, f32, (), L>
+    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, Speed, (), L, f32, f32>
 where
     LM: Motor,
     RM: Motor,
@@ -303,9 +295,6 @@ where
             kdx: SquaredFrequency::from_squared_hertz(self.kdx),
             ky: Frequency::from_hertz(self.ky),
             kdy: SquaredFrequency::from_squared_hertz(self.kdy),
-            kn_kx: Frequency::from_hertz(self.kn_kx),
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -315,29 +304,14 @@ where
             xi: self.xi,
             fail_safe_distance: Self::DEFAULT_FAIL_SAFE_DISTANCE,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
 impl<TC, RC, LM, RM, L>
-    TrackerBuilder<
-        f32,
-        f32,
-        f32,
-        f32,
-        Speed,
-        TC,
-        RC,
-        LM,
-        RM,
-        Time,
-        Speed,
-        f32,
-        f32,
-        f32,
-        Distance,
-        L,
-    >
+    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, Speed, Distance, L, f32, f32>
 where
     LM: Motor,
     RM: Motor,
@@ -351,9 +325,6 @@ where
             kdx: SquaredFrequency::from_squared_hertz(self.kdx),
             ky: Frequency::from_hertz(self.ky),
             kdy: SquaredFrequency::from_squared_hertz(self.kdy),
-            kn_kx: Frequency::from_hertz(self.kn_kx),
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -363,25 +334,24 @@ where
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<(), KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+impl<KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
+    TrackerBuilder<(), KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
 {
     pub fn kx(
         self,
         kx: f32,
-    ) -> TrackerBuilder<f32, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L> {
+    ) -> TrackerBuilder<f32, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx,
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -391,25 +361,24 @@ impl<KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, (), KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+impl<KX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
+    TrackerBuilder<KX, (), KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
 {
     pub fn kdx(
         self,
         kdx: f32,
-    ) -> TrackerBuilder<KX, f32, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L> {
+    ) -> TrackerBuilder<KX, f32, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -419,25 +388,24 @@ impl<KX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, (), KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, (), KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
 {
     pub fn ky(
         self,
         ky: f32,
-    ) -> TrackerBuilder<KX, KDX, f32, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L> {
+    ) -> TrackerBuilder<KX, KDX, f32, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
             ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -447,25 +415,24 @@ impl<KX, KDX, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, (), XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, (), XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
 {
     pub fn kdy(
         self,
         kdy: f32,
-    ) -> TrackerBuilder<KX, KDX, KY, f32, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L> {
+    ) -> TrackerBuilder<KX, KDX, KY, f32, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
             ky: self.ky,
             kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -475,25 +442,24 @@ impl<KX, KDX, KY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, (), TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KY, KDY, TC, RC, LM, RM, P, XI, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, (), TC, RC, LM, RM, P, XI, FS, L, Z, B>
 {
     pub fn valid_control_lower_bound(
         self,
         xi_threshold: Speed,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, Speed, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L> {
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, Speed, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -503,17 +469,19 @@ impl<KX, KDX, KY, KDY, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, (), RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KY, KDY, XIT, RC, LM, RM, P, XI, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, (), RC, LM, RM, P, XI, FS, L, Z, B>
 {
     pub fn translation_controller<TC>(
         self,
         translation_controller: TC,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     where
         TC: Controller<Distance>,
     {
@@ -522,9 +490,6 @@ impl<KX, KDX, KY, KDY, XIT, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller,
             rotation_controller: self.rotation_controller,
@@ -534,17 +499,19 @@ impl<KX, KDX, KY, KDY, XIT, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, (), LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KY, KDY, XIT, TC, LM, RM, P, XI, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, (), LM, RM, P, XI, FS, L, Z, B>
 {
     pub fn rotation_controller<RC>(
         self,
         rotation_controller: RC,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     where
         RC: Controller<Angle>,
     {
@@ -553,9 +520,6 @@ impl<KX, KDX, KY, KDY, XIT, TC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller,
@@ -565,17 +529,19 @@ impl<KX, KDX, KY, KDY, XIT, TC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, RM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, (), RM, P, XI, KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, RM, P, XI, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, (), RM, P, XI, FS, L, Z, B>
 {
     pub fn left_motor<LM>(
         self,
         left_motor: LM,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     where
         LM: Motor,
     {
@@ -584,9 +550,6 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, RM, P, XI, KKX, KKY, KKT, FS, L>
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -596,17 +559,19 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, RM, P, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, P, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, (), P, XI, KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, P, XI, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, (), P, XI, FS, L, Z, B>
 {
     pub fn right_motor<RM>(
         self,
         right_motor: RM,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     where
         RM: Motor,
     {
@@ -615,9 +580,6 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, P, XI, KKX, KKY, KKT, FS, L>
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -627,25 +589,24 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, P, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, XI, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, (), XI, KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, XI, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, (), XI, FS, L, Z, B>
 {
     pub fn period(
         self,
         period: Time,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, Time, XI, KKX, KKY, KKT, FS, L> {
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, Time, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -655,25 +616,24 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, XI, KKX, KKY, KKT, FS, L>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, KKX, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, (), KKX, KKY, KKT, FS, L>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, FS, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, (), FS, L, Z, B>
 {
     pub fn initial_speed(
         self,
         xi: Speed,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, Speed, KKX, KKY, KKT, FS, L> {
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, Speed, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -683,110 +643,24 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, KKX, KKY, KKT, FS, L>
             xi,
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKY, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, (), KKY, KKT, FS, L>
-{
-    pub fn kanayama_kx(
-        self,
-        kn_kx: f32,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, f32, KKY, KKT, FS, L> {
-        TrackerBuilder {
-            kx: self.kx,
-            kdx: self.kdx,
-            ky: self.ky,
-            kdy: self.kdy,
-            kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
-            xi_threshold: self.xi_threshold,
-            translation_controller: self.translation_controller,
-            rotation_controller: self.rotation_controller,
-            left_motor: self.left_motor,
-            right_motor: self.right_motor,
-            period: self.period,
-            xi: self.xi,
-            fail_safe_distance: self.fail_safe_distance,
-            logger: self.logger,
-        }
-    }
-}
-
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKT, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, (), KKT, FS, L>
-{
-    pub fn kanayama_ky(
-        self,
-        kn_ky: f32,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, f32, KKT, FS, L> {
-        TrackerBuilder {
-            kx: self.kx,
-            kdx: self.kdx,
-            ky: self.ky,
-            kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky,
-            kn_ktheta: self.kn_ktheta,
-            xi_threshold: self.xi_threshold,
-            translation_controller: self.translation_controller,
-            rotation_controller: self.rotation_controller,
-            left_motor: self.left_motor,
-            right_motor: self.right_motor,
-            period: self.period,
-            xi: self.xi,
-            fail_safe_distance: self.fail_safe_distance,
-            logger: self.logger,
-        }
-    }
-}
-
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, FS, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, (), FS, L>
-{
-    pub fn kanayama_ktheta(
-        self,
-        kn_ktheta: f32,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, f32, FS, L> {
-        TrackerBuilder {
-            kx: self.kx,
-            kdx: self.kdx,
-            ky: self.ky,
-            kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta,
-            xi_threshold: self.xi_threshold,
-            translation_controller: self.translation_controller,
-            rotation_controller: self.rotation_controller,
-            left_motor: self.left_motor,
-            right_motor: self.right_motor,
-            period: self.period,
-            xi: self.xi,
-            fail_safe_distance: self.fail_safe_distance,
-            logger: self.logger,
-        }
-    }
-}
-
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, L>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, (), L>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, L, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, (), L, Z, B>
 {
     pub fn fail_safe_distance(
         self,
         fail_safe_distance: Distance,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, Distance, L>
-    {
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, Distance, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -796,17 +670,19 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, L>
             xi: self.xi,
             fail_safe_distance,
             logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
         }
     }
 }
 
-impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS>
-    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, NullLogger>
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, Z, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, NullLogger, Z, B>
 {
     pub fn logger<L>(
         self,
         logger: L,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS, L>
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     where
         L: Logger,
     {
@@ -815,9 +691,6 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS>
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
-            kn_kx: self.kn_kx,
-            kn_ky: self.kn_ky,
-            kn_ktheta: self.kn_ktheta,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -827,6 +700,62 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, KKX, KKY, KKT, FS>
             xi: self.xi,
             fail_safe_distance: self.fail_safe_distance,
             logger,
+            zeta: self.zeta,
+            b: self.b,
+        }
+    }
+}
+
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, B>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, (), B>
+{
+    pub fn low_zeta(
+        self,
+        zeta: f32,
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, f32, B> {
+        TrackerBuilder {
+            kx: self.kx,
+            kdx: self.kdx,
+            ky: self.ky,
+            kdy: self.kdy,
+            xi_threshold: self.xi_threshold,
+            translation_controller: self.translation_controller,
+            rotation_controller: self.rotation_controller,
+            left_motor: self.left_motor,
+            right_motor: self.right_motor,
+            period: self.period,
+            xi: self.xi,
+            fail_safe_distance: self.fail_safe_distance,
+            logger: self.logger,
+            zeta,
+            b: self.b,
+        }
+    }
+}
+
+impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z>
+    TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, ()>
+{
+    pub fn low_b(
+        self,
+        b: f32,
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, f32> {
+        TrackerBuilder {
+            kx: self.kx,
+            kdx: self.kdx,
+            ky: self.ky,
+            kdy: self.kdy,
+            xi_threshold: self.xi_threshold,
+            translation_controller: self.translation_controller,
+            rotation_controller: self.rotation_controller,
+            left_motor: self.left_motor,
+            right_motor: self.right_motor,
+            period: self.period,
+            xi: self.xi,
+            fail_safe_distance: self.fail_safe_distance,
+            logger: self.logger,
+            zeta: self.zeta,
+            b,
         }
     }
 }
@@ -884,9 +813,8 @@ mod tests {
             .period(Time::from_seconds(0.001))
             .translation_controller(IController::<Distance>::new())
             .rotation_controller(IController::<Angle>::new())
-            .kanayama_kx(1.0)
-            .kanayama_ky(1.0)
-            .kanayama_ktheta(1.0)
+            .low_zeta(1.0)
+            .low_b(1e-3)
             .fail_safe_distance(Distance::from_meters(0.02))
             .logger(logger)
             .build()
