@@ -29,7 +29,12 @@ git = "https://github.com/ikazuya0201/quantities"
 
 [dev-dependencies]
 approx = "0.3.2"
+criterion = "0.3.3"
 
 [features]
 debug = []
 log = []
+
+[[bench]]
+name = "search_operator"
+harness = false
