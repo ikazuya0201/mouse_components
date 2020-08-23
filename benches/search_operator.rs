@@ -1,9 +1,3 @@
-#![feature(test)]
-
-extern crate test;
-
-use test::Bencher;
-
 #[macro_use]
 extern crate typenum;
 
@@ -118,6 +112,7 @@ use components::{
     },
     prelude::*,
 };
+use criterion::*;
 use generic_array::arr;
 use quantities::{
     Acceleration, Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Frequency, Jerk,
@@ -136,25 +131,35 @@ fn costs(_pattern: Pattern) -> u16 {
     0
 }
 
-#[bench]
-fn bench_tick(b: &mut Bencher) {
-    let operator = create_search_operator();
-    operator.init();
-    operator.run().ok();
-    b.iter(|| {
-        operator.tick();
+fn bench_tick(c: &mut Criterion) {
+    c.bench_function("bench_tick", |b| {
+        b.iter_batched(
+            || {
+                let operator = create_search_operator();
+                operator.run().ok();
+                operator
+            },
+            |operator| operator.tick(),
+            BatchSize::SmallInput,
+        );
     });
 }
 
-#[bench]
-fn bench_run(b: &mut Bencher) {
-    let operator = create_search_operator();
-    operator.init();
-    operator.run().ok();
-    b.iter(|| {
-        operator.run().ok();
+fn bench_run(c: &mut Criterion) {
+    c.bench_function("bench_run", |b| {
+        b.iter_batched(
+            || {
+                let operator = create_search_operator();
+                operator
+            },
+            |operator| operator.run().ok(),
+            BatchSize::SmallInput,
+        );
     });
 }
+
+criterion_group!(benches, bench_tick, bench_run);
+criterion_main!(benches);
 
 fn create_search_operator() -> DefaultSearchOperator<
     IMotor,
@@ -291,7 +296,7 @@ fn create_search_operator() -> DefaultSearchOperator<
         ],
     ));
 
-    DefaultSearchOperator::new(
+    let operator = DefaultSearchOperator::new(
         Pose::new(
             Distance::from_meters(0.045),
             Distance::from_meters(0.045),
@@ -301,5 +306,7 @@ fn create_search_operator() -> DefaultSearchOperator<
         maze,
         agent,
         solver,
-    )
+    );
+    operator.init();
+    operator
 }
