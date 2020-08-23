@@ -560,210 +560,51 @@ impl Iterator for StraightTrajectory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use quantities::{
-        Acceleration, Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Jerk, Speed,
-    };
+    use quantities::{Acceleration, Distance, Jerk, Speed};
 
-    const EPSILON: f32 = 5e-4; //low accuracy...
+    const EPSILON: f32 = 1e-4; //low accuracy...
 
-    fn test_trajectory_calculator<T>(
-        period: Time,
-        v_max: dt!(T),
-        a_max: ddt!(T),
-        j_max: dddt!(T),
-        x_start: T,
-        x_end: T,
-        v_start: dt!(T),
-        v_end: dt!(T),
-        output: bool,
-    ) where
-        T: TimeDifferentiable + From<f32> + Div<T, Output = f32>,
-        dt!(T): TimeDifferentiable
-            + Mul<Time, Output = T>
-            + Div<dddt!(T), Output = SquaredTime>
-            + From<f32>,
-        ddt!(T): TimeDifferentiable + Mul<Time, Output = dt!(T)> + From<f32>,
-        dddt!(T): Quantity + Mul<Time, Output = ddt!(T)> + From<f32>,
-        f32: From<T> + From<dt!(T)> + From<ddt!(T)> + From<dddt!(T)>,
-    {
-        let generator = StraightFunctionGenerator::new(v_max, a_max, j_max);
-        let (trajectory_calculator, t_end) = generator.generate(x_start, x_end, v_start, v_end);
-        let mut current = Time::from_seconds(0.0);
-        let mut before = trajectory_calculator.calculate(current);
-        let t_eps = T::from(EPSILON);
-        let ddt_eps = <<T as Div<Time>>::Output as Div<Time>>::Output::from(EPSILON);
-        let dddt_eps =
-            <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output::from(EPSILON);
-        assert!(
-            (trajectory_calculator.calculate(Default::default()).x - x_start).abs() < t_eps,
-            "lhs: {:?}, rhs: {:?}",
-            trajectory_calculator.calculate(Default::default()).x,
-            x_start
-        );
-        while current < t_end {
-            let target = trajectory_calculator.calculate(current);
-            if output {
-                let x_raw: f32 = target.x.into();
-                let v_raw: f32 = target.v.into();
-                let a_raw: f32 = target.a.into();
-                let j_raw: f32 = target.j.into();
-                println!("{}, {}, {}, {}", x_raw, v_raw, a_raw, j_raw,);
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn test_straight_trajectory(
+            x_start in 0.0f32..288.0f32,
+            y_start in 0.0f32..288.0f32,
+            x_end in 0.0f32..288.0f32,
+            y_end in 0.0f32..288.0f32,
+            start_speed in 0.0f32..2.0f32,
+            end_speed in 0.0f32..2.0f32,
+        ) {
+            let period = Time::from_seconds(0.001);
+            let v_max = Speed::from_meter_per_second(2.0);
+            let a_max = Acceleration::from_meter_per_second_squared(1.0);
+            let j_max = Jerk::from_meter_per_second_cubed(0.5);
+            let generator = StraightTrajectoryGenerator::new(v_max, a_max, j_max, period);
+            let mut trajectory = generator.generate(
+                Distance::from_meters(x_start),
+                Distance::from_meters(y_start),
+                Distance::from_meters(x_end),
+                Distance::from_meters(y_end),
+                Speed::from_meter_per_second(start_speed),
+                Speed::from_meter_per_second(end_speed),
+            );
+
+            let mut before = trajectory.next().unwrap();
+            for target in trajectory {
+                let cos = target.theta.x.cos();
+                let sin = target.theta.x.sin();
+
+                let xd = ((target.x.x-before.x.x) * cos + (target.y.x-before.y.x) * sin).abs();
+                let vd = ((target.x.v-before.x.v) * cos + (target.y.v-before.y.v) * sin).abs();
+                let ad = ((target.x.a-before.x.a) * cos + (target.y.a-before.y.a) * sin).abs();
+
+                assert!(xd <= v_max * period + Distance::from_meters(EPSILON));
+                assert!(vd <= a_max * period + Speed::from_meter_per_second(EPSILON));
+                assert!(ad <= j_max * period + Acceleration::from_meter_per_second_squared(EPSILON));
+
+                before = target;
             }
-            assert!(
-                ((target.v - before.v) / period).abs() <= a_max.abs() + ddt_eps,
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.v - before.v) / period).abs(),
-                a_max.abs() + ddt_eps,
-            );
-            assert!(
-                ((target.a - before.a) / period).abs() <= j_max.abs() + dddt_eps,
-                "{:?} {:?}, lhs: {:?}, rhs: {:?}",
-                target,
-                before,
-                ((target.a - before.a) / period).abs(),
-                j_max.abs() + dddt_eps,
-            );
-            before = target;
-            current += period;
         }
-    }
-
-    #[test]
-    fn test_straight_trajectory_long() {
-        test_trajectory_calculator(
-            Time::from_seconds(0.001),
-            Speed::from_meter_per_second(1.0),
-            Acceleration::from_meter_per_second_squared(1.0),
-            Jerk::from_meter_per_second_cubed(1.0),
-            Distance::from_meters(0.0),
-            Distance::from_meters(3.0),
-            Speed::from_meter_per_second(0.0),
-            Speed::from_meter_per_second(0.0),
-            false,
-        );
-    }
-
-    #[test]
-    fn test_straight_trajectory_with_angle() {
-        test_trajectory_calculator(
-            Time::from_seconds(0.001),
-            AngularSpeed::from_radian_per_second(1.0),
-            AngularAcceleration::from_radian_per_second_squared(1.0),
-            AngularJerk::from_radian_per_second_cubed(1.0),
-            Angle::from_radian(0.0),
-            Angle::from_radian(3.0),
-            AngularSpeed::from_radian_per_second(0.0),
-            AngularSpeed::from_radian_per_second(0.0),
-            false,
-        );
-    }
-
-    #[test]
-    fn test_straight_trajectory_short() {
-        test_trajectory_calculator(
-            Time::from_seconds(0.001),
-            Speed::from_meter_per_second(1.0),
-            Acceleration::from_meter_per_second_squared(1.0),
-            Jerk::from_meter_per_second_cubed(1.0),
-            Distance::from_meters(0.0),
-            Distance::from_meters(1.0),
-            Speed::from_meter_per_second(0.0),
-            Speed::from_meter_per_second(0.0),
-            false,
-        );
-    }
-
-    #[test]
-    fn test_straight_trajectory_with_only_acceleration() {
-        test_trajectory_calculator(
-            Time::from_seconds(0.001),
-            Speed::from_meter_per_second(1.0),
-            Acceleration::from_meter_per_second_squared(0.5),
-            Jerk::from_meter_per_second_cubed(1.0),
-            Distance::from_meters(0.0),
-            Distance::from_meters(1.0),
-            Speed::from_meter_per_second(0.0),
-            Speed::from_meter_per_second(1.0),
-            false,
-        );
-    }
-
-    #[test]
-    fn test_straight_trajectory_with_only_deceleration() {
-        test_trajectory_calculator(
-            Time::from_seconds(0.001),
-            Speed::from_meter_per_second(1.0),
-            Acceleration::from_meter_per_second_squared(0.5),
-            Jerk::from_meter_per_second_cubed(1.0),
-            Distance::from_meters(0.0),
-            Distance::from_meters(1.0),
-            Speed::from_meter_per_second(1.0),
-            Speed::from_meter_per_second(0.0),
-            false,
-        );
-    }
-
-    #[test]
-    fn test_straight_trajectory_with_minus_value() {
-        test_trajectory_calculator(
-            Time::from_seconds(0.001),
-            Speed::from_meter_per_second(1.0),
-            Acceleration::from_meter_per_second_squared(1.0),
-            Jerk::from_meter_per_second_cubed(1.0),
-            Distance::from_meters(0.0),
-            Distance::from_meters(-3.0),
-            Speed::from_meter_per_second(1.0),
-            Speed::from_meter_per_second(0.0),
-            false,
-        );
-    }
-
-    #[test]
-    fn test_straight_trajectory_with_corner_case1() {
-        test_trajectory_calculator(
-            Time::from_seconds(0.001),
-            AngularSpeed::from_degree_per_second(90.0),
-            AngularAcceleration::from_degree_per_second_squared(45.0),
-            AngularJerk::from_radian_per_second_cubed(10.0),
-            Angle::from_degree(90.0),
-            Angle::from_degree(90.0),
-            AngularSpeed::from_radian_per_second(0.0),
-            AngularSpeed::from_radian_per_second(0.0),
-            false,
-        );
-    }
-
-    #[test]
-    fn test_straight_trajectory_with_corner_case2() {
-        test_trajectory_calculator(
-            Time::from_seconds(0.001),
-            Speed::from_meter_per_second(2.0),
-            Acceleration::from_meter_per_second_squared(1.0),
-            Jerk::from_meter_per_second_cubed(0.5),
-            Distance::from_meters(0.0),
-            Distance::from_meters(0.06),
-            Speed::from_meter_per_second(0.6),
-            Speed::from_meter_per_second(0.0),
-            false,
-        )
-    }
-
-    #[test]
-    fn test_straight_trajectory_2d() {
-        let period = Time::from_seconds(0.001);
-        let v_max = Speed::from_meter_per_second(2.0);
-        let a_max = Acceleration::from_meter_per_second_squared(1.0);
-        let j_max = Jerk::from_meter_per_second_cubed(0.5);
-        let generator = StraightTrajectoryGenerator::new(v_max, a_max, j_max, period);
-        let _trajectory = generator.generate(
-            Distance::from_meters(-0.06),
-            Distance::from_meters(0.16),
-            Distance::from_meters(-0.12),
-            Distance::from_meters(0.16),
-            Speed::from_meter_per_second(0.6),
-            Speed::from_meter_per_second(0.0),
-        );
     }
 }
