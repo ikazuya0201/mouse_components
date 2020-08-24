@@ -29,7 +29,7 @@ jobs:
         target: thumbv7em-none-eabihf
         override: true
     - name: Build
-      run: cargo build --target=thumbv7em-none-eabihf --verbose --manifest-path=./ci/Cargo.toml
+      run: cargo build --target=thumbv7em-none-eabihf --verbose --manifest-path=./ci/Cargo.toml -Zfeatures=dev_dep
       working-directory: components
 
     - uses: actions-rs/toolchain@v1
@@ -39,4 +39,7 @@ jobs:
         override: true
     - name: Test
       run: cargo test --target=x86_64-unknown-linux-gnu --verbose --manifest-path=./ci/Cargo.toml
+      working-directory: components
+    - name: Test Ignored
+      run: cargo test --target=x86_64-unknown-linux-gnu --verbose --manifest-path=./ci/Cargo.toml -- --ignored
       working-directory: components

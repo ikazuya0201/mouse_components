@@ -1,10 +1,10 @@
 use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Time};
 
-use super::straight_generator::{OverallCalculator, StraightFunctionGenerator};
+use super::straight_generator::{OverallCalculator, StraightCalculatorGenerator};
 use super::trajectory::Target;
 
 pub struct SpinGenerator {
-    function_generator: StraightFunctionGenerator<Angle>,
+    function_generator: StraightCalculatorGenerator<Angle>,
     period: Time,
 }
 
@@ -16,7 +16,7 @@ impl SpinGenerator {
         period: Time,
     ) -> Self {
         Self {
-            function_generator: StraightFunctionGenerator::new(
+            function_generator: StraightCalculatorGenerator::new(
                 max_angular_speed,
                 max_angular_acceleration,
                 max_angular_jerk,

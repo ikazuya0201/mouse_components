@@ -2,3 +2,4 @@
 Cargo.lock
 /ci/target
 /ci/Cargo.lock
+/proptest-regressions
