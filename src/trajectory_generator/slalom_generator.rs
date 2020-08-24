@@ -3,7 +3,7 @@ use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance
 
 use super::trajectory::{SubTarget, Target};
 
-use super::straight_generator::{OverallCalculator, StraightFunctionGenerator};
+use super::straight_generator::{OverallCalculator, StraightCalculatorGenerator};
 
 pub struct SlalomGenerator {
     dtheta: AngularSpeed,
@@ -39,7 +39,7 @@ impl SlalomGenerator {
         v: Speed,
     ) -> SlalomTrajectory {
         let k = v / self.v_ref;
-        let angle_generator = StraightFunctionGenerator::<Angle>::new(
+        let angle_generator = StraightCalculatorGenerator::<Angle>::new(
             k * self.dtheta,
             k * k * self.ddtheta,
             k * k * k * self.dddtheta,
