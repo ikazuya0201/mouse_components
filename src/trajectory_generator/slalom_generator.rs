@@ -146,88 +146,60 @@ impl Iterator for SlalomTrajectory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::f32::EPSILON;
+    use proptest::prelude::*;
     use quantities::Quantity;
 
-    #[test]
-    fn test_slalom_generator_search90() {
-        use std::f32::consts::PI;
+    const EPSILON: f32 = 1e-4;
 
-        let dtheta = AngularSpeed::from_radian_per_second(3.0 * PI);
-        let ddtheta = AngularAcceleration::from_radian_per_second_squared(36.0 * PI);
-        let dddtheta = AngularJerk::from_radian_per_second_cubed(1200.0 * PI);
-        let v_ref = Speed::from_meter_per_second(0.24159);
-        let period = Time::from_seconds(0.001);
+    fn get_trajectory(
+        tv: f32,
+        ta: f32,
+        tj: f32,
+        v_ref: f32,
+        period: f32,
+        v_target: f32,
+        x: f32,
+        y: f32,
+        theta: f32,
+        theta_dist: f32,
+    ) -> SlalomTrajectory {
+        let dtheta = AngularSpeed::from_radian_per_second(tv);
+        let ddtheta = AngularAcceleration::from_radian_per_second_squared(ta);
+        let dddtheta = AngularJerk::from_radian_per_second_cubed(tj);
+        let v_ref = Speed::from_meter_per_second(v_ref);
+        let period = Time::from_seconds(period);
 
         let generator = SlalomGenerator::new(dtheta, ddtheta, dddtheta, v_ref, period);
-        let v_target = Speed::from_meter_per_second(0.2);
-        let trajectory = generator.generate(
-            Distance::from_meters(0.0),
-            Distance::from_meters(0.0),
-            Angle::from_degree(90.0),
-            Angle::from_degree(90.0),
+        let v_target = Speed::from_meter_per_second(v_target);
+        generator.generate(
+            Distance::from_meters(x),
+            Distance::from_meters(y),
+            Angle::from_degree(theta),
+            Angle::from_degree(theta_dist),
             v_target,
-        );
-
-        for target in trajectory {
-            let v = target.x.v * target.theta.x.cos() + target.y.v * target.theta.x.sin();
-            assert!((v.abs() - v_target).abs().as_meter_per_second() < EPSILON);
-        }
+        )
     }
 
-    #[test]
-    fn test_slalom_generator_run180() {
-        use std::f32::consts::PI;
-
-        let dtheta = AngularSpeed::from_radian_per_second(3.0 * PI);
-        let ddtheta = AngularAcceleration::from_radian_per_second_squared(36.0 * PI);
-        let dddtheta = AngularJerk::from_radian_per_second_cubed(1200.0 * PI);
-        let v_ref = Speed::from_meter_per_second(0.24);
-        let period = Time::from_seconds(0.001);
-
-        let generator = SlalomGenerator::new(dtheta, ddtheta, dddtheta, v_ref, period);
-        let v_target = Speed::from_meter_per_second(0.6);
-        let trajectory = generator.generate(
-            Distance::from_meters(0.0),
-            Distance::from_meters(0.0),
-            Angle::from_degree(90.0),
-            Angle::from_degree(180.0),
-            v_target,
-        );
-
-        for target in trajectory {
-            let vx = target.x.v.as_meter_per_second();
-            let vy = target.y.v.as_meter_per_second();
-            let v = Speed::from_meter_per_second((vx * vx + vy * vy).sqrt());
-            assert!((v - v_target).abs().as_meter_per_second() < EPSILON);
-        }
-    }
-
-    #[test]
-    fn test_slalom_generator_run45() {
-        use std::f32::consts::PI;
-
-        let dtheta = AngularSpeed::from_radian_per_second(3.0 * PI);
-        let ddtheta = AngularAcceleration::from_radian_per_second_squared(36.0 * PI);
-        let dddtheta = AngularJerk::from_radian_per_second_cubed(1200.0 * PI);
-        let v_ref = Speed::from_meter_per_second(0.24);
-        let period = Time::from_seconds(0.001);
-
-        let generator = SlalomGenerator::new(dtheta, ddtheta, dddtheta, v_ref, period);
-        let v_target = Speed::from_meter_per_second(0.6);
-        let trajectory = generator.generate(
-            Distance::from_meters(0.0),
-            Distance::from_meters(0.0),
-            Angle::from_degree(0.0),
-            Angle::from_degree(45.0),
-            v_target,
-        );
-
-        for target in trajectory {
-            let vx = target.x.v.as_meter_per_second();
-            let vy = target.y.v.as_meter_per_second();
-            let v = Speed::from_meter_per_second((vx * vx + vy * vy).sqrt());
-            assert!((v - v_target).abs().as_meter_per_second() < EPSILON);
+    proptest! {
+        #[ignore]
+        #[test]
+        fn test_slalom_generator(
+            tv in 0.1f32..1000.0,
+            ta in 0.1f32..1000.0,
+            tj in 0.1f32..1000.0,
+            v_ref in 0.1f32..100.0,
+            period in 0.001f32..0.01,
+            v_target in 0.1f32..100.0,
+            x in 0.0f32..288.0,
+            y in 0.0f32..288.0,
+            theta in 0.0f32..360.0,
+            theta_dist in (-180.0f32..180.0).prop_filter("the absolute value is too small", |d| d.abs() >= 0.1),
+        ) {
+            let trajectory = get_trajectory(tv,ta,tj,v_ref,period,v_target,x,y,theta,theta_dist);
+            for target in trajectory {
+                let v = target.x.v * target.theta.x.cos() + target.y.v * target.theta.x.sin();
+                prop_assert!((v.abs().as_meter_per_second() - v_target).abs() < EPSILON);
+            }
         }
     }
 }

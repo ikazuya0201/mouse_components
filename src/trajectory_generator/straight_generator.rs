@@ -523,13 +523,14 @@ mod tests {
                         j_max in 0.5f32..1000.0f32,
                         x_start in 0.0f32..288.0f32,
                         distance in 0.01f32..288.0f32,
+                        period in 0.001f32..0.01f32,
                         (v_max, v_start, v_end) in (0.5f32..100.0f32)
                             .prop_flat_map(|v_max| (Just(v_max), 0.0..v_max, 0.0..v_max)),
                     ) {
                         let v_max = <dt!($type)>::from(v_max);
                         let a_max = <ddt!($type)>::from(a_max);
                         let j_max = <dddt!($type)>::from(j_max);
-                        let period = Time::from_seconds(0.001);
+                        let period = Time::from_seconds(period);
                         let generator = StraightCalculatorGenerator::new(v_max, a_max, j_max);
                         let (trajectory_calculator, t_end) = generator.generate(
                             <$type>::from(x_start),
@@ -587,21 +588,24 @@ mod tests {
             y_start in 0.0f32..288.0f32,
             x_end in 0.0f32..288.0f32,
             y_end in 0.0f32..288.0f32,
-            start_speed in 0.0f32..2.0f32,
-            end_speed in 0.0f32..2.0f32,
+            (v_max, v_start, v_end) in (0.5f32..10.0f32)
+                .prop_flat_map(|v_max| (Just(v_max), 0.0..v_max, 0.0..v_max)),
+            a_max in 0.5f32..10.0f32,
+            j_max in 0.5f32..10.0f32,
+            period in 0.001f32..0.01f32,
         ) {
-            let period = Time::from_seconds(0.001);
-            let v_max = Speed::from_meter_per_second(2.0);
-            let a_max = Acceleration::from_meter_per_second_squared(1.0);
-            let j_max = Jerk::from_meter_per_second_cubed(0.5);
+            let period = Time::from_seconds(period);
+            let v_max = Speed::from_meter_per_second(v_max);
+            let a_max = Acceleration::from_meter_per_second_squared(a_max);
+            let j_max = Jerk::from_meter_per_second_cubed(j_max);
             let generator = StraightTrajectoryGenerator::new(v_max, a_max, j_max, period);
             let mut trajectory = generator.generate(
                 Distance::from_meters(x_start),
                 Distance::from_meters(y_start),
                 Distance::from_meters(x_end),
                 Distance::from_meters(y_end),
-                Speed::from_meter_per_second(start_speed),
-                Speed::from_meter_per_second(end_speed),
+                Speed::from_meter_per_second(v_start),
+                Speed::from_meter_per_second(v_end),
             );
 
             let mut before = trajectory.next().unwrap();
