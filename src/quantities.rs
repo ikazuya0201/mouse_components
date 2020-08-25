@@ -110,6 +110,7 @@ pub mod acceleration {
         >;
         units {
             @meter_per_second_squared: 1.0; "m/s^2", "meter per second squared", "meters per second squared";
+            @gravity: 9.80665; "G", "gravity", "gravities";
         }
     }
 }
