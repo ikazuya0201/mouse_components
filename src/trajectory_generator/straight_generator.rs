@@ -496,6 +496,7 @@ impl Iterator for StraightTrajectory {
     }
 }
 
+#[cfg(feature = "expensive_tests")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -524,7 +525,6 @@ mod tests {
         )*) => {
             $(
                 proptest!{
-                    #[ignore]
                     #[test]
                     fn $test_name(
                         a_max in 0.5f32..500.0f32,
@@ -605,7 +605,6 @@ mod tests {
     }
 
     proptest! {
-        #[ignore]
         #[test]
         fn test_straight_trajectory(
             x_start in 0.0f32..288.0f32,

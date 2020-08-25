@@ -17,7 +17,7 @@ libm = "0.2.1"
 [dependencies.uom]
 version = "0.29.0"
 default-features = false
-features = ["f32", "si", "autoconvert"]
+features = ["f32", "autoconvert"]
 
 [dependencies.num]
 version = "0.2"
@@ -35,6 +35,7 @@ proptest = "0.10.1"
 [features]
 debug = []
 log = []
+expensive_tests = []
 
 [[bench]]
 name = "search_operator"

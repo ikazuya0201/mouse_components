@@ -143,6 +143,7 @@ impl Iterator for SlalomTrajectory {
     }
 }
 
+#[cfg(feature = "expensive_tests")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -185,7 +186,6 @@ mod tests {
     }
 
     proptest! {
-        #[ignore]
         #[test]
         fn test_slalom_generator(
             tv in 0.1f32..1000.0,
