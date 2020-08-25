@@ -1,6 +1,8 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(type_alias_impl_trait)]
 
+#[macro_use]
+extern crate uom;
 extern crate alloc;
 
 mod administrator;
@@ -11,6 +13,7 @@ mod maze;
 mod obstacle_detector;
 mod pattern;
 pub mod prelude;
+mod quantities;
 mod solver;
 mod tracker;
 mod trajectory_generator;
