@@ -353,3 +353,253 @@ impl<LE, RE, I, P, COF, POS, X> EstimatorBuilder<LE, RE, I, P, COF, POS, X, ()> 
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        data_types::{Pose, RelativeDirection, Target},
+        impls::{TrajectoryGenerator, TrajectoryGeneratorBuilder},
+        prelude::*,
+    };
+    use approx::assert_abs_diff_eq;
+    use quantities::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    const EPSILON: f32 = 1e-3;
+
+    struct AgentSimulator<T> {
+        inner: Rc<RefCell<AgentSimulatorInner<T>>>,
+    }
+
+    impl<T> AgentSimulator<T> {
+        fn new(trajectory: T) -> Self {
+            Self {
+                inner: Rc::new(RefCell::new(AgentSimulatorInner {
+                    trajectory,
+                    current: Default::default(),
+                    prev: Default::default(),
+                })),
+            }
+        }
+
+        fn split(&self, wheel_interval: Distance) -> (IEncoder<T>, IEncoder<T>, IIMU<T>) {
+            (
+                IEncoder {
+                    inner: Rc::clone(&self.inner),
+                    wheel_interval,
+                    direction: Direction::Right,
+                },
+                IEncoder {
+                    inner: Rc::clone(&self.inner),
+                    wheel_interval,
+                    direction: Direction::Left,
+                },
+                IIMU {
+                    inner: Rc::clone(&self.inner),
+                },
+            )
+        }
+    }
+
+    impl<T> AgentSimulator<T>
+    where
+        T: Iterator<Item = Target>,
+    {
+        fn step(&self) -> Result<State, FinishError> {
+            self.inner.borrow_mut().step()
+        }
+    }
+
+    struct AgentSimulatorInner<T> {
+        trajectory: T,
+        current: Target,
+        prev: Target,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    struct FinishError;
+
+    impl<T> AgentSimulatorInner<T>
+    where
+        T: Iterator<Item = Target>,
+    {
+        fn step(&mut self) -> Result<State, FinishError> {
+            if let Some(target) = self.trajectory.next() {
+                self.prev = self.current;
+                self.current = target;
+                Ok(State {
+                    x: SubState {
+                        x: target.x.x,
+                        v: target.x.v,
+                        a: target.x.a,
+                    },
+                    y: SubState {
+                        x: target.y.x,
+                        v: target.y.v,
+                        a: target.y.a,
+                    },
+                    theta: SubState {
+                        x: target.theta.x,
+                        v: target.theta.v,
+                        a: target.theta.a,
+                    },
+                })
+            } else {
+                Err(FinishError)
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    enum Direction {
+        Right,
+        Left,
+    }
+
+    struct IEncoder<T> {
+        inner: Rc<RefCell<AgentSimulatorInner<T>>>,
+        wheel_interval: Distance,
+        direction: Direction,
+    }
+
+    impl<T> Encoder for IEncoder<T> {
+        type Error = ();
+
+        fn get_relative_distance(&mut self) -> nb::Result<Distance, Self::Error> {
+            let current = self.inner.borrow().current.clone();
+            let prev = self.inner.borrow().prev.clone();
+            let angle = current.theta.x - prev.theta.x;
+            let x = (current.x.x - prev.x.x).as_meters();
+            let y = (current.y.x - prev.y.x).as_meters();
+            let d = Distance::from_meters((x * x + y * y).sqrt());
+            match self.direction {
+                Direction::Right => Ok(d + self.wheel_interval * angle),
+                Direction::Left => Ok(d - self.wheel_interval * angle),
+            }
+        }
+    }
+
+    struct IIMU<T> {
+        inner: Rc<RefCell<AgentSimulatorInner<T>>>,
+    }
+
+    impl<T> IMU for IIMU<T> {
+        type Error = ();
+
+        fn get_angular_speed_x(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
+            Err(nb::Error::WouldBlock)
+        }
+        fn get_angular_speed_y(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
+            Err(nb::Error::WouldBlock)
+        }
+        fn get_angular_speed_z(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
+            let cur_v = self.inner.borrow().current.theta.v;
+            Ok(cur_v)
+        }
+
+        fn get_acceleration_x(&mut self) -> nb::Result<Acceleration, Self::Error> {
+            Err(nb::Error::WouldBlock)
+        }
+        fn get_acceleration_y(&mut self) -> nb::Result<Acceleration, Self::Error> {
+            let f = |target: Target| {
+                target.x.a * target.theta.x.cos() + target.y.a * target.theta.x.sin()
+            };
+            let cur_a = f(self.inner.borrow().current);
+            Ok(cur_a)
+        }
+        fn get_acceleration_z(&mut self) -> nb::Result<Acceleration, Self::Error> {
+            Err(nb::Error::WouldBlock)
+        }
+    }
+
+    const PERIOD: Time = Time::from_seconds(0.001);
+
+    fn build_generator() -> TrajectoryGenerator {
+        TrajectoryGeneratorBuilder::new()
+            .max_speed(Speed::from_meter_per_second(1.0))
+            .max_acceleration(Acceleration::from_meter_per_second_squared(10.0))
+            .max_jerk(Jerk::from_meter_per_second_cubed(100.0))
+            .angular_speed_ref(AngularSpeed::from_degree_per_second(180.0))
+            .angular_acceleration_ref(AngularAcceleration::from_degree_per_second_squared(1800.0))
+            .angular_jerk_ref(AngularJerk::from_degree_per_second_cubed(18000.0))
+            .slalom_speed_ref(Speed::from_meter_per_second(0.6))
+            .period(PERIOD)
+            .search_speed(Speed::from_meter_per_second(0.6))
+            .build()
+    }
+
+    macro_rules! estimator_tests {
+        ($($name: ident: $trajectory: expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let wheel_interval = Distance::from_meters(0.03);
+
+                    let trajectory = $trajectory;
+
+                    let simulator = AgentSimulator::new(trajectory);
+                    let (right_encoder, left_encoder, imu) = simulator.split(wheel_interval);
+                    let mut estimator = EstimatorBuilder::new()
+                        .left_encoder(left_encoder)
+                        .right_encoder(right_encoder)
+                        .imu(imu)
+                        .period(PERIOD)
+                        .cut_off_frequency(Frequency::from_hertz(50.0))
+                        .initial_posture(Default::default())
+                        .initial_x(Default::default())
+                        .initial_y(Default::default())
+                        .build();
+
+                    while let Ok(expected_state) = simulator.step() {
+                        let estimated_state = estimator.estimate();
+                        assert_abs_diff_eq!(expected_state, estimated_state, epsilon = EPSILON);
+                    }
+                }
+            )*
+        };
+    }
+
+    fn straight_trajectory() -> impl Iterator<Item = Target> {
+        let trajectory_generator = build_generator();
+        trajectory_generator.generate_straight(
+            Default::default(),
+            Default::default(),
+            Distance::from_meters(3.0),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
+    }
+
+    fn straight_and_search_trajectory(
+        direction: RelativeDirection,
+    ) -> impl Iterator<Item = Target> {
+        let trajectory_generator = build_generator();
+        trajectory_generator
+            .generate_straight(
+                Default::default(),
+                Default::default(),
+                Distance::from_meters(3.0),
+                Default::default(),
+                Default::default(),
+                Speed::from_meter_per_second(0.6),
+            )
+            .chain(trajectory_generator.generate_search(
+                Pose {
+                    x: Distance::from_meters(3.0),
+                    y: Default::default(),
+                    theta: Default::default(),
+                },
+                direction,
+            ))
+    }
+
+    estimator_tests! {
+        test_estimator1: straight_trajectory(),
+        test_estimator2: straight_and_search_trajectory(RelativeDirection::Right),
+        test_estimator3: straight_and_search_trajectory(RelativeDirection::Left),
+        test_estimator4: straight_and_search_trajectory(RelativeDirection::Front),
+    }
+}
