@@ -461,41 +461,64 @@ mod tests {
         build_generator();
     }
 
-    #[test]
-    fn test_search_trajectory() {
-        use agent::TrajectoryGenerator;
-        use core::f32::consts::PI;
+    macro_rules! search_trajectory_tests {
+        ($($name: ident: $value: expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    use agent::TrajectoryGenerator;
+                    use core::f32::consts::PI;
 
-        const EPSILON: f32 = 0.001;
+                    const EPSILON: f32 = 2e-4;
 
-        let period = Time::from_seconds(0.001);
-        let search_speed = Speed::from_meter_per_second(0.2);
+                    let period = Time::from_seconds(0.001);
+                    let search_speed = Speed::from_meter_per_second(0.2);
 
-        let generator = TrajectoryGeneratorBuilder::new()
-            .period(period)
-            .max_speed(Speed::from_meter_per_second(2.0))
-            .max_acceleration(Acceleration::from_meter_per_second_squared(0.7))
-            .max_jerk(Jerk::from_meter_per_second_cubed(1.0))
-            .search_speed(search_speed)
-            .slalom_speed_ref(Speed::from_meter_per_second(0.27178875))
-            .angular_speed_ref(AngularSpeed::from_radian_per_second(3.0 * PI))
-            .angular_acceleration_ref(AngularAcceleration::from_radian_per_second_squared(
-                36.0 * PI,
-            ))
-            .angular_jerk_ref(AngularJerk::from_radian_per_second_cubed(1200.0 * PI))
-            .build();
+                    let generator = TrajectoryGeneratorBuilder::new()
+                        .period(period)
+                        .max_speed(Speed::from_meter_per_second(2.0))
+                        .max_acceleration(Acceleration::from_meter_per_second_squared(0.7))
+                        .max_jerk(Jerk::from_meter_per_second_cubed(1.0))
+                        .search_speed(search_speed)
+                        .slalom_speed_ref(Speed::from_meter_per_second(0.27178875))
+                        .angular_speed_ref(AngularSpeed::from_radian_per_second(3.0 * PI))
+                        .angular_acceleration_ref(AngularAcceleration::from_radian_per_second_squared(
+                            36.0 * PI,
+                        ))
+                        .angular_jerk_ref(AngularJerk::from_radian_per_second_cubed(1200.0 * PI))
+                        .build();
 
-        let trajectory = generator.generate_search(
-            Pose::new(
-                Distance::from_meters(0.045),
-                Distance::from_meters(0.09),
-                Angle::from_degree(90.0),
-            ),
-            RelativeDirection::Front,
-        );
+                    let (direction, last_x, last_y, last_theta) = $value;
 
-        let last = trajectory.last().unwrap();
-        assert_relative_eq!(last.x.x.as_meters(), 0.045, epsilon = EPSILON);
-        assert_relative_eq!(last.y.x.as_meters(), 0.18, epsilon = EPSILON);
+                    let mut trajectory = generator.generate_search(
+                        Pose::new(
+                            Distance::from_meters(0.045),
+                            Distance::from_meters(0.09),
+                            Angle::from_degree(90.0),
+                        ),
+                        direction,
+                    );
+
+                    let mut last = trajectory.next().unwrap();
+                    for target in trajectory {
+                        let v = target.x.v * target.theta.x.cos() + target.y.v * target.theta.x.sin();
+                        assert!(
+                            v.as_meter_per_second() < search_speed.as_meter_per_second() + EPSILON * 100.0,
+                        );
+                        last = target;
+                    }
+                    assert_relative_eq!(last.x.x.as_meters(), last_x, epsilon = EPSILON);
+                    assert_relative_eq!(last.y.x.as_meters(), last_y, epsilon = EPSILON);
+                    assert_relative_eq!(last.theta.x.as_degree(), last_theta, epsilon = EPSILON);
+                }
+            )*
+        }
+    }
+
+    search_trajectory_tests! {
+        test_search_trajectory_front: (RelativeDirection::Front, 0.045, 0.18, 90.0),
+        test_search_trajectory_right: (RelativeDirection::Right, 0.09, 0.135, 0.0),
+        test_search_trajectory_left: (RelativeDirection::Left, 0.0, 0.135, 180.0),
+        test_search_trajectory_back: (RelativeDirection::Back, 0.045, 0.09, 270.0),
     }
 }
