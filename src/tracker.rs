@@ -21,8 +21,7 @@ use uom::si::{
 };
 use uom::{typenum::*, Kind};
 
-type KDimension = ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>;
-type KQuantity = Quantity<KDimension, SI<f32>, f32>;
+type Gain = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 
 macro_rules! controller_trait {
     ($name: ident: $t: ty, $dt: ty) => {
@@ -47,9 +46,9 @@ impl Logger for NullLogger {
 }
 
 pub struct Tracker<LM, RM, TC, RC, L> {
-    kx: KQuantity,
+    kx: Gain,
     kdx: Frequency,
-    ky: KQuantity,
+    ky: Gain,
     kdy: Frequency,
     xi: Velocity,
     period: Time,
