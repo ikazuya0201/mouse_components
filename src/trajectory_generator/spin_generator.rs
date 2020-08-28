@@ -9,14 +9,14 @@ pub struct SpinGenerator {
 
 impl SpinGenerator {
     pub fn new(
-        max_angular_speed: AngularVelocity,
+        max_angular_velocity: AngularVelocity,
         max_angular_acceleration: AngularAcceleration,
         max_angular_jerk: AngularJerk,
         period: Time,
     ) -> Self {
         Self {
             function_generator: AngleStraightCalculatorGenerator::new(
-                max_angular_speed,
+                max_angular_velocity,
                 max_angular_acceleration,
                 max_angular_jerk,
             ),

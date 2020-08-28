@@ -2,22 +2,28 @@
 extern crate typenum;
 
 mod sensors {
+    use core::marker::PhantomData;
+
     use components::{
         data_types::Pose,
+        quantities::f32::{Acceleration, AngularVelocity, Length, Voltage},
         sensors::{DistanceSensor, Encoder, Motor, IMU},
         utils::sample::Sample,
     };
-    use quantities::{Acceleration, AngularSpeed, Distance, Voltage};
 
     pub struct IDistanceSensor {
-        distance: Distance,
+        distance: Length,
         pose: Pose,
     }
 
     impl IDistanceSensor {
-        const SIGMA: Distance = Distance::from_meters(0.001);
+        const SIGMA: Length = Length {
+            dimension: PhantomData,
+            units: PhantomData,
+            value: 0.001,
+        };
 
-        pub fn new(distance: Distance, pose: Pose) -> Self {
+        pub fn new(distance: Length, pose: Pose) -> Self {
             Self { distance, pose }
         }
     }
@@ -29,7 +35,7 @@ mod sensors {
             self.pose
         }
 
-        fn get_distance(&mut self) -> nb::Result<Sample<Distance>, Self::Error> {
+        fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {
             Ok(Sample {
                 mean: self.distance,
                 standard_deviation: Self::SIGMA,
@@ -38,11 +44,11 @@ mod sensors {
     }
 
     pub struct IEncoder {
-        distance: Distance,
+        distance: Length,
     }
 
     impl IEncoder {
-        pub fn new(distance: Distance) -> Self {
+        pub fn new(distance: Length) -> Self {
             Self { distance }
         }
     }
@@ -50,7 +56,7 @@ mod sensors {
     impl Encoder for IEncoder {
         type Error = ();
 
-        fn get_relative_distance(&mut self) -> nb::Result<Distance, Self::Error> {
+        fn get_relative_distance(&mut self) -> nb::Result<Length, Self::Error> {
             Ok(self.distance)
         }
     }
@@ -63,14 +69,17 @@ mod sensors {
 
     pub struct Imu {
         accelerations: [Acceleration; 3],
-        angular_speeds: [AngularSpeed; 3],
+        angular_velocitys: [AngularVelocity; 3],
     }
 
     impl Imu {
-        pub fn new(accelerations: [Acceleration; 3], angular_speeds: [AngularSpeed; 3]) -> Self {
+        pub fn new(
+            accelerations: [Acceleration; 3],
+            angular_velocitys: [AngularVelocity; 3],
+        ) -> Self {
             Self {
                 accelerations,
-                angular_speeds,
+                angular_velocitys,
             }
         }
     }
@@ -88,14 +97,14 @@ mod sensors {
             Ok(self.accelerations[2])
         }
 
-        fn get_angular_speed_x(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
-            Ok(self.angular_speeds[0])
+        fn get_angular_velocity_x(&mut self) -> nb::Result<AngularVelocity, Self::Error> {
+            Ok(self.angular_velocitys[0])
         }
-        fn get_angular_speed_y(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
-            Ok(self.angular_speeds[1])
+        fn get_angular_velocity_y(&mut self) -> nb::Result<AngularVelocity, Self::Error> {
+            Ok(self.angular_velocitys[1])
         }
-        fn get_angular_speed_z(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
-            Ok(self.angular_speeds[2])
+        fn get_angular_velocity_z(&mut self) -> nb::Result<AngularVelocity, Self::Error> {
+            Ok(self.angular_velocitys[2])
         }
     }
 }
@@ -107,17 +116,29 @@ use components::{
     data_types::{AbsoluteDirection, NodeId, Pattern, Pose, SearchNodeId},
     defaults::{DefaultSearchOperator, DefaultSolver},
     impls::{
-        Agent, ControllerBuilder, EstimatorBuilder, MazeBuilder, NullLogger, ObstacleDetector,
-        TrackerBuilder, TrajectoryGeneratorBuilder,
+        Agent, EstimatorBuilder, MazeBuilder, NullLogger, ObstacleDetector,
+        RotationControllerBuilder, TrackerBuilder, TrajectoryGeneratorBuilder,
+        TranslationControllerBuilder,
     },
     prelude::*,
+    quantities::{
+        acceleration::meter_per_second_squared,
+        cubed_frequency::radian_per_second_cubed,
+        dimensionless::degree,
+        f32::{
+            Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Frequency,
+            Jerk, Length, Time, Velocity,
+        },
+        frequency::{hertz, radian_per_second},
+        jerk::meter_per_second_cubed,
+        length::meter,
+        squared_frequency::radian_per_second_squared,
+        time::second,
+        velocity::meter_per_second,
+    },
 };
 use criterion::*;
 use generic_array::arr;
-use quantities::{
-    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Frequency, Jerk,
-    Speed, Time,
-};
 use typenum::consts::*;
 
 use sensors::{IDistanceSensor, IEncoder, IMotor, Imu};
@@ -174,7 +195,7 @@ fn create_search_operator() -> DefaultSearchOperator<
     GoalSize,
     NullLogger,
 > {
-    let period = Time::from_seconds(0.001);
+    let period = Time::new::<second>(0.001);
 
     let agent = {
         let estimator = {
@@ -183,31 +204,31 @@ fn create_search_operator() -> DefaultSearchOperator<
                 .right_encoder(IEncoder::new(Default::default()))
                 .imu(Imu::new(Default::default(), Default::default()))
                 .period(period)
-                .cut_off_frequency(Frequency::from_hertz(50.0))
-                .initial_posture(Angle::from_degree(90.0))
-                .initial_x(Distance::from_meters(0.045))
-                .initial_y(Distance::from_meters(0.045))
-                // .wheel_interval(Distance::from_meters(0.0335))
+                .cut_off_frequency(Frequency::new::<hertz>(50.0))
+                .initial_posture(Angle::new::<degree>(90.0))
+                .initial_x(Length::new::<meter>(0.045))
+                .initial_y(Length::new::<meter>(0.045))
+                // .wheel_interval(Length::new::<meter>(0.0335))
                 .build()
         };
 
         let tracker = {
-            let trans_controller = ControllerBuilder::new()
+            let trans_controller = TranslationControllerBuilder::new()
                 .kp(0.9)
                 .ki(0.05)
                 .kd(0.01)
                 .period(period)
                 .model_gain(1.0)
-                .model_time_constant(Time::from_seconds(0.3694))
+                .model_time_constant(Time::new::<second>(0.3694))
                 .build();
 
-            let rot_controller = ControllerBuilder::new()
+            let rot_controller = RotationControllerBuilder::new()
                 .kp(0.2)
                 .ki(0.2)
                 .kd(0.0)
                 .period(period)
                 .model_gain(10.0)
-                .model_time_constant(Time::from_seconds(0.1499))
+                .model_time_constant(Time::new::<second>(0.1499))
                 .build();
 
             TrackerBuilder::new()
@@ -218,56 +239,56 @@ fn create_search_operator() -> DefaultSearchOperator<
                 .kdx(4.0)
                 .ky(40.0)
                 .kdy(4.0)
-                .valid_control_lower_bound(Speed::from_meter_per_second(0.03))
+                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
                 .translation_controller(trans_controller)
                 .rotation_controller(rot_controller)
                 .low_zeta(1.0)
                 .low_b(1e-3)
-                .fail_safe_distance(Distance::from_meters(0.05))
+                .fail_safe_distance(Length::new::<meter>(0.05))
                 .build()
         };
 
-        let search_speed = Speed::from_meter_per_second(0.12);
+        let search_velocity = Velocity::new::<meter_per_second>(0.12);
 
         let trajectory_generator = TrajectoryGeneratorBuilder::new()
             .period(period)
-            .max_speed(Speed::from_meter_per_second(2.0))
-            .max_acceleration(Acceleration::from_meter_per_second_squared(0.7))
-            .max_jerk(Jerk::from_meter_per_second_cubed(1.0))
-            .search_speed(search_speed)
-            .slalom_speed_ref(Speed::from_meter_per_second(0.27178875))
-            .angular_speed_ref(AngularSpeed::from_radian_per_second(3.0 * PI))
-            .angular_acceleration_ref(AngularAcceleration::from_radian_per_second_squared(
+            .max_velocity(Velocity::new::<meter_per_second>(2.0))
+            .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
+            .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
+            .search_velocity(search_velocity)
+            .slalom_velocity_ref(Velocity::new::<meter_per_second>(0.27178875))
+            .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
+            .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
                 36.0 * PI,
             ))
-            .angular_jerk_ref(AngularJerk::from_radian_per_second_cubed(1200.0 * PI))
+            .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
             .build();
 
         let obstacle_detector = {
             ObstacleDetector::new(arr![
                 IDistanceSensor;
                 IDistanceSensor::new(
-                    Distance::from_meters(0.0305),
+                    Length::new::<meter>(0.0305),
                     Pose {
-                        x: Distance::from_meters(-0.0115),
-                        y: Distance::from_meters(0.013),
-                        theta: Angle::from_degree(90.0),
+                        x: Length::new::<meter>(-0.0115),
+                        y: Length::new::<meter>(0.013),
+                        theta: Angle::new::<degree>(90.0),
                     },
                 ),
                 IDistanceSensor::new(
-                    Distance::from_meters(0.0305),
+                    Length::new::<meter>(0.0305),
                     Pose {
-                        x: Distance::from_meters(0.0115),
-                        y: Distance::from_meters(0.013),
-                        theta: Angle::from_degree(-90.0),
+                        x: Length::new::<meter>(0.0115),
+                        y: Length::new::<meter>(0.013),
+                        theta: Angle::new::<degree>(-90.0),
                     },
                 ),
                 IDistanceSensor::new(
-                    Distance::from_meters(0.109),
+                    Length::new::<meter>(0.109),
                     Pose {
-                        x: Distance::from_meters(0.0),
-                        y: Distance::from_meters(0.023),
-                        theta: Angle::from_degree(0.0),
+                        x: Length::new::<meter>(0.0),
+                        y: Length::new::<meter>(0.023),
+                        theta: Angle::new::<degree>(0.0),
                     },
                 ),
             ])
@@ -298,9 +319,9 @@ fn create_search_operator() -> DefaultSearchOperator<
 
     let operator = DefaultSearchOperator::new(
         Pose::new(
-            Distance::from_meters(0.045),
-            Distance::from_meters(0.045),
-            Angle::from_degree(90.0),
+            Length::new::<meter>(0.045),
+            Length::new::<meter>(0.045),
+            Angle::new::<degree>(90.0),
         ),
         SearchNodeId::new(0, 1, AbsoluteDirection::North).unwrap(),
         maze,

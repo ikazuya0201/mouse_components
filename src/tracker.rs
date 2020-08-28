@@ -654,7 +654,7 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, XI, FS, L, Z, B>
 impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, FS, L, Z, B>
     TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, (), FS, L, Z, B>
 {
-    pub fn initial_speed(
+    pub fn initial_velocity(
         self,
         xi: Velocity,
     ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, Velocity, FS, L, Z, B> {
@@ -836,7 +836,7 @@ mod tests {
             .kdx(1.0)
             .ky(1.0)
             .kdy(1.0)
-            .initial_speed(Velocity::new::<meter_per_second>(0.0))
+            .initial_velocity(Velocity::new::<meter_per_second>(0.0))
             .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.001))
             .right_motor(IMotor)
             .left_motor(IMotor)

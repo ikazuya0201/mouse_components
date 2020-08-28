@@ -35,7 +35,7 @@ pub struct TrajectoryGenerator {
     #[allow(unused)]
     spin_generator: SpinGenerator,
 
-    search_speed: Velocity,
+    search_velocity: Velocity,
     front_trajectory: StraightTrajectory,
     right_trajectory: SlalomTrajectory,
     left_trajectory: SlalomTrajectory,
@@ -99,7 +99,7 @@ impl TrajectoryGenerator {
                     x_end,
                     y_end,
                     Default::default(),
-                    self.search_speed,
+                    self.search_velocity,
                 )
             }
             Search(direction) => {
@@ -141,29 +141,29 @@ impl TrajectoryGenerator {
 }
 
 pub struct TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A, J, T, SV> {
-    angular_speed_ref: TV,
+    angular_velocity_ref: TV,
     angular_acceleration_ref: TA,
     angular_jerk_ref: TJ,
-    slalom_speed_ref: VR,
-    max_speed: V,
+    slalom_velocity_ref: VR,
+    max_velocity: V,
     max_acceleration: A,
     max_jerk: J,
     period: T,
-    search_speed: SV,
+    search_velocity: SV,
 }
 
 impl TrajectoryGeneratorBuilder<(), (), (), (), (), (), (), (), ()> {
     pub fn new() -> Self {
         Self {
-            angular_speed_ref: (),
+            angular_velocity_ref: (),
             angular_acceleration_ref: (),
             angular_jerk_ref: (),
-            slalom_speed_ref: (),
-            max_speed: (),
+            slalom_velocity_ref: (),
+            max_velocity: (),
             max_acceleration: (),
             max_jerk: (),
             period: (),
-            search_speed: (),
+            search_velocity: (),
         }
     }
 }
@@ -183,20 +183,20 @@ impl
 {
     pub fn build(self) -> TrajectoryGenerator {
         let straight_generator = StraightTrajectoryGenerator::new(
-            self.max_speed,
+            self.max_velocity,
             self.max_acceleration,
             self.max_jerk,
             self.period,
         );
         let slalom_generator = SlalomGenerator::new(
-            self.angular_speed_ref,
+            self.angular_velocity_ref,
             self.angular_acceleration_ref,
             self.angular_jerk_ref,
-            self.slalom_speed_ref,
+            self.slalom_velocity_ref,
             self.period,
         );
         let spin_generator = SpinGenerator::new(
-            self.angular_speed_ref,
+            self.angular_velocity_ref,
             self.angular_acceleration_ref,
             self.angular_jerk_ref,
             self.period,
@@ -208,14 +208,14 @@ impl
             pose.y,
             pose.theta,
             Angle::new::<degree>(-90.0),
-            self.search_speed,
+            self.search_velocity,
         );
         let left_trajectory = slalom_generator.generate(
             pose.x,
             pose.y,
             pose.theta,
             Angle::new::<degree>(90.0),
-            self.search_speed,
+            self.search_velocity,
         );
         let front_trajectory = {
             let distance = Length::new::<meter>(0.09); //TODO: use configurable value
@@ -226,8 +226,8 @@ impl
                 pose.y,
                 x_end,
                 y_end,
-                self.search_speed,
-                self.search_speed,
+                self.search_velocity,
+                self.search_velocity,
             )
         };
         let back_trajectory = {
@@ -240,7 +240,7 @@ impl
                     pose.y,
                     x_end,
                     y_end,
-                    self.search_speed,
+                    self.search_velocity,
                     Default::default(),
                 )
                 .chain(spin_generator.generate(pose.theta, Angle::new::<degree>(180.0)))
@@ -250,7 +250,7 @@ impl
                     pose.x,
                     pose.y,
                     Default::default(),
-                    self.search_speed,
+                    self.search_velocity,
                 ))
         };
 
@@ -258,7 +258,7 @@ impl
             straight_generator,
             slalom_generator,
             spin_generator,
-            search_speed: self.search_speed,
+            search_velocity: self.search_velocity,
             front_trajectory,
             right_trajectory,
             left_trajectory,
@@ -268,20 +268,20 @@ impl
 }
 
 impl<TA, TJ, VR, V, A, J, T, SV> TrajectoryGeneratorBuilder<(), TA, TJ, VR, V, A, J, T, SV> {
-    pub fn angular_speed_ref(
+    pub fn angular_velocity_ref(
         self,
-        angular_speed_ref: AngularVelocity,
+        angular_velocity_ref: AngularVelocity,
     ) -> TrajectoryGeneratorBuilder<AngularVelocity, TA, TJ, VR, V, A, J, T, SV> {
         TrajectoryGeneratorBuilder {
-            angular_speed_ref,
+            angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
             angular_jerk_ref: self.angular_jerk_ref,
-            slalom_speed_ref: self.slalom_speed_ref,
-            max_speed: self.max_speed,
+            slalom_velocity_ref: self.slalom_velocity_ref,
+            max_velocity: self.max_velocity,
             max_acceleration: self.max_acceleration,
             max_jerk: self.max_jerk,
             period: self.period,
-            search_speed: self.search_speed,
+            search_velocity: self.search_velocity,
         }
     }
 }
@@ -292,15 +292,15 @@ impl<TV, TJ, VR, V, A, J, T, SV> TrajectoryGeneratorBuilder<TV, (), TJ, VR, V, A
         angular_acceleration_ref: AngularAcceleration,
     ) -> TrajectoryGeneratorBuilder<TV, AngularAcceleration, TJ, VR, V, A, J, T, SV> {
         TrajectoryGeneratorBuilder {
-            angular_speed_ref: self.angular_speed_ref,
+            angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref,
             angular_jerk_ref: self.angular_jerk_ref,
-            slalom_speed_ref: self.slalom_speed_ref,
-            max_speed: self.max_speed,
+            slalom_velocity_ref: self.slalom_velocity_ref,
+            max_velocity: self.max_velocity,
             max_acceleration: self.max_acceleration,
             max_jerk: self.max_jerk,
             period: self.period,
-            search_speed: self.search_speed,
+            search_velocity: self.search_velocity,
         }
     }
 }
@@ -311,53 +311,53 @@ impl<TV, TA, VR, V, A, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, (), VR, V, A
         angular_jerk_ref: AngularJerk,
     ) -> TrajectoryGeneratorBuilder<TV, TA, AngularJerk, VR, V, A, J, T, SV> {
         TrajectoryGeneratorBuilder {
-            angular_speed_ref: self.angular_speed_ref,
+            angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
             angular_jerk_ref,
-            slalom_speed_ref: self.slalom_speed_ref,
-            max_speed: self.max_speed,
+            slalom_velocity_ref: self.slalom_velocity_ref,
+            max_velocity: self.max_velocity,
             max_acceleration: self.max_acceleration,
             max_jerk: self.max_jerk,
             period: self.period,
-            search_speed: self.search_speed,
+            search_velocity: self.search_velocity,
         }
     }
 }
 
 impl<TV, TA, TJ, V, A, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, (), V, A, J, T, SV> {
-    pub fn slalom_speed_ref(
+    pub fn slalom_velocity_ref(
         self,
-        slalom_speed_ref: Velocity,
+        slalom_velocity_ref: Velocity,
     ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, Velocity, V, A, J, T, SV> {
         TrajectoryGeneratorBuilder {
-            angular_speed_ref: self.angular_speed_ref,
+            angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
             angular_jerk_ref: self.angular_jerk_ref,
-            slalom_speed_ref,
-            max_speed: self.max_speed,
+            slalom_velocity_ref,
+            max_velocity: self.max_velocity,
             max_acceleration: self.max_acceleration,
             max_jerk: self.max_jerk,
             period: self.period,
-            search_speed: self.search_speed,
+            search_velocity: self.search_velocity,
         }
     }
 }
 
 impl<TV, TA, TJ, VR, A, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, (), A, J, T, SV> {
-    pub fn max_speed(
+    pub fn max_velocity(
         self,
-        max_speed: Velocity,
+        max_velocity: Velocity,
     ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, Velocity, A, J, T, SV> {
         TrajectoryGeneratorBuilder {
-            angular_speed_ref: self.angular_speed_ref,
+            angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
             angular_jerk_ref: self.angular_jerk_ref,
-            slalom_speed_ref: self.slalom_speed_ref,
-            max_speed,
+            slalom_velocity_ref: self.slalom_velocity_ref,
+            max_velocity,
             max_acceleration: self.max_acceleration,
             max_jerk: self.max_jerk,
             period: self.period,
-            search_speed: self.search_speed,
+            search_velocity: self.search_velocity,
         }
     }
 }
@@ -368,15 +368,15 @@ impl<TV, TA, TJ, VR, V, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, 
         max_acceleration: Acceleration,
     ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, Acceleration, J, T, SV> {
         TrajectoryGeneratorBuilder {
-            angular_speed_ref: self.angular_speed_ref,
+            angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
             angular_jerk_ref: self.angular_jerk_ref,
-            slalom_speed_ref: self.slalom_speed_ref,
-            max_speed: self.max_speed,
+            slalom_velocity_ref: self.slalom_velocity_ref,
+            max_velocity: self.max_velocity,
             max_acceleration,
             max_jerk: self.max_jerk,
             period: self.period,
-            search_speed: self.search_speed,
+            search_velocity: self.search_velocity,
         }
     }
 }
@@ -387,15 +387,15 @@ impl<TV, TA, TJ, VR, V, A, T, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, 
         max_jerk: Jerk,
     ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A, Jerk, T, SV> {
         TrajectoryGeneratorBuilder {
-            angular_speed_ref: self.angular_speed_ref,
+            angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
             angular_jerk_ref: self.angular_jerk_ref,
-            slalom_speed_ref: self.slalom_speed_ref,
-            max_speed: self.max_speed,
+            slalom_velocity_ref: self.slalom_velocity_ref,
+            max_velocity: self.max_velocity,
             max_acceleration: self.max_acceleration,
             max_jerk,
             period: self.period,
-            search_speed: self.search_speed,
+            search_velocity: self.search_velocity,
         }
     }
 }
@@ -406,34 +406,34 @@ impl<TV, TA, TJ, VR, V, A, J, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, 
         period: Time,
     ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A, J, Time, SV> {
         TrajectoryGeneratorBuilder {
-            angular_speed_ref: self.angular_speed_ref,
+            angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
             angular_jerk_ref: self.angular_jerk_ref,
-            slalom_speed_ref: self.slalom_speed_ref,
-            max_speed: self.max_speed,
+            slalom_velocity_ref: self.slalom_velocity_ref,
+            max_velocity: self.max_velocity,
             max_acceleration: self.max_acceleration,
             max_jerk: self.max_jerk,
             period,
-            search_speed: self.search_speed,
+            search_velocity: self.search_velocity,
         }
     }
 }
 
 impl<TV, TA, TJ, VR, V, A, J, T> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A, J, T, ()> {
-    pub fn search_speed(
+    pub fn search_velocity(
         self,
-        search_speed: Velocity,
+        search_velocity: Velocity,
     ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A, J, T, Velocity> {
         TrajectoryGeneratorBuilder {
-            angular_speed_ref: self.angular_speed_ref,
+            angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
             angular_jerk_ref: self.angular_jerk_ref,
-            slalom_speed_ref: self.slalom_speed_ref,
-            max_speed: self.max_speed,
+            slalom_velocity_ref: self.slalom_velocity_ref,
+            max_velocity: self.max_velocity,
             max_acceleration: self.max_acceleration,
             max_jerk: self.max_jerk,
             period: self.period,
-            search_speed,
+            search_velocity,
         }
     }
 }
@@ -454,17 +454,17 @@ mod tests {
 
     fn build_generator() -> TrajectoryGenerator {
         TrajectoryGeneratorBuilder::new()
-            .max_speed(Velocity::new::<meter_per_second>(1.0))
+            .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
-            .angular_speed_ref(AngularVelocity::new::<degree_per_second>(180.0))
+            .angular_velocity_ref(AngularVelocity::new::<degree_per_second>(180.0))
             .angular_acceleration_ref(AngularAcceleration::new::<degree_per_second_squared>(
                 1800.0,
             ))
             .angular_jerk_ref(AngularJerk::new::<degree_per_second_cubed>(18000.0))
-            .slalom_speed_ref(Velocity::new::<meter_per_second>(0.6))
+            .slalom_velocity_ref(Velocity::new::<meter_per_second>(0.6))
             .period(Time::new::<second>(0.001))
-            .search_speed(Velocity::new::<meter_per_second>(0.6))
+            .search_velocity(Velocity::new::<meter_per_second>(0.6))
             .build()
     }
 

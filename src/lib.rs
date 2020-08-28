@@ -13,7 +13,7 @@ mod maze;
 mod obstacle_detector;
 mod pattern;
 pub mod prelude;
-mod quantities;
+pub mod quantities;
 mod solver;
 mod tracker;
 mod trajectory_generator;

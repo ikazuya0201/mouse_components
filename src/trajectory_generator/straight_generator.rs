@@ -52,7 +52,7 @@ macro_rules! impl_calculator_generator {
                 } else {
                     (distance, 1.0f32)
                 };
-                let v_reach = self.calculate_reachable_speed(v_start, v_end, distance);
+                let v_reach = self.calculate_reachable_velocity(v_start, v_end, distance);
                 let v_end = if v_start < v_end {
                     if v_reach < v_end {
                         v_reach
@@ -174,7 +174,12 @@ macro_rules! impl_calculator_generator {
             }
 
             //TODO: devise faster algorithm
-            pub fn calculate_reachable_speed(&self, v_start: $dt, v_end: $dt, distance: $t) -> $dt {
+            pub fn calculate_reachable_velocity(
+                &self,
+                v_start: $dt,
+                v_end: $dt,
+                distance: $t,
+            ) -> $dt {
                 if v_start < v_end {
                     let mut low = v_start;
                     let mut high = self.v_max;
