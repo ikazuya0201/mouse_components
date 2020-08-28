@@ -486,45 +486,46 @@ mod tests {
 
                     const EPSILON: f32 = 2e-4;
 
-                    let period = Time::from_seconds(0.001);
-                    let search_speed = Speed::from_meter_per_second(0.2);
+                    let period = Time::new::<second>(0.001);
+                    let search_velocity = Velocity::new::<meter_per_second>(0.2);
 
                     let generator = TrajectoryGeneratorBuilder::new()
                         .period(period)
-                        .max_speed(Speed::from_meter_per_second(2.0))
-                        .max_acceleration(Acceleration::from_meter_per_second_squared(0.7))
-                        .max_jerk(Jerk::from_meter_per_second_cubed(1.0))
-                        .search_speed(search_speed)
-                        .slalom_speed_ref(Speed::from_meter_per_second(0.27178875))
-                        .angular_speed_ref(AngularSpeed::from_radian_per_second(3.0 * PI))
-                        .angular_acceleration_ref(AngularAcceleration::from_radian_per_second_squared(
+                        .max_velocity(Velocity::new::<meter_per_second>(2.0))
+                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
+                        .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
+                        .search_velocity(search_velocity)
+                        .slalom_velocity_ref(Velocity::new::<meter_per_second>(0.27178875))
+                        .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
+                        .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
                             36.0 * PI,
                         ))
-                        .angular_jerk_ref(AngularJerk::from_radian_per_second_cubed(1200.0 * PI))
+                        .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
                         .build();
 
                     let (direction, last_x, last_y, last_theta) = $value;
 
                     let mut trajectory = generator.generate_search(
                         Pose::new(
-                            Distance::from_meters(0.045),
-                            Distance::from_meters(0.09),
-                            Angle::from_degree(90.0),
+                            Length::new::<meter>(0.045),
+                            Length::new::<meter>(0.09),
+                            Angle::new::<degree>(90.0),
                         ),
                         direction,
                     );
 
                     let mut last = trajectory.next().unwrap();
                     for target in trajectory {
-                        let v = target.x.v * target.theta.x.cos() + target.y.v * target.theta.x.sin();
+                        let v = target.x.v * target.theta.x.get::<radian>().cos()
+                            + target.y.v * target.theta.x.get::<radian>().sin();
                         assert!(
-                            v.as_meter_per_second() < search_speed.as_meter_per_second() + EPSILON * 100.0,
+                            v.get::<meter_per_second>() < search_velocity.get::<meter_per_second>() + EPSILON * 100.0,
                         );
                         last = target;
                     }
-                    assert_relative_eq!(last.x.x.as_meters(), last_x, epsilon = EPSILON);
-                    assert_relative_eq!(last.y.x.as_meters(), last_y, epsilon = EPSILON);
-                    assert_relative_eq!(last.theta.x.as_degree(), last_theta, epsilon = EPSILON);
+                    assert_relative_eq!(last.x.x.get::<meter>(), last_x, epsilon = EPSILON);
+                    assert_relative_eq!(last.y.x.get::<meter>(), last_y, epsilon = EPSILON);
+                    assert_relative_eq!(last.theta.x.get::<degree>(), last_theta, epsilon = EPSILON);
                 }
             )*
         }
