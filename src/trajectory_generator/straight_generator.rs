@@ -11,371 +11,376 @@ use uom::si::{
 };
 
 macro_rules! impl_calculator_generator {
-    (
-        $generator_name: ident,
-        $overall_name: ident,
-        $accel_name: ident,
-        $constant_name: ident:
-        $t: ty,
-        $dt: ty,
-        $ddt: ty,
-        $dddt: ty,
-        $tunit: ty,
-        $target: ident,
-    ) => {
-        pub struct $generator_name {
-            v_max: $dt,
-            a_max: $ddt,
-            j_max: $dddt,
-        }
+    ($mod_name: ident, $t: ty, $dt: ty, $ddt: ty, $dddt: ty, $tunit: ty, $target: ident) => {
+        mod $mod_name {
+            use super::*;
 
-        impl $generator_name {
-            const LOOP_COUNT: u8 = 25;
-
-            pub fn new(v_max: $dt, a_max: $ddt, j_max: $dddt) -> Self {
-                Self {
-                    v_max,
-                    a_max,
-                    j_max,
-                }
+            pub struct StraightCalculatorGenerator {
+                v_max: $dt,
+                a_max: $ddt,
+                j_max: $dddt,
             }
 
-            //NOTO: v_start and v_end should not be negative
-            pub fn generate(
-                &self,
-                x_start: $t,
-                distance: $t,
-                v_start: $dt,
-                v_end: $dt,
-            ) -> ($overall_name, Time) {
-                let (distance, sign) = if distance.get::<$tunit>() < 0.0 {
-                    (-distance, -1.0f32)
-                } else {
-                    (distance, 1.0f32)
-                };
-                let v_reach = self.calculate_reachable_velocity(v_start, v_end, distance);
-                let v_end = if v_start < v_end {
-                    if v_reach < v_end {
+            impl StraightCalculatorGenerator {
+                const LOOP_COUNT: u8 = 25;
+
+                pub fn new(v_max: $dt, a_max: $ddt, j_max: $dddt) -> Self {
+                    Self {
+                        v_max,
+                        a_max,
+                        j_max,
+                    }
+                }
+
+                //NOTO: v_start and v_end should not be negative
+                pub fn generate(
+                    &self,
+                    x_start: $t,
+                    distance: $t,
+                    v_start: $dt,
+                    v_end: $dt,
+                ) -> (OverallCalculator, Time) {
+                    let (distance, sign) = if distance.get::<$tunit>() < 0.0 {
+                        (-distance, -1.0f32)
+                    } else {
+                        (distance, 1.0f32)
+                    };
+                    let v_reach = self.calculate_reachable_velocity(v_start, v_end, distance);
+                    let v_end = if v_start < v_end {
+                        if v_reach < v_end {
+                            v_reach
+                        } else {
+                            v_end
+                        }
+                    } else if v_reach > v_end {
                         v_reach
                     } else {
                         v_end
-                    }
-                } else if v_reach > v_end {
-                    v_reach
-                } else {
-                    v_end
-                };
-                let mut low = if v_start < v_end { v_end } else { v_start };
-                let mut high = self.v_max;
-                for _ in 0..Self::LOOP_COUNT {
-                    let mid = (low + high) / 2.0;
-                    let d = self.calculate_acceleration_distance(v_start, mid)
-                        + self.calculate_acceleration_distance(mid, v_end);
-                    if d <= distance {
-                        low = mid;
-                    } else {
-                        high = mid;
-                    }
-                }
-
-                let v_max = low;
-                let v_end = if v_end < v_max { v_end } else { v_max };
-
-                let dist1 = self.calculate_acceleration_distance(v_start, v_max);
-                let dist3 = self.calculate_acceleration_distance(v_max, v_end);
-                let dist2 = distance - dist1 - dist3;
-
-                let (accel_calculator, dt1) = self.generate_acceleration(x_start, v_start, v_max);
-                let (const_calculator, dt2) =
-                    Self::generate_constant(x_start + dist1, dist2, v_max);
-                let (decel_calculator, dt3) =
-                    self.generate_acceleration(x_start + distance - dist3, v_max, v_end);
-
-                let t1 = dt1;
-                let t2 = t1 + dt2;
-                let t3 = t2 + dt3;
-
-                (
-                    $overall_name {
-                        x_start,
-                        v_start,
-                        t1,
-                        t2,
-                        t3,
-                        distance,
-                        v_end,
-                        accel_calculator,
-                        const_calculator,
-                        decel_calculator,
-                        sign,
-                    },
-                    t3,
-                )
-            }
-
-            fn generate_acceleration(
-                &self,
-                x_start: $t,
-                v_start: $dt,
-                v_end: $dt,
-            ) -> ($accel_name, Time) {
-                let tc = self.a_max / self.j_max;
-                let vd = <$dt>::from(self.a_max * tc);
-                let (t1, t2, t3) = if (v_end - v_start).abs() >= vd {
-                    let tm = (v_end - v_start).abs() / self.a_max - tc;
-                    (tc, tc + tm, 2.0 * tc + tm)
-                } else {
-                    let td = Time::new::<second>(libm::sqrtf(
-                        ((v_end - v_start).abs() / self.j_max).value,
-                    ));
-                    (td, td, 2.0 * td)
-                };
-
-                let (a_m, j_m) = if v_start <= v_end {
-                    (self.a_max, self.j_max)
-                } else {
-                    (-self.a_max, -self.j_max)
-                };
-
-                let distance = <$t>::from((v_start + v_end) * t3) / 2.0;
-                let x_end = x_start + distance;
-
-                (
-                    $accel_name {
-                        x_start,
-                        v_start,
-                        x_end,
-                        v_end,
-                        a_m,
-                        j_m,
-                        t1,
-                        t2,
-                        t3,
-                    },
-                    t3,
-                )
-            }
-
-            fn calculate_acceleration_distance(&self, v_start: $dt, v_end: $dt) -> $t {
-                let tc = self.a_max / self.j_max;
-                let vd = <$dt>::from(self.a_max * tc);
-                let t = if (v_end - v_start).abs() >= vd {
-                    (v_end - v_start).abs() / self.a_max + tc
-                } else {
-                    2.0 * Time::new::<second>(libm::sqrtf(
-                        ((v_end - v_start).abs() / self.j_max).value,
-                    ))
-                };
-                <$t>::from((v_start + v_end) * t / 2.0)
-            }
-
-            fn generate_constant(x_start: $t, distance: $t, v: $dt) -> ($constant_name, Time) {
-                let t_end = if (distance / v).get::<second>() < 0.0 {
-                    Default::default()
-                } else {
-                    distance / v
-                };
-                ($constant_name { t_end, x_start, v }, t_end)
-            }
-
-            //TODO: devise faster algorithm
-            pub fn calculate_reachable_velocity(
-                &self,
-                v_start: $dt,
-                v_end: $dt,
-                distance: $t,
-            ) -> $dt {
-                if v_start < v_end {
-                    let mut low = v_start;
+                    };
+                    let mut low = if v_start < v_end { v_end } else { v_start };
                     let mut high = self.v_max;
                     for _ in 0..Self::LOOP_COUNT {
                         let mid = (low + high) / 2.0;
-                        let d = self.calculate_acceleration_distance(v_start, mid);
-                        if d < distance {
+                        let d = self.calculate_acceleration_distance(v_start, mid)
+                            + self.calculate_acceleration_distance(mid, v_end);
+                        if d <= distance {
                             low = mid;
                         } else {
                             high = mid;
                         }
                     }
-                    low
-                } else {
-                    let mut low = Default::default();
-                    let mut high = v_start;
-                    for _ in 0..Self::LOOP_COUNT {
-                        let mid = (low + high) / 2.0;
-                        let d = self.calculate_acceleration_distance(v_start, mid);
-                        if d < distance {
-                            high = mid;
-                        } else {
-                            low = mid;
+
+                    let v_max = low;
+                    let v_end = if v_end < v_max { v_end } else { v_max };
+
+                    let dist1 = self.calculate_acceleration_distance(v_start, v_max);
+                    let dist3 = self.calculate_acceleration_distance(v_max, v_end);
+                    let dist2 = distance - dist1 - dist3;
+
+                    let (accel_calculator, dt1) =
+                        self.generate_acceleration(x_start, v_start, v_max);
+                    let (const_calculator, dt2) =
+                        Self::generate_constant(x_start + dist1, dist2, v_max);
+                    let (decel_calculator, dt3) =
+                        self.generate_acceleration(x_start + distance - dist3, v_max, v_end);
+
+                    let t1 = dt1;
+                    let t2 = t1 + dt2;
+                    let t3 = t2 + dt3;
+
+                    (
+                        OverallCalculator {
+                            x_start,
+                            v_start,
+                            t1,
+                            t2,
+                            t3,
+                            distance,
+                            v_end,
+                            accel_calculator,
+                            const_calculator,
+                            decel_calculator,
+                            sign,
+                        },
+                        t3,
+                    )
+                }
+
+                fn generate_acceleration(
+                    &self,
+                    x_start: $t,
+                    v_start: $dt,
+                    v_end: $dt,
+                ) -> (AccelerationCalculator, Time) {
+                    let tc = self.a_max / self.j_max;
+                    let vd = <$dt>::from(self.a_max * tc);
+                    let (t1, t2, t3) = if (v_end - v_start).abs() >= vd {
+                        let tm = (v_end - v_start).abs() / self.a_max - tc;
+                        (tc, tc + tm, 2.0 * tc + tm)
+                    } else {
+                        let td = Time::new::<second>(libm::sqrtf(
+                            ((v_end - v_start).abs() / self.j_max).value,
+                        ));
+                        (td, td, 2.0 * td)
+                    };
+
+                    let (a_m, j_m) = if v_start <= v_end {
+                        (self.a_max, self.j_max)
+                    } else {
+                        (-self.a_max, -self.j_max)
+                    };
+
+                    let distance = <$t>::from((v_start + v_end) * t3) / 2.0;
+                    let x_end = x_start + distance;
+
+                    (
+                        AccelerationCalculator {
+                            x_start,
+                            v_start,
+                            x_end,
+                            v_end,
+                            a_m,
+                            j_m,
+                            t1,
+                            t2,
+                            t3,
+                        },
+                        t3,
+                    )
+                }
+
+                fn calculate_acceleration_distance(&self, v_start: $dt, v_end: $dt) -> $t {
+                    let tc = self.a_max / self.j_max;
+                    let vd = <$dt>::from(self.a_max * tc);
+                    let t = if (v_end - v_start).abs() >= vd {
+                        (v_end - v_start).abs() / self.a_max + tc
+                    } else {
+                        2.0 * Time::new::<second>(libm::sqrtf(
+                            ((v_end - v_start).abs() / self.j_max).value,
+                        ))
+                    };
+                    <$t>::from((v_start + v_end) * t / 2.0)
+                }
+
+                fn generate_constant(
+                    x_start: $t,
+                    distance: $t,
+                    v: $dt,
+                ) -> (ContantCalculator, Time) {
+                    let t_end = if (distance / v).get::<second>() < 0.0 {
+                        Default::default()
+                    } else {
+                        distance / v
+                    };
+                    (ContantCalculator { t_end, x_start, v }, t_end)
+                }
+
+                //TODO: devise faster algorithm
+                pub fn calculate_reachable_velocity(
+                    &self,
+                    v_start: $dt,
+                    v_end: $dt,
+                    distance: $t,
+                ) -> $dt {
+                    if v_start < v_end {
+                        let mut low = v_start;
+                        let mut high = self.v_max;
+                        for _ in 0..Self::LOOP_COUNT {
+                            let mid = (low + high) / 2.0;
+                            let d = self.calculate_acceleration_distance(v_start, mid);
+                            if d < distance {
+                                low = mid;
+                            } else {
+                                high = mid;
+                            }
+                        }
+                        low
+                    } else {
+                        let mut low = Default::default();
+                        let mut high = v_start;
+                        for _ in 0..Self::LOOP_COUNT {
+                            let mid = (low + high) / 2.0;
+                            let d = self.calculate_acceleration_distance(v_start, mid);
+                            if d < distance {
+                                high = mid;
+                            } else {
+                                low = mid;
+                            }
+                        }
+                        low
+                    }
+                }
+            }
+
+            #[derive(Clone)]
+            struct AccelerationCalculator {
+                x_start: $t,
+                v_start: $dt,
+                x_end: $t,
+                v_end: $dt,
+                a_m: $ddt,
+                j_m: $dddt,
+                t1: Time,
+                t2: Time,
+                t3: Time,
+            }
+
+            impl AccelerationCalculator {
+                fn calculate(&self, t: Time) -> $target {
+                    if t.get::<second>() < 0.0 {
+                        $target {
+                            x: self.x_start,
+                            v: self.v_start,
+                            a: Default::default(),
+                            j: Default::default(),
+                        }
+                    } else if t <= self.t1 {
+                        $target {
+                            j: self.j_m,
+                            a: <$ddt>::from(self.j_m * t),
+                            v: self.v_start + <$dt>::from(self.j_m * t * t / 2.0),
+                            x: self.x_start
+                                + <$t>::from(self.v_start * t + self.j_m * t * t * t / 6.0),
+                        }
+                    } else if t <= self.t2 {
+                        let dt1 = t - self.t1;
+                        $target {
+                            j: Default::default(),
+                            a: self.a_m,
+                            v: self.v_start
+                                + <$dt>::from(self.a_m * self.t1 / 2.0 + self.a_m * dt1),
+                            x: self.x_start
+                                + <$t>::from(
+                                    self.v_start * self.t1
+                                        + self.j_m * self.t1 * self.t1 * self.t1 / 6.0
+                                        + (self.v_start + <$dt>::from(self.a_m * self.t1) / 2.0)
+                                            * dt1
+                                        + self.a_m * dt1 * dt1 / 2.0,
+                                ),
+                        }
+                    } else if t <= self.t3 {
+                        let dt3 = self.t3 - t;
+                        $target {
+                            j: -self.j_m,
+                            a: <$ddt>::from(self.j_m * dt3),
+                            v: self.v_end - <$dt>::from(self.j_m * dt3 * dt3 / 2.0),
+                            x: self.x_end - <$t>::from(self.v_end * dt3)
+                                + <$t>::from(self.j_m * dt3 * dt3 * dt3 / 6.0),
+                        }
+                    } else {
+                        $target {
+                            x: self.x_end,
+                            v: self.v_end,
+                            a: Default::default(),
+                            j: Default::default(),
                         }
                     }
-                    low
                 }
             }
-        }
 
-        #[derive(Clone)]
-        struct $accel_name {
-            x_start: $t,
-            v_start: $dt,
-            x_end: $t,
-            v_end: $dt,
-            a_m: $ddt,
-            j_m: $dddt,
-            t1: Time,
-            t2: Time,
-            t3: Time,
-        }
+            #[derive(Clone)]
+            struct ContantCalculator {
+                t_end: Time,
+                x_start: $t,
+                v: $dt,
+            }
 
-        impl $accel_name {
-            fn calculate(&self, t: Time) -> $target {
-                if t.get::<second>() < 0.0 {
-                    $target {
-                        x: self.x_start,
-                        v: self.v_start,
-                        a: Default::default(),
-                        j: Default::default(),
-                    }
-                } else if t <= self.t1 {
-                    $target {
-                        j: self.j_m,
-                        a: <$ddt>::from(self.j_m * t),
-                        v: self.v_start + <$dt>::from(self.j_m * t * t / 2.0),
-                        x: self.x_start + <$t>::from(self.v_start * t + self.j_m * t * t * t / 6.0),
-                    }
-                } else if t <= self.t2 {
-                    let dt1 = t - self.t1;
-                    $target {
-                        j: Default::default(),
-                        a: self.a_m,
-                        v: self.v_start + <$dt>::from(self.a_m * self.t1 / 2.0 + self.a_m * dt1),
-                        x: self.x_start
-                            + <$t>::from(
-                                self.v_start * self.t1
-                                    + self.j_m * self.t1 * self.t1 * self.t1 / 6.0
-                                    + (self.v_start + <$dt>::from(self.a_m * self.t1) / 2.0) * dt1
-                                    + self.a_m * dt1 * dt1 / 2.0,
-                            ),
-                    }
-                } else if t <= self.t3 {
-                    let dt3 = self.t3 - t;
-                    $target {
-                        j: -self.j_m,
-                        a: <$ddt>::from(self.j_m * dt3),
-                        v: self.v_end - <$dt>::from(self.j_m * dt3 * dt3 / 2.0),
-                        x: self.x_end - <$t>::from(self.v_end * dt3)
-                            + <$t>::from(self.j_m * dt3 * dt3 * dt3 / 6.0),
-                    }
-                } else {
-                    $target {
-                        x: self.x_end,
-                        v: self.v_end,
-                        a: Default::default(),
-                        j: Default::default(),
+            impl ContantCalculator {
+                fn calculate(&self, t: Time) -> $target {
+                    if t > self.t_end || t.get::<second>() < 0.0 {
+                        $target {
+                            x: self.x_start + <$t>::from(self.v * self.t_end),
+                            v: self.v,
+                            a: Default::default(),
+                            j: Default::default(),
+                        }
+                    } else {
+                        $target {
+                            j: Default::default(),
+                            a: Default::default(),
+                            v: self.v,
+                            x: self.x_start + <$t>::from(self.v * t),
+                        }
                     }
                 }
             }
-        }
 
-        #[derive(Clone)]
-        struct $constant_name {
-            t_end: Time,
-            x_start: $t,
-            v: $dt,
-        }
-
-        impl $constant_name {
-            fn calculate(&self, t: Time) -> $target {
-                if t > self.t_end || t.get::<second>() < 0.0 {
-                    $target {
-                        x: self.x_start + <$t>::from(self.v * self.t_end),
-                        v: self.v,
-                        a: Default::default(),
-                        j: Default::default(),
-                    }
-                } else {
-                    $target {
-                        j: Default::default(),
-                        a: Default::default(),
-                        v: self.v,
-                        x: self.x_start + <$t>::from(self.v * t),
-                    }
-                }
+            #[derive(Clone)]
+            pub struct OverallCalculator {
+                x_start: $t,
+                v_start: $dt,
+                t1: Time,
+                t2: Time,
+                t3: Time,
+                distance: $t,
+                v_end: $dt,
+                accel_calculator: AccelerationCalculator,
+                const_calculator: ContantCalculator,
+                decel_calculator: AccelerationCalculator,
+                sign: f32,
             }
-        }
 
-        #[derive(Clone)]
-        pub struct $overall_name {
-            x_start: $t,
-            v_start: $dt,
-            t1: Time,
-            t2: Time,
-            t3: Time,
-            distance: $t,
-            v_end: $dt,
-            accel_calculator: $accel_name,
-            const_calculator: $constant_name,
-            decel_calculator: $accel_name,
-            sign: f32,
-        }
-
-        impl $overall_name {
-            pub fn calculate(&self, t: Time) -> $target {
-                let target = if t.get::<second>() < 0.0 {
+            impl OverallCalculator {
+                pub fn calculate(&self, t: Time) -> $target {
+                    let target = if t.get::<second>() < 0.0 {
+                        $target {
+                            x: self.x_start,
+                            v: self.v_start,
+                            a: Default::default(),
+                            j: Default::default(),
+                        }
+                    } else if t <= self.t1 {
+                        self.accel_calculator.calculate(t)
+                    } else if t <= self.t2 {
+                        self.const_calculator.calculate(t - self.t1)
+                    } else if t <= self.t3 {
+                        self.decel_calculator.calculate(t - self.t2)
+                    } else {
+                        $target {
+                            x: self.x_start + self.distance,
+                            v: self.v_end,
+                            a: Default::default(),
+                            j: Default::default(),
+                        }
+                    };
                     $target {
-                        x: self.x_start,
-                        v: self.v_start,
-                        a: Default::default(),
-                        j: Default::default(),
+                        x: (target.x - self.x_start) * self.sign + self.x_start,
+                        v: target.v * self.sign,
+                        a: target.a * self.sign,
+                        j: target.j * self.sign,
                     }
-                } else if t <= self.t1 {
-                    self.accel_calculator.calculate(t)
-                } else if t <= self.t2 {
-                    self.const_calculator.calculate(t - self.t1)
-                } else if t <= self.t3 {
-                    self.decel_calculator.calculate(t - self.t2)
-                } else {
-                    $target {
-                        x: self.x_start + self.distance,
-                        v: self.v_end,
-                        a: Default::default(),
-                        j: Default::default(),
-                    }
-                };
-                $target {
-                    x: (target.x - self.x_start) * self.sign + self.x_start,
-                    v: target.v * self.sign,
-                    a: target.a * self.sign,
-                    j: target.j * self.sign,
                 }
             }
         }
     };
 }
 
+pub use length_calculator::{
+    OverallCalculator as LengthOverallCalculator,
+    StraightCalculatorGenerator as LengthStraightCalculatorGenerator,
+};
 impl_calculator_generator!(
-    LengthStraightCalculatorGenerator,
-    LengthOverallCalculator,
-    LengthAccelerationCalculator,
-    LengthConstantCalculator: Length,
+    length_calculator,
+    Length,
     Velocity,
     Acceleration,
     Jerk,
     meter,
-    LengthTarget,
+    LengthTarget
 );
 
+pub use angle_calculator::{
+    OverallCalculator as AngleOverallCalculator,
+    StraightCalculatorGenerator as AngleStraightCalculatorGenerator,
+};
 impl_calculator_generator!(
-    AngleStraightCalculatorGenerator,
-    AngleOverallCalculator,
-    AnglerAccelerationCalculator,
-    AnglerConstantCalculator: Angle,
+    angle_calculator,
+    Angle,
     AngularVelocity,
     AngularAcceleration,
     AngularJerk,
     radian,
-    AngleTarget,
+    AngleTarget
 );
 
 pub struct StraightTrajectoryGenerator {
