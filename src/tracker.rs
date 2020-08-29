@@ -16,12 +16,12 @@ use uom::si::{
     },
     frequency::hertz,
     length::meter,
-    velocity::meter_per_second,
     Quantity, ISQ, SI,
 };
 use uom::{typenum::*, Kind};
 
-type Gain = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
+type GainType = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
+type BType = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 
 macro_rules! controller_trait {
     ($name: ident: $t: ty, $dt: ty) => {
@@ -46,9 +46,9 @@ impl Logger for NullLogger {
 }
 
 pub struct Tracker<LM, RM, TC, RC, L> {
-    kx: Gain,
+    kx: GainType,
     kdx: Frequency,
-    ky: Gain,
+    ky: GainType,
     kdy: Frequency,
     xi: Velocity,
     period: Time,
@@ -61,7 +61,7 @@ pub struct Tracker<LM, RM, TC, RC, L> {
     #[allow(unused)]
     logger: L,
     zeta: f32,
-    b: f32,
+    b: BType,
 }
 
 impl<LM, RM, TC, RC, L> agent::Tracker<State, Target> for Tracker<LM, RM, TC, RC, L>
@@ -163,24 +163,19 @@ where
             let vr = target.x.v * cos_th_r + target.y.v * sin_th_r;
             let wr = target.theta.v;
 
-            let k1 = {
-                let wr_raw = wr.get::<radian_per_second>();
-                let vr_raw = vr.get::<meter_per_second>();
-                Frequency::new::<hertz>(
-                    2.0 * self.zeta * libm::sqrtf(wr_raw * wr_raw + self.b * vr_raw * vr_raw),
-                )
-            };
+            let k1 = 2.0
+                * self.zeta
+                * AngularVelocity::new::<radian_per_second>(libm::sqrtf(
+                    (wr * wr + self.b * vr * vr).value,
+                ));
             let k2 = self.b;
             let k3 = k1;
 
             let e = xd * cos_th + yd * sin_th;
             let uv = vr * cos_th_d + k1 * e;
-            let uw =
-                wr + AngularVelocity::new::<radian_per_second>(
-                    k2 * vr.get::<meter_per_second>()
-                        * e.get::<meter>()
-                        * Self::sinc(theta_d.get::<radian>()),
-                ) + AngularVelocity::from(k3 * theta_d);
+            let uw = wr
+                + AngularVelocity::from(k2 * vr * e * Self::sinc(theta_d.get::<radian>()))
+                + AngularVelocity::from(k3 * theta_d);
             (uv, uw, Default::default(), Default::default())
         };
 
@@ -245,135 +240,22 @@ impl TrackerBuilder<(), (), (), (), (), (), (), (), (), (), (), (), NullLogger, 
 }
 
 impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Velocity, TC, RC, LM, RM, Time, (), (), L, f32, f32>
-where
-    LM: Motor,
-    RM: Motor,
-    TC: TranslationController,
-    RC: RotationController,
-    L: Logger,
-{
-    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
-        Tracker {
-            kx: Quantity {
-                dimension: PhantomData,
-                units: PhantomData,
-                value: self.kx,
-            },
-            kdx: Frequency::new::<hertz>(self.kdx),
-            ky: Quantity {
-                dimension: PhantomData,
-                units: PhantomData,
-                value: self.ky,
-            },
-            kdy: Frequency::new::<hertz>(self.kdy),
-            xi_threshold: self.xi_threshold,
-            translation_controller: self.translation_controller,
-            rotation_controller: self.rotation_controller,
-            left_motor: self.left_motor,
-            right_motor: self.right_motor,
-            period: self.period,
-            xi: Default::default(),
-            fail_safe_distance: Self::DEFAULT_FAIL_SAFE_DISTANCE,
-            logger: self.logger,
-            zeta: self.zeta,
-            b: self.b,
-        }
-    }
-}
-
-impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Velocity, TC, RC, LM, RM, Time, (), Length, L, f32, f32>
-where
-    LM: Motor,
-    RM: Motor,
-    TC: TranslationController,
-    RC: RotationController,
-    L: Logger,
-{
-    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
-        Tracker {
-            kx: Quantity {
-                dimension: PhantomData,
-                units: PhantomData,
-                value: self.kx,
-            },
-            kdx: Frequency::new::<hertz>(self.kdx),
-            ky: Quantity {
-                dimension: PhantomData,
-                units: PhantomData,
-                value: self.ky,
-            },
-            kdy: Frequency::new::<hertz>(self.kdy),
-            xi_threshold: self.xi_threshold,
-            translation_controller: self.translation_controller,
-            rotation_controller: self.rotation_controller,
-            left_motor: self.left_motor,
-            right_motor: self.right_motor,
-            period: self.period,
-            xi: Default::default(),
-            fail_safe_distance: self.fail_safe_distance,
-            logger: self.logger,
-            zeta: self.zeta,
-            b: self.b,
-        }
-    }
-}
-
-impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Velocity, TC, RC, LM, RM, Time, Velocity, (), L, f32, f32>
-where
-    LM: Motor,
-    RM: Motor,
-    TC: TranslationController,
-    RC: RotationController,
-{
-    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
-        Tracker {
-            kx: Quantity {
-                dimension: PhantomData,
-                units: PhantomData,
-                value: self.kx,
-            },
-            kdx: Frequency::new::<hertz>(self.kdx),
-            ky: Quantity {
-                dimension: PhantomData,
-                units: PhantomData,
-                value: self.ky,
-            },
-            kdy: Frequency::new::<hertz>(self.kdy),
-            xi_threshold: self.xi_threshold,
-            translation_controller: self.translation_controller,
-            rotation_controller: self.rotation_controller,
-            left_motor: self.left_motor,
-            right_motor: self.right_motor,
-            period: self.period,
-            xi: self.xi,
-            fail_safe_distance: Self::DEFAULT_FAIL_SAFE_DISTANCE,
-            logger: self.logger,
-            zeta: self.zeta,
-            b: self.b,
-        }
-    }
-}
-
-impl<TC, RC, LM, RM, L>
     TrackerBuilder<
-        f32,
-        f32,
-        f32,
-        f32,
+        GainType,
+        Frequency,
+        GainType,
+        Frequency,
         Velocity,
         TC,
         RC,
         LM,
         RM,
         Time,
-        Velocity,
-        Length,
+        (),
+        (),
         L,
         f32,
-        f32,
+        BType,
     >
 where
     LM: Motor,
@@ -384,26 +266,155 @@ where
 {
     pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
         Tracker {
-            kx: Quantity {
-                dimension: PhantomData,
-                units: PhantomData,
-                value: self.kx,
-            },
-            kdx: Frequency::new::<hertz>(self.kdx),
-            ky: Quantity {
-                dimension: PhantomData,
-                units: PhantomData,
-                value: self.ky,
-            },
-            kdy: Frequency::new::<hertz>(self.kdy),
+            kx: self.kx,
+            kdx: self.kdx,
+            ky: self.ky,
+            kdy: self.kdy,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
             left_motor: self.left_motor,
             right_motor: self.right_motor,
             period: self.period,
-            xi: self.xi,
-            fail_safe_distance: self.fail_safe_distance,
+            xi: Default::default(),
+            fail_safe_distance: Self::DEFAULT_FAIL_SAFE_DISTANCE,
+            logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
+        }
+    }
+}
+
+impl<TC, RC, LM, RM, L>
+    TrackerBuilder<
+        GainType,
+        Frequency,
+        GainType,
+        Frequency,
+        Velocity,
+        TC,
+        RC,
+        LM,
+        RM,
+        Time,
+        (),
+        Length,
+        L,
+        f32,
+        BType,
+    >
+where
+    LM: Motor,
+    RM: Motor,
+    TC: TranslationController,
+    RC: RotationController,
+    L: Logger,
+{
+    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
+        Tracker {
+            kx: self.kx,
+            kdx: self.kdx,
+            ky: self.ky,
+            kdy: self.kdy,
+            xi_threshold: self.xi_threshold,
+            translation_controller: self.translation_controller,
+            rotation_controller: self.rotation_controller,
+            left_motor: self.left_motor,
+            right_motor: self.right_motor,
+            period: self.period,
+            xi: Default::default(),
+            fail_safe_distance: Self::DEFAULT_FAIL_SAFE_DISTANCE,
+            logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
+        }
+    }
+}
+
+impl<TC, RC, LM, RM, L>
+    TrackerBuilder<
+        GainType,
+        Frequency,
+        GainType,
+        Frequency,
+        Velocity,
+        TC,
+        RC,
+        LM,
+        RM,
+        Time,
+        Velocity,
+        (),
+        L,
+        f32,
+        BType,
+    >
+where
+    LM: Motor,
+    RM: Motor,
+    TC: TranslationController,
+    RC: RotationController,
+{
+    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
+        Tracker {
+            kx: self.kx,
+            kdx: self.kdx,
+            ky: self.ky,
+            kdy: self.kdy,
+            xi_threshold: self.xi_threshold,
+            translation_controller: self.translation_controller,
+            rotation_controller: self.rotation_controller,
+            left_motor: self.left_motor,
+            right_motor: self.right_motor,
+            period: self.period,
+            xi: Default::default(),
+            fail_safe_distance: Self::DEFAULT_FAIL_SAFE_DISTANCE,
+            logger: self.logger,
+            zeta: self.zeta,
+            b: self.b,
+        }
+    }
+}
+
+impl<TC, RC, LM, RM, L>
+    TrackerBuilder<
+        GainType,
+        Frequency,
+        GainType,
+        Frequency,
+        Velocity,
+        TC,
+        RC,
+        LM,
+        RM,
+        Time,
+        Velocity,
+        Length,
+        L,
+        f32,
+        BType,
+    >
+where
+    LM: Motor,
+    RM: Motor,
+    TC: TranslationController,
+    RC: RotationController,
+    L: Logger,
+{
+    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
+        Tracker {
+            kx: self.kx,
+            kdx: self.kdx,
+            ky: self.ky,
+            kdy: self.kdy,
+            xi_threshold: self.xi_threshold,
+            translation_controller: self.translation_controller,
+            rotation_controller: self.rotation_controller,
+            left_motor: self.left_motor,
+            right_motor: self.right_motor,
+            period: self.period,
+            xi: Default::default(),
+            fail_safe_distance: Self::DEFAULT_FAIL_SAFE_DISTANCE,
             logger: self.logger,
             zeta: self.zeta,
             b: self.b,
@@ -417,9 +428,12 @@ impl<KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     pub fn kx(
         self,
         kx: f32,
-    ) -> TrackerBuilder<f32, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
+    ) -> TrackerBuilder<GainType, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
-            kx,
+            kx: GainType {
+                value: kx,
+                ..Default::default()
+            },
             kdx: self.kdx,
             ky: self.ky,
             kdy: self.kdy,
@@ -444,10 +458,10 @@ impl<KX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     pub fn kdx(
         self,
         kdx: f32,
-    ) -> TrackerBuilder<KX, f32, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
+    ) -> TrackerBuilder<KX, Frequency, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
-            kdx,
+            kdx: Frequency::new::<hertz>(kdx),
             ky: self.ky,
             kdy: self.kdy,
             xi_threshold: self.xi_threshold,
@@ -471,11 +485,14 @@ impl<KX, KDX, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     pub fn ky(
         self,
         ky: f32,
-    ) -> TrackerBuilder<KX, KDX, f32, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
+    ) -> TrackerBuilder<KX, KDX, GainType, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
-            ky,
+            ky: GainType {
+                value: ky,
+                ..Default::default()
+            },
             kdy: self.kdy,
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
@@ -498,12 +515,12 @@ impl<KX, KDX, KY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     pub fn kdy(
         self,
         kdy: f32,
-    ) -> TrackerBuilder<KX, KDX, KY, f32, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
+    ) -> TrackerBuilder<KX, KDX, KY, Frequency, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
             ky: self.ky,
-            kdy,
+            kdy: Frequency::new::<hertz>(kdy),
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -810,7 +827,7 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z>
     pub fn low_b(
         self,
         b: f32,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, f32> {
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, BType> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
@@ -826,7 +843,10 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z>
             fail_safe_distance: self.fail_safe_distance,
             logger: self.logger,
             zeta: self.zeta,
-            b,
+            b: BType {
+                value: b,
+                ..Default::default()
+            },
         }
     }
 }
@@ -834,7 +854,7 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uom::si::{electric_potential::volt, time::second};
+    use uom::si::{electric_potential::volt, time::second, velocity::meter_per_second};
 
     struct IMotor;
 
