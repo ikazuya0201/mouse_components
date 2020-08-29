@@ -91,6 +91,12 @@ where
     RC: Controller<Angle>,
     L: Logger,
 {
+    fn sinc(x: f32) -> f32 {
+        let xx = x * x;
+        let xxxx = xx * xx;
+        xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
+    }
+
     fn fail_safe(&mut self, state: &State, target: &Target) {
         use agent::Tracker;
 
@@ -134,7 +140,6 @@ where
             let sin_th_r = target.theta.x.sin();
             let cos_th_r = target.theta.x.cos();
             let theta_d = target.theta.x - state.theta.x;
-            let sin_th_d = theta_d.sin();
             let cos_th_d = theta_d.cos();
             let xd = target.x.x - state.x.x;
             let yd = target.y.x - state.y.x;
@@ -150,7 +155,7 @@ where
             let uv = vr * cos_th_d + k1 * e;
             let uw =
                 wr + AngularSpeed::from_radian_per_second(
-                    k2 * vr.as_meter_per_second() * sin_th_d * e.as_meters() / theta_d.as_radian(),
+                    k2 * vr.as_meter_per_second() * e.as_meters() * Self::sinc(theta_d.as_radian()),
                 ) + k3 * theta_d;
             (uv, uw, Default::default(), Default::default())
         };
