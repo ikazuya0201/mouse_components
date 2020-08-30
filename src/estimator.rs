@@ -52,8 +52,8 @@ where
 
         let average_trans_speed = (average_left_speed + average_right_speed) / 2.0;
 
-        let trans_acceleration = block!(self.imu.get_acceleration_y()).unwrap();
-        let angular_speed = block!(self.imu.get_angular_speed_z()).unwrap();
+        let trans_acceleration = block!(self.imu.get_translational_acceleration()).unwrap();
+        let angular_speed = block!(self.imu.get_angular_speed()).unwrap();
 
         //complementary filter
         let trans_speed = self.alpha * (self.trans_speed + trans_acceleration * self.period)
@@ -488,29 +488,17 @@ mod tests {
     impl<T> IMU for IIMU<T> {
         type Error = ();
 
-        fn get_angular_speed_x(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
-            Err(nb::Error::WouldBlock)
-        }
-        fn get_angular_speed_y(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
-            Err(nb::Error::WouldBlock)
-        }
-        fn get_angular_speed_z(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
+        fn get_angular_speed(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
             let cur_v = self.inner.borrow().current.theta.v;
             Ok(cur_v)
         }
 
-        fn get_acceleration_x(&mut self) -> nb::Result<Acceleration, Self::Error> {
-            Err(nb::Error::WouldBlock)
-        }
-        fn get_acceleration_y(&mut self) -> nb::Result<Acceleration, Self::Error> {
+        fn get_translational_acceleration(&mut self) -> nb::Result<Acceleration, Self::Error> {
             let f = |target: Target| {
                 target.x.a * target.theta.x.cos() + target.y.a * target.theta.x.sin()
             };
             let cur_a = f(self.inner.borrow().current);
             Ok(cur_a)
-        }
-        fn get_acceleration_z(&mut self) -> nb::Result<Acceleration, Self::Error> {
-            Err(nb::Error::WouldBlock)
         }
     }
 
