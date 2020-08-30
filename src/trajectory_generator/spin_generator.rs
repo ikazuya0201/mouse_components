@@ -1,13 +1,15 @@
-use super::straight_generator::{AngleOverallCalculator, AngleStraightCalculatorGenerator};
-use super::trajectory::Target;
 use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
-pub struct SpinGenerator {
-    function_generator: AngleStraightCalculatorGenerator,
+use super::straight_generator::{AngleOverallCalculator, AngleStraightCalculatorGenerator};
+use super::trajectory::Target;
+use crate::traits::Math;
+
+pub struct SpinGenerator<M> {
+    function_generator: AngleStraightCalculatorGenerator<M>,
     period: Time,
 }
 
-impl SpinGenerator {
+impl<M> SpinGenerator<M> {
     pub fn new(
         max_angular_velocity: AngularVelocity,
         max_angular_acceleration: AngularAcceleration,
@@ -23,7 +25,12 @@ impl SpinGenerator {
             period,
         }
     }
+}
 
+impl<M> SpinGenerator<M>
+where
+    M: Math,
+{
     pub fn generate(&self, theta_start: Angle, theta_distance: Angle) -> SpinTrajectory {
         let (trajectory_fn, t_end) = self.function_generator.generate(
             theta_start,

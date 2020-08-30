@@ -6,7 +6,37 @@ use components::{
     data_types::{AbsoluteDirection, NodeId, Pattern, SearchNodeId, WallDirection, WallPosition},
     impls::{MazeBuilder, Solver},
     prelude::*,
+    traits::Math,
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MathFake;
+
+impl Math for MathFake {
+    fn sqrtf(val: f32) -> f32 {
+        val.sqrt()
+    }
+
+    fn sinf(val: f32) -> f32 {
+        val.sin()
+    }
+
+    fn cosf(val: f32) -> f32 {
+        val.cos()
+    }
+
+    fn expf(val: f32) -> f32 {
+        val.exp()
+    }
+
+    fn atan2f(x: f32, y: f32) -> f32 {
+        x.atan2(y)
+    }
+
+    fn rem_euclidf(lhs: f32, rhs: f32) -> f32 {
+        lhs.rem_euclid(rhs)
+    }
+}
 
 fn cost(pattern: Pattern) -> u16 {
     use Pattern::*;
@@ -68,7 +98,7 @@ fn test_compute_shortest_path_u4() {
     ];
 
     for (walls, expected) in test_data {
-        let maze = MazeBuilder::new().costs(cost).build::<U4>();
+        let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
         for wall in walls {
             maze.check_wall(wall, true);
         }
@@ -100,7 +130,7 @@ macro_rules! next_node_candidates_tests {
                     let walls = input.1;
 
                     let current = new_search(current.0, current.1, current.2);
-                    let maze = MazeBuilder::new().costs(cost).build::<U4>();
+                    let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
                     for (wall, exists) in walls.into_iter().map(|wall| (new_wall(wall.0,wall.1,wall.2), wall.3)) {
                         maze.check_wall(wall, exists);
                     }

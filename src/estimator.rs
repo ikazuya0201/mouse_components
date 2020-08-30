@@ -1,19 +1,21 @@
 mod encoder;
 mod imu;
 
+use core::marker::PhantomData;
+
 use nb::block;
 use uom::si::{
-    angle::radian,
     f32::{Angle, AngularAcceleration, AngularVelocity, Frequency, Length, Time, Velocity},
     ratio::ratio,
 };
 
 use crate::agent::StateEstimator;
 use crate::tracker::{AngleState, LengthState, State};
+use crate::traits::Math;
 pub use encoder::Encoder;
 pub use imu::IMU;
 
-pub struct Estimator<LE, RE, I> {
+pub struct Estimator<LE, RE, I, M> {
     initial_x: Length,
     initial_y: Length,
     initial_theta: Angle,
@@ -27,9 +29,10 @@ pub struct Estimator<LE, RE, I> {
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
+    _phantom: PhantomData<fn() -> M>,
 }
 
-impl<LE, RE, I> StateEstimator<State> for Estimator<LE, RE, I>
+impl<LE, RE, I, M> StateEstimator<State> for Estimator<LE, RE, I, M>
 where
     LE: Encoder,
     RE: Encoder,
@@ -37,6 +40,7 @@ where
     <LE as Encoder>::Error: core::fmt::Debug,
     <RE as Encoder>::Error: core::fmt::Debug,
     <I as IMU>::Error: core::fmt::Debug,
+    M: Math,
 {
     fn init(&mut self) {
         self.x = self.initial_x;
@@ -68,14 +72,14 @@ where
         let trans_distance = trans_velocity * self.period;
         let middle_theta = self.theta
             + Angle::from((self.angular_velocity + angular_velocity / 2.0) * self.period / 2.0);
-        let (sin_mth, cos_mth) = libm::sincosf(middle_theta.get::<radian>());
+        let (sin_mth, cos_mth) = M::sincos(middle_theta);
         self.x += trans_distance * cos_mth;
         self.y += trans_distance * sin_mth;
 
         self.theta += Angle::from((self.angular_velocity + angular_velocity) * self.period / 2.0);
         //------
 
-        let (sin_th, cos_th) = libm::sincosf(self.theta.get::<radian>());
+        let (sin_th, cos_th) = M::sincos(self.theta);
         let vx = trans_velocity * cos_th;
         let vy = trans_velocity * sin_th;
         let ax = trans_acceleration * cos_th;
@@ -138,7 +142,10 @@ where
     RE: Encoder,
     I: IMU,
 {
-    pub fn build(self) -> Estimator<LE, RE, I> {
+    pub fn build<M>(self) -> Estimator<LE, RE, I, M>
+    where
+        M: Math,
+    {
         let alpha = 1.0
             / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
                 + 1.0);
@@ -156,6 +163,7 @@ where
             left_encoder: self.left_encoder,
             right_encoder: self.right_encoder,
             imu: self.imu,
+            _phantom: PhantomData,
         }
     }
 }
@@ -166,7 +174,10 @@ where
     RE: Encoder,
     I: IMU,
 {
-    pub fn build(self) -> Estimator<LE, RE, I> {
+    pub fn build<M>(self) -> Estimator<LE, RE, I, M>
+    where
+        M: Math,
+    {
         let alpha = 1.0
             / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
                 + 1.0);
@@ -184,6 +195,7 @@ where
             left_encoder: self.left_encoder,
             right_encoder: self.right_encoder,
             imu: self.imu,
+            _phantom: PhantomData,
         }
     }
 }
@@ -194,7 +206,10 @@ where
     RE: Encoder,
     I: IMU,
 {
-    pub fn build(self) -> Estimator<LE, RE, I> {
+    pub fn build<M>(self) -> Estimator<LE, RE, I, M>
+    where
+        M: Math,
+    {
         let alpha = 1.0
             / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
                 + 1.0);
@@ -212,6 +227,7 @@ where
             left_encoder: self.left_encoder,
             right_encoder: self.right_encoder,
             imu: self.imu,
+            _phantom: PhantomData,
         }
     }
 }
@@ -368,6 +384,7 @@ mod tests {
         data_types::{Pose, RelativeDirection, Target},
         impls::{TrajectoryGenerator, TrajectoryGeneratorBuilder},
         prelude::*,
+        utils::math::MathFake,
     };
     use approx::assert_abs_diff_eq;
     use core::marker::PhantomData;
@@ -522,7 +539,7 @@ mod tests {
         value: 0.001,
     };
 
-    fn build_generator() -> TrajectoryGenerator {
+    fn build_generator() -> TrajectoryGenerator<MathFake> {
         TrajectoryGeneratorBuilder::new()
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
@@ -558,7 +575,7 @@ mod tests {
                         .initial_posture(Default::default())
                         .initial_x(Default::default())
                         .initial_y(Default::default())
-                        .build();
+                        .build::<MathFake>();
 
                     while let Ok(expected_state) = simulator.step() {
                         let estimated_state = estimator.estimate();

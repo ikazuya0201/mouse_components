@@ -18,6 +18,7 @@ use crate::administrator::{
 use crate::agent::Pose;
 use crate::obstacle_detector::Obstacle;
 use crate::pattern::Pattern;
+use crate::traits::Math;
 use crate::utils::itertools::repeat_n;
 use crate::utils::mutex::Mutex;
 pub use direction::{AbsoluteDirection, RelativeDirection};
@@ -27,7 +28,7 @@ use pose_converter::PoseConverter;
 use uom::si::{f32::Length, ratio::ratio};
 pub use wall::{WallDirection, WallPosition};
 
-pub struct Maze<N, F>
+pub struct Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -38,10 +39,10 @@ where
     wall_prob_threshold: f32,
     costs: F,
     candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
-    converter: PoseConverter,
+    converter: PoseConverter<M>,
 }
 
-impl<N, F> Maze<N, F>
+impl<N, F, M> Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -140,7 +141,7 @@ where
     }
 }
 
-impl<N, F> Maze<N, F>
+impl<N, F, M> Maze<N, F, M>
 where
     N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
     <N as Mul<U2>>::Output: Add<U10>,
@@ -333,7 +334,7 @@ where
     }
 }
 
-impl<N, F> Maze<N, F>
+impl<N, F, M> Maze<N, F, M>
 where
     N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
     <N as Mul<U2>>::Output: Add<U10>,
@@ -378,7 +379,7 @@ where
     }
 }
 
-impl<N, F> Maze<N, F>
+impl<N, F, M> Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -426,7 +427,7 @@ where
     }
 }
 
-impl<N, F> Graph<NodeId<N>, u16> for Maze<N, F>
+impl<N, F, M> Graph<NodeId<N>, u16> for Maze<N, F, M>
 where
     N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
     <N as Mul<U2>>::Output: Add<U10>,
@@ -448,7 +449,7 @@ where
     }
 }
 
-impl<N, F> Graph<SearchNodeId<N>, u16> for Maze<N, F>
+impl<N, F, M> Graph<SearchNodeId<N>, u16> for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -467,7 +468,7 @@ where
     }
 }
 
-impl<N, F> Maze<N, F>
+impl<N, F, M> Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
@@ -599,7 +600,7 @@ where
     }
 }
 
-impl<N, F> GraphConverter<NodeId<N>, SearchNodeId<N>> for Maze<N, F>
+impl<N, F, M> GraphConverter<NodeId<N>, SearchNodeId<N>> for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
@@ -711,7 +712,7 @@ where
     }
 }
 
-impl<N, F> DirectionInstructor<SearchNodeId<N>, RelativeDirection> for Maze<N, F>
+impl<N, F, M> DirectionInstructor<SearchNodeId<N>, RelativeDirection> for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -745,12 +746,13 @@ where
     }
 }
 
-impl<N, F> ObstacleInterpreter<Obstacle> for Maze<N, F>
+impl<N, F, M> ObstacleInterpreter<Obstacle> for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
+    M: Math,
 {
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
         if let Ok(mut probs) = self.wall_existence_probs.try_borrow_mut() {
@@ -779,8 +781,8 @@ where
                     } else {
                         not_exist_val
                     };
-                    let exist_val = libm::expf(exist_val - min) * existence_prob;
-                    let not_exist_val = libm::expf(not_exist_val - min) * (1.0 - existence_prob);
+                    let exist_val = M::expf(exist_val - min) * existence_prob;
+                    let not_exist_val = M::expf(not_exist_val - min) * (1.0 - existence_prob);
 
                     probs[index] = if exist_val.is_infinite() {
                         1.0
@@ -795,7 +797,7 @@ where
     }
 }
 
-impl<N, F> NodeConverter<SearchNodeId<N>, Pose> for Maze<N, F>
+impl<N, F, M> NodeConverter<SearchNodeId<N>, Pose> for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -807,7 +809,7 @@ where
     }
 }
 
-impl<N, F> core::fmt::Debug for Maze<N, F>
+impl<N, F, M> core::fmt::Debug for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + core::fmt::Debug,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -882,11 +884,12 @@ impl<C> MazeBuilder<C, (), (), ()>
 where
     C: Fn(Pattern) -> u16,
 {
-    pub fn build<N>(self) -> Maze<N, C>
+    pub fn build<N, M>(self) -> Maze<N, C, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+        M: Math,
     {
         let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
             .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
@@ -906,11 +909,12 @@ impl<C> MazeBuilder<C, Length, Length, ()>
 where
     C: Fn(Pattern) -> u16,
 {
-    pub fn build<N>(self) -> Maze<N, C>
+    pub fn build<N, M>(self) -> Maze<N, C, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+        M: Math,
     {
         let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
             .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
@@ -930,11 +934,12 @@ impl<C> MazeBuilder<C, (), (), f32>
 where
     C: Fn(Pattern) -> u16,
 {
-    pub fn build<N>(self) -> Maze<N, C>
+    pub fn build<N, M>(self) -> Maze<N, C, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+        M: Math,
     {
         let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
             .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
@@ -954,11 +959,12 @@ impl<C> MazeBuilder<C, Length, Length, f32>
 where
     C: Fn(Pattern) -> u16,
 {
-    pub fn build<N>(self) -> Maze<N, C>
+    pub fn build<N, M>(self) -> Maze<N, C, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+        M: Math,
     {
         let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
             .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
@@ -1029,6 +1035,7 @@ impl<C, SW, WW> MazeBuilder<C, SW, WW, ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::math::MathFake;
 
     fn cost(pattern: Pattern) -> u16 {
         use Pattern::*;
@@ -1060,7 +1067,7 @@ mod tests {
                             NodeId::<U4>::new(x, y, direction).unwrap()
                         }
 
-                        let maze = MazeBuilder::new().costs(cost).build::<U4>();
+                        let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
                         let (input, mut expected) = $value;
                         expected.sort();
                         let mut nodes = maze.$method(input);
@@ -1175,7 +1182,7 @@ mod tests {
         use AbsoluteDirection::*;
         use Pattern::*;
 
-        let maze = MazeBuilder::new().costs(cost).build::<U4>();
+        let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
 
         let new = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
 
@@ -1213,7 +1220,7 @@ mod tests {
         use AbsoluteDirection::*;
         use Pattern::*;
 
-        let maze = MazeBuilder::new().costs(cost).build::<U4>();
+        let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
 
         let new = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
 
@@ -1333,7 +1340,7 @@ mod tests {
         ];
 
         for (walls, path, mut expected) in test_data {
-            let maze = MazeBuilder::new().costs(cost).build::<U4>();
+            let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
             for wall in walls {
                 maze.check_wall(wall, true);
             }
@@ -1372,7 +1379,7 @@ mod tests {
         )];
 
         for ((src, dsts, walls), expected) in test_data {
-            let maze = MazeBuilder::new().costs(cost).build::<U4>();
+            let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
             assert_eq!(maze.instruct(src), None);
             maze.update_node_candidates(dsts);
             for (wall, exists) in walls {
