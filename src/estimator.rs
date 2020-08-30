@@ -370,9 +370,15 @@ mod tests {
         prelude::*,
     };
     use approx::assert_abs_diff_eq;
-    use quantities::*;
+    use core::marker::PhantomData;
     use std::cell::RefCell;
     use std::rc::Rc;
+    use uom::si::{
+        acceleration::meter_per_second_squared, angle::radian,
+        angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
+        angular_velocity::degree_per_second, f32::*, frequency::hertz,
+        jerk::meter_per_second_cubed, length::meter, velocity::meter_per_second,
+    };
 
     const EPSILON: f32 = 1e-3;
 
@@ -391,7 +397,7 @@ mod tests {
             }
         }
 
-        fn split(&self, wheel_interval: Distance) -> (IEncoder<T>, IEncoder<T>, IIMU<T>) {
+        fn split(&self, wheel_interval: Length) -> (IEncoder<T>, IEncoder<T>, IIMU<T>) {
             (
                 IEncoder {
                     inner: Rc::clone(&self.inner),
@@ -437,17 +443,17 @@ mod tests {
                 self.prev = self.current;
                 self.current = target;
                 Ok(State {
-                    x: SubState {
+                    x: LengthState {
                         x: target.x.x,
                         v: target.x.v,
                         a: target.x.a,
                     },
-                    y: SubState {
+                    y: LengthState {
                         x: target.y.x,
                         v: target.y.v,
                         a: target.y.a,
                     },
-                    theta: SubState {
+                    theta: AngleState {
                         x: target.theta.x,
                         v: target.theta.v,
                         a: target.theta.a,
@@ -467,20 +473,20 @@ mod tests {
 
     struct IEncoder<T> {
         inner: Rc<RefCell<AgentSimulatorInner<T>>>,
-        wheel_interval: Distance,
+        wheel_interval: Length,
         direction: Direction,
     }
 
     impl<T> Encoder for IEncoder<T> {
         type Error = ();
 
-        fn get_relative_distance(&mut self) -> nb::Result<Distance, Self::Error> {
+        fn get_relative_distance(&mut self) -> nb::Result<Length, Self::Error> {
             let current = self.inner.borrow().current.clone();
             let prev = self.inner.borrow().prev.clone();
             let angle = current.theta.x - prev.theta.x;
-            let x = (current.x.x - prev.x.x).as_meters();
-            let y = (current.y.x - prev.y.x).as_meters();
-            let d = Distance::from_meters((x * x + y * y).sqrt());
+            let x = (current.x.x - prev.x.x).get::<meter>();
+            let y = (current.y.x - prev.y.x).get::<meter>();
+            let d = Length::new::<meter>((x * x + y * y).sqrt());
             match self.direction {
                 Direction::Right => Ok(d + self.wheel_interval * angle),
                 Direction::Left => Ok(d - self.wheel_interval * angle),
@@ -495,33 +501,40 @@ mod tests {
     impl<T> IMU for IIMU<T> {
         type Error = ();
 
-        fn get_angular_speed(&mut self) -> nb::Result<AngularSpeed, Self::Error> {
+        fn get_angular_velocity(&mut self) -> nb::Result<AngularVelocity, Self::Error> {
             let cur_v = self.inner.borrow().current.theta.v;
             Ok(cur_v)
         }
 
         fn get_translational_acceleration(&mut self) -> nb::Result<Acceleration, Self::Error> {
             let f = |target: Target| {
-                target.x.a * target.theta.x.cos() + target.y.a * target.theta.x.sin()
+                target.x.a * target.theta.x.get::<radian>().cos()
+                    + target.y.a * target.theta.x.get::<radian>().sin()
             };
             let cur_a = f(self.inner.borrow().current);
             Ok(cur_a)
         }
     }
 
-    const PERIOD: Time = Time::from_seconds(0.001);
+    const PERIOD: Time = Time {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.001,
+    };
 
     fn build_generator() -> TrajectoryGenerator {
         TrajectoryGeneratorBuilder::new()
-            .max_speed(Speed::from_meter_per_second(1.0))
-            .max_acceleration(Acceleration::from_meter_per_second_squared(10.0))
-            .max_jerk(Jerk::from_meter_per_second_cubed(100.0))
-            .angular_speed_ref(AngularSpeed::from_degree_per_second(180.0))
-            .angular_acceleration_ref(AngularAcceleration::from_degree_per_second_squared(1800.0))
-            .angular_jerk_ref(AngularJerk::from_degree_per_second_cubed(18000.0))
-            .slalom_speed_ref(Speed::from_meter_per_second(0.6))
+            .max_velocity(Velocity::new::<meter_per_second>(1.0))
+            .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
+            .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
+            .angular_velocity_ref(AngularVelocity::new::<degree_per_second>(180.0))
+            .angular_acceleration_ref(AngularAcceleration::new::<degree_per_second_squared>(
+                1800.0,
+            ))
+            .angular_jerk_ref(AngularJerk::new::<degree_per_second_cubed>(18000.0))
+            .slalom_velocity_ref(Velocity::new::<meter_per_second>(0.6))
             .period(PERIOD)
-            .search_speed(Speed::from_meter_per_second(0.6))
+            .search_velocity(Velocity::new::<meter_per_second>(0.6))
             .build()
     }
 
@@ -530,7 +543,7 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    let wheel_interval = Distance::from_meters(0.03);
+                    let wheel_interval = Length::new::<meter>(0.03);
 
                     let trajectory = $trajectory;
 
@@ -541,7 +554,7 @@ mod tests {
                         .right_encoder(right_encoder)
                         .imu(imu)
                         .period(PERIOD)
-                        .cut_off_frequency(Frequency::from_hertz(50.0))
+                        .cut_off_frequency(Frequency::new::<hertz>(50.0))
                         .initial_posture(Default::default())
                         .initial_x(Default::default())
                         .initial_y(Default::default())
@@ -561,7 +574,7 @@ mod tests {
         trajectory_generator.generate_straight(
             Default::default(),
             Default::default(),
-            Distance::from_meters(3.0),
+            Length::new::<meter>(3.0),
             Default::default(),
             Default::default(),
             Default::default(),
@@ -576,14 +589,14 @@ mod tests {
             .generate_straight(
                 Default::default(),
                 Default::default(),
-                Distance::from_meters(3.0),
+                Length::new::<meter>(3.0),
                 Default::default(),
                 Default::default(),
-                Speed::from_meter_per_second(0.6),
+                Velocity::new::<meter_per_second>(0.6),
             )
             .chain(trajectory_generator.generate_search(
                 Pose {
-                    x: Distance::from_meters(3.0),
+                    x: Length::new::<meter>(3.0),
                     y: Default::default(),
                     theta: Default::default(),
                 },
