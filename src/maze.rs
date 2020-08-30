@@ -18,13 +18,13 @@ use crate::administrator::{
 use crate::agent::Pose;
 use crate::obstacle_detector::Obstacle;
 use crate::pattern::Pattern;
-use crate::quantities::{dimensionless::scalar, f32::Length};
 use crate::utils::itertools::repeat_n;
 use crate::utils::mutex::Mutex;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 use node::{Location, Node, Position};
 pub use node::{NodeId, SearchNodeId};
 use pose_converter::PoseConverter;
+use uom::si::{f32::Length, ratio::ratio};
 pub use wall::{WallDirection, WallPosition};
 
 pub struct Maze<N, F>
@@ -764,13 +764,13 @@ where
                     let exist_val = {
                         let tmp = ((wall_info.existing_distance - obstacle.distance.mean)
                             / obstacle.distance.standard_deviation)
-                            .get::<scalar>();
+                            .get::<ratio>();
                         -tmp * tmp / 2.0
                     };
                     let not_exist_val = {
                         let tmp = ((wall_info.not_existing_distance - obstacle.distance.mean)
                             / obstacle.distance.standard_deviation)
-                            .get::<scalar>();
+                            .get::<ratio>();
                         -tmp * tmp / 2.0
                     };
 

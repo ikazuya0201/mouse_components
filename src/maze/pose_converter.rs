@@ -3,12 +3,12 @@ use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use super::{AbsoluteDirection, SearchNodeId, WallDirection, WallPosition};
 use crate::agent::Pose;
-use crate::quantities::{
-    dimensionless::{degree, revolution},
+use crate::utils::total::Total;
+use uom::si::{
+    angle::{degree, radian, revolution},
     f32::{Angle, Length},
     length::meter,
 };
-use crate::utils::total::Total;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WallInfo<N>
@@ -114,7 +114,7 @@ impl PoseConverter {
             ]
         };
 
-        let (sin_th, cos_th) = pose.theta.sincos();
+        let (sin_th, cos_th) = libm::sincosf(pose.theta.get::<radian>());
 
         let mut axes_distance = axes
             .iter()

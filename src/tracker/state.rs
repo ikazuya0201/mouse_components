@@ -1,4 +1,4 @@
-use crate::quantities::f32::{
+use uom::si::f32::{
     Acceleration, Angle, AngularAcceleration, AngularVelocity, Length, Velocity,
 };
 

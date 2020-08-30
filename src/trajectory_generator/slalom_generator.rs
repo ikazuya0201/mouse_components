@@ -1,7 +1,9 @@
 use super::straight_generator::{AngleOverallCalculator, AngleStraightCalculatorGenerator};
 use super::trajectory::{LengthTarget, Target};
-use crate::quantities::f32::{
-    Angle, AngularAcceleration, AngularJerk, AngularVelocity, Length, Time, Velocity,
+use uom::si::{
+    angle::radian,
+    f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Length, Time, Velocity},
+    ratio::ratio,
 };
 
 pub struct SlalomGenerator {
@@ -37,7 +39,7 @@ impl SlalomGenerator {
         theta_distance: Angle,
         v: Velocity,
     ) -> SlalomTrajectory {
-        let k = v / self.v_ref;
+        let k = (v / self.v_ref).get::<ratio>();
         let angle_generator = AngleStraightCalculatorGenerator::new(
             k * self.dtheta,
             k * k * self.ddtheta,
@@ -103,7 +105,7 @@ impl Iterator for SlalomTrajectory {
         let mut sin_theta = [0.0; 3];
         let mut cos_theta = [0.0; 3];
         for i in 0..3 {
-            let (sin, cos) = targets[i].x.sincos();
+            let (sin, cos) = libm::sincosf(targets[i].x.get::<radian>());
             sin_theta[i] = sin;
             cos_theta[i] = cos;
         }
@@ -119,11 +121,13 @@ impl Iterator for SlalomTrajectory {
 
         let vx = self.v * cos_theta;
         let ax = -self.v * sin_theta * target.v;
-        let jx = -self.v * (cos_theta * target.v * target.v + sin_theta * target.a);
+        let jx = -self.v
+            * (cos_theta * AngularAcceleration::from(target.v * target.v) + sin_theta * target.a);
 
         let vy = self.v * sin_theta;
         let ay = self.v * cos_theta * target.v;
-        let jy = self.v * (-sin_theta * target.v * target.v + cos_theta * target.a);
+        let jy = self.v
+            * (-sin_theta * AngularAcceleration::from(target.v * target.v) + cos_theta * target.a);
 
         Some(Target {
             x: LengthTarget {
@@ -143,16 +147,15 @@ impl Iterator for SlalomTrajectory {
     }
 }
 
-#[cfg(feature = "expensive_tests")]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quantities::{
-        cubed_frequency::radian_per_second_cubed, dimensionless::degree,
-        frequency::radian_per_second, length::meter, squared_frequency::radian_per_second_squared,
+    use proptest::prelude::*;
+    use uom::si::{
+        angle::degree, angular_acceleration::radian_per_second_squared,
+        angular_jerk::radian_per_second_cubed, angular_velocity::radian_per_second, length::meter,
         time::second, velocity::meter_per_second,
     };
-    use proptest::prelude::*;
 
     const EPSILON: f32 = 1e-4;
 
@@ -186,6 +189,7 @@ mod tests {
     }
 
     proptest! {
+        #[ignore]
         #[test]
         fn test_slalom_generator(
             tv in 0.1f32..1000.0,
@@ -201,7 +205,7 @@ mod tests {
         ) {
             let trajectory = get_trajectory(tv,ta,tj,v_ref,period,v_target,x,y,theta,theta_dist);
             for target in trajectory {
-                let v = target.x.v * target.theta.x.cos() + target.y.v * target.theta.x.sin();
+                let v = target.x.v * target.theta.x.get::<radian>().cos() + target.y.v * target.theta.x.get::<radian>().sin();
                 prop_assert!((v.abs().get::<meter_per_second>() - v_target).abs() < EPSILON);
             }
         }

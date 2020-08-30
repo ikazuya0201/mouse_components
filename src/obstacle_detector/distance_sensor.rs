@@ -1,5 +1,5 @@
 use crate::agent::Pose;
-use crate::quantities::f32::Length;
+use uom::si::f32::Length;
 use crate::utils::sample::Sample;
 
 pub trait DistanceSensor {

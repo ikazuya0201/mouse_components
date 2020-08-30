@@ -1,11 +1,12 @@
 use super::trajectory::{AngleTarget, LengthTarget, Target};
-use crate::quantities::f32::{
-    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
-    Velocity,
-};
-use crate::quantities::{
-    dimensionless::{radian, scalar},
+use uom::si::{
+    angle::radian,
+    f32::{
+        Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
+        Velocity,
+    },
     length::meter,
+    ratio::ratio,
     time::second,
 };
 
@@ -119,12 +120,14 @@ macro_rules! impl_calculator_generator {
                 v_end: $dt,
             ) -> ($accel_name, Time) {
                 let tc = self.a_max / self.j_max;
-                let vd = self.a_max * tc;
+                let vd = <$dt>::from(self.a_max * tc);
                 let (t1, t2, t3) = if (v_end - v_start).abs() >= vd {
                     let tm = (v_end - v_start).abs() / self.a_max - tc;
                     (tc, tc + tm, 2.0 * tc + tm)
                 } else {
-                    let td = ((v_end - v_start).abs() / self.j_max).sqrt();
+                    let td = Time::new::<second>(libm::sqrtf(
+                        ((v_end - v_start).abs() / self.j_max).value,
+                    ));
                     (td, td, 2.0 * td)
                 };
 
@@ -134,7 +137,7 @@ macro_rules! impl_calculator_generator {
                     (-self.a_max, -self.j_max)
                 };
 
-                let distance = (v_start + v_end) * t3 / 2.0;
+                let distance = <$t>::from((v_start + v_end) * t3) / 2.0;
                 let x_end = x_start + distance;
 
                 (
@@ -155,13 +158,15 @@ macro_rules! impl_calculator_generator {
 
             fn calculate_acceleration_distance(&self, v_start: $dt, v_end: $dt) -> $t {
                 let tc = self.a_max / self.j_max;
-                let vd = self.a_max * tc;
+                let vd = <$dt>::from(self.a_max * tc);
                 let t = if (v_end - v_start).abs() >= vd {
                     (v_end - v_start).abs() / self.a_max + tc
                 } else {
-                    2.0 * ((v_end - v_start).abs() / self.j_max).sqrt()
+                    2.0 * Time::new::<second>(libm::sqrtf(
+                        ((v_end - v_start).abs() / self.j_max).value,
+                    ))
                 };
-                (v_start + v_end) * t / 2.0
+                <$t>::from((v_start + v_end) * t / 2.0)
             }
 
             fn generate_constant(x_start: $t, distance: $t, v: $dt) -> ($constant_name, Time) {
@@ -235,29 +240,32 @@ macro_rules! impl_calculator_generator {
                 } else if t <= self.t1 {
                     $target {
                         j: self.j_m,
-                        a: self.j_m * t,
-                        v: self.v_start + self.j_m * t * t / 2.0,
-                        x: self.x_start + self.v_start * t + self.j_m * t * t * t / 6.0,
+                        a: <$ddt>::from(self.j_m * t),
+                        v: self.v_start + <$dt>::from(self.j_m * t * t / 2.0),
+                        x: self.x_start + <$t>::from(self.v_start * t + self.j_m * t * t * t / 6.0),
                     }
                 } else if t <= self.t2 {
                     let dt1 = t - self.t1;
                     $target {
                         j: Default::default(),
                         a: self.a_m,
-                        v: self.v_start + self.a_m * self.t1 / 2.0 + self.a_m * dt1,
+                        v: self.v_start + <$dt>::from(self.a_m * self.t1 / 2.0 + self.a_m * dt1),
                         x: self.x_start
-                            + self.v_start * self.t1
-                            + self.j_m * self.t1 * self.t1 * self.t1 / 6.0
-                            + (self.v_start + self.a_m * self.t1 / 2.0) * dt1
-                            + self.a_m * dt1 * dt1 / 2.0,
+                            + <$t>::from(
+                                self.v_start * self.t1
+                                    + self.j_m * self.t1 * self.t1 * self.t1 / 6.0
+                                    + (self.v_start + <$dt>::from(self.a_m * self.t1) / 2.0) * dt1
+                                    + self.a_m * dt1 * dt1 / 2.0,
+                            ),
                     }
                 } else if t <= self.t3 {
                     let dt3 = self.t3 - t;
                     $target {
                         j: -self.j_m,
-                        a: self.j_m * dt3,
-                        v: self.v_end - self.j_m * dt3 * dt3 / 2.0,
-                        x: self.x_end - self.v_end * dt3 + self.j_m * dt3 * dt3 * dt3 / 6.0,
+                        a: <$ddt>::from(self.j_m * dt3),
+                        v: self.v_end - <$dt>::from(self.j_m * dt3 * dt3 / 2.0),
+                        x: self.x_end - <$t>::from(self.v_end * dt3)
+                            + <$t>::from(self.j_m * dt3 * dt3 * dt3 / 6.0),
                     }
                 } else {
                     $target {
@@ -281,7 +289,7 @@ macro_rules! impl_calculator_generator {
             fn calculate(&self, t: Time) -> $target {
                 if t > self.t_end || t.get::<second>() < 0.0 {
                     $target {
-                        x: self.x_start + self.v * self.t_end,
+                        x: self.x_start + <$t>::from(self.v * self.t_end),
                         v: self.v,
                         a: Default::default(),
                         j: Default::default(),
@@ -291,7 +299,7 @@ macro_rules! impl_calculator_generator {
                         j: Default::default(),
                         a: Default::default(),
                         v: self.v,
-                        x: self.x_start + self.v * t,
+                        x: self.x_start + <$t>::from(self.v * t),
                     }
                 }
             }
@@ -413,8 +421,8 @@ impl StraightTrajectoryGenerator {
             self.function_generator
                 .generate(Default::default(), dist, v_start, v_end);
 
-        let x_ratio = (x_dist / dist).get::<scalar>();
-        let y_ratio = (y_dist / dist).get::<scalar>();
+        let x_ratio = (x_dist / dist).get::<ratio>();
+        let y_ratio = (y_dist / dist).get::<ratio>();
 
         let theta =
             Angle::new::<radian>(libm::atan2f(y_dist.get::<meter>(), x_dist.get::<meter>()));
@@ -501,15 +509,14 @@ impl Iterator for StraightTrajectory {
     }
 }
 
-#[cfg(feature = "expensive_tests")]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quantities::{
-        acceleration::meter_per_second_squared, cubed_frequency::radian_per_second_cubed,
-        dimensionless::radian, frequency::radian_per_second, jerk::meter_per_second_cubed,
-        length::meter, squared_frequency::radian_per_second_squared, time::second,
-        velocity::meter_per_second,
+    use uom::si::{
+        acceleration::meter_per_second_squared, angle::radian,
+        angular_acceleration::radian_per_second_squared, angular_jerk::radian_per_second_cubed,
+        angular_velocity::radian_per_second, jerk::meter_per_second_cubed, length::meter,
+        time::second, velocity::meter_per_second,
     };
 
     const EPSILON: f32 = 1e-2; //low accuracy...
@@ -519,17 +526,20 @@ mod tests {
     macro_rules! straight_calculator_tests {
         ($(
             $test_name: ident,
-            $generator_name: ident: $t: ty,
-            $dt: ty,
-            $ddt: ty,
-            $dddt: ty,
-            $tunit: ty,
-            $dtunit: ty,
-            $ddtunit: ty,
-            $dddtunit: ty,
+            $generator_name: ident: (
+                $t: ty,
+                $dt: ty,
+                $ddt: ty,
+                $dddt: ty,
+                $tunit: ty,
+                $dtunit: ty,
+                $ddtunit: ty,
+                $dddtunit: ty,
+            ),
         )*) => {
             $(
                 proptest!{
+                    #[ignore]
                     #[test]
                     fn $test_name(
                         a_max in 0.5f32..500.0f32,
@@ -565,17 +575,20 @@ mod tests {
                             let vd = (target.v - before.v).abs();
                             let ad = (target.a - before.a).abs();
 
+                            let x_max = <$t>::from(v_max * period) + epst;
+                            let v_max = <$dt>::from(a_max * period) + epsdt;
+                            let a_max = <$ddt>::from(j_max * period) + epsddt;
                             prop_assert!(
-                                xd <= v_max * period + epst,
-                                "left:{:?}, right:{:?}", xd, v_max * period + epst,
+                                xd <= x_max,
+                                "left:{:?}, right:{:?}", xd, x_max,
                             );
                             prop_assert!(
-                                vd <= a_max * period + epsdt,
-                                "left:{:?}, right:{:?}", vd, a_max * period + epsdt,
+                                vd <= v_max,
+                                "left:{:?}, right:{:?}", vd, v_max,
                             );
                             prop_assert!(
-                                ad <= j_max * period + epsddt,
-                                "left:{:?}, right:{:?}", ad, j_max * period + epsddt,
+                                ad <= a_max,
+                                "left:{:?}, right:{:?}", ad, a_max,
                             );
 
                             before = target;
@@ -590,26 +603,31 @@ mod tests {
 
     straight_calculator_tests! {
         test_length_straight_calculator,
-        LengthStraightCalculatorGenerator: Length,
-        Velocity,
-        Acceleration,
-        Jerk,
-        meter,
-        meter_per_second,
-        meter_per_second_squared,
-        meter_per_second_cubed,
+        LengthStraightCalculatorGenerator: (
+            Length,
+            Velocity,
+            Acceleration,
+            Jerk,
+            meter,
+            meter_per_second,
+            meter_per_second_squared,
+            meter_per_second_cubed,
+        ),
         test_angle_straight_calculator,
-        AngleStraightCalculatorGenerator: Angle,
-        AngularVelocity,
-        AngularAcceleration,
-        AngularJerk,
-        radian,
-        radian_per_second,
-        radian_per_second_squared,
-        radian_per_second_cubed,
+        AngleStraightCalculatorGenerator: (
+            Angle,
+            AngularVelocity,
+            AngularAcceleration,
+            AngularJerk,
+            radian,
+            radian_per_second,
+            radian_per_second_squared,
+            radian_per_second_cubed,
+        ),
     }
 
     proptest! {
+        #[ignore]
         #[test]
         fn test_straight_trajectory(
             x_start in 0.0f32..288.0f32,
@@ -638,8 +656,8 @@ mod tests {
 
             let mut before = trajectory.next().unwrap();
             for target in trajectory {
-                let cos = target.theta.x.cos();
-                let sin = target.theta.x.sin();
+                let cos = target.theta.x.get::<radian>().cos();
+                let sin = target.theta.x.get::<radian>().sin();
 
                 let xd = ((target.x.x-before.x.x) * cos + (target.y.x-before.y.x) * sin).abs();
                 let vd = ((target.x.v-before.x.v) * cos + (target.y.v-before.y.v) * sin).abs();

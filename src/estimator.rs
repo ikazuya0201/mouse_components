@@ -1,9 +1,12 @@
 mod encoder;
 mod imu;
 
-use crate::quantities::dimensionless::scalar;
-use crate::quantities::f32::{Angle, AngularVelocity, Frequency, Length, Time, Velocity};
 use nb::block;
+use uom::si::{
+    angle::radian,
+    f32::{Angle, AngularAcceleration, AngularVelocity, Frequency, Length, Time, Velocity},
+    ratio::ratio,
+};
 
 use crate::agent::StateEstimator;
 use crate::tracker::{AngleState, LengthState, State};
@@ -63,16 +66,16 @@ where
 
         //pose estimation
         let trans_distance = trans_velocity * self.period;
-        let middle_theta =
-            self.theta + (self.angular_velocity + angular_velocity / 2.0) * self.period / 2.0;
-        self.x += trans_distance * middle_theta.cos();
-        self.y += trans_distance * middle_theta.sin();
+        let middle_theta = self.theta
+            + Angle::from((self.angular_velocity + angular_velocity / 2.0) * self.period / 2.0);
+        let (sin_mth, cos_mth) = libm::sincosf(middle_theta.get::<radian>());
+        self.x += trans_distance * cos_mth;
+        self.y += trans_distance * sin_mth;
 
-        self.theta += (self.angular_velocity + angular_velocity) * self.period / 2.0;
+        self.theta += Angle::from((self.angular_velocity + angular_velocity) * self.period / 2.0);
         //------
 
-        let cos_th = self.theta.cos();
-        let sin_th = self.theta.sin();
+        let (sin_th, cos_th) = libm::sincosf(self.theta.get::<radian>());
         let vx = trans_velocity * cos_th;
         let vy = trans_velocity * sin_th;
         let ax = trans_acceleration * cos_th;
@@ -97,7 +100,7 @@ where
             theta: AngleState {
                 x: self.theta,
                 v: angular_velocity,
-                a: angular_acceleration,
+                a: AngularAcceleration::from(angular_acceleration),
             },
         }
     }
@@ -137,9 +140,7 @@ where
 {
     pub fn build(self) -> Estimator<LE, RE, I> {
         let alpha = 1.0
-            / (2.0
-                * core::f32::consts::PI
-                * (self.period * self.cut_off_frequency).get::<scalar>()
+            / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
                 + 1.0);
         Estimator {
             initial_x: Default::default(),
@@ -167,9 +168,7 @@ where
 {
     pub fn build(self) -> Estimator<LE, RE, I> {
         let alpha = 1.0
-            / (2.0
-                * core::f32::consts::PI
-                * (self.period * self.cut_off_frequency).get::<scalar>()
+            / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
                 + 1.0);
         Estimator {
             initial_x: self.initial_x,
@@ -197,9 +196,7 @@ where
 {
     pub fn build(self) -> Estimator<LE, RE, I> {
         let alpha = 1.0
-            / (2.0
-                * core::f32::consts::PI
-                * (self.period * self.cut_off_frequency).get::<scalar>()
+            / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
                 + 1.0);
         Estimator {
             initial_x: Default::default(),

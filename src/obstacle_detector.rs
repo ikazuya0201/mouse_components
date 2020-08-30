@@ -4,10 +4,10 @@ use generic_array::{ArrayLength, GenericArray};
 use heapless::Vec;
 
 use crate::agent::{self, Pose};
-use crate::quantities::f32::Length;
 use crate::tracker::State;
 use crate::utils::sample::Sample;
 use distance_sensor::DistanceSensor;
+use uom::si::f32::Length;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Obstacle {
@@ -65,7 +65,7 @@ mod tests {
 
     use super::*;
     use crate::agent::Pose;
-    use crate::quantities::{dimensionless::degree, f32::Angle, length::meter};
+    use uom::si::{angle::degree, f32::Angle, length::meter};
 
     struct IDistanceSensor {
         pose: Pose,

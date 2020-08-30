@@ -1,6 +1,6 @@
 use super::straight_generator::{AngleOverallCalculator, AngleStraightCalculatorGenerator};
 use super::trajectory::Target;
-use crate::quantities::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
+use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
 pub struct SpinGenerator {
     function_generator: AngleStraightCalculatorGenerator,

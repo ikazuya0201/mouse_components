@@ -1,4 +1,4 @@
-use crate::quantities::f32::{Angle, Length};
+use uom::si::f32::{Angle, Length};
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Pose {

@@ -12,7 +12,8 @@ pub use crate::agent::StateEstimator as _components_agent_StateEstimator;
 pub use crate::agent::Tracker as _components_agent_Tracker;
 pub use crate::agent::TrajectoryGenerator as _components_agent_TrajectoryGenerator;
 
-pub use crate::tracker::Controller as _components_tracker_Controller;
+pub use crate::tracker::RotationController as _components_tracker_RotationController;
+pub use crate::tracker::TranslationController as _components_tracker_TranslationController;
 
 pub use crate::sensors::DistanceSensor as _components_sensors_DistanceSensor;
 pub use crate::sensors::Encoder as _components_sensors_Encoder;

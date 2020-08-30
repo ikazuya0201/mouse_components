@@ -1,20 +1,22 @@
-use crate::quantities::{
-    acceleration::meter_per_second_squared,
-    dimensionless::radian,
-    f32::{
-        Acceleration, Angle, AngularAcceleration, AngularVelocity, Length, Time, Velocity, Voltage,
-    },
-    frequency::radian_per_second,
-    length::meter,
-    squared_frequency::radian_per_second_squared,
-    velocity::meter_per_second,
-    voltage::volt,
-};
 use crate::tracker;
+use uom::si::{
+    acceleration::meter_per_second_squared,
+    angle::radian,
+    angular_acceleration::radian_per_second_squared,
+    angular_velocity::radian_per_second,
+    electric_potential::volt,
+    f32::{
+        Acceleration, Angle, AngularAcceleration, AngularVelocity, ElectricPotential, Length, Time,
+        Velocity,
+    },
+    length::meter,
+    velocity::meter_per_second,
+};
 
 macro_rules! impl_controller {
     (
         $controller_name: ident,
+        $trait: ident,
         $builder_name: ident: $t: ty,
         $dt: ty,
         $ddt: ty,
@@ -54,18 +56,19 @@ macro_rules! impl_controller {
             }
         }
 
-        impl tracker::Controller<$t> for $controller_name {
+        impl tracker::$trait for $controller_name {
             fn init(&mut self) {
                 self.error_sum = Default::default();
             }
 
-            fn calculate(&mut self, r: $dt, dr: $ddt, y: $dt, dy: $ddt) -> Voltage {
-                let vol_f = (dr * self.time_constant + r).get::<$dtunit>() / self.model_gain;
+            fn calculate(&mut self, r: $dt, dr: $ddt, y: $dt, dy: $ddt) -> ElectricPotential {
+                let vol_f =
+                    (<$dt>::from(dr * self.time_constant) + r).get::<$dtunit>() / self.model_gain;
                 let vol_p = self.kp * (r - y).get::<$dtunit>();
                 let vol_i = self.ki * self.error_sum.get::<$tunit>();
                 let vol_d = self.kd * (dr - dy).get::<$ddtunit>();
-                self.error_sum = self.error_sum + (r - y) * self.period;
-                Voltage::new::<volt>(vol_f + vol_p + vol_i + vol_d)
+                self.error_sum = self.error_sum + <$t>::from((r - y) * self.period);
+                ElectricPotential::new::<volt>(vol_f + vol_p + vol_i + vol_d)
             }
         }
 
@@ -190,6 +193,7 @@ macro_rules! impl_controller {
 
 impl_controller!(
     TranslationController,
+    TranslationController,
     TranslationControllerBuilder: Length,
     Velocity,
     Acceleration,
@@ -199,6 +203,7 @@ impl_controller!(
 );
 
 impl_controller!(
+    RotationController,
     RotationController,
     RotationControllerBuilder: Angle,
     AngularVelocity,
@@ -211,7 +216,7 @@ impl_controller!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quantities::time::second;
+    use uom::si::time::second;
 
     fn build_translation_controller() -> TranslationController {
         TranslationControllerBuilder::new()

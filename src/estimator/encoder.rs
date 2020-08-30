@@ -1,4 +1,4 @@
-use crate::quantities::f32::Length;
+use uom::si::f32::Length;
 
 pub trait Encoder {
     type Error;

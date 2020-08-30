@@ -6,10 +6,10 @@ mod sensors {
 
     use components::{
         data_types::Pose,
-        quantities::f32::{Acceleration, AngularVelocity, Length, Voltage},
         sensors::{DistanceSensor, Encoder, Motor, IMU},
         utils::sample::Sample,
     };
+    use uom::si::f32::{Acceleration, AngularVelocity, ElectricPotential, Length};
 
     pub struct IDistanceSensor {
         distance: Length,
@@ -64,7 +64,7 @@ mod sensors {
     pub struct IMotor;
 
     impl Motor for IMotor {
-        fn apply(&mut self, _voltage: Voltage) {}
+        fn apply(&mut self, _voltage: ElectricPotential) {}
     }
 
     pub struct Imu {
@@ -121,25 +121,26 @@ use components::{
         TranslationControllerBuilder,
     },
     prelude::*,
-    quantities::{
-        acceleration::meter_per_second_squared,
-        cubed_frequency::radian_per_second_cubed,
-        dimensionless::degree,
-        f32::{
-            Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Frequency,
-            Jerk, Length, Time, Velocity,
-        },
-        frequency::{hertz, radian_per_second},
-        jerk::meter_per_second_cubed,
-        length::meter,
-        squared_frequency::radian_per_second_squared,
-        time::second,
-        velocity::meter_per_second,
-    },
 };
 use criterion::*;
 use generic_array::arr;
 use typenum::consts::*;
+use uom::si::{
+    acceleration::meter_per_second_squared,
+    angle::degree,
+    angular_acceleration::radian_per_second_squared,
+    angular_jerk::radian_per_second_cubed,
+    angular_velocity::radian_per_second,
+    f32::{
+        Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Frequency, Jerk,
+        Length, Time, Velocity,
+    },
+    frequency::hertz,
+    jerk::meter_per_second_cubed,
+    length::meter,
+    time::second,
+    velocity::meter_per_second,
+};
 
 use sensors::{IDistanceSensor, IEncoder, IMotor, Imu};
 

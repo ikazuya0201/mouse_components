@@ -1,8 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(type_alias_impl_trait)]
 
-#[macro_use]
-extern crate uom;
 extern crate alloc;
 
 mod administrator;
@@ -13,7 +11,6 @@ mod maze;
 mod obstacle_detector;
 mod pattern;
 pub mod prelude;
-pub mod quantities;
 mod solver;
 mod tracker;
 mod trajectory_generator;
@@ -27,7 +24,7 @@ pub mod traits {
         Operator, Solver,
     };
     pub use agent::{ObstacleDetector, StateEstimator, Tracker, TrajectoryGenerator};
-    pub use tracker::{Controller, Logger};
+    pub use tracker::{Logger, RotationController, TranslationController};
 }
 
 pub mod sensors {
