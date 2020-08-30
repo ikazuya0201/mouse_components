@@ -68,6 +68,13 @@ where
         self.check_wall_by_index(position.as_index(), is_wall);
     }
 
+    #[cfg(test)]
+    fn wall_existence_probs<'a>(
+        &'a self,
+    ) -> &'a RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>> {
+        &self.wall_existence_probs
+    }
+
     #[inline]
     fn check_wall_by_index(&self, index: usize, is_wall: bool) {
         self.update_wall_by_index(index, is_wall);
@@ -1034,8 +1041,12 @@ impl<C, SW, WW> MazeBuilder<C, SW, WW, ()> {
 
 #[cfg(test)]
 mod tests {
+    use proptest::prelude::*;
+    use uom::si::{angle::degree, f32::*, length::meter};
+
     use super::*;
     use crate::utils::math::MathFake;
+    use crate::utils::sample::Sample;
 
     fn cost(pattern: Pattern) -> u16 {
         use Pattern::*;
@@ -1387,6 +1398,36 @@ mod tests {
             }
             assert_eq!(maze.instruct(src), expected);
             assert_eq!(maze.instruct(src), None);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_obstacle_interpreter(
+            x in 0.0f32..0.36,
+            y in 0.0f32..0.36,
+            theta in 0.0f32..360.0,
+            mean_distance in 0.0f32..0.3,
+            standard_deviation in 0.001f32..0.05,
+        ) {
+            use core::ops::Deref;
+
+            let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
+            let obstacle = Obstacle {
+                source: Pose {
+                    x: Length::new::<meter>(x),
+                    y: Length::new::<meter>(y),
+                    theta: Angle::new::<degree>(theta),
+                },
+                distance: Sample {
+                    mean: Length::new::<meter>(mean_distance),
+                    standard_deviation: Length::new::<meter>(standard_deviation),
+                }
+            };
+            maze.interpret_obstacles(vec![obstacle]);
+            for prob in maze.wall_existence_probs().borrow().deref() {
+                prop_assert!(!prob.is_nan())
+            }
         }
     }
 }
