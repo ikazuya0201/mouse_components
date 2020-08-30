@@ -1,25 +1,26 @@
 mod encoder;
 mod imu;
 
+use crate::quantities::dimensionless::scalar;
+use crate::quantities::f32::{Angle, AngularVelocity, Frequency, Length, Time, Velocity};
 use nb::block;
-use quantities::{Angle, AngularSpeed, Distance, Frequency, Speed, Time};
 
 use crate::agent::StateEstimator;
-use crate::tracker::{State, SubState};
+use crate::tracker::{AngleState, LengthState, State};
 pub use encoder::Encoder;
 pub use imu::IMU;
 
 pub struct Estimator<LE, RE, I> {
-    initial_x: Distance,
-    initial_y: Distance,
+    initial_x: Length,
+    initial_y: Length,
     initial_theta: Angle,
-    x: Distance,
-    y: Distance,
+    x: Length,
+    y: Length,
     theta: Angle,
     period: Time,
     alpha: f32,
-    trans_speed: Speed,
-    angular_speed: AngularSpeed,
+    trans_velocity: Velocity,
+    angular_velocity: AngularVelocity,
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
@@ -38,8 +39,8 @@ where
         self.x = self.initial_x;
         self.y = self.initial_y;
         self.theta = self.initial_theta;
-        self.trans_speed = Default::default();
-        self.angular_speed = Default::default();
+        self.trans_velocity = Default::default();
+        self.angular_velocity = Default::default();
     }
 
     fn estimate(&mut self) -> State {
@@ -47,55 +48,55 @@ where
         let left_distance = block!(self.left_encoder.get_relative_distance()).unwrap();
         let right_distance = block!(self.right_encoder.get_relative_distance()).unwrap();
 
-        let average_left_speed = left_distance / self.period;
-        let average_right_speed = right_distance / self.period;
+        let average_left_velocity = left_distance / self.period;
+        let average_right_velocity = right_distance / self.period;
 
-        let average_trans_speed = (average_left_speed + average_right_speed) / 2.0;
+        let average_trans_velocity = (average_left_velocity + average_right_velocity) / 2.0;
 
         let trans_acceleration = block!(self.imu.get_translational_acceleration()).unwrap();
-        let angular_speed = block!(self.imu.get_angular_speed()).unwrap();
+        let angular_velocity = block!(self.imu.get_angular_velocity()).unwrap();
 
         //complementary filter
-        let trans_speed = self.alpha * (self.trans_speed + trans_acceleration * self.period)
-            + (1.0 - self.alpha) * average_trans_speed;
+        let trans_velocity = self.alpha * (self.trans_velocity + trans_acceleration * self.period)
+            + (1.0 - self.alpha) * average_trans_velocity;
         //------
 
         //pose estimation
-        let trans_distance = trans_speed * self.period;
+        let trans_distance = trans_velocity * self.period;
         let middle_theta =
-            self.theta + (self.angular_speed + angular_speed / 2.0) * self.period / 2.0;
+            self.theta + (self.angular_velocity + angular_velocity / 2.0) * self.period / 2.0;
         self.x += trans_distance * middle_theta.cos();
         self.y += trans_distance * middle_theta.sin();
 
-        self.theta += (self.angular_speed + angular_speed) * self.period / 2.0;
+        self.theta += (self.angular_velocity + angular_velocity) * self.period / 2.0;
         //------
 
         let cos_th = self.theta.cos();
         let sin_th = self.theta.sin();
-        let vx = trans_speed * cos_th;
-        let vy = trans_speed * sin_th;
+        let vx = trans_velocity * cos_th;
+        let vy = trans_velocity * sin_th;
         let ax = trans_acceleration * cos_th;
         let ay = trans_acceleration * sin_th;
 
-        let angular_acceleration = (angular_speed - self.angular_speed) / self.period;
+        let angular_acceleration = (angular_velocity - self.angular_velocity) / self.period;
 
-        self.trans_speed = trans_speed;
-        self.angular_speed = angular_speed;
+        self.trans_velocity = trans_velocity;
+        self.angular_velocity = angular_velocity;
 
         State {
-            x: SubState {
+            x: LengthState {
                 x: self.x,
                 v: vx,
                 a: ax,
             },
-            y: SubState {
+            y: LengthState {
                 x: self.y,
                 v: vy,
                 a: ay,
             },
-            theta: SubState {
+            theta: AngleState {
                 x: self.theta,
-                v: angular_speed,
+                v: angular_velocity,
                 a: angular_acceleration,
             },
         }
@@ -135,8 +136,11 @@ where
     I: IMU,
 {
     pub fn build(self) -> Estimator<LE, RE, I> {
-        let alpha =
-            1.0 / (2.0 * core::f32::consts::PI * self.period * self.cut_off_frequency + 1.0);
+        let alpha = 1.0
+            / (2.0
+                * core::f32::consts::PI
+                * (self.period * self.cut_off_frequency).get::<scalar>()
+                + 1.0);
         Estimator {
             initial_x: Default::default(),
             initial_y: Default::default(),
@@ -146,8 +150,8 @@ where
             theta: self.initial_posture,
             period: self.period,
             alpha,
-            trans_speed: Default::default(),
-            angular_speed: Default::default(),
+            trans_velocity: Default::default(),
+            angular_velocity: Default::default(),
             left_encoder: self.left_encoder,
             right_encoder: self.right_encoder,
             imu: self.imu,
@@ -155,15 +159,18 @@ where
     }
 }
 
-impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, Angle, Distance, Distance>
+impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, Angle, Length, Length>
 where
     LE: Encoder,
     RE: Encoder,
     I: IMU,
 {
     pub fn build(self) -> Estimator<LE, RE, I> {
-        let alpha =
-            1.0 / (2.0 * core::f32::consts::PI * self.period * self.cut_off_frequency + 1.0);
+        let alpha = 1.0
+            / (2.0
+                * core::f32::consts::PI
+                * (self.period * self.cut_off_frequency).get::<scalar>()
+                + 1.0);
         Estimator {
             initial_x: self.initial_x,
             initial_y: self.initial_y,
@@ -173,8 +180,8 @@ where
             theta: self.initial_posture,
             period: self.period,
             alpha,
-            trans_speed: Default::default(),
-            angular_speed: Default::default(),
+            trans_velocity: Default::default(),
+            angular_velocity: Default::default(),
             left_encoder: self.left_encoder,
             right_encoder: self.right_encoder,
             imu: self.imu,
@@ -189,8 +196,11 @@ where
     I: IMU,
 {
     pub fn build(self) -> Estimator<LE, RE, I> {
-        let alpha =
-            1.0 / (2.0 * core::f32::consts::PI * self.period * self.cut_off_frequency + 1.0);
+        let alpha = 1.0
+            / (2.0
+                * core::f32::consts::PI
+                * (self.period * self.cut_off_frequency).get::<scalar>()
+                + 1.0);
         Estimator {
             initial_x: Default::default(),
             initial_y: Default::default(),
@@ -200,8 +210,8 @@ where
             theta: Default::default(),
             period: self.period,
             alpha,
-            trans_speed: Default::default(),
-            angular_speed: Default::default(),
+            trans_velocity: Default::default(),
+            angular_velocity: Default::default(),
             left_encoder: self.left_encoder,
             right_encoder: self.right_encoder,
             imu: self.imu,
@@ -322,8 +332,8 @@ impl<LE, RE, I, P, COF, X, Y> EstimatorBuilder<LE, RE, I, P, COF, (), X, Y> {
 impl<LE, RE, I, P, COF, POS, Y> EstimatorBuilder<LE, RE, I, P, COF, POS, (), Y> {
     pub fn initial_x(
         self,
-        initial_x: Distance,
-    ) -> EstimatorBuilder<LE, RE, I, P, COF, POS, Distance, Y> {
+        initial_x: Length,
+    ) -> EstimatorBuilder<LE, RE, I, P, COF, POS, Length, Y> {
         EstimatorBuilder {
             initial_x,
             initial_y: self.initial_y,
@@ -339,8 +349,8 @@ impl<LE, RE, I, P, COF, POS, Y> EstimatorBuilder<LE, RE, I, P, COF, POS, (), Y> 
 impl<LE, RE, I, P, COF, POS, X> EstimatorBuilder<LE, RE, I, P, COF, POS, X, ()> {
     pub fn initial_y(
         self,
-        initial_y: Distance,
-    ) -> EstimatorBuilder<LE, RE, I, P, COF, POS, X, Distance> {
+        initial_y: Length,
+    ) -> EstimatorBuilder<LE, RE, I, P, COF, POS, X, Length> {
         EstimatorBuilder {
             initial_x: self.initial_x,
             initial_y,

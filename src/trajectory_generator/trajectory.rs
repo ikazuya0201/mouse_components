@@ -1,26 +1,26 @@
-use core::ops::Div;
+use crate::quantities::f32::{
+    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Velocity,
+};
 
-use quantities::{Angle, Distance, Quantity, Time, TimeDifferentiable};
-
-use crate::{dddt, ddt, dt};
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SubTarget<T>
-where
-    T: TimeDifferentiable,
-    dt!(T): TimeDifferentiable,
-    ddt!(T): TimeDifferentiable,
-    dddt!(T): Quantity,
-{
-    pub x: T,
-    pub v: <T as Div<Time>>::Output,
-    pub a: <<T as Div<Time>>::Output as Div<Time>>::Output,
-    pub j: <<<T as Div<Time>>::Output as Div<Time>>::Output as Div<Time>>::Output,
+#[derive(Clone, Debug, Default)]
+pub struct Target {
+    pub x: LengthTarget,
+    pub y: LengthTarget,
+    pub theta: AngleTarget,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Target {
-    pub x: SubTarget<Distance>,
-    pub y: SubTarget<Distance>,
-    pub theta: SubTarget<Angle>,
+#[derive(Clone, Debug, Default)]
+pub struct LengthTarget {
+    pub x: Length,
+    pub v: Velocity,
+    pub a: Acceleration,
+    pub j: Jerk,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct AngleTarget {
+    pub x: Angle,
+    pub v: AngularVelocity,
+    pub a: AngularAcceleration,
+    pub j: AngularJerk,
 }

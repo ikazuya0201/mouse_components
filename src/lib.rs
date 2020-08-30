@@ -48,8 +48,8 @@ pub mod data_types {
     };
     pub use obstacle_detector::Obstacle;
     pub use pattern::Pattern;
-    pub use tracker::{State, SubState};
-    pub use trajectory_generator::{SubTarget, Target};
+    pub use tracker::{AngleState, LengthState, State};
+    pub use trajectory_generator::{AngleTarget, LengthTarget, Target};
 }
 
 pub mod impls {
@@ -58,7 +58,10 @@ pub mod impls {
     pub use administrator::operator::SearchOperator;
     pub use administrator::Administrator;
     pub use agent::Agent;
-    pub use controller::{Controller, ControllerBuilder};
+    pub use controller::{
+        RotationController, RotationControllerBuilder, TranslationController,
+        TranslationControllerBuilder,
+    };
     pub use estimator::{Estimator, EstimatorBuilder};
     pub use maze::{Maze, MazeBuilder};
     pub use obstacle_detector::ObstacleDetector;
@@ -69,10 +72,9 @@ pub mod impls {
 
 pub mod defaults {
     use super::{data_types::*, impls::*};
-    use quantities::{Angle, Distance};
 
     pub type DefaultTracker<LeftMotor, RightMotor, Logger> =
-        Tracker<LeftMotor, RightMotor, Controller<Distance>, Controller<Angle>, Logger>;
+        Tracker<LeftMotor, RightMotor, TranslationController, RotationController, Logger>;
 
     pub type DefaultAgent<
         LeftMotor,

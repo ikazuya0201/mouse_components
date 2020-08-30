@@ -6,18 +6,19 @@ mod trajectory;
 use core::iter::Chain;
 
 use auto_enums::auto_enum;
-use quantities::{
-    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Jerk, Speed,
-    Time,
-};
 
 use super::agent;
 use crate::agent::pose::Pose;
 use crate::maze::RelativeDirection;
+use crate::quantities::f32::{
+    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
+    Velocity,
+};
+use crate::quantities::{dimensionless::degree, length::meter};
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use spin_generator::{SpinGenerator, SpinTrajectory};
 use straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
-pub use trajectory::{SubTarget, Target};
+pub use trajectory::{AngleTarget, LengthTarget, Target};
 
 enum Kind {
     Init,
@@ -34,7 +35,7 @@ pub struct TrajectoryGenerator {
     #[allow(unused)]
     spin_generator: SpinGenerator,
 
-    search_speed: Speed,
+    search_speed: Velocity,
     front_trajectory: StraightTrajectory,
     right_trajectory: SlalomTrajectory,
     left_trajectory: SlalomTrajectory,
@@ -59,19 +60,19 @@ impl TrajectoryGenerator {
         let sin_th = pose.theta.sin();
 
         move |target: Target| Target {
-            x: SubTarget {
+            x: LengthTarget {
                 x: target.x.x * cos_th - target.y.x * sin_th + pose.x,
                 v: target.x.v * cos_th - target.y.v * sin_th,
                 a: target.x.a * cos_th - target.y.a * sin_th,
                 j: target.x.j * cos_th - target.y.j * sin_th,
             },
-            y: SubTarget {
+            y: LengthTarget {
                 x: target.x.x * sin_th + target.y.x * cos_th + pose.y,
                 v: target.x.v * sin_th + target.y.v * cos_th,
                 a: target.x.a * sin_th + target.y.a * cos_th,
                 j: target.x.j * sin_th + target.y.j * cos_th,
             },
-            theta: SubTarget {
+            theta: AngleTarget {
                 x: target.theta.x + pose.theta,
                 v: target.theta.v,
                 a: target.theta.a,
@@ -89,7 +90,7 @@ impl TrajectoryGenerator {
         #[auto_enum(Iterator)]
         match kind {
             Init => {
-                let distance = Distance::from_meters(0.045);
+                let distance = Length::new::<meter>(0.045);
                 let x_end = pose.x + distance * pose.theta.cos();
                 let y_end = pose.y + distance * pose.theta.sin();
                 self.straight_generator.generate(
@@ -118,12 +119,12 @@ impl TrajectoryGenerator {
     #[cfg(any(test, feature = "debug"))]
     pub fn generate_straight(
         &self,
-        x_start: Distance,
-        y_start: Distance,
-        x_end: Distance,
-        y_end: Distance,
-        v_start: Speed,
-        v_end: Speed,
+        x_start: Length,
+        y_start: Length,
+        x_end: Length,
+        y_end: Length,
+        v_start: Velocity,
+        v_end: Velocity,
     ) -> impl Iterator<Item = Target> {
         self.straight_generator
             .generate(x_start, y_start, x_end, y_end, v_start, v_end)
@@ -169,15 +170,15 @@ impl TrajectoryGeneratorBuilder<(), (), (), (), (), (), (), (), ()> {
 
 impl
     TrajectoryGeneratorBuilder<
-        AngularSpeed,
+        AngularVelocity,
         AngularAcceleration,
         AngularJerk,
-        Speed,
-        Speed,
+        Velocity,
+        Velocity,
         Acceleration,
         Jerk,
         Time,
-        Speed,
+        Velocity,
     >
 {
     pub fn build(self) -> TrajectoryGenerator {
@@ -206,18 +207,18 @@ impl
             pose.x,
             pose.y,
             pose.theta,
-            Angle::from_degree(-90.0),
+            Angle::new::<degree>(-90.0),
             self.search_speed,
         );
         let left_trajectory = slalom_generator.generate(
             pose.x,
             pose.y,
             pose.theta,
-            Angle::from_degree(90.0),
+            Angle::new::<degree>(90.0),
             self.search_speed,
         );
         let front_trajectory = {
-            let distance = Distance::from_meters(0.09); //TODO: use configurable value
+            let distance = Length::new::<meter>(0.09); //TODO: use configurable value
             let x_end = pose.x + distance * pose.theta.cos();
             let y_end = pose.y + distance * pose.theta.sin();
             straight_generator.generate(
@@ -230,7 +231,7 @@ impl
             )
         };
         let back_trajectory = {
-            let distance = Distance::from_meters(0.045); //TODO: use configurable value
+            let distance = Length::new::<meter>(0.045); //TODO: use configurable value
             let x_end = pose.x + distance * pose.theta.cos();
             let y_end = pose.y + distance * pose.theta.sin();
             straight_generator
@@ -242,7 +243,7 @@ impl
                     self.search_speed,
                     Default::default(),
                 )
-                .chain(spin_generator.generate(pose.theta, Angle::from_degree(180.0)))
+                .chain(spin_generator.generate(pose.theta, Angle::new::<degree>(180.0)))
                 .chain(straight_generator.generate(
                     x_end,
                     y_end,
@@ -269,8 +270,8 @@ impl
 impl<TA, TJ, VR, V, A, J, T, SV> TrajectoryGeneratorBuilder<(), TA, TJ, VR, V, A, J, T, SV> {
     pub fn angular_speed_ref(
         self,
-        angular_speed_ref: AngularSpeed,
-    ) -> TrajectoryGeneratorBuilder<AngularSpeed, TA, TJ, VR, V, A, J, T, SV> {
+        angular_speed_ref: AngularVelocity,
+    ) -> TrajectoryGeneratorBuilder<AngularVelocity, TA, TJ, VR, V, A, J, T, SV> {
         TrajectoryGeneratorBuilder {
             angular_speed_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -326,8 +327,8 @@ impl<TV, TA, VR, V, A, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, (), VR, V, A
 impl<TV, TA, TJ, V, A, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, (), V, A, J, T, SV> {
     pub fn slalom_speed_ref(
         self,
-        slalom_speed_ref: Speed,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, Speed, V, A, J, T, SV> {
+        slalom_speed_ref: Velocity,
+    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, Velocity, V, A, J, T, SV> {
         TrajectoryGeneratorBuilder {
             angular_speed_ref: self.angular_speed_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -345,8 +346,8 @@ impl<TV, TA, TJ, V, A, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, (), V, A
 impl<TV, TA, TJ, VR, A, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, (), A, J, T, SV> {
     pub fn max_speed(
         self,
-        max_speed: Speed,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, Speed, A, J, T, SV> {
+        max_speed: Velocity,
+    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, Velocity, A, J, T, SV> {
         TrajectoryGeneratorBuilder {
             angular_speed_ref: self.angular_speed_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -421,8 +422,8 @@ impl<TV, TA, TJ, VR, V, A, J, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, 
 impl<TV, TA, TJ, VR, V, A, J, T> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A, J, T, ()> {
     pub fn search_speed(
         self,
-        search_speed: Speed,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A, J, T, Speed> {
+        search_speed: Velocity,
+    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A, J, T, Velocity> {
         TrajectoryGeneratorBuilder {
             angular_speed_ref: self.angular_speed_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -440,19 +441,30 @@ impl<TV, TA, TJ, VR, V, A, J, T> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::quantities::{
+        acceleration::meter_per_second_squared,
+        cubed_frequency::{degree_per_second_cubed, radian_per_second_cubed},
+        frequency::{degree_per_second, radian_per_second},
+        jerk::meter_per_second_cubed,
+        squared_frequency::{degree_per_second_squared, radian_per_second_squared},
+        time::second,
+        velocity::meter_per_second,
+    };
     use approx::assert_relative_eq;
 
     fn build_generator() -> TrajectoryGenerator {
         TrajectoryGeneratorBuilder::new()
-            .max_speed(Speed::from_meter_per_second(1.0))
-            .max_acceleration(Acceleration::from_meter_per_second_squared(10.0))
-            .max_jerk(Jerk::from_meter_per_second_cubed(100.0))
-            .angular_speed_ref(AngularSpeed::from_degree_per_second(180.0))
-            .angular_acceleration_ref(AngularAcceleration::from_degree_per_second_squared(1800.0))
-            .angular_jerk_ref(AngularJerk::from_degree_per_second_cubed(18000.0))
-            .slalom_speed_ref(Speed::from_meter_per_second(0.6))
-            .period(Time::from_seconds(0.001))
-            .search_speed(Speed::from_meter_per_second(0.6))
+            .max_speed(Velocity::new::<meter_per_second>(1.0))
+            .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
+            .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
+            .angular_speed_ref(AngularVelocity::new::<degree_per_second>(180.0))
+            .angular_acceleration_ref(AngularAcceleration::new::<degree_per_second_squared>(
+                1800.0,
+            ))
+            .angular_jerk_ref(AngularJerk::new::<degree_per_second_cubed>(18000.0))
+            .slalom_speed_ref(Velocity::new::<meter_per_second>(0.6))
+            .period(Time::new::<second>(0.001))
+            .search_speed(Velocity::new::<meter_per_second>(0.6))
             .build()
     }
 

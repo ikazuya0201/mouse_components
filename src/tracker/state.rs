@@ -1,26 +1,26 @@
-use core::ops::Div;
-
-use quantities::{Angle, Distance, Quantity, Time, TimeDifferentiable};
-
-use crate::{ddt, dt};
+use crate::quantities::f32::{
+    Acceleration, Angle, AngularAcceleration, AngularVelocity, Length, Velocity,
+};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct State {
-    pub x: SubState<Distance>,
-    pub y: SubState<Distance>,
-    pub theta: SubState<Angle>,
+    pub x: LengthState,
+    pub y: LengthState,
+    pub theta: AngleState,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct SubState<T>
-where
-    T: TimeDifferentiable + core::fmt::Debug,
-    dt!(T): TimeDifferentiable + core::fmt::Debug,
-    ddt!(T): Quantity + core::fmt::Debug,
-{
-    pub x: T,
-    pub v: <T as Div<Time>>::Output,
-    pub a: <<T as Div<Time>>::Output as Div<Time>>::Output,
+pub struct LengthState {
+    pub x: Length,
+    pub v: Velocity,
+    pub a: Acceleration,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct AngleState {
+    pub x: Angle,
+    pub v: AngularVelocity,
+    pub a: AngularAcceleration,
 }
 
 #[cfg(test)]
@@ -31,7 +31,7 @@ mod tests {
     const V_RATIO: f32 = 100.0;
     const A_RATIO: f32 = 10000.0;
 
-    impl AbsDiffEq for SubState<Distance> {
+    impl AbsDiffEq for LengthState {
         type Epsilon = f32;
 
         fn default_epsilon() -> Self::Epsilon {
@@ -40,20 +40,20 @@ mod tests {
 
         fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
             self.x
-                .as_meters()
-                .abs_diff_eq(&other.x.as_meters(), epsilon)
+                .get::<meter>()
+                .abs_diff_eq(&other.x.get::<meter>(), epsilon)
                 && self
                     .v
-                    .as_meter_per_second()
-                    .abs_diff_eq(&other.v.as_meter_per_second(), epsilon * V_RATIO)
-                && self
-                    .a
-                    .as_meter_per_second_squared()
-                    .abs_diff_eq(&other.a.as_meter_per_second_squared(), epsilon * A_RATIO)
+                    .get::<meter_per_second>()
+                    .abs_diff_eq(&other.v.get::<meter_per_second>(), epsilon * V_RATIO)
+                && self.a.get::<meter_per_second_squared>().abs_diff_eq(
+                    &other.a.get::<meter_per_second_squared>(),
+                    epsilon * A_RATIO,
+                )
         }
     }
 
-    impl AbsDiffEq for SubState<Angle> {
+    impl AbsDiffEq for AngleState {
         type Epsilon = f32;
 
         fn default_epsilon() -> Self::Epsilon {
@@ -75,7 +75,7 @@ mod tests {
         }
     }
 
-    impl RelativeEq for SubState<Distance> {
+    impl RelativeEq for LengthState {
         fn default_max_relative() -> Self::Epsilon {
             Self::default_epsilon()
         }
@@ -87,22 +87,22 @@ mod tests {
             max_relative: Self::Epsilon,
         ) -> bool {
             self.x
-                .as_meters()
-                .relative_eq(&other.x.as_meters(), epsilon, max_relative)
-                && self.v.as_meter_per_second().relative_eq(
-                    &other.v.as_meter_per_second(),
+                .get::<meter>()
+                .relative_eq(&other.x.get::<meter>(), epsilon, max_relative)
+                && self.v.get::<meter_per_second>().relative_eq(
+                    &other.v.get::<meter_per_second>(),
                     epsilon * V_RATIO,
                     max_relative,
                 )
-                && self.a.as_meter_per_second_squared().relative_eq(
-                    &other.a.as_meter_per_second_squared(),
+                && self.a.get::<meter_per_second_squared>().relative_eq(
+                    &other.a.get::<meter_per_second_squared>(),
                     epsilon * A_RATIO,
                     max_relative,
                 )
         }
     }
 
-    impl RelativeEq for SubState<Angle> {
+    impl RelativeEq for AngleState {
         fn default_max_relative() -> Self::Epsilon {
             Self::default_epsilon()
         }

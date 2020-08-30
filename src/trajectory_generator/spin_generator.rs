@@ -1,22 +1,21 @@
-use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Time};
-
-use super::straight_generator::{OverallCalculator, StraightCalculatorGenerator};
+use super::straight_generator::{AngleOverallCalculator, AngleStraightCalculatorGenerator};
 use super::trajectory::Target;
+use crate::quantities::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
 pub struct SpinGenerator {
-    function_generator: StraightCalculatorGenerator<Angle>,
+    function_generator: AngleStraightCalculatorGenerator,
     period: Time,
 }
 
 impl SpinGenerator {
     pub fn new(
-        max_angular_speed: AngularSpeed,
+        max_angular_speed: AngularVelocity,
         max_angular_acceleration: AngularAcceleration,
         max_angular_jerk: AngularJerk,
         period: Time,
     ) -> Self {
         Self {
-            function_generator: StraightCalculatorGenerator::new(
+            function_generator: AngleStraightCalculatorGenerator::new(
                 max_angular_speed,
                 max_angular_acceleration,
                 max_angular_jerk,
@@ -38,14 +37,14 @@ impl SpinGenerator {
 
 #[derive(Clone)]
 pub struct SpinTrajectory {
-    angle_calculator: OverallCalculator<Angle>,
+    angle_calculator: AngleOverallCalculator,
     t: Time,
     t_end: Time,
     period: Time,
 }
 
 impl SpinTrajectory {
-    fn new(angle_calculator: OverallCalculator<Angle>, t_end: Time, period: Time) -> Self {
+    fn new(angle_calculator: AngleOverallCalculator, t_end: Time, period: Time) -> Self {
         Self {
             angle_calculator,
             t: Default::default(),

@@ -1,9 +1,13 @@
 use generic_array::GenericArray;
-use quantities::{Angle, Distance, Quantity};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use super::{AbsoluteDirection, SearchNodeId, WallDirection, WallPosition};
 use crate::agent::Pose;
+use crate::quantities::{
+    dimensionless::{degree, revolution},
+    f32::{Angle, Length},
+    length::meter,
+};
 use crate::utils::total::Total;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -12,8 +16,8 @@ where
     N: Unsigned + PowerOfTwo,
 {
     pub position: WallPosition<N>,
-    pub existing_distance: Distance,
-    pub not_existing_distance: Distance,
+    pub existing_distance: Length,
+    pub not_existing_distance: Length,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,21 +25,21 @@ pub struct OutOfBoundError;
 
 pub struct PoseConverter {
     i_square_width: i32, //[mm]
-    square_width_half: Distance,
-    p1: Distance,
-    p2: Distance,
-    n1: Distance,
-    n2: Distance,
+    square_width_half: Length,
+    p1: Length,
+    p2: Length,
+    n1: Length,
+    n2: Length,
 }
 
 impl PoseConverter {
-    pub fn new(square_width: Distance, wall_width: Distance) -> Self {
+    pub fn new(square_width: Length, wall_width: Length) -> Self {
         let p1 = square_width - wall_width / 2.0;
         let p2 = p1 + square_width;
         let n1 = wall_width / 2.0;
         let n2 = n1 - square_width;
         Self {
-            i_square_width: (square_width.as_meters() * 1000.0) as i32,
+            i_square_width: (square_width.get::<meter>() * 1000.0) as i32,
             square_width_half: square_width / 2.0,
             p1,
             p2,
@@ -45,9 +49,9 @@ impl PoseConverter {
     }
 
     //(remainder, quotient)
-    fn remquof_with_width(&self, val: Distance) -> (Distance, i32) {
-        let quo = (val.as_meters() * 1000.0) as i32 / self.i_square_width;
-        let rem = val - Distance::from_meters((quo * self.i_square_width) as f32 * 0.001);
+    fn remquof_with_width(&self, val: Length) -> (Length, i32) {
+        let quo = (val.get::<meter>() * 1000.0) as i32 / self.i_square_width;
+        let rem = val - Length::new::<meter>((quo * self.i_square_width) as f32 * 0.001);
         (rem, quo)
     }
 
@@ -57,8 +61,8 @@ impl PoseConverter {
     {
         #[derive(Clone, Copy, Debug)]
         enum Axis {
-            X(Distance),
-            Y(Distance),
+            X(Length),
+            Y(Length),
         }
 
         #[derive(Clone, Copy, Debug)]
@@ -78,7 +82,7 @@ impl PoseConverter {
             return Err(OutOfBoundError);
         }
 
-        let rot = pose.theta.as_bounded_rotation();
+        let rot = libm::fmodf(pose.theta.get::<revolution>(), 1.0);
 
         let axes = if rot < 0.25 {
             [
@@ -110,7 +114,7 @@ impl PoseConverter {
             ]
         };
 
-        let (sin_th, cos_th) = libm::sincosf(pose.theta.as_radian());
+        let (sin_th, cos_th) = pose.theta.sincos();
 
         let mut axes_distance = axes
             .iter()
@@ -120,8 +124,8 @@ impl PoseConverter {
                     Axis::Y(y) => (y - y_rem) / sin_th,
                 };
                 //assign infinity to invalid values
-                let dist = if dist.is_negative() || dist.as_meters().is_nan() {
-                    Distance::from_meters(core::f32::INFINITY)
+                let dist = if dist.get::<meter>() < 0.0 || dist.get::<meter>().is_nan() {
+                    Length::new::<meter>(core::f32::INFINITY)
                 } else {
                     dist
                 };
@@ -183,10 +187,10 @@ impl PoseConverter {
             x: (x + 1) as f32 * self.square_width_half,
             y: (y + 1) as f32 * self.square_width_half,
             theta: match direction {
-                East => Angle::from_degree(0.0),
-                North => Angle::from_degree(90.0),
-                West => Angle::from_degree(180.0),
-                South => Angle::from_degree(270.0),
+                East => Angle::new::<degree>(0.0),
+                North => Angle::new::<degree>(90.0),
+                West => Angle::new::<degree>(180.0),
+                South => Angle::new::<degree>(270.0),
                 _ => unreachable!(),
             },
         }
@@ -198,7 +202,6 @@ mod tests {
     use approx::assert_relative_eq;
 
     use super::*;
-    use quantities::Angle;
     use WallDirection::*;
 
     macro_rules! convert_ok_tests {
@@ -208,21 +211,21 @@ mod tests {
                 fn $name() {
                     let (input, expected) = $value;
                     let input = Pose{
-                        x: Distance::from_meters(input.0),
-                        y: Distance::from_meters(input.1),
-                        theta: Angle::from_degree(input.2),
+                        x: Length::new::<meter>(input.0),
+                        y: Length::new::<meter>(input.1),
+                        theta: Angle::new::<degree>(input.2),
                     };
                     let expected = WallInfo::<$size>{
                         position: WallPosition::new(expected.0, expected.1, expected.2).unwrap(),
-                        existing_distance: Distance::from_meters(expected.3),
-                        not_existing_distance: Distance::from_meters(expected.4),
+                        existing_distance: Length::new::<meter>(expected.3),
+                        not_existing_distance: Length::new::<meter>(expected.4),
                     };
 
-                    let converter = PoseConverter::new(Distance::from_meters(0.09), Distance::from_meters(0.006));
+                    let converter = PoseConverter::new(Length::new::<meter>(0.09), Length::new::<meter>(0.006));
                     let info = converter.convert::<$size>(input).unwrap();
                     assert_eq!(info.position, expected.position);
-                    assert_relative_eq!(info.existing_distance.as_meters(), expected.existing_distance.as_meters());
-                    assert_relative_eq!(info.not_existing_distance.as_meters(), expected.not_existing_distance.as_meters());
+                    assert_relative_eq!(info.existing_distance.get::<meter>(), expected.existing_distance.get::<meter>());
+                    assert_relative_eq!(info.not_existing_distance.get::<meter>(), expected.not_existing_distance.get::<meter>());
                 }
             )*
         }
@@ -235,12 +238,12 @@ mod tests {
                 fn $name() {
                     let input = $value;
                     let input = Pose{
-                        x: Distance::from_meters(input.0),
-                        y: Distance::from_meters(input.1),
-                        theta: Angle::from_degree(input.2),
+                        x: Length::new::<meter>(input.0),
+                        y: Length::new::<meter>(input.1),
+                        theta: Angle::new::<degree>(input.2),
                     };
 
-                    let converter = PoseConverter::new(Distance::from_meters(0.09), Distance::from_meters(0.006));
+                    let converter = PoseConverter::new(Length::new::<meter>(0.09), Length::new::<meter>(0.006));
                     assert!(converter.convert::<$size>(input).is_err());
                 }
             )*

@@ -5,11 +5,11 @@ mod wall;
 
 use core::cell::RefCell;
 use core::fmt::Debug;
+use core::marker::PhantomData;
 use core::ops::{Add, Mul};
 
 use generic_array::{ArrayLength, GenericArray};
 use heapless::{consts::*, Vec};
-use quantities::Distance;
 use typenum::{PowerOfTwo, Unsigned};
 
 use crate::administrator::{
@@ -18,6 +18,7 @@ use crate::administrator::{
 use crate::agent::Pose;
 use crate::obstacle_detector::Obstacle;
 use crate::pattern::Pattern;
+use crate::quantities::{dimensionless::scalar, f32::Length};
 use crate::utils::itertools::repeat_n;
 use crate::utils::mutex::Mutex;
 pub use direction::{AbsoluteDirection, RelativeDirection};
@@ -761,13 +762,15 @@ where
                         continue;
                     }
                     let exist_val = {
-                        let tmp = (wall_info.existing_distance - obstacle.distance.mean)
-                            / obstacle.distance.standard_deviation;
+                        let tmp = ((wall_info.existing_distance - obstacle.distance.mean)
+                            / obstacle.distance.standard_deviation)
+                            .get::<scalar>();
                         -tmp * tmp / 2.0
                     };
                     let not_exist_val = {
-                        let tmp = (wall_info.not_existing_distance - obstacle.distance.mean)
-                            / obstacle.distance.standard_deviation;
+                        let tmp = ((wall_info.not_existing_distance - obstacle.distance.mean)
+                            / obstacle.distance.standard_deviation)
+                            .get::<scalar>();
                         -tmp * tmp / 2.0
                     };
 
@@ -851,8 +854,16 @@ pub struct MazeBuilder<C, SW, WW, WPT> {
 }
 
 impl<C, SW, WW, WPT> MazeBuilder<C, SW, WW, WPT> {
-    const DEFAULT_SQUARE_WIDTH: Distance = Distance::from_meters(0.09);
-    const DEFAULT_WALL_WIDTH: Distance = Distance::from_meters(0.006);
+    const DEFAULT_SQUARE_WIDTH: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.09,
+    };
+    const DEFAULT_WALL_WIDTH: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.006,
+    };
     const DEFAULT_PROB_THRESHOLD: f32 = 0.05;
 }
 
@@ -891,7 +902,7 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, Distance, Distance, ()>
+impl<C> MazeBuilder<C, Length, Length, ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -939,7 +950,7 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, Distance, Distance, f32>
+impl<C> MazeBuilder<C, Length, Length, f32>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -978,7 +989,7 @@ impl<SW, WW, WPT> MazeBuilder<(), SW, WW, WPT> {
 }
 
 impl<C, WW, WPT> MazeBuilder<C, (), WW, WPT> {
-    pub fn square_width(self, square_width: Distance) -> MazeBuilder<C, Distance, WW, WPT> {
+    pub fn square_width(self, square_width: Length) -> MazeBuilder<C, Length, WW, WPT> {
         MazeBuilder {
             wall_prob_threshold: self.wall_prob_threshold,
             costs: self.costs,
@@ -989,7 +1000,7 @@ impl<C, WW, WPT> MazeBuilder<C, (), WW, WPT> {
 }
 
 impl<C, SW, WPT> MazeBuilder<C, SW, (), WPT> {
-    pub fn wall_width(self, wall_width: Distance) -> MazeBuilder<C, SW, Distance, WPT> {
+    pub fn wall_width(self, wall_width: Length) -> MazeBuilder<C, SW, Length, WPT> {
         MazeBuilder {
             wall_prob_threshold: self.wall_prob_threshold,
             costs: self.costs,

@@ -1,23 +1,27 @@
 mod motor;
 mod state;
 
+use core::marker::PhantomData;
 use core::ops::Div;
-
-use quantities::{
-    Angle, AngularSpeed, Distance, Frequency, Speed, SquaredFrequency, Time, TimeDifferentiable,
-    Voltage,
-};
 
 use super::agent;
 use super::trajectory_generator::Target;
+use crate::quantities::{
+    dimensionless::radian,
+    f32::{Angle, AngularVelocity, Frequency, Length, SquaredFrequency, Time, Velocity, Voltage},
+    frequency::{hertz, radian_per_second},
+    length::meter,
+    squared_frequency::squared_hertz,
+    velocity::meter_per_second,
+};
 use crate::{ddt, dt};
 pub use motor::Motor;
-pub use state::{State, SubState};
+pub use state::{AngleState, LengthState, State};
 
 pub trait Controller<T>
 where
-    T: TimeDifferentiable,
-    dt!(T): TimeDifferentiable,
+    T: Div<Time>,
+    dt!(T): Div<Time>,
 {
     fn init(&mut self);
     fn calculate(&mut self, r: dt!(T), dr: ddt!(T), y: dt!(T), dy: ddt!(T)) -> Voltage;
@@ -38,10 +42,10 @@ pub struct Tracker<LM, RM, TC, RC, L> {
     kdx: Frequency,
     ky: SquaredFrequency,
     kdy: Frequency,
-    xi: Speed,
+    xi: Velocity,
     period: Time,
-    xi_threshold: Speed,
-    fail_safe_distance: Distance,
+    xi_threshold: Velocity,
+    fail_safe_distance: Length,
     translation_controller: TC,
     rotation_controller: RC,
     left_motor: LM,
@@ -56,7 +60,7 @@ impl<LM, RM, TC, RC, L> agent::Tracker<State, Target> for Tracker<LM, RM, TC, RC
 where
     LM: Motor,
     RM: Motor,
-    TC: Controller<Distance>,
+    TC: Controller<Length>,
     RC: Controller<Angle>,
     L: Logger,
 {
@@ -87,7 +91,7 @@ impl<LM, RM, TC, RC, L> Tracker<LM, RM, TC, RC, L>
 where
     LM: Motor,
     RM: Motor,
-    TC: Controller<Distance>,
+    TC: Controller<Length>,
     RC: Controller<Angle>,
     L: Logger,
 {
@@ -100,10 +104,10 @@ where
     fn fail_safe(&mut self, state: &State, target: &Target) {
         use agent::Tracker;
 
-        let x_diff = (state.x.x - target.x.x).as_meters();
-        let y_diff = (state.y.x - target.y.x).as_meters();
+        let x_diff = (state.x.x - target.x.x).get::<meter>();
+        let y_diff = (state.y.x - target.y.x).get::<meter>();
 
-        let distance = Distance::from_meters(libm::sqrtf(x_diff * x_diff + y_diff * y_diff));
+        let distance = Length::new::<meter>(libm::sqrtf(x_diff * x_diff + y_diff * y_diff));
         if distance >= self.fail_safe_distance {
             self.stop();
             panic!("state: {:?}, target: {:?}", state, target);
@@ -154,8 +158,10 @@ where
             let e = xd * cos_th + yd * sin_th;
             let uv = vr * cos_th_d + k1 * e;
             let uw =
-                wr + AngularSpeed::from_radian_per_second(
-                    k2 * vr.as_meter_per_second() * e.as_meters() * Self::sinc(theta_d.as_radian()),
+                wr + AngularVelocity::new::<radian_per_second>(
+                    k2 * vr.get::<meter_per_second>()
+                        * e.get::<meter>()
+                        * Self::sinc(theta_d.get::<radian>()),
                 ) + k3 * theta_d;
             (uv, uw, Default::default(), Default::default())
         };
@@ -169,10 +175,10 @@ where
         (vol_v - vol_w, vol_v + vol_w)
     }
 
-    fn calculate_k1(&self, wr: AngularSpeed, vr: Speed) -> Frequency {
-        let wr_raw = wr.as_radian_per_second();
-        let vr_raw = vr.as_meter_per_second();
-        Frequency::from_hertz(
+    fn calculate_k1(&self, wr: AngularVelocity, vr: Velocity) -> Frequency {
+        let wr_raw = wr.get::<radian_per_second>();
+        let vr_raw = vr.get::<meter_per_second>();
+        Frequency::new::<hertz>(
             2.0 * self.zeta * libm::sqrtf(wr_raw * wr_raw + self.b * vr_raw * vr_raw),
         )
     }
@@ -199,7 +205,11 @@ pub struct TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z
 impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
 {
-    const DEFAULT_FAIL_SAFE_DISTANCE: Distance = Distance::from_meters(0.02);
+    const DEFAULT_FAIL_SAFE_DISTANCE: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.02,
+    };
 }
 
 impl TrackerBuilder<(), (), (), (), (), (), (), (), (), (), (), (), NullLogger, (), ()> {
@@ -225,20 +235,20 @@ impl TrackerBuilder<(), (), (), (), (), (), (), (), (), (), (), (), NullLogger, 
 }
 
 impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, (), (), L, f32, f32>
+    TrackerBuilder<f32, f32, f32, f32, Velocity, TC, RC, LM, RM, Time, (), (), L, f32, f32>
 where
     LM: Motor,
     RM: Motor,
-    TC: Controller<Distance>,
+    TC: Controller<Length>,
     RC: Controller<Angle>,
     L: Logger,
 {
     pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
         Tracker {
-            kx: SquaredFrequency::from_squared_hertz(self.kx),
-            kdx: Frequency::from_hertz(self.kdx),
-            ky: SquaredFrequency::from_squared_hertz(self.ky),
-            kdy: Frequency::from_hertz(self.kdy),
+            kx: SquaredFrequency::new::<squared_hertz>(self.kx),
+            kdx: Frequency::new::<hertz>(self.kdx),
+            ky: SquaredFrequency::new::<squared_hertz>(self.ky),
+            kdy: Frequency::new::<hertz>(self.kdy),
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -255,20 +265,20 @@ where
 }
 
 impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, (), Distance, L, f32, f32>
+    TrackerBuilder<f32, f32, f32, f32, Velocity, TC, RC, LM, RM, Time, (), Length, L, f32, f32>
 where
     LM: Motor,
     RM: Motor,
-    TC: Controller<Distance>,
+    TC: Controller<Length>,
     RC: Controller<Angle>,
     L: Logger,
 {
     pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
         Tracker {
-            kx: SquaredFrequency::from_squared_hertz(self.kx),
-            kdx: Frequency::from_hertz(self.kdx),
-            ky: SquaredFrequency::from_squared_hertz(self.ky),
-            kdy: Frequency::from_hertz(self.kdy),
+            kx: SquaredFrequency::new::<squared_hertz>(self.kx),
+            kdx: Frequency::new::<hertz>(self.kdx),
+            ky: SquaredFrequency::new::<squared_hertz>(self.ky),
+            kdy: Frequency::new::<hertz>(self.kdy),
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -285,19 +295,19 @@ where
 }
 
 impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, Speed, (), L, f32, f32>
+    TrackerBuilder<f32, f32, f32, f32, Velocity, TC, RC, LM, RM, Time, Velocity, (), L, f32, f32>
 where
     LM: Motor,
     RM: Motor,
-    TC: Controller<Distance>,
+    TC: Controller<Length>,
     RC: Controller<Angle>,
 {
     pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
         Tracker {
-            kx: SquaredFrequency::from_squared_hertz(self.kx),
-            kdx: Frequency::from_hertz(self.kdx),
-            ky: SquaredFrequency::from_squared_hertz(self.ky),
-            kdy: Frequency::from_hertz(self.kdy),
+            kx: SquaredFrequency::new::<squared_hertz>(self.kx),
+            kdx: Frequency::new::<hertz>(self.kdx),
+            ky: SquaredFrequency::new::<squared_hertz>(self.ky),
+            kdy: Frequency::new::<hertz>(self.kdy),
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -314,20 +324,36 @@ where
 }
 
 impl<TC, RC, LM, RM, L>
-    TrackerBuilder<f32, f32, f32, f32, Speed, TC, RC, LM, RM, Time, Speed, Distance, L, f32, f32>
+    TrackerBuilder<
+        f32,
+        f32,
+        f32,
+        f32,
+        Velocity,
+        TC,
+        RC,
+        LM,
+        RM,
+        Time,
+        Velocity,
+        Length,
+        L,
+        f32,
+        f32,
+    >
 where
     LM: Motor,
     RM: Motor,
-    TC: Controller<Distance>,
+    TC: Controller<Length>,
     RC: Controller<Angle>,
     L: Logger,
 {
     pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
         Tracker {
-            kx: SquaredFrequency::from_squared_hertz(self.kx),
-            kdx: Frequency::from_hertz(self.kdx),
-            ky: SquaredFrequency::from_squared_hertz(self.ky),
-            kdy: Frequency::from_hertz(self.kdy),
+            kx: SquaredFrequency::new::<squared_hertz>(self.kx),
+            kdx: Frequency::new::<hertz>(self.kdx),
+            ky: SquaredFrequency::new::<squared_hertz>(self.ky),
+            kdy: Frequency::new::<hertz>(self.kdy),
             xi_threshold: self.xi_threshold,
             translation_controller: self.translation_controller,
             rotation_controller: self.rotation_controller,
@@ -456,8 +482,8 @@ impl<KX, KDX, KY, KDY, TC, RC, LM, RM, P, XI, FS, L, Z, B>
 {
     pub fn valid_control_lower_bound(
         self,
-        xi_threshold: Speed,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, Speed, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
+        xi_threshold: Velocity,
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, Velocity, TC, RC, LM, RM, P, XI, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
@@ -486,7 +512,7 @@ impl<KX, KDX, KY, KDY, XIT, RC, LM, RM, P, XI, FS, L, Z, B>
         translation_controller: TC,
     ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z, B>
     where
-        TC: Controller<Distance>,
+        TC: Controller<Length>,
     {
         TrackerBuilder {
             kx: self.kx,
@@ -630,8 +656,8 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, FS, L, Z, B>
 {
     pub fn initial_speed(
         self,
-        xi: Speed,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, Speed, FS, L, Z, B> {
+        xi: Velocity,
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, Velocity, FS, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
@@ -657,8 +683,8 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, L, Z, B>
 {
     pub fn fail_safe_distance(
         self,
-        fail_safe_distance: Distance,
-    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, Distance, L, Z, B> {
+        fail_safe_distance: Length,
+    ) -> TrackerBuilder<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, Length, L, Z, B> {
         TrackerBuilder {
             kx: self.kx,
             kdx: self.kdx,
@@ -766,6 +792,7 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::quantities::{time::second, voltage::volt};
     use core::marker::PhantomData;
 
     struct IMotor;
@@ -788,19 +815,19 @@ mod tests {
 
     impl<T> Controller<T> for IController<T>
     where
-        T: TimeDifferentiable,
-        dt!(T): TimeDifferentiable,
+        T: Div<Time>,
+        dt!(T): Div<Time>,
     {
         fn init(&mut self) {}
 
         fn calculate(&mut self, _r: dt!(T), _dr: ddt!(T), _y: dt!(T), _dy: ddt!(T)) -> Voltage {
-            Voltage::from_volts(1.0)
+            Voltage::new::<volt>(1.0)
         }
     }
 
     fn build_tracker<L>(
         logger: L,
-    ) -> Tracker<IMotor, IMotor, IController<Distance>, IController<Angle>, L>
+    ) -> Tracker<IMotor, IMotor, IController<Length>, IController<Angle>, L>
     where
         L: Logger,
     {
@@ -809,16 +836,16 @@ mod tests {
             .kdx(1.0)
             .ky(1.0)
             .kdy(1.0)
-            .initial_speed(Speed::from_meter_per_second(0.0))
-            .valid_control_lower_bound(Speed::from_meter_per_second(0.001))
+            .initial_speed(Velocity::new::<meter_per_second>(0.0))
+            .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.001))
             .right_motor(IMotor)
             .left_motor(IMotor)
-            .period(Time::from_seconds(0.001))
-            .translation_controller(IController::<Distance>::new())
+            .period(Time::new::<second>(0.001))
+            .translation_controller(IController::<Length>::new())
             .rotation_controller(IController::<Angle>::new())
             .low_zeta(1.0)
             .low_b(1e-3)
-            .fail_safe_distance(Distance::from_meters(0.02))
+            .fail_safe_distance(Length::new::<meter>(0.02))
             .logger(logger)
             .build()
     }

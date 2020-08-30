@@ -1,7 +1,7 @@
-use quantities::Distance;
+use crate::quantities::f32::Length;
 
 pub trait Encoder {
     type Error;
 
-    fn get_relative_distance(&mut self) -> nb::Result<Distance, Self::Error>;
+    fn get_relative_distance(&mut self) -> nb::Result<Length, Self::Error>;
 }

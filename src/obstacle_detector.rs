@@ -2,9 +2,9 @@ pub mod distance_sensor;
 
 use generic_array::{ArrayLength, GenericArray};
 use heapless::Vec;
-use quantities::Distance;
 
 use crate::agent::{self, Pose};
+use crate::quantities::f32::Length;
 use crate::tracker::State;
 use crate::utils::sample::Sample;
 use distance_sensor::DistanceSensor;
@@ -12,7 +12,7 @@ use distance_sensor::DistanceSensor;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Obstacle {
     pub source: Pose,
-    pub distance: Sample<Distance>,
+    pub distance: Sample<Length>,
 }
 
 pub struct ObstacleDetector<D, N>
@@ -62,18 +62,18 @@ where
 #[cfg(test)]
 mod tests {
     use approx::assert_relative_eq;
-    use quantities::Angle;
 
     use super::*;
     use crate::agent::Pose;
+    use crate::quantities::{dimensionless::degree, f32::Angle, length::meter};
 
     struct IDistanceSensor {
         pose: Pose,
-        distance: Option<Sample<Distance>>,
+        distance: Option<Sample<Length>>,
     }
 
     impl IDistanceSensor {
-        fn new(pose: Pose, distance: Option<Sample<Distance>>) -> Self {
+        fn new(pose: Pose, distance: Option<Sample<Length>>) -> Self {
             Self { pose, distance }
         }
     }
@@ -85,7 +85,7 @@ mod tests {
             self.pose
         }
 
-        fn get_distance(&mut self) -> nb::Result<Sample<Distance>, Self::Error> {
+        fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {
             self.distance.clone().ok_or(nb::Error::Other(()))
         }
     }
@@ -94,36 +94,36 @@ mod tests {
     fn test_detect() {
         use generic_array::arr;
 
-        let standard_deviation = Distance::from_meters(0.001);
+        let standard_deviation = Length::new::<meter>(0.001);
         let sensors = arr![
             IDistanceSensor;
             IDistanceSensor::new(
                 Pose {
-                    x: Distance::from_meters(0.015),
-                    y: Distance::from_meters(0.015),
-                    theta: Angle::from_degree(0.0),
+                    x: Length::new::<meter>(0.015),
+                    y: Length::new::<meter>(0.015),
+                    theta: Angle::new::<degree>(0.0),
                 },
                 Some( Sample{
-                    mean: Distance::from_meters(0.03),
+                    mean: Length::new::<meter>(0.03),
                     standard_deviation,
                 }),
             ),
             IDistanceSensor::new(
                 Pose {
-                    x: Distance::from_meters(-0.015),
-                    y: Distance::from_meters(0.015),
-                    theta: Angle::from_degree(180.0),
+                    x: Length::new::<meter>(-0.015),
+                    y: Length::new::<meter>(0.015),
+                    theta: Angle::new::<degree>(180.0),
                 },
                 None,
             ),
             IDistanceSensor::new(
                 Pose {
-                    x: Distance::from_meters(0.0),
-                    y: Distance::from_meters(0.025),
-                    theta: Angle::from_degree(90.0),
+                    x: Length::new::<meter>(0.0),
+                    y: Length::new::<meter>(0.025),
+                    theta: Angle::new::<degree>(90.0),
                 },
                 Some(Sample{
-                    mean:Distance::from_meters(0.02),
+                    mean:Length::new::<meter>(0.02),
                     standard_deviation,
                 }
                     ),
@@ -131,25 +131,25 @@ mod tests {
         ];
         let expected = vec![
             Pose {
-                x: Distance::from_meters(0.015),
-                y: Distance::from_meters(0.015),
-                theta: Angle::from_degree(0.0),
+                x: Length::new::<meter>(0.015),
+                y: Length::new::<meter>(0.015),
+                theta: Angle::new::<degree>(0.0),
             },
             Pose {
-                x: Distance::from_meters(0.0),
-                y: Distance::from_meters(0.025),
-                theta: Angle::from_degree(90.0),
+                x: Length::new::<meter>(0.0),
+                y: Length::new::<meter>(0.025),
+                theta: Angle::new::<degree>(90.0),
             },
         ];
 
         let mut detector = ObstacleDetector::new(sensors);
         let obstacles = agent::ObstacleDetector::detect(&mut detector, Default::default());
         for (obstacle, expected) in obstacles.into_iter().zip(expected.into_iter()) {
-            assert_relative_eq!(obstacle.source.x.as_meters(), expected.x.as_meters());
-            assert_relative_eq!(obstacle.source.y.as_meters(), expected.y.as_meters());
+            assert_relative_eq!(obstacle.source.x.get::<meter>(), expected.x.get::<meter>());
+            assert_relative_eq!(obstacle.source.y.get::<meter>(), expected.y.get::<meter>());
             assert_relative_eq!(
-                obstacle.source.theta.as_radian(),
-                expected.theta.as_radian()
+                obstacle.source.theta.get::<degree>(),
+                expected.theta.get::<degree>()
             );
         }
     }

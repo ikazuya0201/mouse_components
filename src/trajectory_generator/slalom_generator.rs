@@ -1,24 +1,23 @@
-use libm::{cosf, sinf};
-use quantities::{Angle, AngularAcceleration, AngularJerk, AngularSpeed, Distance, Speed, Time};
-
-use super::trajectory::{SubTarget, Target};
-
-use super::straight_generator::{OverallCalculator, StraightCalculatorGenerator};
+use super::straight_generator::{AngleOverallCalculator, AngleStraightCalculatorGenerator};
+use super::trajectory::{LengthTarget, Target};
+use crate::quantities::f32::{
+    Angle, AngularAcceleration, AngularJerk, AngularVelocity, Length, Time, Velocity,
+};
 
 pub struct SlalomGenerator {
-    dtheta: AngularSpeed,
+    dtheta: AngularVelocity,
     ddtheta: AngularAcceleration,
     dddtheta: AngularJerk,
-    v_ref: Speed,
+    v_ref: Velocity,
     period: Time,
 }
 
 impl SlalomGenerator {
     pub fn new(
-        dtheta: AngularSpeed,
+        dtheta: AngularVelocity,
         ddtheta: AngularAcceleration,
         dddtheta: AngularJerk,
-        v_ref: Speed,
+        v_ref: Velocity,
         period: Time,
     ) -> Self {
         Self {
@@ -32,14 +31,14 @@ impl SlalomGenerator {
 
     pub fn generate(
         &self,
-        x: Distance,
-        y: Distance,
+        x: Length,
+        y: Length,
         theta: Angle,
         theta_distance: Angle,
-        v: Speed,
+        v: Velocity,
     ) -> SlalomTrajectory {
         let k = v / self.v_ref;
-        let angle_generator = StraightCalculatorGenerator::<Angle>::new(
+        let angle_generator = AngleStraightCalculatorGenerator::new(
             k * self.dtheta,
             k * k * self.ddtheta,
             k * k * k * self.dddtheta,
@@ -47,8 +46,8 @@ impl SlalomGenerator {
         let (angle_fn, t_end) = angle_generator.generate(
             theta,
             theta_distance,
-            AngularSpeed::from_radian_per_second(0.0),
-            AngularSpeed::from_radian_per_second(0.0),
+            Default::default(),
+            Default::default(),
         );
         SlalomTrajectory::new(angle_fn, t_end, self.period, x, y, v)
     }
@@ -56,23 +55,23 @@ impl SlalomGenerator {
 
 #[derive(Clone)]
 pub struct SlalomTrajectory {
-    angle_calculator: OverallCalculator<Angle>,
+    angle_calculator: AngleOverallCalculator,
     t: Time,
     t_end: Time,
     period: Time,
-    x: Distance,
-    y: Distance,
-    v: Speed,
+    x: Length,
+    y: Length,
+    v: Velocity,
 }
 
 impl SlalomTrajectory {
     pub fn new(
-        angle_calculator: OverallCalculator<Angle>,
+        angle_calculator: AngleOverallCalculator,
         t_end: Time,
         period: Time,
-        x_start: Distance,
-        y_start: Distance,
-        v: Speed,
+        x_start: Length,
+        y_start: Length,
+        v: Velocity,
     ) -> Self {
         Self {
             angle_calculator,
@@ -104,8 +103,9 @@ impl Iterator for SlalomTrajectory {
         let mut sin_theta = [0.0; 3];
         let mut cos_theta = [0.0; 3];
         for i in 0..3 {
-            sin_theta[i] = sinf(targets[i].x.as_radian());
-            cos_theta[i] = cosf(targets[i].x.as_radian());
+            let (sin, cos) = targets[i].x.sincos();
+            sin_theta[i] = sin;
+            cos_theta[i] = cos;
         }
 
         let x = self.x;
@@ -126,13 +126,13 @@ impl Iterator for SlalomTrajectory {
         let jy = self.v * (-sin_theta * target.v * target.v + cos_theta * target.a);
 
         Some(Target {
-            x: SubTarget {
+            x: LengthTarget {
                 x,
                 v: vx,
                 a: ax,
                 j: jx,
             },
-            y: SubTarget {
+            y: LengthTarget {
                 x: y,
                 v: vy,
                 a: ay,
@@ -146,8 +146,12 @@ impl Iterator for SlalomTrajectory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::quantities::{
+        cubed_frequency::radian_per_second_cubed, dimensionless::degree,
+        frequency::radian_per_second, length::meter, squared_frequency::radian_per_second_squared,
+        time::second, velocity::meter_per_second,
+    };
     use proptest::prelude::*;
-    use quantities::Quantity;
 
     const EPSILON: f32 = 1e-4;
 
@@ -163,19 +167,19 @@ mod tests {
         theta: f32,
         theta_dist: f32,
     ) -> SlalomTrajectory {
-        let dtheta = AngularSpeed::from_radian_per_second(tv);
-        let ddtheta = AngularAcceleration::from_radian_per_second_squared(ta);
-        let dddtheta = AngularJerk::from_radian_per_second_cubed(tj);
-        let v_ref = Speed::from_meter_per_second(v_ref);
-        let period = Time::from_seconds(period);
+        let dtheta = AngularVelocity::new::<radian_per_second>(tv);
+        let ddtheta = AngularAcceleration::new::<radian_per_second_squared>(ta);
+        let dddtheta = AngularJerk::new::<radian_per_second_cubed>(tj);
+        let v_ref = Velocity::new::<meter_per_second>(v_ref);
+        let period = Time::new::<second>(period);
 
         let generator = SlalomGenerator::new(dtheta, ddtheta, dddtheta, v_ref, period);
-        let v_target = Speed::from_meter_per_second(v_target);
+        let v_target = Velocity::new::<meter_per_second>(v_target);
         generator.generate(
-            Distance::from_meters(x),
-            Distance::from_meters(y),
-            Angle::from_degree(theta),
-            Angle::from_degree(theta_dist),
+            Length::new::<meter>(x),
+            Length::new::<meter>(y),
+            Angle::new::<degree>(theta),
+            Angle::new::<degree>(theta_dist),
             v_target,
         )
     }
@@ -198,7 +202,7 @@ mod tests {
             let trajectory = get_trajectory(tv,ta,tj,v_ref,period,v_target,x,y,theta,theta_dist);
             for target in trajectory {
                 let v = target.x.v * target.theta.x.cos() + target.y.v * target.theta.x.sin();
-                prop_assert!((v.abs().as_meter_per_second() - v_target).abs() < EPSILON);
+                prop_assert!((v.abs().get::<meter_per_second>() - v_target).abs() < EPSILON);
             }
         }
     }

@@ -17,7 +17,7 @@ libm = "0.2.1"
 [dependencies.uom]
 version = "0.29.0"
 default-features = false
-features = ["f32"]
+features = ["f32", "si", "autoconvert"]
 
 [dependencies.num]
 version = "0.2"
@@ -26,10 +26,6 @@ default-features = false
 [dependencies.heap]
 version = "0.1.0"
 git = "https://github.com/ikazuya0201/heap"
-
-[dependencies.quantities]
-version = "0.1.1"
-git = "https://github.com/ikazuya0201/quantities"
 
 [dev-dependencies]
 approx = "0.3.2"
