@@ -68,18 +68,18 @@ mod sensors {
     }
 
     pub struct Imu {
-        accelerations: [Acceleration; 3],
-        angular_velocitys: [AngularVelocity; 3],
+        translational_acceleration: Acceleration,
+        angular_velocity: AngularVelocity,
     }
 
     impl Imu {
         pub fn new(
-            accelerations: [Acceleration; 3],
-            angular_velocitys: [AngularVelocity; 3],
+            translational_acceleration: Acceleration,
+            angular_velocity: AngularVelocity,
         ) -> Self {
             Self {
-                accelerations,
-                angular_velocitys,
+                translational_acceleration,
+                angular_velocity,
             }
         }
     }
@@ -87,24 +87,12 @@ mod sensors {
     impl IMU for Imu {
         type Error = ();
 
-        fn get_acceleration_x(&mut self) -> nb::Result<Acceleration, Self::Error> {
-            Ok(self.accelerations[0])
-        }
-        fn get_acceleration_y(&mut self) -> nb::Result<Acceleration, Self::Error> {
-            Ok(self.accelerations[1])
-        }
-        fn get_acceleration_z(&mut self) -> nb::Result<Acceleration, Self::Error> {
-            Ok(self.accelerations[2])
+        fn get_translational_acceleration(&mut self) -> nb::Result<Acceleration, Self::Error> {
+            Ok(self.translational_acceleration)
         }
 
-        fn get_angular_velocity_x(&mut self) -> nb::Result<AngularVelocity, Self::Error> {
-            Ok(self.angular_velocitys[0])
-        }
-        fn get_angular_velocity_y(&mut self) -> nb::Result<AngularVelocity, Self::Error> {
-            Ok(self.angular_velocitys[1])
-        }
-        fn get_angular_velocity_z(&mut self) -> nb::Result<AngularVelocity, Self::Error> {
-            Ok(self.angular_velocitys[2])
+        fn get_angular_velocity(&mut self) -> nb::Result<AngularVelocity, Self::Error> {
+            Ok(self.angular_velocity)
         }
     }
 }
@@ -121,6 +109,7 @@ use components::{
         TranslationControllerBuilder,
     },
     prelude::*,
+    traits::Math,
 };
 use criterion::*;
 use generic_array::arr;
@@ -143,6 +132,35 @@ use uom::si::{
 };
 
 use sensors::{IDistanceSensor, IEncoder, IMotor, Imu};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MathFake;
+
+impl Math for MathFake {
+    fn sqrtf(val: f32) -> f32 {
+        val.sqrt()
+    }
+
+    fn sinf(val: f32) -> f32 {
+        val.sin()
+    }
+
+    fn cosf(val: f32) -> f32 {
+        val.cos()
+    }
+
+    fn expf(val: f32) -> f32 {
+        val.exp()
+    }
+
+    fn atan2f(x: f32, y: f32) -> f32 {
+        x.atan2(y)
+    }
+
+    fn rem_euclidf(lhs: f32, rhs: f32) -> f32 {
+        lhs.rem_euclid(rhs)
+    }
+}
 
 type MazeWidth = U4;
 type MaxSize = op!(U16 * MazeWidth * MazeWidth);
@@ -195,6 +213,7 @@ fn create_search_operator() -> DefaultSearchOperator<
     MaxSize,
     GoalSize,
     NullLogger,
+    MathFake,
 > {
     let period = Time::new::<second>(0.001);
 
@@ -306,7 +325,7 @@ fn create_search_operator() -> DefaultSearchOperator<
         MazeBuilder::new()
             .costs(costs as fn(Pattern) -> u16)
             .wall_existence_probability_threshold(0.3)
-            .build::<MazeWidth>(),
+            .build::<MazeWidth, MathFake>(),
     );
 
     let solver = Rc::new(DefaultSolver::<MazeWidth, MaxSize, GoalSize>::new(
