@@ -1,20 +1,23 @@
+use core::marker::PhantomData;
+
 use super::straight_generator::{AngleOverallCalculator, AngleStraightCalculatorGenerator};
 use super::trajectory::{LengthTarget, Target};
+use crate::traits::Math;
 use uom::si::{
-    angle::radian,
     f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Length, Time, Velocity},
     ratio::ratio,
 };
 
-pub struct SlalomGenerator {
+pub struct SlalomGenerator<M> {
     dtheta: AngularVelocity,
     ddtheta: AngularAcceleration,
     dddtheta: AngularJerk,
     v_ref: Velocity,
     period: Time,
+    _phantom: PhantomData<fn() -> M>,
 }
 
-impl SlalomGenerator {
+impl<M> SlalomGenerator<M> {
     pub fn new(
         dtheta: AngularVelocity,
         ddtheta: AngularAcceleration,
@@ -28,9 +31,15 @@ impl SlalomGenerator {
             dddtheta,
             v_ref,
             period,
+            _phantom: PhantomData,
         }
     }
+}
 
+impl<M> SlalomGenerator<M>
+where
+    M: Math,
+{
     pub fn generate(
         &self,
         x: Length,
@@ -38,9 +47,9 @@ impl SlalomGenerator {
         theta: Angle,
         theta_distance: Angle,
         v: Velocity,
-    ) -> SlalomTrajectory {
+    ) -> SlalomTrajectory<M> {
         let k = (v / self.v_ref).get::<ratio>();
-        let angle_generator = AngleStraightCalculatorGenerator::new(
+        let angle_generator = AngleStraightCalculatorGenerator::<M>::new(
             k * self.dtheta,
             k * k * self.ddtheta,
             k * k * k * self.dddtheta,
@@ -56,7 +65,7 @@ impl SlalomGenerator {
 }
 
 #[derive(Clone)]
-pub struct SlalomTrajectory {
+pub struct SlalomTrajectory<M> {
     angle_calculator: AngleOverallCalculator,
     t: Time,
     t_end: Time,
@@ -64,9 +73,10 @@ pub struct SlalomTrajectory {
     x: Length,
     y: Length,
     v: Velocity,
+    _phantom: PhantomData<fn() -> M>,
 }
 
-impl SlalomTrajectory {
+impl<M> SlalomTrajectory<M> {
     pub fn new(
         angle_calculator: AngleOverallCalculator,
         t_end: Time,
@@ -83,11 +93,12 @@ impl SlalomTrajectory {
             x: x_start,
             y: y_start,
             v,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl Iterator for SlalomTrajectory {
+impl<M: Math> Iterator for SlalomTrajectory<M> {
     type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -105,7 +116,7 @@ impl Iterator for SlalomTrajectory {
         let mut sin_theta = [0.0; 3];
         let mut cos_theta = [0.0; 3];
         for i in 0..3 {
-            let (sin, cos) = libm::sincosf(targets[i].x.get::<radian>());
+            let (sin, cos) = M::sincos(targets[i].x);
             sin_theta[i] = sin;
             cos_theta[i] = cos;
         }
@@ -150,11 +161,16 @@ impl Iterator for SlalomTrajectory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::math::MathFake;
     use proptest::prelude::*;
     use uom::si::{
-        angle::degree, angular_acceleration::radian_per_second_squared,
-        angular_jerk::radian_per_second_cubed, angular_velocity::radian_per_second, length::meter,
-        time::second, velocity::meter_per_second,
+        angle::{degree, radian},
+        angular_acceleration::radian_per_second_squared,
+        angular_jerk::radian_per_second_cubed,
+        angular_velocity::radian_per_second,
+        length::meter,
+        time::second,
+        velocity::meter_per_second,
     };
 
     const EPSILON: f32 = 1e-4;
@@ -170,7 +186,7 @@ mod tests {
         y: f32,
         theta: f32,
         theta_dist: f32,
-    ) -> SlalomTrajectory {
+    ) -> SlalomTrajectory<MathFake> {
         let dtheta = AngularVelocity::new::<radian_per_second>(tv);
         let ddtheta = AngularAcceleration::new::<radian_per_second_squared>(ta);
         let dddtheta = AngularJerk::new::<radian_per_second_cubed>(tj);

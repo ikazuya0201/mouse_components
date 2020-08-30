@@ -10,12 +10,13 @@ use auto_enums::auto_enum;
 use super::agent;
 use crate::agent::pose::Pose;
 use crate::maze::RelativeDirection;
+use crate::traits::Math;
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use spin_generator::{SpinGenerator, SpinTrajectory};
 use straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 pub use trajectory::{AngleTarget, LengthTarget, Target};
 use uom::si::{
-    angle::{degree, radian},
+    angle::degree,
     f32::{
         Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
         Velocity,
@@ -30,22 +31,25 @@ enum Kind {
 
 pub type BackTrajectory = Chain<Chain<StraightTrajectory, SpinTrajectory>, StraightTrajectory>;
 
-pub struct TrajectoryGenerator {
-    straight_generator: StraightTrajectoryGenerator,
+pub struct TrajectoryGenerator<M> {
+    straight_generator: StraightTrajectoryGenerator<M>,
 
     #[allow(unused)]
-    slalom_generator: SlalomGenerator,
+    slalom_generator: SlalomGenerator<M>,
     #[allow(unused)]
-    spin_generator: SpinGenerator,
+    spin_generator: SpinGenerator<M>,
 
     search_velocity: Velocity,
     front_trajectory: StraightTrajectory,
-    right_trajectory: SlalomTrajectory,
-    left_trajectory: SlalomTrajectory,
+    right_trajectory: SlalomTrajectory<M>,
+    left_trajectory: SlalomTrajectory<M>,
     back_trajectory: BackTrajectory,
 }
 
-impl agent::TrajectoryGenerator<Pose, Target, RelativeDirection> for TrajectoryGenerator {
+impl<M> agent::TrajectoryGenerator<Pose, Target, RelativeDirection> for TrajectoryGenerator<M>
+where
+    M: Math + Clone,
+{
     type Trajectory = impl Iterator<Item = Target>;
 
     fn generate_search_init(&self, pose: Pose) -> Self::Trajectory {
@@ -57,10 +61,12 @@ impl agent::TrajectoryGenerator<Pose, Target, RelativeDirection> for TrajectoryG
     }
 }
 
-impl TrajectoryGenerator {
+impl<M> TrajectoryGenerator<M>
+where
+    M: Math + Clone,
+{
     fn get_shift(pose: Pose) -> impl Fn(Target) -> Target {
-        let cos_th = libm::cosf(pose.theta.get::<radian>());
-        let sin_th = libm::sinf(pose.theta.get::<radian>());
+        let (sin_th, cos_th) = M::sincos(pose.theta);
 
         move |target: Target| Target {
             x: LengthTarget {
@@ -94,8 +100,9 @@ impl TrajectoryGenerator {
         match kind {
             Init => {
                 let distance = Length::new::<meter>(0.045);
-                let x_end = pose.x + distance * libm::cosf(pose.theta.get::<radian>());
-                let y_end = pose.y + distance * libm::sinf(pose.theta.get::<radian>());
+                let (sin_th, cos_th) = M::sincos(pose.theta);
+                let x_end = pose.x + distance * cos_th;
+                let y_end = pose.y + distance * sin_th;
                 self.straight_generator.generate(
                     pose.x,
                     pose.y,
@@ -184,7 +191,7 @@ impl
         Velocity,
     >
 {
-    pub fn build(self) -> TrajectoryGenerator {
+    pub fn build<M: Math>(self) -> TrajectoryGenerator<M> {
         let straight_generator = StraightTrajectoryGenerator::new(
             self.max_velocity,
             self.max_acceleration,
@@ -222,8 +229,8 @@ impl
         );
         let front_trajectory = {
             let distance = Length::new::<meter>(0.09); //TODO: use configurable value
-            let x_end = pose.x + distance * libm::cosf(pose.theta.get::<radian>());
-            let y_end = pose.y + distance * libm::sinf(pose.theta.get::<radian>());
+            let x_end = pose.x + distance * M::cos(pose.theta);
+            let y_end = pose.y + distance * M::sin(pose.theta);
             straight_generator.generate(
                 pose.x,
                 pose.y,
@@ -235,8 +242,8 @@ impl
         };
         let back_trajectory = {
             let distance = Length::new::<meter>(0.045); //TODO: use configurable value
-            let x_end = pose.x + distance * libm::cosf(pose.theta.get::<radian>());
-            let y_end = pose.y + distance * libm::sinf(pose.theta.get::<radian>());
+            let x_end = pose.x + distance * M::cos(pose.theta);
+            let y_end = pose.y + distance * M::sin(pose.theta);
             straight_generator
                 .generate(
                     pose.x,
@@ -444,9 +451,11 @@ impl<TV, TA, TJ, VR, V, A, J, T> TrajectoryGeneratorBuilder<TV, TA, TJ, VR, V, A
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::math::MathFake;
     use approx::assert_relative_eq;
     use uom::si::{
         acceleration::meter_per_second_squared,
+        angle::radian,
         angular_acceleration::{degree_per_second_squared, radian_per_second_squared},
         angular_jerk::{degree_per_second_cubed, radian_per_second_cubed},
         angular_velocity::{degree_per_second, radian_per_second},
@@ -455,7 +464,7 @@ mod tests {
         velocity::meter_per_second,
     };
 
-    fn build_generator() -> TrajectoryGenerator {
+    fn build_generator() -> TrajectoryGenerator<MathFake> {
         TrajectoryGeneratorBuilder::new()
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
@@ -501,7 +510,7 @@ mod tests {
                             36.0 * PI,
                         ))
                         .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
-                        .build();
+                        .build::<MathFake>();
 
                     let (direction, last_x, last_y, last_theta) = $value;
 

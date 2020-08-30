@@ -25,6 +25,7 @@ pub mod traits {
     };
     pub use agent::{ObstacleDetector, StateEstimator, Tracker, TrajectoryGenerator};
     pub use tracker::{Logger, RotationController, TranslationController};
+    pub use utils::math::Math;
 }
 
 pub mod sensors {
@@ -70,8 +71,8 @@ pub mod impls {
 pub mod defaults {
     use super::{data_types::*, impls::*};
 
-    pub type DefaultTracker<LeftMotor, RightMotor, Logger> =
-        Tracker<LeftMotor, RightMotor, TranslationController, RotationController, Logger>;
+    pub type DefaultTracker<LeftMotor, RightMotor, Logger, Math> =
+        Tracker<LeftMotor, RightMotor, TranslationController, RotationController, Logger, Math>;
 
     pub type DefaultAgent<
         LeftMotor,
@@ -82,6 +83,7 @@ pub mod defaults {
         DistanceSensor,
         DistanceSensorNum,
         Logger,
+        Math,
     > = Agent<
         State,
         Target,
@@ -89,12 +91,12 @@ pub mod defaults {
         Obstacle,
         RelativeDirection,
         ObstacleDetector<DistanceSensor, DistanceSensorNum>,
-        Estimator<LeftEncoder, RightEncoder, Imu>,
-        DefaultTracker<LeftMotor, RightMotor, Logger>,
-        TrajectoryGenerator,
+        Estimator<LeftEncoder, RightEncoder, Imu, Math>,
+        DefaultTracker<LeftMotor, RightMotor, Logger, Math>,
+        TrajectoryGenerator<Math>,
     >;
 
-    pub type DefaultMaze<MazeWidth> = Maze<MazeWidth, fn(Pattern) -> u16>;
+    pub type DefaultMaze<MazeWidth, Math> = Maze<MazeWidth, fn(Pattern) -> u16, Math>;
 
     pub type DefaultSolver<MazeWidth, MaxSize, GoalSize> =
         Solver<NodeId<MazeWidth>, SearchNodeId<MazeWidth>, MaxSize, GoalSize>;
@@ -111,6 +113,7 @@ pub mod defaults {
         MaxSize,
         GoalSize,
         Logger,
+        Math,
     > = SearchOperator<
         NodeId<MazeWidth>,
         SearchNodeId<MazeWidth>,
@@ -118,7 +121,7 @@ pub mod defaults {
         RelativeDirection,
         Obstacle,
         Pose,
-        DefaultMaze<MazeWidth>,
+        DefaultMaze<MazeWidth, Math>,
         DefaultAgent<
             LeftMotor,
             RightMotor,
@@ -128,6 +131,7 @@ pub mod defaults {
             DistanceSensor,
             DistanceSensorNum,
             Logger,
+            Math,
         >,
         DefaultSolver<MazeWidth, MaxSize, GoalSize>,
     >;

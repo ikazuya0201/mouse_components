@@ -1,14 +1,17 @@
+use core::marker::PhantomData;
+
 use generic_array::GenericArray;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
-
-use super::{AbsoluteDirection, SearchNodeId, WallDirection, WallPosition};
-use crate::agent::Pose;
-use crate::utils::total::Total;
 use uom::si::{
-    angle::{degree, radian, revolution},
+    angle::{degree, revolution},
     f32::{Angle, Length},
     length::meter,
 };
+
+use super::{AbsoluteDirection, SearchNodeId, WallDirection, WallPosition};
+use crate::agent::Pose;
+use crate::traits::Math;
+use crate::utils::total::Total;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WallInfo<N>
@@ -23,16 +26,17 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OutOfBoundError;
 
-pub struct PoseConverter {
+pub struct PoseConverter<M> {
     i_square_width: i32, //[mm]
     square_width_half: Length,
     p1: Length,
     p2: Length,
     n1: Length,
     n2: Length,
+    _phantom: PhantomData<fn() -> M>,
 }
 
-impl PoseConverter {
+impl<M> PoseConverter<M> {
     pub fn new(square_width: Length, wall_width: Length) -> Self {
         let p1 = square_width - wall_width / 2.0;
         let p2 = p1 + square_width;
@@ -45,6 +49,7 @@ impl PoseConverter {
             p2,
             n1,
             n2,
+            _phantom: PhantomData,
         }
     }
 
@@ -55,6 +60,34 @@ impl PoseConverter {
         (rem, quo)
     }
 
+    pub fn convert_node<N>(&self, node: SearchNodeId<N>) -> Pose
+    where
+        N: Unsigned + PowerOfTwo,
+    {
+        use AbsoluteDirection::*;
+
+        let node = node.as_node();
+        let x = node.x();
+        let y = node.y();
+        let direction = node.direction();
+        Pose {
+            x: (x + 1) as f32 * self.square_width_half,
+            y: (y + 1) as f32 * self.square_width_half,
+            theta: match direction {
+                East => Angle::new::<degree>(0.0),
+                North => Angle::new::<degree>(90.0),
+                West => Angle::new::<degree>(180.0),
+                South => Angle::new::<degree>(270.0),
+                _ => unreachable!(),
+            },
+        }
+    }
+}
+
+impl<M> PoseConverter<M>
+where
+    M: Math,
+{
     pub fn convert<N>(&self, pose: Pose) -> Result<WallInfo<N>, OutOfBoundError>
     where
         N: Unsigned + PowerOfTwo,
@@ -82,7 +115,7 @@ impl PoseConverter {
             return Err(OutOfBoundError);
         }
 
-        let rot = libm::fmodf(pose.theta.get::<revolution>(), 1.0);
+        let rot = M::rem_euclidf(pose.theta.get::<revolution>(), 1.0);
 
         let axes = if rot < 0.25 {
             [
@@ -114,7 +147,7 @@ impl PoseConverter {
             ]
         };
 
-        let (sin_th, cos_th) = libm::sincosf(pose.theta.get::<radian>());
+        let (sin_th, cos_th) = M::sincos(pose.theta);
 
         let mut axes_distance = axes
             .iter()
@@ -172,29 +205,6 @@ impl PoseConverter {
             Err(OutOfBoundError)
         }
     }
-
-    pub fn convert_node<N>(&self, node: SearchNodeId<N>) -> Pose
-    where
-        N: Unsigned + PowerOfTwo,
-    {
-        use AbsoluteDirection::*;
-
-        let node = node.as_node();
-        let x = node.x();
-        let y = node.y();
-        let direction = node.direction();
-        Pose {
-            x: (x + 1) as f32 * self.square_width_half,
-            y: (y + 1) as f32 * self.square_width_half,
-            theta: match direction {
-                East => Angle::new::<degree>(0.0),
-                North => Angle::new::<degree>(90.0),
-                West => Angle::new::<degree>(180.0),
-                South => Angle::new::<degree>(270.0),
-                _ => unreachable!(),
-            },
-        }
-    }
 }
 
 #[cfg(test)]
@@ -202,6 +212,7 @@ mod tests {
     use approx::assert_relative_eq;
 
     use super::*;
+    use crate::utils::math::MathFake;
     use WallDirection::*;
 
     macro_rules! convert_ok_tests {
@@ -221,7 +232,7 @@ mod tests {
                         not_existing_distance: Length::new::<meter>(expected.4),
                     };
 
-                    let converter = PoseConverter::new(Length::new::<meter>(0.09), Length::new::<meter>(0.006));
+                    let converter = PoseConverter::<MathFake>::new(Length::new::<meter>(0.09), Length::new::<meter>(0.006));
                     let info = converter.convert::<$size>(input).unwrap();
                     assert_eq!(info.position, expected.position);
                     assert_relative_eq!(info.existing_distance.get::<meter>(), expected.existing_distance.get::<meter>());
@@ -243,7 +254,7 @@ mod tests {
                         theta: Angle::new::<degree>(input.2),
                     };
 
-                    let converter = PoseConverter::new(Length::new::<meter>(0.09), Length::new::<meter>(0.006));
+                    let converter = PoseConverter::<MathFake>::new(Length::new::<meter>(0.09), Length::new::<meter>(0.006));
                     assert!(converter.convert::<$size>(input).is_err());
                 }
             )*

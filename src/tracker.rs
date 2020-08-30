@@ -3,22 +3,22 @@ mod state;
 
 use core::marker::PhantomData;
 
-use super::agent;
-use super::trajectory_generator::Target;
-pub use motor::Motor;
-pub use state::{AngleState, LengthState, State};
 use uom::si::{
     angle::radian,
-    angular_velocity::radian_per_second,
     f32::{
         Acceleration, AngularAcceleration, AngularVelocity, ElectricPotential, Frequency, Length,
         Time, Velocity,
     },
     frequency::hertz,
-    length::meter,
     Quantity, ISQ, SI,
 };
 use uom::{typenum::*, Kind};
+
+use super::agent;
+use super::trajectory_generator::Target;
+use crate::traits::Math;
+pub use motor::Motor;
+pub use state::{AngleState, LengthState, State};
 
 type GainType = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 type BType = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
@@ -45,7 +45,7 @@ impl Logger for NullLogger {
     fn log(&self, _state: &State, _target: &Target) {}
 }
 
-pub struct Tracker<LM, RM, TC, RC, L> {
+pub struct Tracker<LM, RM, TC, RC, L, M> {
     kx: GainType,
     kdx: Frequency,
     ky: GainType,
@@ -62,15 +62,17 @@ pub struct Tracker<LM, RM, TC, RC, L> {
     logger: L,
     zeta: f32,
     b: BType,
+    _phantom: PhantomData<fn() -> M>,
 }
 
-impl<LM, RM, TC, RC, L> agent::Tracker<State, Target> for Tracker<LM, RM, TC, RC, L>
+impl<LM, RM, TC, RC, L, M> agent::Tracker<State, Target> for Tracker<LM, RM, TC, RC, L, M>
 where
     LM: Motor,
     RM: Motor,
     TC: TranslationController,
     RC: RotationController,
     L: Logger,
+    M: Math,
 {
     fn stop(&mut self)
     where
@@ -95,13 +97,14 @@ where
     }
 }
 
-impl<LM, RM, TC, RC, L> Tracker<LM, RM, TC, RC, L>
+impl<LM, RM, TC, RC, L, M> Tracker<LM, RM, TC, RC, L, M>
 where
     LM: Motor,
     RM: Motor,
     TC: TranslationController,
     RC: RotationController,
     L: Logger,
+    M: Math,
 {
     fn sinc(x: f32) -> f32 {
         let xx = x * x;
@@ -112,10 +115,10 @@ where
     fn fail_safe(&mut self, state: &State, target: &Target) {
         use agent::Tracker;
 
-        let x_diff = (state.x.x - target.x.x).get::<meter>();
-        let y_diff = (state.y.x - target.y.x).get::<meter>();
+        let x_diff = state.x.x - target.x.x;
+        let y_diff = state.y.x - target.y.x;
 
-        let distance = Length::new::<meter>(libm::sqrtf(x_diff * x_diff + y_diff * y_diff));
+        let distance = M::sqrt(x_diff * x_diff + y_diff * y_diff);
         if distance >= self.fail_safe_distance {
             self.stop();
             panic!("state: {:?}, target: {:?}", state, target);
@@ -129,7 +132,7 @@ where
     ) -> (ElectricPotential, ElectricPotential) {
         self.fail_safe(&state, &target);
 
-        let (sin_th, cos_th) = libm::sincosf(state.theta.x.get::<radian>());
+        let (sin_th, cos_th) = M::sincos(state.theta.x);
 
         let vv = state.x.v * cos_th + state.y.v * sin_th;
         let va = state.x.a * cos_th + state.y.a * sin_th;
@@ -154,20 +157,16 @@ where
             );
             (uv, uw, duv, duw)
         } else {
-            let (sin_th_r, cos_th_r) = libm::sincosf(target.theta.x.get::<radian>());
+            let (sin_th_r, cos_th_r) = M::sincos(target.theta.x);
             let theta_d = target.theta.x - state.theta.x;
-            let cos_th_d = libm::cosf(theta_d.get::<radian>());
+            let cos_th_d = M::cos(theta_d);
             let xd = target.x.x - state.x.x;
             let yd = target.y.x - state.y.x;
 
             let vr = target.x.v * cos_th_r + target.y.v * sin_th_r;
             let wr = target.theta.v;
 
-            let k1 = 2.0
-                * self.zeta
-                * AngularVelocity::new::<radian_per_second>(libm::sqrtf(
-                    (wr * wr + self.b * vr * vr).value,
-                ));
+            let k1 = 2.0 * self.zeta * AngularVelocity::from(M::sqrt(wr * wr + self.b * vr * vr));
             let k2 = self.b;
             let k3 = k1;
 
@@ -264,7 +263,10 @@ where
     RC: RotationController,
     L: Logger,
 {
-    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
+    pub fn build<M>(self) -> Tracker<LM, RM, TC, RC, L, M>
+    where
+        M: Math,
+    {
         Tracker {
             kx: self.kx,
             kdx: self.kdx,
@@ -281,6 +283,7 @@ where
             logger: self.logger,
             zeta: self.zeta,
             b: self.b,
+            _phantom: PhantomData,
         }
     }
 }
@@ -310,7 +313,10 @@ where
     RC: RotationController,
     L: Logger,
 {
-    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
+    pub fn build<M>(self) -> Tracker<LM, RM, TC, RC, L, M>
+    where
+        M: Math,
+    {
         Tracker {
             kx: self.kx,
             kdx: self.kdx,
@@ -327,6 +333,7 @@ where
             logger: self.logger,
             zeta: self.zeta,
             b: self.b,
+            _phantom: PhantomData,
         }
     }
 }
@@ -355,7 +362,10 @@ where
     TC: TranslationController,
     RC: RotationController,
 {
-    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
+    pub fn build<M>(self) -> Tracker<LM, RM, TC, RC, L, M>
+    where
+        M: Math,
+    {
         Tracker {
             kx: self.kx,
             kdx: self.kdx,
@@ -372,6 +382,7 @@ where
             logger: self.logger,
             zeta: self.zeta,
             b: self.b,
+            _phantom: PhantomData,
         }
     }
 }
@@ -401,7 +412,10 @@ where
     RC: RotationController,
     L: Logger,
 {
-    pub fn build(self) -> Tracker<LM, RM, TC, RC, L> {
+    pub fn build<M>(self) -> Tracker<LM, RM, TC, RC, L, M>
+    where
+        M: Math,
+    {
         Tracker {
             kx: self.kx,
             kdx: self.kdx,
@@ -418,6 +432,7 @@ where
             logger: self.logger,
             zeta: self.zeta,
             b: self.b,
+            _phantom: PhantomData,
         }
     }
 }
@@ -854,7 +869,10 @@ impl<KX, KDX, KY, KDY, XIT, TC, RC, LM, RM, P, XI, FS, L, Z>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uom::si::{electric_potential::volt, time::second, velocity::meter_per_second};
+    use crate::utils::math::MathFake;
+    use uom::si::{
+        electric_potential::volt, length::meter, time::second, velocity::meter_per_second,
+    };
 
     struct IMotor;
 
@@ -895,7 +913,7 @@ mod tests {
 
     fn build_tracker<L>(
         logger: L,
-    ) -> Tracker<IMotor, IMotor, ITranslationController, IRotationController, L>
+    ) -> Tracker<IMotor, IMotor, ITranslationController, IRotationController, L, MathFake>
     where
         L: Logger,
     {
