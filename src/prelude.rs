@@ -19,3 +19,5 @@ pub use crate::sensors::DistanceSensor as _components_sensors_DistanceSensor;
 pub use crate::sensors::Encoder as _components_sensors_Encoder;
 pub use crate::sensors::Motor as _components_sensors_Motor;
 pub use crate::sensors::IMU as _components_sensors_IMU;
+
+pub use crate::utils::math::Math as _utils_math_Math;
