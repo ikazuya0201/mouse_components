@@ -272,81 +272,105 @@ where
     fn track_next(&self) {}
 }
 
-#[test]
-fn test_search() -> std::io::Result<()> {
-    use generic_array::arr;
-    use std::fs;
+macro_rules! search_tests {
+    ($($name: ident: ($size: ty, $goal: ty, $value: expr),)*) => {
+        $(
+            #[ignore]
+            #[test]
+            fn $name() -> std::io::Result<()> {
+                use generic_array::GenericArray;
+                use std::fs;
+                use AbsoluteDirection::*;
 
-    let root = env!("CARGO_MANIFEST_DIR").to_string();
-    let file_name = root + "/mazes/maze1.dat";
-    let start = NodeId::new(0, 0, AbsoluteDirection::North).unwrap();
-    let goals = arr![
-        NodeId<U4>;
-        NodeId::new(2, 0, AbsoluteDirection::South).unwrap(),
-        NodeId::new(2, 0, AbsoluteDirection::West).unwrap(),
-    ];
+                let (goals, filename) = $value;
+                let root = env!("CARGO_MANIFEST_DIR").to_string();
+                let file_name = root + "/mazes/" + filename;
+                let start = NodeId::new(0, 0, North).unwrap();
+                let goals = goals.into_iter()
+                    .map(|goal| NodeId::new(goal.0, goal.1, goal.2).unwrap())
+                    .collect::<GenericArray<NodeId<$size>, $goal>>();
 
-    let square_width = Length::new::<meter>(0.09);
-    let wall_width = Length::new::<meter>(0.006);
+                let square_width = Length::new::<meter>(0.09);
+                let wall_width = Length::new::<meter>(0.006);
 
-    let contents = fs::read_to_string(file_name)?;
-    let agent_maze = Rc::new(
-        MazeBuilder::new()
-            .costs(cost)
-            .init_with(&contents)
-            .square_width(square_width)
-            .wall_width(wall_width)
-            .build::<U4, MathFake>(),
-    );
+                let contents = fs::read_to_string(file_name)?;
+                let agent_maze = Rc::new(
+                    MazeBuilder::new()
+                        .costs(cost)
+                        .init_with(&contents)
+                        .square_width(square_width)
+                        .wall_width(wall_width)
+                        .build::<$size, MathFake>(),
+                );
 
-    let start_search_node = SearchNodeId::new(0, 1, AbsoluteDirection::North).unwrap();
-    let agent = Rc::new(AgentMock::new(
-        Rc::clone(&agent_maze),
-        start_search_node,
-        square_width,
-        wall_width,
-    ));
+                let start_search_node = SearchNodeId::new(0, 1, North).unwrap();
+                let agent = Rc::new(AgentMock::new(
+                    Rc::clone(&agent_maze),
+                    start_search_node,
+                    square_width,
+                    wall_width,
+                ));
 
-    let maze = Rc::new(
-        MazeBuilder::new()
-            .costs(cost)
-            .square_width(square_width)
-            .wall_width(wall_width)
-            .build::<U4, MathFake>(),
-    );
+                let maze = Rc::new(
+                    MazeBuilder::new()
+                        .costs(cost)
+                        .square_width(square_width)
+                        .wall_width(wall_width)
+                        .build::<$size, MathFake>(),
+                );
 
-    let solver = Rc::new(Solver::<NodeId<U4>, SearchNodeId<U4>, U256, _>::new(
-        start, goals,
-    ));
+                use std::ops::Mul;
+                type PathLen = <<$size as Mul<$size>>::Output as Mul<U16>>::Output;
+                let solver = Rc::new(Solver::<NodeId<$size>, SearchNodeId<$size>, PathLen, _>::new(
+                    start, goals,
+                ));
 
-    let start_pose = Pose {
-        x: Length::new::<meter>(0.045),
-        y: Length::new::<meter>(0.045),
-        theta: Angle::new::<degree>(90.0),
-    };
-    let operator = SearchOperator::<
-        NodeId<U4>,
-        SearchNodeId<U4>,
-        u16,
-        RelativeDirection,
-        Obstacle,
-        _,
-        _,
-        _,
-        _,
-    >::new(
-        start_pose,
-        start_search_node,
-        Rc::clone(&maze),
-        agent,
-        Rc::clone(&solver),
-    );
-    while operator.run().is_err() {
-        operator.tick();
+                let start_pose = Pose {
+                    x: Length::new::<meter>(0.045),
+                    y: Length::new::<meter>(0.045),
+                    theta: Angle::new::<degree>(90.0),
+                };
+                let operator = SearchOperator::<
+                    NodeId<$size>,
+                    SearchNodeId<$size>,
+                    u16,
+                    RelativeDirection,
+                    Obstacle,
+                    _,
+                    _,
+                    _,
+                    _,
+                >::new(
+                    start_pose,
+                    start_search_node,
+                    Rc::clone(&maze),
+                    agent,
+                    Rc::clone(&solver),
+                );
+                while operator.run().is_err() {
+                    operator.tick();
+                }
+                assert_eq!(
+                    solver.compute_shortest_path(agent_maze.as_ref()),
+                    solver.compute_shortest_path(maze.as_ref())
+                );
+                Ok(())
+            }
+        )*
     }
-    assert_eq!(
-        solver.compute_shortest_path(agent_maze.as_ref()),
-        solver.compute_shortest_path(maze.as_ref())
-    );
-    Ok(())
+}
+
+search_tests! {
+    test_search1: (U4, U2, (vec![(2,0,South), (2,0,West)], "maze1.dat")),
+    test_search2: (U16, U8, (vec![
+        (15, 14, NorthEast),
+        (15, 14, NorthWest),
+        (14, 15, NorthEast),
+        (14, 15, SouthEast),
+        (16, 15, NorthWest),
+        (16, 15, SouthWest),
+        (15, 16, SouthEast),
+        (15, 16, SouthWest),
+    ],
+    "maze2.dat")),
 }

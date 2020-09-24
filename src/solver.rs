@@ -71,7 +71,8 @@ where
         let mut dists = repeat_n(Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
         let mut heap = BinaryHeap::<SearchNode, Reverse<Cost>, Max>::new();
         for node in checker_nodes {
-            heap.push(node, Reverse(Cost::min_value())).unwrap();
+            heap.push_or_update(node, Reverse(Cost::min_value()))
+                .unwrap();
             dists[node.into()] = Cost::min_value();
         }
         while let Some((node, Reverse(cost))) = heap.pop() {

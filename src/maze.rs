@@ -605,7 +605,7 @@ where
         walls.push(relative_wall_position(1, 1)).unwrap();
         match src.difference(dst, NorthEast) {
             (1, 2, FrontLeft) => (),
-            (0, 2, Left) | (0, 2, BackLeft) => {
+            (0, 2, Left) | (-1, 2, BackLeft) => {
                 walls.push(relative_wall_position(0, 2)).unwrap();
             }
             (x, y, Front) if x == y => {
@@ -631,7 +631,7 @@ where
         walls.push(relative_wall_position(1, 1)).unwrap();
         match src.difference(dst, NorthEast) {
             (2, 1, FrontRight) => (),
-            (2, 0, Right) | (2, 0, BackRight) => {
+            (2, 0, Right) | (2, -1, BackRight) => {
                 walls.push(relative_wall_position(2, 0)).unwrap();
             }
             (x, y, Front) if x == y => {
