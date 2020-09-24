@@ -1428,102 +1428,115 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_convert_to_checker_nodes() {
-        use AbsoluteDirection::*;
+    macro_rules! convert_to_checker_nodes_tests {
+        ($($name: ident: $value: expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    use AbsoluteDirection::*;
+                    use WallDirection::*;
+                    use std::vec::Vec;
 
-        let new = |x, y, direction| NodeId::<U4>::new(x, y, direction).unwrap();
-        let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
-        let new_wall = |x, y, z| WallPosition::new(x, y, z).unwrap();
+                    let new = |x, y, direction| NodeId::<U4>::new(x, y, direction).unwrap();
+                    let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
+                    let new_wall = |x, y, z| WallPosition::new(x, y, z).unwrap();
 
-        let test_data = vec![
-            (
-                vec![
-                    new_wall(0, 0, WallDirection::Right),
-                    new_wall(0, 1, WallDirection::Right),
-                    new_wall(0, 2, WallDirection::Up),
-                    new_wall(1, 0, WallDirection::Up),
-                    new_wall(1, 1, WallDirection::Up),
-                    new_wall(1, 2, WallDirection::Right),
-                    new_wall(2, 1, WallDirection::Right),
-                    new_wall(2, 2, WallDirection::Up),
-                    new_wall(3, 1, WallDirection::Up),
-                ],
-                vec![
-                    new(0, 0, North),
-                    new(0, 2, North),
-                    new(1, 4, NorthEast),
-                    new(2, 5, NorthEast),
-                    new(4, 6, East),
-                    new(5, 4, SouthWest),
-                    new(4, 2, South),
-                    new(2, 0, West),
-                ],
-                vec![
-                    new_search(0, 1, North),
-                    new_search(0, 3, South),
-                    new_search(0, 3, North),
-                    new_search(1, 4, East),
-                    new_search(1, 4, West),
-                    new_search(2, 5, South),
-                    new_search(2, 5, North),
-                    new_search(1, 6, East),
-                    new_search(3, 6, East),
-                    new_search(3, 6, West),
-                    new_search(5, 6, East),
-                    new_search(5, 6, West),
-                    new_search(6, 5, South),
-                    new_search(6, 5, North),
-                    new_search(5, 4, East),
-                    new_search(5, 4, West),
-                    new_search(4, 3, North),
-                    new_search(4, 3, South),
-                    new_search(4, 1, North),
-                    new_search(4, 1, South),
-                    new_search(3, 2, East),
-                    new_search(5, 0, West),
-                    new_search(3, 0, East),
-                ],
-            ),
-            (
-                vec![new_wall(1, 2, WallDirection::Right)],
-                vec![
-                    new(0, 0, North),
-                    new(1, 2, NorthEast),
-                    new(2, 4, North),
-                    new(4, 4, South),
-                ],
-                vec![
-                    new_search(0, 1, North),
-                    new_search(0, 3, South),
-                    new_search(1, 2, West),
-                    new_search(1, 2, East),
-                    new_search(2, 1, North),
-                    new_search(3, 2, West),
-                    new_search(2, 3, South),
-                    new_search(2, 3, North),
-                    new_search(1, 4, East),
-                    new_search(2, 5, South),
-                    new_search(2, 5, North),
-                    new_search(1, 6, East),
-                    new_search(3, 6, West),
-                    new_search(3, 6, East),
-                    new_search(5, 6, West),
-                    new_search(4, 5, North),
-                ],
-            ),
-        ];
+                    let (walls, path, expected) = $value;
+                    let walls = walls.into_iter().map(|(x,y,z)| new_wall(x,y,z)).collect::<Vec<_>>();
+                    let path = path.into_iter().map(|(x,y,dir)| new(x,y,dir)).collect::<Vec<_>>();
+                    let mut expected = expected.into_iter().map(|(x,y,dir)| new_search(x,y,dir)).collect::<Vec<_>>();
 
-        for (walls, path, mut expected) in test_data {
-            let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
-            for wall in walls {
-                maze.check_wall(wall, true);
-            }
-            expected.sort();
-            let mut checker_nodes = maze.convert_to_checker_nodes(path);
-            checker_nodes.sort();
-            assert_eq!(checker_nodes, expected.as_slice());
+                    let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
+                    for wall in walls {
+                        maze.check_wall(wall, true);
+                    }
+                    expected.sort();
+                    let mut checker_nodes = maze.convert_to_checker_nodes(path);
+                    checker_nodes.sort();
+                    assert_eq!(checker_nodes, expected.as_slice());
+                }
+            )*
         }
+    }
+
+    convert_to_checker_nodes_tests! {
+        test_convert_to_checker_nodes1:
+            (
+                vec![
+                    (0, 0, Right),
+                    (0, 1, Right),
+                    (0, 2, Up),
+                    (1, 0, Up),
+                    (1, 1, Up),
+                    (1, 2, Right),
+                    (2, 1, Right),
+                    (2, 2, Up),
+                    (3, 1, Up),
+                ],
+                vec![
+                    (0, 0, North),
+                    (0, 2, North),
+                    (1, 4, NorthEast),
+                    (2, 5, NorthEast),
+                    (4, 6, East),
+                    (5, 4, SouthWest),
+                    (4, 2, South),
+                    (2, 0, West),
+                ],
+                vec![
+                    (0, 1, North),
+                    (0, 3, South),
+                    (0, 3, North),
+                    (1, 4, East),
+                    (1, 4, West),
+                    (2, 5, South),
+                    (2, 5, North),
+                    (1, 6, East),
+                    (3, 6, East),
+                    (3, 6, West),
+                    (5, 6, East),
+                    (5, 6, West),
+                    (6, 5, South),
+                    (6, 5, North),
+                    (5, 4, East),
+                    (5, 4, West),
+                    (4, 3, North),
+                    (4, 3, South),
+                    (4, 1, North),
+                    (4, 1, South),
+                    (3, 2, East),
+                    (5, 0, West),
+                    (3, 0, East),
+                ],
+            ),
+        test_convert_to_checker_nodes2:
+            (
+                vec![(1, 2, Right)],
+                vec![
+                    (0, 0, North),
+                    (1, 2, NorthEast),
+                    (2, 4, North),
+                    (4, 4, South),
+                ],
+                vec![
+                    (0, 1, North),
+                    (0, 3, South),
+                    (1, 2, West),
+                    (1, 2, East),
+                    (2, 1, North),
+                    (3, 2, West),
+                    (2, 3, South),
+                    (2, 3, North),
+                    (1, 4, East),
+                    (2, 5, South),
+                    (2, 5, North),
+                    (1, 6, East),
+                    (3, 6, West),
+                    (3, 6, East),
+                    (5, 6, West),
+                    (4, 5, North),
+                ],
+            ),
     }
 
     #[test]
