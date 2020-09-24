@@ -324,7 +324,6 @@ mod tests {
                         let vol =
                             controller.calculate(target_vel, target_accel, cur_vel, cur_accel);
                         let (vel, accel) = simulator.step(vol);
-                        dbg!(vel, accel);
                         cur_vel = vel;
                         cur_accel = accel;
                     }

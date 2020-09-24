@@ -1,12 +1,26 @@
 extern crate components;
 
-use heapless::consts::*;
+use core::cell::RefCell;
+use core::ops::Mul;
+use std::rc::Rc;
+
+use generic_array::ArrayLength;
+use typenum::{consts::*, PowerOfTwo, Unsigned};
+use uom::si::{
+    angle::degree,
+    f32::{Angle, Length},
+    length::meter,
+};
 
 use components::{
-    data_types::{AbsoluteDirection, NodeId, Pattern, SearchNodeId, WallDirection, WallPosition},
-    impls::{MazeBuilder, Solver},
+    data_types::{
+        AbsoluteDirection, NodeId, Obstacle, Pattern, Pose, Position, RelativeDirection,
+        SearchNodeId, WallDirection, WallPosition,
+    },
+    impls::{Maze, MazeBuilder, SearchOperator, Solver},
     prelude::*,
-    traits::Math,
+    traits::{Agent, Math},
+    utils::sample::Sample,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,71 +121,256 @@ fn test_compute_shortest_path_u4() {
     }
 }
 
-macro_rules! next_node_candidates_tests {
-    ($($name: ident: $value: expr,)*) => {
+struct AgentMock<N, F, M>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    F: Fn(Pattern) -> u16,
+{
+    maze: Rc<Maze<N, F, M>>,
+    current: RefCell<SearchNodeId<N>>,
+    square_width: Length,
+    wall_width: Length,
+}
+
+impl<N, F, M> AgentMock<N, F, M>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    F: Fn(Pattern) -> u16,
+{
+    fn new(
+        maze: Rc<Maze<N, F, M>>,
+        current: SearchNodeId<N>,
+        square_width: Length,
+        wall_width: Length,
+    ) -> Self {
+        Self {
+            maze,
+            current: RefCell::new(current),
+            square_width,
+            wall_width,
+        }
+    }
+
+    fn position_to_obstacle(&self, position: Position<N>) -> Obstacle {
+        let convert = |x: i16| (x + 1) as f32 * self.square_width / 2.0;
+        let pose = if position.x() % 2 == 0 {
+            Pose {
+                x: convert(position.x()),
+                y: convert(position.y() - 1),
+                theta: Angle::new::<degree>(90.0),
+            }
+        } else {
+            Pose {
+                x: convert(position.x() - 1),
+                y: convert(position.y()),
+                theta: Angle::new::<degree>(0.0),
+            }
+        };
+        let distance = if self.maze.is_wall_by_position(position) {
+            self.square_width / 2.0 - self.wall_width / 2.0
+        } else {
+            self.square_width * 3.0 / 2.0 - self.wall_width / 2.0
+        };
+        Obstacle {
+            source: pose,
+            distance: Sample {
+                mean: distance,
+                standard_deviation: Length::new::<meter>(0.001),
+            },
+        }
+    }
+
+    fn pose_to_node(&self, pose: Pose) -> SearchNodeId<N> {
+        let length_to_i16 = |length: Length| {
+            let ld = length - self.square_width / 2.0;
+            ((ld * 2.0 / self.square_width).value + 0.01) as i16
+        };
+        let x = length_to_i16(pose.x);
+        let y = length_to_i16(pose.y);
+
+        let dir = if pose.theta < Angle::new::<degree>(45.0) {
+            AbsoluteDirection::East
+        } else if pose.theta < Angle::new::<degree>(135.0) {
+            AbsoluteDirection::North
+        } else if pose.theta < Angle::new::<degree>(225.0) {
+            AbsoluteDirection::West
+        } else {
+            AbsoluteDirection::South
+        };
+        assert!(x >= 0);
+        assert!(y >= 0);
+        SearchNodeId::new(x as u16, y as u16, dir)
+            .unwrap_or_else(|| panic!("node out of bound: {:?}", (x, y, dir)))
+    }
+}
+
+impl<N, F, M> Agent<Obstacle, Pose, RelativeDirection> for AgentMock<N, F, M>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo + core::fmt::Debug,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    F: Fn(Pattern) -> u16,
+{
+    type Obstacles = Vec<Obstacle>;
+
+    fn init(&self, pose: Pose) {
+        self.current.replace(
+            self.pose_to_node(pose)
+                .as_node()
+                .to_search_node_id()
+                .expect("cannot convert to search node id"),
+        );
+    }
+
+    fn get_existing_obstacles(&self) -> Self::Obstacles {
+        let current = self.current.borrow().as_node();
+        let relative = |x: i16, y: i16| {
+            current
+                .relative_position(x, y, AbsoluteDirection::North)
+                .unwrap()
+        };
+        let positions = vec![relative(1, 1), relative(0, 2), relative(-1, 1)];
+        let obstacles = positions
+            .into_iter()
+            .map(|position| self.position_to_obstacle(position))
+            .collect();
+        obstacles
+    }
+
+    fn set_instructed_direction(&self, pose: Pose, direction: RelativeDirection) {
+        use RelativeDirection::*;
+
+        let current = self.pose_to_node(pose).as_node();
+
+        let relative = |x: i16, y: i16, dir: RelativeDirection| {
+            current
+                .relative_node(x, y, dir, AbsoluteDirection::North)
+                .expect("failed to convert to relative node")
+                .to_search_node_id()
+                .unwrap_or_else(|| {
+                    panic!(
+                        "failed to convert to search node id: current: {:?}, relative: {:?}",
+                        current,
+                        (x, y, dir)
+                    )
+                })
+        };
+        let next = match direction {
+            Right => relative(1, 1, direction),
+            Left => relative(-1, 1, direction),
+            Front => relative(0, 2, direction),
+            Back => relative(0, 0, direction),
+            _ => unreachable!(),
+        };
+        self.current.replace(next);
+    }
+
+    fn track_next(&self) {}
+}
+
+macro_rules! search_tests {
+    ($($name: ident: ($size: ty, $goal: ty, $value: expr),)*) => {
         $(
-                #[test]
-                fn $name() {
-                    use generic_array::arr;
-                    use AbsoluteDirection::*;
-                    use WallDirection::*;
+            #[ignore]
+            #[test]
+            fn $name() -> std::io::Result<()> {
+                use generic_array::GenericArray;
+                use std::fs;
+                use AbsoluteDirection::*;
 
-                    let new = |x, y, dir| NodeId::<U4>::new(x, y, dir).unwrap();
-                    let new_search = |x, y, dir| SearchNodeId::<U4>::new(x, y, dir).unwrap();
-                    let new_wall = |x, y, z| WallPosition::<U4>::new(x, y, z).unwrap();
+                let (goals, filename) = $value;
+                let root = env!("CARGO_MANIFEST_DIR").to_string();
+                let file_name = root + "/mazes/" + filename;
+                let start = NodeId::new(0, 0, North).unwrap();
+                let goals = goals.into_iter()
+                    .map(|goal| NodeId::new(goal.0, goal.1, goal.2).unwrap())
+                    .collect::<GenericArray<NodeId<$size>, $goal>>();
 
-                    let start = new(0, 0, North);
-                    let goals = arr![NodeId<U4>; new(2,0,West), new(2,0,South)];
+                let square_width = Length::new::<meter>(0.09);
+                let wall_width = Length::new::<meter>(0.006);
 
-                    let solver = Solver::<NodeId<U4>, SearchNodeId<U4>, U256, _>::new(start, goals);
+                let contents = fs::read_to_string(file_name)?;
+                let agent_maze = Rc::new(
+                    MazeBuilder::new()
+                        .costs(cost)
+                        .init_with(&contents)
+                        .square_width(square_width)
+                        .wall_width(wall_width)
+                        .build::<$size, MathFake>(),
+                );
 
-                    let (input, expected) = $value;
-                    let current = input.0;
-                    let walls = input.1;
+                let start_search_node = SearchNodeId::new(0, 1, North).unwrap();
+                let agent = Rc::new(AgentMock::new(
+                    Rc::clone(&agent_maze),
+                    start_search_node,
+                    square_width,
+                    wall_width,
+                ));
 
-                    let current = new_search(current.0, current.1, current.2);
-                    let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
-                    for (wall, exists) in walls.into_iter().map(|wall| (new_wall(wall.0,wall.1,wall.2), wall.3)) {
-                        maze.check_wall(wall, exists);
-                    }
-                    let expected = expected.into_iter().map(|input| new_search(input.0, input.1, input.2)).collect::<Vec<_>>();
-                    let candidates = solver.next_node_candidates(current, &maze);
-                    assert_eq!(candidates.unwrap(), expected.as_slice());
+                let maze = Rc::new(
+                    MazeBuilder::new()
+                        .costs(cost)
+                        .square_width(square_width)
+                        .wall_width(wall_width)
+                        .build::<$size, MathFake>(),
+                );
+
+                use std::ops::Mul;
+                type PathLen = <<$size as Mul<$size>>::Output as Mul<U16>>::Output;
+                let solver = Rc::new(Solver::<NodeId<$size>, SearchNodeId<$size>, PathLen, _>::new(
+                    start, goals,
+                ));
+
+                let start_pose = Pose {
+                    x: Length::new::<meter>(0.045),
+                    y: Length::new::<meter>(0.045),
+                    theta: Angle::new::<degree>(90.0),
+                };
+                let operator = SearchOperator::<
+                    NodeId<$size>,
+                    SearchNodeId<$size>,
+                    u16,
+                    RelativeDirection,
+                    Obstacle,
+                    _,
+                    _,
+                    _,
+                    _,
+                >::new(
+                    start_pose,
+                    start_search_node,
+                    Rc::clone(&maze),
+                    agent,
+                    Rc::clone(&solver),
+                );
+                while operator.run().is_err() {
+                    operator.tick();
                 }
+                assert_eq!(
+                    solver.compute_shortest_path(agent_maze.as_ref()),
+                    solver.compute_shortest_path(maze.as_ref())
+                );
+                Ok(())
+            }
         )*
     }
 }
 
-next_node_candidates_tests! {
-    test_next_node_candidates1: (
-        (
-            (0,1,North),
-            vec![
-                (0,0,Right,true),
-                (0,0,Up,false),
-            ],
-        ),
-        vec![
-            (1,2,East),
-            (0,3,North),
-            (0,1,South),
-        ],
-    ),
-    test_next_node_candidates2: (
-        (
-            (1,2,East),
-            vec![
-                (0,0,Right,true),
-                (0,0,Up,false),
-                (0,1,Right,false),
-                (0,1,Up,false),
-            ],
-        ),
-        vec![
-            (3,2,East),
-            (2,3,North),
-            (2,1,South),
-            (1,2,West),
-        ],
-    ),
+search_tests! {
+    test_search1: (U4, U2, (vec![(2,0,South), (2,0,West)], "maze1.dat")),
+    test_search2: (U16, U8, (vec![
+        (15, 14, NorthEast),
+        (15, 14, NorthWest),
+        (14, 15, NorthEast),
+        (14, 15, SouthEast),
+        (16, 15, NorthWest),
+        (16, 15, SouthWest),
+        (15, 16, SouthEast),
+        (15, 16, SouthWest),
+    ],
+    "maze2.dat")),
 }

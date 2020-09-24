@@ -22,7 +22,8 @@ use crate::traits::Math;
 use crate::utils::itertools::repeat_n;
 use crate::utils::mutex::Mutex;
 pub use direction::{AbsoluteDirection, RelativeDirection};
-use node::{Location, Node, Position};
+pub use node::Position;
+use node::{Location, Node};
 pub use node::{NodeId, SearchNodeId};
 use pose_converter::PoseConverter;
 use uom::si::{f32::Length, ratio::ratio};
@@ -35,7 +36,8 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    wall_existence_probs: RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
+    pub(crate) wall_existence_probs:
+        RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
     wall_prob_threshold: f32,
     costs: F,
     candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
@@ -49,6 +51,36 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
+    fn initialize_with_str(&self, input: &str) {
+        input.lines().enumerate().for_each(|(y, line)| {
+            line.chars().enumerate().for_each(|(x, c)| {
+                if y % 2 == 0 {
+                    if x % 4 != 1 {
+                        return;
+                    }
+                    let x = x / 4;
+                    let position = Position::<N>::new(2 * x as i16, 2 * N::I16 - y as i16 - 1);
+                    if c == '-' {
+                        self.check_wall_by_position(position, true)
+                    } else {
+                        self.check_wall_by_position(position, false)
+                    }
+                } else {
+                    if x % 4 != 0 {
+                        return;
+                    }
+                    let x = x / 4;
+                    let position = Position::<N>::new(2 * x as i16 - 1, 2 * N::I16 - y as i16 - 1);
+                    if c == '|' {
+                        self.check_wall_by_position(position, true);
+                    } else {
+                        self.check_wall_by_position(position, false);
+                    }
+                }
+            });
+        });
+    }
+
     fn initialize(&self) {
         for i in 0..WallPosition::<N>::max() + 1 {
             self.check_wall(
@@ -66,6 +98,12 @@ where
 
     pub fn check_wall(&self, position: WallPosition<N>, is_wall: bool) {
         self.check_wall_by_index(position.as_index(), is_wall);
+    }
+
+    fn check_wall_by_position(&self, position: Position<N>, is_wall: bool) {
+        if let Some(wall_position) = WallPosition::from_position(position) {
+            self.check_wall(wall_position, is_wall);
+        }
     }
 
     #[cfg(test)]
@@ -91,7 +129,7 @@ where
         return prob > 1.0 - self.wall_prob_threshold;
     }
 
-    fn is_wall_by_position(&self, position: Position<N>) -> bool {
+    pub fn is_wall_by_position(&self, position: Position<N>) -> bool {
         if let Some(wall_position) = WallPosition::from_position(position) {
             self.is_wall(wall_position)
         } else {
@@ -567,7 +605,7 @@ where
         walls.push(relative_wall_position(1, 1)).unwrap();
         match src.difference(dst, NorthEast) {
             (1, 2, FrontLeft) => (),
-            (0, 2, Left) | (0, 2, BackLeft) => {
+            (0, 2, Left) | (-1, 2, BackLeft) => {
                 walls.push(relative_wall_position(0, 2)).unwrap();
             }
             (x, y, Front) if x == y => {
@@ -593,7 +631,7 @@ where
         walls.push(relative_wall_position(1, 1)).unwrap();
         match src.difference(dst, NorthEast) {
             (2, 1, FrontRight) => (),
-            (2, 0, Right) | (2, 0, BackRight) => {
+            (2, 0, Right) | (2, -1, BackRight) => {
                 walls.push(relative_wall_position(2, 0)).unwrap();
             }
             (x, y, Front) if x == y => {
@@ -855,14 +893,15 @@ where
     }
 }
 
-pub struct MazeBuilder<C, SW, WW, WPT> {
+pub struct MazeBuilder<C, SW, WW, WPT, S> {
     costs: C,
     square_width: SW,
     wall_width: WW,
     wall_prob_threshold: WPT,
+    init: S,
 }
 
-impl<C, SW, WW, WPT> MazeBuilder<C, SW, WW, WPT> {
+impl<C, SW, WW, WPT, S> MazeBuilder<C, SW, WW, WPT, S> {
     const DEFAULT_SQUARE_WIDTH: Length = Length {
         dimension: PhantomData,
         units: PhantomData,
@@ -876,18 +915,19 @@ impl<C, SW, WW, WPT> MazeBuilder<C, SW, WW, WPT> {
     const DEFAULT_PROB_THRESHOLD: f32 = 0.05;
 }
 
-impl MazeBuilder<(), (), (), ()> {
+impl MazeBuilder<(), (), (), (), ()> {
     pub fn new() -> Self {
         Self {
             costs: (),
             square_width: (),
             wall_width: (),
             wall_prob_threshold: (),
+            init: (),
         }
     }
 }
 
-impl<C> MazeBuilder<C, (), (), ()>
+impl<C> MazeBuilder<C, (), (), (), ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -912,7 +952,7 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, ()>
+impl<C> MazeBuilder<C, Length, Length, (), ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -937,7 +977,7 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, (), (), f32>
+impl<C> MazeBuilder<C, (), (), f32, ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -962,7 +1002,7 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, f32>
+impl<C> MazeBuilder<C, Length, Length, f32, ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -987,8 +1027,108 @@ where
     }
 }
 
-impl<SW, WW, WPT> MazeBuilder<(), SW, WW, WPT> {
-    pub fn costs<C>(self, costs: C) -> MazeBuilder<C, SW, WW, WPT>
+impl<C> MazeBuilder<C, (), (), (), &str>
+where
+    C: Fn(Pattern) -> u16,
+{
+    pub fn build<N, M>(self) -> Maze<N, C, M>
+    where
+        N: Mul<N> + Unsigned + PowerOfTwo,
+        <N as Mul<N>>::Output: Mul<U2>,
+        <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+        M: Math,
+    {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
+        let maze = Maze {
+            wall_prob_threshold: Self::DEFAULT_PROB_THRESHOLD,
+            wall_existence_probs: RefCell::new(probs),
+            costs: self.costs,
+            candidates: Mutex::new(Vec::new()),
+            converter: PoseConverter::new(Self::DEFAULT_SQUARE_WIDTH, Self::DEFAULT_WALL_WIDTH),
+        };
+        maze.initialize_with_str(self.init);
+        maze
+    }
+}
+
+impl<C> MazeBuilder<C, Length, Length, (), &str>
+where
+    C: Fn(Pattern) -> u16,
+{
+    pub fn build<N, M>(self) -> Maze<N, C, M>
+    where
+        N: Mul<N> + Unsigned + PowerOfTwo,
+        <N as Mul<N>>::Output: Mul<U2>,
+        <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+        M: Math,
+    {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
+        let maze = Maze {
+            wall_prob_threshold: Self::DEFAULT_PROB_THRESHOLD,
+            wall_existence_probs: RefCell::new(probs),
+            costs: self.costs,
+            candidates: Mutex::new(Vec::new()),
+            converter: PoseConverter::new(self.square_width, self.wall_width),
+        };
+        maze.initialize_with_str(self.init);
+        maze
+    }
+}
+
+impl<C> MazeBuilder<C, (), (), f32, &str>
+where
+    C: Fn(Pattern) -> u16,
+{
+    pub fn build<N, M>(self) -> Maze<N, C, M>
+    where
+        N: Mul<N> + Unsigned + PowerOfTwo,
+        <N as Mul<N>>::Output: Mul<U2>,
+        <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+        M: Math,
+    {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
+        let maze = Maze {
+            wall_prob_threshold: self.wall_prob_threshold,
+            wall_existence_probs: RefCell::new(probs),
+            costs: self.costs,
+            candidates: Mutex::new(Vec::new()),
+            converter: PoseConverter::new(Self::DEFAULT_SQUARE_WIDTH, Self::DEFAULT_WALL_WIDTH),
+        };
+        maze.initialize_with_str(self.init);
+        maze
+    }
+}
+
+impl<C> MazeBuilder<C, Length, Length, f32, &str>
+where
+    C: Fn(Pattern) -> u16,
+{
+    pub fn build<N, M>(self) -> Maze<N, C, M>
+    where
+        N: Mul<N> + Unsigned + PowerOfTwo,
+        <N as Mul<N>>::Output: Mul<U2>,
+        <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+        M: Math,
+    {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
+        let maze = Maze {
+            wall_prob_threshold: self.wall_prob_threshold,
+            wall_existence_probs: RefCell::new(probs),
+            costs: self.costs,
+            candidates: Mutex::new(Vec::new()),
+            converter: PoseConverter::new(self.square_width, self.wall_width),
+        };
+        maze.initialize_with_str(self.init);
+        maze
+    }
+}
+
+impl<SW, WW, WPT, S> MazeBuilder<(), SW, WW, WPT, S> {
+    pub fn costs<C>(self, costs: C) -> MazeBuilder<C, SW, WW, WPT, S>
     where
         C: Fn(Pattern) -> u16,
     {
@@ -997,44 +1137,68 @@ impl<SW, WW, WPT> MazeBuilder<(), SW, WW, WPT> {
             costs,
             square_width: self.square_width,
             wall_width: self.wall_width,
+            init: self.init,
         }
     }
 }
 
-impl<C, WW, WPT> MazeBuilder<C, (), WW, WPT> {
-    pub fn square_width(self, square_width: Length) -> MazeBuilder<C, Length, WW, WPT> {
+impl<C, WW, WPT, S> MazeBuilder<C, (), WW, WPT, S> {
+    pub fn square_width(self, square_width: Length) -> MazeBuilder<C, Length, WW, WPT, S> {
         MazeBuilder {
             wall_prob_threshold: self.wall_prob_threshold,
             costs: self.costs,
             square_width,
             wall_width: self.wall_width,
+            init: self.init,
         }
     }
 }
 
-impl<C, SW, WPT> MazeBuilder<C, SW, (), WPT> {
-    pub fn wall_width(self, wall_width: Length) -> MazeBuilder<C, SW, Length, WPT> {
+impl<C, SW, WPT, S> MazeBuilder<C, SW, (), WPT, S> {
+    pub fn wall_width(self, wall_width: Length) -> MazeBuilder<C, SW, Length, WPT, S> {
         MazeBuilder {
             wall_prob_threshold: self.wall_prob_threshold,
             costs: self.costs,
             square_width: self.square_width,
             wall_width,
+            init: self.init,
         }
     }
 }
 
-impl<C, SW, WW> MazeBuilder<C, SW, WW, ()> {
+impl<C, SW, WW, S> MazeBuilder<C, SW, WW, (), S> {
     ///NOTE: This value should be in [0.0,0.5].
     pub fn wall_existence_probability_threshold(
         self,
         wall_prob_threshold: f32,
-    ) -> MazeBuilder<C, SW, WW, f32> {
+    ) -> MazeBuilder<C, SW, WW, f32, S> {
         assert!(wall_prob_threshold >= 0.0 && wall_prob_threshold <= 0.5);
         MazeBuilder {
             wall_prob_threshold,
             costs: self.costs,
             square_width: self.square_width,
             wall_width: self.wall_width,
+            init: self.init,
+        }
+    }
+}
+
+impl<C, SW, WW, WPT> MazeBuilder<C, SW, WW, WPT, ()> {
+    ///example of maze format:
+    ///```maze
+    ///+---+---+
+    ///|   |   |
+    ///+---+   +
+    ///|       |
+    ///+---+---+
+    ///```
+    pub fn init_with(self, init: &str) -> MazeBuilder<C, SW, WW, WPT, &str> {
+        MazeBuilder {
+            wall_prob_threshold: self.wall_prob_threshold,
+            costs: self.costs,
+            square_width: self.square_width,
+            wall_width: self.wall_width,
+            init,
         }
     }
 }
@@ -1264,102 +1428,115 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_convert_to_checker_nodes() {
-        use AbsoluteDirection::*;
+    macro_rules! convert_to_checker_nodes_tests {
+        ($($name: ident: $value: expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    use AbsoluteDirection::*;
+                    use WallDirection::*;
+                    use std::vec::Vec;
 
-        let new = |x, y, direction| NodeId::<U4>::new(x, y, direction).unwrap();
-        let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
-        let new_wall = |x, y, z| WallPosition::new(x, y, z).unwrap();
+                    let new = |x, y, direction| NodeId::<U4>::new(x, y, direction).unwrap();
+                    let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
+                    let new_wall = |x, y, z| WallPosition::new(x, y, z).unwrap();
 
-        let test_data = vec![
-            (
-                vec![
-                    new_wall(0, 0, WallDirection::Right),
-                    new_wall(0, 1, WallDirection::Right),
-                    new_wall(0, 2, WallDirection::Up),
-                    new_wall(1, 0, WallDirection::Up),
-                    new_wall(1, 1, WallDirection::Up),
-                    new_wall(1, 2, WallDirection::Right),
-                    new_wall(2, 1, WallDirection::Right),
-                    new_wall(2, 2, WallDirection::Up),
-                    new_wall(3, 1, WallDirection::Up),
-                ],
-                vec![
-                    new(0, 0, North),
-                    new(0, 2, North),
-                    new(1, 4, NorthEast),
-                    new(2, 5, NorthEast),
-                    new(4, 6, East),
-                    new(5, 4, SouthWest),
-                    new(4, 2, South),
-                    new(2, 0, West),
-                ],
-                vec![
-                    new_search(0, 1, North),
-                    new_search(0, 3, South),
-                    new_search(0, 3, North),
-                    new_search(1, 4, East),
-                    new_search(1, 4, West),
-                    new_search(2, 5, South),
-                    new_search(2, 5, North),
-                    new_search(1, 6, East),
-                    new_search(3, 6, East),
-                    new_search(3, 6, West),
-                    new_search(5, 6, East),
-                    new_search(5, 6, West),
-                    new_search(6, 5, South),
-                    new_search(6, 5, North),
-                    new_search(5, 4, East),
-                    new_search(5, 4, West),
-                    new_search(4, 3, North),
-                    new_search(4, 3, South),
-                    new_search(4, 1, North),
-                    new_search(4, 1, South),
-                    new_search(3, 2, East),
-                    new_search(5, 0, West),
-                    new_search(3, 0, East),
-                ],
-            ),
-            (
-                vec![new_wall(1, 2, WallDirection::Right)],
-                vec![
-                    new(0, 0, North),
-                    new(1, 2, NorthEast),
-                    new(2, 4, North),
-                    new(4, 4, South),
-                ],
-                vec![
-                    new_search(0, 1, North),
-                    new_search(0, 3, South),
-                    new_search(1, 2, West),
-                    new_search(1, 2, East),
-                    new_search(2, 1, North),
-                    new_search(3, 2, West),
-                    new_search(2, 3, South),
-                    new_search(2, 3, North),
-                    new_search(1, 4, East),
-                    new_search(2, 5, South),
-                    new_search(2, 5, North),
-                    new_search(1, 6, East),
-                    new_search(3, 6, West),
-                    new_search(3, 6, East),
-                    new_search(5, 6, West),
-                    new_search(4, 5, North),
-                ],
-            ),
-        ];
+                    let (walls, path, expected) = $value;
+                    let walls = walls.into_iter().map(|(x,y,z)| new_wall(x,y,z)).collect::<Vec<_>>();
+                    let path = path.into_iter().map(|(x,y,dir)| new(x,y,dir)).collect::<Vec<_>>();
+                    let mut expected = expected.into_iter().map(|(x,y,dir)| new_search(x,y,dir)).collect::<Vec<_>>();
 
-        for (walls, path, mut expected) in test_data {
-            let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
-            for wall in walls {
-                maze.check_wall(wall, true);
-            }
-            expected.sort();
-            let mut checker_nodes = maze.convert_to_checker_nodes(path);
-            checker_nodes.sort();
-            assert_eq!(checker_nodes, expected.as_slice());
+                    let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
+                    for wall in walls {
+                        maze.check_wall(wall, true);
+                    }
+                    expected.sort();
+                    let mut checker_nodes = maze.convert_to_checker_nodes(path);
+                    checker_nodes.sort();
+                    assert_eq!(checker_nodes, expected.as_slice());
+                }
+            )*
         }
+    }
+
+    convert_to_checker_nodes_tests! {
+        test_convert_to_checker_nodes1:
+            (
+                vec![
+                    (0, 0, Right),
+                    (0, 1, Right),
+                    (0, 2, Up),
+                    (1, 0, Up),
+                    (1, 1, Up),
+                    (1, 2, Right),
+                    (2, 1, Right),
+                    (2, 2, Up),
+                    (3, 1, Up),
+                ],
+                vec![
+                    (0, 0, North),
+                    (0, 2, North),
+                    (1, 4, NorthEast),
+                    (2, 5, NorthEast),
+                    (4, 6, East),
+                    (5, 4, SouthWest),
+                    (4, 2, South),
+                    (2, 0, West),
+                ],
+                vec![
+                    (0, 1, North),
+                    (0, 3, South),
+                    (0, 3, North),
+                    (1, 4, East),
+                    (1, 4, West),
+                    (2, 5, South),
+                    (2, 5, North),
+                    (1, 6, East),
+                    (3, 6, East),
+                    (3, 6, West),
+                    (5, 6, East),
+                    (5, 6, West),
+                    (6, 5, South),
+                    (6, 5, North),
+                    (5, 4, East),
+                    (5, 4, West),
+                    (4, 3, North),
+                    (4, 3, South),
+                    (4, 1, North),
+                    (4, 1, South),
+                    (3, 2, East),
+                    (5, 0, West),
+                    (3, 0, East),
+                ],
+            ),
+        test_convert_to_checker_nodes2:
+            (
+                vec![(1, 2, Right)],
+                vec![
+                    (0, 0, North),
+                    (1, 2, NorthEast),
+                    (2, 4, North),
+                    (4, 4, South),
+                ],
+                vec![
+                    (0, 1, North),
+                    (0, 3, South),
+                    (1, 2, West),
+                    (1, 2, East),
+                    (2, 1, North),
+                    (3, 2, West),
+                    (2, 3, South),
+                    (2, 3, North),
+                    (1, 4, East),
+                    (2, 5, South),
+                    (2, 5, North),
+                    (1, 6, East),
+                    (3, 6, West),
+                    (3, 6, East),
+                    (5, 6, West),
+                    (4, 5, North),
+                ],
+            ),
     }
 
     #[test]
@@ -1428,6 +1605,40 @@ mod tests {
             for prob in maze.wall_existence_probs().borrow().deref() {
                 prop_assert!(!prob.is_nan())
             }
+        }
+    }
+
+    #[test]
+    fn test_initialize_with_str() {
+        let input = "+---+---+
+|   |   |
++---+   +
+|       |
++---+---+";
+        let maze = MazeBuilder::new()
+            .costs(cost)
+            .init_with(input)
+            .build::<U2, MathFake>();
+
+        let test_cases = vec![
+            ((1, 0), false),
+            ((3, 0), true),
+            ((0, 1), true),
+            ((2, 1), false),
+            ((1, 2), true),
+            ((3, 2), true),
+            ((0, 3), true),
+            ((2, 3), true),
+        ];
+
+        for (position, expected) in test_cases {
+            let position = Position::new(position.0, position.1);
+            assert_eq!(
+                maze.is_wall_by_position(position),
+                expected,
+                "{:?}",
+                position
+            );
         }
     }
 }

@@ -42,7 +42,8 @@ pub mod data_types {
     pub use administrator::{FastRun, Idle, Search, Select};
     pub use agent::Pose;
     pub use maze::{
-        AbsoluteDirection, NodeId, RelativeDirection, SearchNodeId, WallDirection, WallPosition,
+        AbsoluteDirection, NodeId, Position, RelativeDirection, SearchNodeId, WallDirection,
+        WallPosition,
     };
     pub use obstacle_detector::Obstacle;
     pub use pattern::Pattern;
