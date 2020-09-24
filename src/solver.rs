@@ -97,7 +97,7 @@ where
             return None;
         }
 
-        candidates.sort_unstable();
+        candidates.sort_unstable_by_key(|elem| elem.1);
         Some(candidates.into_iter().map(|(node, _)| node).collect())
     }
 
@@ -150,6 +150,8 @@ where
 mod tests {
     use super::administrator::Graph;
     use super::Solver;
+    use crate::maze::MazeBuilder;
+
     use heapless::consts::*;
 
     struct IGraph {
@@ -163,7 +165,7 @@ mod tests {
             for &(src, dst, cost) in edges {
                 mat[src][dst] = Some(cost);
             }
-            Self { n: n, mat: mat }
+            Self { n, mat }
         }
     }
 
@@ -220,5 +222,124 @@ mod tests {
 
         assert!(path.is_some());
         assert_eq!(path.unwrap().as_ref(), expected);
+    }
+
+    macro_rules! next_node_candidates_tests {
+        ($($name: ident: $value: expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    use generic_array::arr;
+                    use crate::maze::{AbsoluteDirection::*, WallPosition, WallDirection::*, NodeId, SearchNodeId};
+                    use crate::utils::math::MathFake;
+                    use crate::prelude::*;
+                    use crate::data_types::Pattern;
+
+                    fn cost(pattern: Pattern) -> u16 {
+                        use Pattern::*;
+
+                        match pattern {
+                            Straight(x) => 10 * x,
+                            StraightDiagonal(x) => 7 * x,
+                            Search90 => 8,
+                            FastRun45 => 12,
+                            FastRun90 => 15,
+                            FastRun135 => 20,
+                            FastRun180 => 25,
+                            FastRunDiagonal90 => 15,
+                            SpinBack => 15,
+                        }
+                    }
+
+                    let new = |x, y, dir| {
+                        NodeId::<U4>::new(x, y, dir)
+                            .unwrap_or_else(|| panic!("Failed to create node id: {:?}", (x,y,dir)))
+                    };
+                    let new_search = |x, y, dir| {
+                        SearchNodeId::<U4>::new(x, y, dir)
+                            .unwrap_or_else(|| panic!("Failed to create search node id: {:?}", (x,y,dir)))
+                    };
+                    let new_wall = |x, y, z| {
+                        WallPosition::<U4>::new(x, y, z)
+                            .unwrap_or_else(|| panic!("Failed to create wall position: {:?}", (x,y,z)))
+                    };
+
+                    let start = new(0, 0, North);
+                    let goals = arr![NodeId<U4>; new(2,0,West), new(2,0,South)];
+
+                    let solver = Solver::<NodeId<U4>, SearchNodeId<U4>, U256, _>::new(start, goals);
+
+                    let (input, expected) = $value;
+                    let current = input.0;
+                    let walls = input.1;
+
+                    let current = new_search(current.0, current.1, current.2);
+                    let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
+                    for (wall, exists) in walls.into_iter().map(|wall| (new_wall(wall.0,wall.1,wall.2), wall.3)) {
+                        maze.check_wall(wall, exists);
+                    }
+                    let expected = expected.into_iter().map(|input| new_search(input.0, input.1, input.2)).collect::<Vec<_>>();
+                    let candidates = solver.next_node_candidates(current, &maze);
+                    assert_eq!(candidates.expect("Failed to unwrap candidates"), expected.as_slice());
+                }
+            )*
+        }
+    }
+
+    next_node_candidates_tests! {
+        test_next_node_candidates1: (
+            (
+                (0,1,North),
+                vec![
+                    (0,0,Right,true),
+                    (0,0,Up,false),
+                ],
+            ),
+            vec![
+                (1,2,East),
+                (0,3,North),
+                (0,1,South),
+            ],
+        ),
+        test_next_node_candidates2: (
+            (
+                (1,2,East),
+                vec![
+                    (0,0,Right,true),
+                    (0,0,Up,false),
+                    (0,1,Right,false),
+                    (0,1,Up,false),
+                ],
+            ),
+            vec![
+                (2,1,South),
+                (2,3,North),
+                (3,2,East),
+                (1,2,West),
+            ],
+        ),
+        test_next_node_candidates3: (
+            (
+                (6,5,South),
+                vec![
+                    (0,1,Right,true),
+                    (0,1,Up,false),
+                    (0,2,Right,true),
+                    (0,2,Up,false),
+                    (0,3,Right,false),
+                    (1,2,Up,false),
+                    (1,3,Right,false),
+                    (2,2,Right,false),
+                    (2,2,Up,true),
+                    (2,3,Right,false),
+                    (3,1,Up,true),
+                    (3,2,Up,false),
+                ],
+            ),
+            vec![
+                (5,4,West),
+                (6,5,North),
+            ],
+        ),
     }
 }
