@@ -292,6 +292,7 @@ macro_rules! search_tests {
 
                 let square_width = Length::new::<meter>(0.09);
                 let wall_width = Length::new::<meter>(0.006);
+                let ignore_radius = Length::new::<meter>(0.01);
 
                 let contents = fs::read_to_string(file_name)?;
                 let agent_maze = Rc::new(
@@ -300,6 +301,7 @@ macro_rules! search_tests {
                         .init_with(&contents)
                         .square_width(square_width)
                         .wall_width(wall_width)
+                        .ignore_radius_from_pillar(ignore_radius)
                         .build::<$size, MathFake>(),
                 );
 
@@ -316,6 +318,7 @@ macro_rules! search_tests {
                         .costs(cost)
                         .square_width(square_width)
                         .wall_width(wall_width)
+                        .ignore_radius_from_pillar(ignore_radius)
                         .build::<$size, MathFake>(),
                 );
 
