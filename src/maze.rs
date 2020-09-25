@@ -51,7 +51,13 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    fn new(wall_prob_threshold: f32, costs: F, square_width: Length, wall_width: Length) -> Self {
+    fn new(
+        wall_prob_threshold: f32,
+        costs: F,
+        square_width: Length,
+        wall_width: Length,
+        ignore_radius_from_pillar: Length,
+    ) -> Self {
         let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
             .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
         Maze {
@@ -59,7 +65,7 @@ where
             wall_existence_probs: RefCell::new(probs),
             costs,
             candidates: Mutex::new(Vec::new()),
-            converter: PoseConverter::new(square_width, wall_width),
+            converter: PoseConverter::new(square_width, wall_width, ignore_radius_from_pillar),
         }
     }
 
@@ -814,7 +820,7 @@ where
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
         if let Ok(mut probs) = self.wall_existence_probs.try_borrow_mut() {
             for obstacle in obstacles {
-                if let Ok(wall_info) = self.converter.convert::<N>(obstacle.source) {
+                if let Ok(wall_info) = self.converter.convert::<N>(&obstacle) {
                     let index = wall_info.position.as_index();
                     let existence_prob = probs[index];
                     if existence_prob == 0.0 || existence_prob == 1.0 {
@@ -905,15 +911,16 @@ where
     }
 }
 
-pub struct MazeBuilder<C, SW, WW, WPT, S> {
+pub struct MazeBuilder<C, SW, WW, WPT, S, R> {
     costs: C,
     square_width: SW,
     wall_width: WW,
     wall_prob_threshold: WPT,
     init: S,
+    ignore_radius: R,
 }
 
-impl<C, SW, WW, WPT, S> MazeBuilder<C, SW, WW, WPT, S> {
+impl<C, SW, WW, WPT, S, R> MazeBuilder<C, SW, WW, WPT, S, R> {
     const DEFAULT_SQUARE_WIDTH: Length = Length {
         dimension: PhantomData,
         units: PhantomData,
@@ -925,9 +932,14 @@ impl<C, SW, WW, WPT, S> MazeBuilder<C, SW, WW, WPT, S> {
         value: 0.006,
     };
     const DEFAULT_PROB_THRESHOLD: f32 = 0.05;
+    const DEFAULT_IGNORE_RADIUS: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.01,
+    };
 }
 
-impl MazeBuilder<(), (), (), (), ()> {
+impl MazeBuilder<(), (), (), (), (), ()> {
     pub fn new() -> Self {
         Self {
             costs: (),
@@ -935,11 +947,12 @@ impl MazeBuilder<(), (), (), (), ()> {
             wall_width: (),
             wall_prob_threshold: (),
             init: (),
+            ignore_radius: (),
         }
     }
 }
 
-impl<C> MazeBuilder<C, (), (), (), ()>
+impl<C> MazeBuilder<C, (), (), (), (), ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -955,13 +968,14 @@ where
             self.costs,
             Self::DEFAULT_SQUARE_WIDTH,
             Self::DEFAULT_WALL_WIDTH,
+            Self::DEFAULT_IGNORE_RADIUS,
         );
         maze.initialize();
         maze
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, (), ()>
+impl<C> MazeBuilder<C, Length, Length, (), (), Length>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -977,13 +991,14 @@ where
             self.costs,
             self.square_width,
             self.wall_width,
+            self.ignore_radius,
         );
         maze.initialize();
         maze
     }
 }
 
-impl<C> MazeBuilder<C, (), (), f32, ()>
+impl<C> MazeBuilder<C, (), (), f32, (), ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -999,13 +1014,14 @@ where
             self.costs,
             Self::DEFAULT_SQUARE_WIDTH,
             Self::DEFAULT_WALL_WIDTH,
+            Self::DEFAULT_IGNORE_RADIUS,
         );
         maze.initialize();
         maze
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, f32, ()>
+impl<C> MazeBuilder<C, Length, Length, f32, (), Length>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -1021,13 +1037,14 @@ where
             self.costs,
             self.square_width,
             self.wall_width,
+            self.ignore_radius,
         );
         maze.initialize();
         maze
     }
 }
 
-impl<C> MazeBuilder<C, (), (), (), &str>
+impl<C> MazeBuilder<C, (), (), (), &str, ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -1043,13 +1060,14 @@ where
             self.costs,
             Self::DEFAULT_SQUARE_WIDTH,
             Self::DEFAULT_WALL_WIDTH,
+            Self::DEFAULT_IGNORE_RADIUS,
         );
         maze.initialize_with_str(self.init);
         maze
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, (), &str>
+impl<C> MazeBuilder<C, Length, Length, (), &str, Length>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -1065,13 +1083,14 @@ where
             self.costs,
             self.square_width,
             self.wall_width,
+            self.ignore_radius,
         );
         maze.initialize_with_str(self.init);
         maze
     }
 }
 
-impl<C> MazeBuilder<C, (), (), f32, &str>
+impl<C> MazeBuilder<C, (), (), f32, &str, ()>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -1087,13 +1106,14 @@ where
             self.costs,
             Self::DEFAULT_SQUARE_WIDTH,
             Self::DEFAULT_WALL_WIDTH,
+            Self::DEFAULT_IGNORE_RADIUS,
         );
         maze.initialize_with_str(self.init);
         maze
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, f32, &str>
+impl<C> MazeBuilder<C, Length, Length, f32, &str, Length>
 where
     C: Fn(Pattern) -> u16,
 {
@@ -1109,14 +1129,15 @@ where
             self.costs,
             self.square_width,
             self.wall_width,
+            self.ignore_radius,
         );
         maze.initialize_with_str(self.init);
         maze
     }
 }
 
-impl<SW, WW, WPT, S> MazeBuilder<(), SW, WW, WPT, S> {
-    pub fn costs<C>(self, costs: C) -> MazeBuilder<C, SW, WW, WPT, S>
+impl<SW, WW, WPT, S, R> MazeBuilder<(), SW, WW, WPT, S, R> {
+    pub fn costs<C>(self, costs: C) -> MazeBuilder<C, SW, WW, WPT, S, R>
     where
         C: Fn(Pattern) -> u16,
     {
@@ -1126,40 +1147,43 @@ impl<SW, WW, WPT, S> MazeBuilder<(), SW, WW, WPT, S> {
             square_width: self.square_width,
             wall_width: self.wall_width,
             init: self.init,
+            ignore_radius: self.ignore_radius,
         }
     }
 }
 
-impl<C, WW, WPT, S> MazeBuilder<C, (), WW, WPT, S> {
-    pub fn square_width(self, square_width: Length) -> MazeBuilder<C, Length, WW, WPT, S> {
+impl<C, WW, WPT, S, R> MazeBuilder<C, (), WW, WPT, S, R> {
+    pub fn square_width(self, square_width: Length) -> MazeBuilder<C, Length, WW, WPT, S, R> {
         MazeBuilder {
             wall_prob_threshold: self.wall_prob_threshold,
             costs: self.costs,
             square_width,
             wall_width: self.wall_width,
             init: self.init,
+            ignore_radius: self.ignore_radius,
         }
     }
 }
 
-impl<C, SW, WPT, S> MazeBuilder<C, SW, (), WPT, S> {
-    pub fn wall_width(self, wall_width: Length) -> MazeBuilder<C, SW, Length, WPT, S> {
+impl<C, SW, WPT, S, R> MazeBuilder<C, SW, (), WPT, S, R> {
+    pub fn wall_width(self, wall_width: Length) -> MazeBuilder<C, SW, Length, WPT, S, R> {
         MazeBuilder {
             wall_prob_threshold: self.wall_prob_threshold,
             costs: self.costs,
             square_width: self.square_width,
             wall_width,
             init: self.init,
+            ignore_radius: self.ignore_radius,
         }
     }
 }
 
-impl<C, SW, WW, S> MazeBuilder<C, SW, WW, (), S> {
+impl<C, SW, WW, S, R> MazeBuilder<C, SW, WW, (), S, R> {
     ///NOTE: This value should be in [0.0,0.5].
     pub fn wall_existence_probability_threshold(
         self,
         wall_prob_threshold: f32,
-    ) -> MazeBuilder<C, SW, WW, f32, S> {
+    ) -> MazeBuilder<C, SW, WW, f32, S, R> {
         assert!(wall_prob_threshold >= 0.0 && wall_prob_threshold <= 0.5);
         MazeBuilder {
             wall_prob_threshold,
@@ -1167,11 +1191,12 @@ impl<C, SW, WW, S> MazeBuilder<C, SW, WW, (), S> {
             square_width: self.square_width,
             wall_width: self.wall_width,
             init: self.init,
+            ignore_radius: self.ignore_radius,
         }
     }
 }
 
-impl<C, SW, WW, WPT> MazeBuilder<C, SW, WW, WPT, ()> {
+impl<C, SW, WW, WPT, R> MazeBuilder<C, SW, WW, WPT, (), R> {
     ///example of maze format:
     ///```maze
     ///+---+---+
@@ -1180,13 +1205,30 @@ impl<C, SW, WW, WPT> MazeBuilder<C, SW, WW, WPT, ()> {
     ///|       |
     ///+---+---+
     ///```
-    pub fn init_with(self, init: &str) -> MazeBuilder<C, SW, WW, WPT, &str> {
+    pub fn init_with(self, init: &str) -> MazeBuilder<C, SW, WW, WPT, &str, R> {
         MazeBuilder {
             wall_prob_threshold: self.wall_prob_threshold,
             costs: self.costs,
             square_width: self.square_width,
             wall_width: self.wall_width,
             init,
+            ignore_radius: self.ignore_radius,
+        }
+    }
+}
+
+impl<C, SW, WW, WPT, S> MazeBuilder<C, SW, WW, WPT, S, ()> {
+    pub fn ignore_radius_from_pillar(
+        self,
+        ignore_radius: Length,
+    ) -> MazeBuilder<C, SW, WW, WPT, S, Length> {
+        MazeBuilder {
+            wall_prob_threshold: self.wall_prob_threshold,
+            costs: self.costs,
+            square_width: self.square_width,
+            wall_width: self.wall_width,
+            init: self.init,
+            ignore_radius,
         }
     }
 }

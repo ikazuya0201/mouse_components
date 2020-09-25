@@ -8,7 +8,7 @@ use uom::si::{
     length::meter,
 };
 
-use super::{AbsoluteDirection, SearchNodeId, WallDirection, WallPosition};
+use super::{AbsoluteDirection, Obstacle, SearchNodeId, WallDirection, WallPosition};
 use crate::agent::Pose;
 use crate::traits::Math;
 use crate::utils::total::Total;
@@ -29,6 +29,8 @@ pub struct OutOfBoundError;
 pub struct PoseConverter<M> {
     i_square_width: i32, //[mm]
     square_width_half: Length,
+    square_width: Length,
+    ignore_radius_from_pillar: Length,
     p1: Length,
     p2: Length,
     n1: Length,
@@ -37,7 +39,11 @@ pub struct PoseConverter<M> {
 }
 
 impl<M> PoseConverter<M> {
-    pub fn new(square_width: Length, wall_width: Length) -> Self {
+    pub fn new(
+        square_width: Length,
+        wall_width: Length,
+        ignore_radius_from_pillar: Length,
+    ) -> Self {
         let p1 = square_width - wall_width / 2.0;
         let p2 = p1 + square_width;
         let n1 = wall_width / 2.0;
@@ -45,6 +51,8 @@ impl<M> PoseConverter<M> {
         Self {
             i_square_width: (square_width.get::<meter>() * 1000.0) as i32,
             square_width_half: square_width / 2.0,
+            square_width,
+            ignore_radius_from_pillar,
             p1,
             p2,
             n1,
@@ -88,7 +96,34 @@ impl<M> PoseConverter<M>
 where
     M: Math,
 {
-    pub fn convert<N>(&self, pose: Pose) -> Result<WallInfo<N>, OutOfBoundError>
+    fn is_near_pillar(&self, obstacle: &Obstacle) -> bool {
+        let pose = obstacle.source;
+        let distance = obstacle.distance.mean;
+
+        let x = pose.x + distance * M::cos(pose.theta);
+        let y = pose.y + distance * M::sin(pose.theta);
+
+        let (x, _) = self.remquof_with_width(x);
+        let (y, _) = self.remquof_with_width(y);
+
+        let diff_from_pillar = |x: Length| {
+            let pillar = if x < self.square_width_half {
+                Length::default()
+            } else {
+                self.square_width
+            };
+            x - pillar
+        };
+
+        let xd = diff_from_pillar(x);
+        let yd = diff_from_pillar(y);
+
+        let distance = M::sqrt(xd * xd + yd * yd);
+
+        distance < self.ignore_radius_from_pillar
+    }
+
+    pub fn convert<N>(&self, obstacle: &Obstacle) -> Result<WallInfo<N>, OutOfBoundError>
     where
         N: Unsigned + PowerOfTwo,
     {
@@ -107,6 +142,12 @@ where
         }
 
         use Direction::*;
+
+        if self.is_near_pillar(obstacle) {
+            return Err(OutOfBoundError);
+        }
+
+        let pose = obstacle.source;
 
         let (x_rem, x_quo) = self.remquof_with_width(pose.x);
         let (y_rem, y_quo) = self.remquof_with_width(pose.y);
@@ -212,7 +253,7 @@ mod tests {
     use approx::assert_relative_eq;
 
     use super::*;
-    use crate::utils::math::MathFake;
+    use crate::utils::{math::MathFake, sample::Sample};
     use WallDirection::*;
 
     macro_rules! convert_ok_tests {
@@ -221,10 +262,16 @@ mod tests {
                 #[test]
                 fn $name() {
                     let (input, expected) = $value;
-                    let input = Pose{
-                        x: Length::new::<meter>(input.0),
-                        y: Length::new::<meter>(input.1),
-                        theta: Angle::new::<degree>(input.2),
+                    let input = Obstacle {
+                        source: Pose{
+                            x: Length::new::<meter>(input.0),
+                            y: Length::new::<meter>(input.1),
+                            theta: Angle::new::<degree>(input.2),
+                        },
+                        distance: Sample{
+                            mean: Length::new::<meter>(input.3),
+                            standard_deviation: Length::new::<meter>(0.001),
+                        },
                     };
                     let expected = WallInfo::<$size>{
                         position: WallPosition::new(expected.0, expected.1, expected.2).unwrap(),
@@ -232,8 +279,12 @@ mod tests {
                         not_existing_distance: Length::new::<meter>(expected.4),
                     };
 
-                    let converter = PoseConverter::<MathFake>::new(Length::new::<meter>(0.09), Length::new::<meter>(0.006));
-                    let info = converter.convert::<$size>(input).unwrap();
+                    let converter = PoseConverter::<MathFake>::new(
+                        Length::new::<meter>(0.09),
+                        Length::new::<meter>(0.006),
+                        Length::new::<meter>(0.01),
+                    );
+                    let info = converter.convert::<$size>(&input).unwrap();
                     assert_eq!(info.position, expected.position);
                     assert_relative_eq!(info.existing_distance.get::<meter>(), expected.existing_distance.get::<meter>());
                     assert_relative_eq!(info.not_existing_distance.get::<meter>(), expected.not_existing_distance.get::<meter>());
@@ -248,14 +299,24 @@ mod tests {
                 #[test]
                 fn $name() {
                     let input = $value;
-                    let input = Pose{
-                        x: Length::new::<meter>(input.0),
-                        y: Length::new::<meter>(input.1),
-                        theta: Angle::new::<degree>(input.2),
+                    let input = Obstacle {
+                        source: Pose{
+                            x: Length::new::<meter>(input.0),
+                            y: Length::new::<meter>(input.1),
+                            theta: Angle::new::<degree>(input.2),
+                        },
+                        distance: Sample{
+                            mean: Length::new::<meter>(input.3),
+                            standard_deviation: Length::new::<meter>(0.001),
+                        },
                     };
 
-                    let converter = PoseConverter::<MathFake>::new(Length::new::<meter>(0.09), Length::new::<meter>(0.006));
-                    assert!(converter.convert::<$size>(input).is_err());
+                    let converter = PoseConverter::<MathFake>::new(
+                        Length::new::<meter>(0.09),
+                        Length::new::<meter>(0.006),
+                        Length::new::<meter>(0.01),
+                    );
+                    assert!(converter.convert::<$size>(&input).is_err());
                 }
             )*
         }
@@ -263,38 +324,39 @@ mod tests {
 
     convert_ok_tests! {
         convert_ok_test1: (U4, (
-            (0.045, 0.045, 0.0),
+            (0.045, 0.045, 0.0, 0.045),
             (0, 0, Right, 0.042, 0.132),
         )),
         convert_ok_test2: (U4, (
-            (0.077, 0.045, 45.0),
+            (0.077, 0.045, 45.0, 0.045),
             (0, 0, Right, 2.0f32.sqrt() * 0.01, 2.0f32.sqrt() * 0.042),
         )),
         convert_ok_test3: (U4, (
-            (0.135, 0.045, 180.0),
+            (0.135, 0.045, 180.0, 0.045),
             (0, 0, Right, 0.042, 0.132),
         )),
         convert_ok_test4: (U4, (
-            (0.045, 0.135, 270.0),
+            (0.045, 0.135, 270.0, 0.045),
             (0, 0, Up, 0.042, 0.132),
         )),
         convert_ok_test5: (U4, (
-            (0.135, 0.135, 90.0),
+            (0.135, 0.135, 90.0, 0.045),
             (1, 1, Up, 0.042, 0.132),
         )),
         convert_ok_test6: (U4, (
-            (0.135, 0.135, 180.0),
+            (0.135, 0.135, 180.0, 0.045),
             (0, 1, Right, 0.042, 0.132),
         )),
         convert_ok_test7: (U4, (
-            (0.045, 0.135, 0.0),
+            (0.045, 0.135, 0.0, 0.045),
             (0, 1, Right, 0.042, 0.132),
         )),
     }
 
     convert_err_tests! {
-        convert_err_test1: (U4, (0.0, 0.0, 0.0)),
-        convert_err_test2: (U4, (0.405, 0.045, 0.0)),
-        convert_err_test3: (U4, (-0.045, 0.045, 0.0)),
+        convert_err_test1: (U4, (0.0, 0.0, 0.0, 0.045)),
+        convert_err_test2: (U4, (0.405, 0.045, 0.0, 0.045)),
+        convert_err_test3: (U4, (-0.045, 0.045, 0.0, 0.045)),
+        convert_err_test4: (U4, (0.045, 0.045, 45.0, 0.0636)),
     }
 }
