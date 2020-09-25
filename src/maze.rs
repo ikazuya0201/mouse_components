@@ -51,6 +51,18 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
+    fn new(wall_prob_threshold: f32, costs: F, square_width: Length, wall_width: Length) -> Self {
+        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
+            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
+        Maze {
+            wall_prob_threshold,
+            wall_existence_probs: RefCell::new(probs),
+            costs,
+            candidates: Mutex::new(Vec::new()),
+            converter: PoseConverter::new(square_width, wall_width),
+        }
+    }
+
     fn initialize_with_str(&self, input: &str) {
         input.lines().enumerate().for_each(|(y, line)| {
             line.chars().enumerate().for_each(|(x, c)| {
@@ -938,15 +950,12 @@ where
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
         M: Math,
     {
-        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
-        let maze = Maze {
-            wall_prob_threshold: Self::DEFAULT_PROB_THRESHOLD,
-            wall_existence_probs: RefCell::new(probs),
-            costs: self.costs,
-            candidates: Mutex::new(Vec::new()),
-            converter: PoseConverter::new(Self::DEFAULT_SQUARE_WIDTH, Self::DEFAULT_WALL_WIDTH),
-        };
+        let maze = Maze::new(
+            Self::DEFAULT_PROB_THRESHOLD,
+            self.costs,
+            Self::DEFAULT_SQUARE_WIDTH,
+            Self::DEFAULT_WALL_WIDTH,
+        );
         maze.initialize();
         maze
     }
@@ -963,15 +972,12 @@ where
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
         M: Math,
     {
-        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
-        let maze = Maze {
-            wall_prob_threshold: Self::DEFAULT_PROB_THRESHOLD,
-            wall_existence_probs: RefCell::new(probs),
-            costs: self.costs,
-            candidates: Mutex::new(Vec::new()),
-            converter: PoseConverter::new(self.square_width, self.wall_width),
-        };
+        let maze = Maze::new(
+            Self::DEFAULT_PROB_THRESHOLD,
+            self.costs,
+            self.square_width,
+            self.wall_width,
+        );
         maze.initialize();
         maze
     }
@@ -988,15 +994,12 @@ where
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
         M: Math,
     {
-        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
-        let maze = Maze {
-            wall_prob_threshold: self.wall_prob_threshold,
-            wall_existence_probs: RefCell::new(probs),
-            costs: self.costs,
-            candidates: Mutex::new(Vec::new()),
-            converter: PoseConverter::new(Self::DEFAULT_SQUARE_WIDTH, Self::DEFAULT_WALL_WIDTH),
-        };
+        let maze = Maze::new(
+            self.wall_prob_threshold,
+            self.costs,
+            Self::DEFAULT_SQUARE_WIDTH,
+            Self::DEFAULT_WALL_WIDTH,
+        );
         maze.initialize();
         maze
     }
@@ -1013,15 +1016,12 @@ where
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
         M: Math,
     {
-        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
-        let maze = Maze {
-            wall_prob_threshold: self.wall_prob_threshold,
-            wall_existence_probs: RefCell::new(probs),
-            costs: self.costs,
-            candidates: Mutex::new(Vec::new()),
-            converter: PoseConverter::new(self.square_width, self.wall_width),
-        };
+        let maze = Maze::new(
+            self.wall_prob_threshold,
+            self.costs,
+            self.square_width,
+            self.wall_width,
+        );
         maze.initialize();
         maze
     }
@@ -1038,15 +1038,12 @@ where
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
         M: Math,
     {
-        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
-        let maze = Maze {
-            wall_prob_threshold: Self::DEFAULT_PROB_THRESHOLD,
-            wall_existence_probs: RefCell::new(probs),
-            costs: self.costs,
-            candidates: Mutex::new(Vec::new()),
-            converter: PoseConverter::new(Self::DEFAULT_SQUARE_WIDTH, Self::DEFAULT_WALL_WIDTH),
-        };
+        let maze = Maze::new(
+            Self::DEFAULT_PROB_THRESHOLD,
+            self.costs,
+            Self::DEFAULT_SQUARE_WIDTH,
+            Self::DEFAULT_WALL_WIDTH,
+        );
         maze.initialize_with_str(self.init);
         maze
     }
@@ -1063,15 +1060,12 @@ where
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
         M: Math,
     {
-        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
-        let maze = Maze {
-            wall_prob_threshold: Self::DEFAULT_PROB_THRESHOLD,
-            wall_existence_probs: RefCell::new(probs),
-            costs: self.costs,
-            candidates: Mutex::new(Vec::new()),
-            converter: PoseConverter::new(self.square_width, self.wall_width),
-        };
+        let maze = Maze::new(
+            Self::DEFAULT_PROB_THRESHOLD,
+            self.costs,
+            self.square_width,
+            self.wall_width,
+        );
         maze.initialize_with_str(self.init);
         maze
     }
@@ -1088,15 +1082,12 @@ where
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
         M: Math,
     {
-        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
-        let maze = Maze {
-            wall_prob_threshold: self.wall_prob_threshold,
-            wall_existence_probs: RefCell::new(probs),
-            costs: self.costs,
-            candidates: Mutex::new(Vec::new()),
-            converter: PoseConverter::new(Self::DEFAULT_SQUARE_WIDTH, Self::DEFAULT_WALL_WIDTH),
-        };
+        let maze = Maze::new(
+            self.wall_prob_threshold,
+            self.costs,
+            Self::DEFAULT_SQUARE_WIDTH,
+            Self::DEFAULT_WALL_WIDTH,
+        );
         maze.initialize_with_str(self.init);
         maze
     }
@@ -1113,15 +1104,12 @@ where
         <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
         M: Math,
     {
-        let probs = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .collect::<GenericArray<_, <<N as Mul<N>>::Output as Mul<U2>>::Output>>();
-        let maze = Maze {
-            wall_prob_threshold: self.wall_prob_threshold,
-            wall_existence_probs: RefCell::new(probs),
-            costs: self.costs,
-            candidates: Mutex::new(Vec::new()),
-            converter: PoseConverter::new(self.square_width, self.wall_width),
-        };
+        let maze = Maze::new(
+            self.wall_prob_threshold,
+            self.costs,
+            self.square_width,
+            self.wall_width,
+        );
         maze.initialize_with_str(self.init);
         maze
     }
