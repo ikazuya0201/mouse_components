@@ -126,7 +126,6 @@ where
         }
     }
 
-    #[cfg(any(test, feature = "debug"))]
     pub fn generate_straight(
         &self,
         x_start: Length,
@@ -140,7 +139,6 @@ where
             .generate(x_start, y_start, x_end, y_end, v_start, v_end)
     }
 
-    #[cfg(any(test, feature = "debug"))]
     pub fn generate_spin(
         &self,
         theta_start: Angle,
