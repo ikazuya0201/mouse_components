@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use typenum::{consts::*, operator_aliases::PartialQuot, type_operators::PartialDiv};
+use typenum::{consts::*, operator_aliases::PartialQuot, type_operators::PartialDiv, Integer};
 use uom::marker::Div;
 use uom::si::{angle::radian, f32::Angle, Dimension, Quantity, ISQ, SI};
 
@@ -34,12 +34,19 @@ pub trait Math {
     where
         D: Dimension + ?Sized,
         D::L: PartialDiv<P2>,
+        <D::L as PartialDiv<P2>>::Output: Integer,
         D::M: PartialDiv<P2>,
+        <D::M as PartialDiv<P2>>::Output: Integer,
         D::T: PartialDiv<P2>,
+        <D::T as PartialDiv<P2>>::Output: Integer,
         D::I: PartialDiv<P2>,
+        <D::I as PartialDiv<P2>>::Output: Integer,
         D::Th: PartialDiv<P2>,
+        <D::Th as PartialDiv<P2>>::Output: Integer,
         D::N: PartialDiv<P2>,
+        <D::N as PartialDiv<P2>>::Output: Integer,
         D::J: PartialDiv<P2>,
+        <D::J as PartialDiv<P2>>::Output: Integer,
         D::Kind: Div,
     {
         Quantity {
