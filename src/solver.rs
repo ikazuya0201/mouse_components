@@ -4,11 +4,11 @@ use core::marker::PhantomData;
 
 use generic_array::GenericArray;
 use heap::BinaryHeap;
-use heapless::{consts::*, ArrayLength, Vec};
+use heapless::{consts::*, Vec};
 use num::{Bounded, Saturating};
 
 use super::administrator;
-use crate::utils::itertools::repeat_n;
+use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
 
 pub struct Solver<Node, SearchNode, Max, GSize>
 where

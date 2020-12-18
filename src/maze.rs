@@ -8,7 +8,7 @@ use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::ops::{Add, Mul};
 
-use generic_array::{ArrayLength, GenericArray};
+use generic_array::GenericArray;
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
@@ -19,8 +19,7 @@ use crate::agent::Pose;
 use crate::obstacle_detector::Obstacle;
 use crate::pattern::Pattern;
 use crate::traits::Math;
-use crate::utils::itertools::repeat_n;
-use crate::utils::mutex::Mutex;
+use crate::utils::{array_length::ArrayLength, itertools::repeat_n, mutex::Mutex};
 pub use direction::{AbsoluteDirection, RelativeDirection};
 pub use node::Position;
 use node::{Location, Node};

@@ -4,7 +4,6 @@ use core::cell::RefCell;
 use core::ops::Mul;
 use std::rc::Rc;
 
-use generic_array::ArrayLength;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 use uom::si::{
     angle::degree,
@@ -20,7 +19,7 @@ use components::{
     impls::{Maze, MazeBuilder, SearchOperator, Solver},
     prelude::*,
     traits::{Agent, Math},
-    utils::sample::Sample,
+    utils::{array_length::ArrayLength, sample::Sample},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
