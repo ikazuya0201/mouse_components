@@ -33,11 +33,12 @@ where
     }
 }
 
-impl<D, N> agent::ObstacleDetector<Obstacle, State> for ObstacleDetector<D, N>
+impl<D, N> agent::ObstacleDetector<State> for ObstacleDetector<D, N>
 where
     D: DistanceSensor,
     N: ArrayLength<D> + ArrayLength<Obstacle>,
 {
+    type Obstacle = Obstacle;
     type Obstacles = Vec<Obstacle, N>;
 
     fn detect(&mut self, state: State) -> Self::Obstacles {

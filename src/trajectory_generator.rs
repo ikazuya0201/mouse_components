@@ -46,10 +46,11 @@ pub struct TrajectoryGenerator<M> {
     back_trajectory: BackTrajectory,
 }
 
-impl<M> agent::TrajectoryGenerator<Pose, Target, RelativeDirection> for TrajectoryGenerator<M>
+impl<M> agent::TrajectoryGenerator<Pose, RelativeDirection> for TrajectoryGenerator<M>
 where
     M: Math + Clone,
 {
+    type Target = Target;
     type Trajectory = impl Iterator<Item = Target>;
 
     fn generate_search_init(&self, pose: &Pose) -> Self::Trajectory {

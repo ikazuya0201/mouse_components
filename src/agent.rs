@@ -9,19 +9,23 @@ use crate::operators::search_operator::SearchAgent;
 use crate::utils::mutex::Mutex;
 pub use pose::Pose;
 
-pub trait ObstacleDetector<Obstacle, State> {
-    type Obstacles: IntoIterator<Item = Obstacle>;
+pub trait ObstacleDetector<State> {
+    type Obstacle;
+    type Obstacles: IntoIterator<Item = Self::Obstacle>;
 
     fn detect(&mut self, state: State) -> Self::Obstacles;
 }
 
-pub trait StateEstimator<State> {
+pub trait StateEstimator {
+    type State;
+
     fn init(&mut self);
-    fn estimate(&mut self) -> State;
+    fn estimate(&mut self) -> Self::State;
 }
 
-pub trait TrajectoryGenerator<Pose, Target, Direction> {
-    type Trajectory: Iterator<Item = Target>;
+pub trait TrajectoryGenerator<Pose, Direction> {
+    type Target;
+    type Trajectory: Iterator<Item = Self::Target>;
 
     fn generate_search_init(&self, pose: &Pose) -> Self::Trajectory;
     fn generate_search(&self, pose: &Pose, direction: &Direction) -> Self::Trajectory;
@@ -34,60 +38,35 @@ pub trait Tracker<State, Target> {
 }
 
 pub struct Agent<
-    State,
-    Target,
     Pose,
-    Obstacle,
     Direction,
     IObstacleDetector,
     IStateEstimator,
     ITracker,
     ITrajectoryGenerator,
 > where
-    IObstacleDetector: ObstacleDetector<Obstacle, State>,
-    IStateEstimator: StateEstimator<State>,
-    ITracker: Tracker<State, Target>,
-    ITrajectoryGenerator: TrajectoryGenerator<Pose, Target, Direction>,
+    IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
+    IStateEstimator: StateEstimator,
+    ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
+    ITrajectoryGenerator: TrajectoryGenerator<Pose, Direction>,
 {
     obstacle_detector: RefCell<IObstacleDetector>,
     state_estimator: RefCell<IStateEstimator>,
     tracker: RefCell<ITracker>,
     trajectory_generator: ITrajectoryGenerator,
     trajectories: Mutex<Queue<ITrajectoryGenerator::Trajectory, U3>>,
-    last_target: Cell<Option<Target>>,
-    _state: PhantomData<fn() -> State>,
+    last_target: Cell<Option<ITrajectoryGenerator::Target>>,
     _pose: PhantomData<fn() -> Pose>,
-    _obstacle: PhantomData<fn() -> Obstacle>,
     _direction: PhantomData<fn() -> Direction>,
 }
 
-impl<
-        State,
-        Target,
-        Pose,
-        Obstacle,
-        Direction,
-        IObstacleDetector,
-        IStateEstimator,
-        ITracker,
-        ITrajectoryGenerator,
-    >
-    Agent<
-        State,
-        Target,
-        Pose,
-        Obstacle,
-        Direction,
-        IObstacleDetector,
-        IStateEstimator,
-        ITracker,
-        ITrajectoryGenerator,
-    >
+impl<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
+    Agent<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
 where
-    IObstacleDetector: ObstacleDetector<Obstacle, State>,
-    IStateEstimator: StateEstimator<State>,
-    ITracker: Tracker<State, Target>,
-    ITrajectoryGenerator: TrajectoryGenerator<Pose, Target, Direction>,
+    IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
+    IStateEstimator: StateEstimator,
+    ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
+    ITrajectoryGenerator: TrajectoryGenerator<Pose, Direction>,
 {
     pub fn new(
         obstacle_detector: IObstacleDetector,
@@ -102,9 +81,7 @@ where
             trajectory_generator,
             trajectories: Mutex::new(Queue::new()),
             last_target: Cell::new(None),
-            _state: PhantomData,
             _pose: PhantomData,
-            _obstacle: PhantomData,
             _direction: PhantomData,
         }
     }
@@ -114,37 +91,18 @@ where
     }
 }
 
-impl<
-        State,
-        Target,
-        Pose,
-        Obstacle,
-        Direction,
-        IObstacleDetector,
-        IStateEstimator,
-        ITracker,
-        ITrajectoryGenerator,
-    > SearchAgent<Pose, Direction>
-    for Agent<
-        State,
-        Target,
-        Pose,
-        Obstacle,
-        Direction,
-        IObstacleDetector,
-        IStateEstimator,
-        ITracker,
-        ITrajectoryGenerator,
-    >
+impl<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
+    SearchAgent<Pose, Direction>
+    for Agent<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
 where
     Pose: Copy,
-    Target: Copy,
-    IObstacleDetector: ObstacleDetector<Obstacle, State>,
-    IStateEstimator: StateEstimator<State>,
-    ITracker: Tracker<State, Target>,
-    ITrajectoryGenerator: TrajectoryGenerator<Pose, Target, Direction>,
+    ITrajectoryGenerator::Target: Copy,
+    IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
+    IStateEstimator: StateEstimator,
+    ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
+    ITrajectoryGenerator: TrajectoryGenerator<Pose, Direction>,
 {
-    type Obstacle = Obstacle;
+    type Obstacle = IObstacleDetector::Obstacle;
     type Obstacles = IObstacleDetector::Obstacles;
 
     fn init(&self, pose: &Pose) {

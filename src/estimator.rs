@@ -34,7 +34,7 @@ pub struct Estimator<LE, RE, I, M> {
     _phantom: PhantomData<fn() -> M>,
 }
 
-impl<LE, RE, I, M> StateEstimator<State> for Estimator<LE, RE, I, M>
+impl<LE, RE, I, M> StateEstimator for Estimator<LE, RE, I, M>
 where
     LE: Encoder,
     RE: Encoder,
@@ -44,6 +44,8 @@ where
     <I as IMU>::Error: core::fmt::Debug,
     M: Math,
 {
+    type State = State;
+
     fn init(&mut self) {
         self.x = self.initial_x;
         self.y = self.initial_y;
