@@ -15,7 +15,6 @@ use typenum::{PowerOfTwo, Unsigned};
 use crate::agent::Pose;
 use crate::obstacle_detector::Obstacle;
 use crate::operators::search_operator::{DirectionInstructor, NodeConverter, ObstacleInterpreter};
-use crate::pattern::Pattern;
 use crate::solver::{Graph, GraphConverter};
 use crate::traits::Math;
 use crate::utils::{array_length::ArrayLength, itertools::repeat_n, mutex::Mutex};
@@ -26,6 +25,19 @@ pub use node::{NodeId, SearchNodeId};
 use pose_converter::PoseConverter;
 use uom::si::{f32::Length, ratio::ratio};
 pub use wall::{WallDirection, WallPosition};
+
+#[derive(Clone, Copy, Debug)]
+pub enum Pattern {
+    Straight(u16),
+    StraightDiagonal(u16),
+    Search90,
+    FastRun45,
+    FastRun90,
+    FastRun135,
+    FastRun180,
+    FastRunDiagonal90,
+    SpinBack,
+}
 
 pub struct Maze<N, F, M>
 where

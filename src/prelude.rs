@@ -13,9 +13,9 @@ pub use crate::solver::Graph as _components_administrator_Solver;
 pub use crate::solver::GraphConverter as _components_administrator_GraphConverter;
 
 pub use crate::agent::ObstacleDetector as _components_agent_ObstacleDetector;
+pub use crate::agent::SearchTrajectoryGenerator as _components_agent_SearchTrajectoryGenerator;
 pub use crate::agent::StateEstimator as _components_agent_StateEstimator;
 pub use crate::agent::Tracker as _components_agent_Tracker;
-pub use crate::agent::TrajectoryGenerator as _components_agent_TrajectoryGenerator;
 
 pub use crate::tracker::RotationController as _components_tracker_RotationController;
 pub use crate::tracker::TranslationController as _components_tracker_TranslationController;
