@@ -7,8 +7,7 @@ use core::iter::Chain;
 
 use auto_enums::auto_enum;
 
-use super::agent;
-use crate::agent::pose::Pose;
+use crate::agent::{Pose, SearchTrajectoryGenerator};
 use crate::maze::RelativeDirection;
 use crate::traits::Math;
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
@@ -46,7 +45,7 @@ pub struct TrajectoryGenerator<M> {
     back_trajectory: BackTrajectory,
 }
 
-impl<M> agent::TrajectoryGenerator<Pose, RelativeDirection> for TrajectoryGenerator<M>
+impl<M> SearchTrajectoryGenerator<Pose, RelativeDirection> for TrajectoryGenerator<M>
 where
     M: Math + Clone,
 {
@@ -489,7 +488,6 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    use agent::TrajectoryGenerator;
                     use core::f32::consts::PI;
 
                     const EPSILON: f32 = 2e-4;

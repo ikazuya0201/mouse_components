@@ -10,7 +10,6 @@ mod estimator;
 mod maze;
 mod obstacle_detector;
 mod operators;
-mod pattern;
 pub mod prelude;
 mod solver;
 mod tracker;
@@ -21,7 +20,7 @@ pub mod traits {
     use super::*;
 
     pub use administrator::{Atomic, Operator, OperatorStore, SelectMode, Selector};
-    pub use agent::{ObstacleDetector, StateEstimator, Tracker, TrajectoryGenerator};
+    pub use agent::{ObstacleDetector, SearchTrajectoryGenerator, StateEstimator, Tracker};
     pub use operators::search_operator::{
         DirectionInstructor, NodeConverter, ObstacleInterpreter, SearchAgent, SearchSolver,
     };
@@ -33,7 +32,7 @@ pub mod sensors {
     use super::*;
 
     pub use estimator::{Encoder, IMU};
-    pub use obstacle_detector::distance_sensor::DistanceSensor;
+    pub use obstacle_detector::DistanceSensor;
     pub use tracker::Motor;
 }
 
@@ -42,12 +41,12 @@ pub mod data_types {
 
     pub use administrator::SelectMode;
     pub use agent::Pose;
+    pub use maze::Pattern;
     pub use maze::{
         AbsoluteDirection, NodeId, Position, RelativeDirection, SearchNodeId, WallDirection,
         WallPosition,
     };
     pub use obstacle_detector::Obstacle;
-    pub use pattern::Pattern;
     pub use tracker::{AngleState, LengthState, State};
     pub use trajectory_generator::{AngleTarget, LengthTarget, Target};
 }

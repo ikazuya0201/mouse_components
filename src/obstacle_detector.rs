@@ -1,13 +1,17 @@
-pub mod distance_sensor;
-
 use generic_array::GenericArray;
 use heapless::Vec;
 
 use crate::agent::{self, Pose};
 use crate::tracker::State;
 use crate::utils::{array_length::ArrayLength, sample::Sample};
-use distance_sensor::DistanceSensor;
 use uom::si::f32::Length;
+
+pub trait DistanceSensor {
+    type Error;
+
+    fn pose(&self) -> Pose;
+    fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error>;
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Obstacle {

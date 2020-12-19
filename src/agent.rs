@@ -1,13 +1,11 @@
-pub mod pose;
-
 use core::cell::{Cell, RefCell};
 use core::marker::PhantomData;
 
 use heapless::{consts::*, spsc::Queue};
+use uom::si::f32::{Angle, Length};
 
 use crate::operators::search_operator::SearchAgent;
 use crate::utils::mutex::Mutex;
-pub use pose::Pose;
 
 pub trait ObstacleDetector<State> {
     type Obstacle;
@@ -23,7 +21,7 @@ pub trait StateEstimator {
     fn estimate(&mut self) -> Self::State;
 }
 
-pub trait TrajectoryGenerator<Pose, Direction> {
+pub trait SearchTrajectoryGenerator<Pose, Direction> {
     type Target;
     type Trajectory: Iterator<Item = Self::Target>;
 
@@ -37,6 +35,19 @@ pub trait Tracker<State, Target> {
     fn stop(&mut self);
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct Pose {
+    pub x: Length,
+    pub y: Length,
+    pub theta: Angle,
+}
+
+impl Pose {
+    pub fn new(x: Length, y: Length, theta: Angle) -> Self {
+        Self { x, y, theta }
+    }
+}
+
 pub struct Agent<
     Pose,
     Direction,
@@ -48,7 +59,7 @@ pub struct Agent<
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
-    ITrajectoryGenerator: TrajectoryGenerator<Pose, Direction>,
+    ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Direction>,
 {
     obstacle_detector: RefCell<IObstacleDetector>,
     state_estimator: RefCell<IStateEstimator>,
@@ -66,7 +77,7 @@ where
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
-    ITrajectoryGenerator: TrajectoryGenerator<Pose, Direction>,
+    ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Direction>,
 {
     pub fn new(
         obstacle_detector: IObstacleDetector,
@@ -100,7 +111,7 @@ where
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
-    ITrajectoryGenerator: TrajectoryGenerator<Pose, Direction>,
+    ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Direction>,
 {
     type Obstacle = IObstacleDetector::Obstacle;
     type Obstacles = IObstacleDetector::Obstacles;

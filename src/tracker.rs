@@ -1,4 +1,3 @@
-mod motor;
 mod state;
 
 use core::marker::PhantomData;
@@ -17,8 +16,11 @@ use uom::{typenum::*, Kind};
 use super::agent;
 use super::trajectory_generator::Target;
 use crate::traits::Math;
-pub use motor::Motor;
 pub use state::{AngleState, LengthState, State};
+
+pub trait Motor {
+    fn apply(&mut self, electric_potential: ElectricPotential);
+}
 
 type GainType = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 type BType = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;

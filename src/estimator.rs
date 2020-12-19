@@ -1,19 +1,30 @@
-mod encoder;
-mod imu;
-
 use core::marker::PhantomData;
 
 use nb::block;
 use uom::si::{
-    f32::{Angle, AngularAcceleration, AngularVelocity, Frequency, Length, Time, Velocity},
+    f32::{
+        Acceleration, Angle, AngularAcceleration, AngularVelocity, Frequency, Length, Time,
+        Velocity,
+    },
     ratio::ratio,
 };
 
 use crate::agent::StateEstimator;
 use crate::tracker::{AngleState, LengthState, State};
 use crate::traits::Math;
-pub use encoder::Encoder;
-pub use imu::IMU;
+
+pub trait IMU {
+    type Error;
+
+    fn get_translational_acceleration(&mut self) -> nb::Result<Acceleration, Self::Error>;
+    fn get_angular_velocity(&mut self) -> nb::Result<AngularVelocity, Self::Error>;
+}
+
+pub trait Encoder {
+    type Error;
+
+    fn get_relative_distance(&mut self) -> nb::Result<Length, Self::Error>;
+}
 
 pub struct Estimator<LE, RE, I, M> {
     initial_x: Length,
