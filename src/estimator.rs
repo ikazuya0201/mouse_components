@@ -660,12 +660,12 @@ mod tests {
                 Velocity::new::<meter_per_second>(0.6),
             )
             .chain(trajectory_generator.generate_search(
-                Pose {
+                &Pose {
                     x: Length::new::<meter>(3.0),
                     y: Default::default(),
                     theta: Default::default(),
                 },
-                direction,
+                &direction,
             ))
     }
 

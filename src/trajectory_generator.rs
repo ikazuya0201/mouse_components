@@ -52,12 +52,12 @@ where
 {
     type Trajectory = impl Iterator<Item = Target>;
 
-    fn generate_search_init(&self, pose: Pose) -> Self::Trajectory {
+    fn generate_search_init(&self, pose: &Pose) -> Self::Trajectory {
         self.generate_trajectory(pose, Kind::Init)
     }
 
-    fn generate_search(&self, pose: Pose, direction: RelativeDirection) -> Self::Trajectory {
-        self.generate_trajectory(pose, Kind::Search(direction))
+    fn generate_search(&self, pose: &Pose, direction: &RelativeDirection) -> Self::Trajectory {
+        self.generate_trajectory(pose, Kind::Search(*direction))
     }
 }
 
@@ -91,11 +91,11 @@ where
     }
 
     #[auto_enum]
-    fn generate_trajectory(&self, pose: Pose, kind: Kind) -> impl Iterator<Item = Target> {
+    fn generate_trajectory(&self, pose: &Pose, kind: Kind) -> impl Iterator<Item = Target> {
         use Kind::*;
         use RelativeDirection::*;
 
-        let shift = Self::get_shift(pose);
+        let shift = Self::get_shift(*pose);
         #[auto_enum(Iterator)]
         match kind {
             Init => {
@@ -513,12 +513,12 @@ mod tests {
                     let (direction, last_x, last_y, last_theta) = $value;
 
                     let mut trajectory = generator.generate_search(
-                        Pose::new(
+                        &Pose::new(
                             Length::new::<meter>(0.045),
                             Length::new::<meter>(0.09),
                             Angle::new::<degree>(90.0),
                         ),
-                        direction,
+                        &direction,
                     );
 
                     let mut last = trajectory.next().unwrap();
