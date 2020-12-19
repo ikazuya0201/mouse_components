@@ -3,8 +3,7 @@ use core::cell::Cell;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use super::Operator;
-use crate::administrator::NotFinishError;
+use crate::administrator::{NotFinishError, Operator};
 
 pub trait SearchAgent<Pose, Direction> {
     type Obstacle;

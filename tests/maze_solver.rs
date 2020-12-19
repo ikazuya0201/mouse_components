@@ -18,6 +18,7 @@ use components::{
     },
     impls::{Maze, MazeBuilder, Solver},
     operators::search_operator::{SearchAgent, SearchOperator},
+    prelude::*,
     traits::Math,
     utils::{array_length::ArrayLength, sample::Sample},
 };
@@ -350,7 +351,6 @@ macro_rules! search_tests {
                     Rc::clone(&solver),
                     ()
                 );
-                use components::operators::Operator;
 
                 while operator.run().is_err() {
                     operator.tick();
