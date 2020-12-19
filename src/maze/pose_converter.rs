@@ -68,7 +68,7 @@ impl<M> PoseConverter<M> {
         (rem, quo)
     }
 
-    pub fn convert_node<N>(&self, node: SearchNodeId<N>) -> Pose
+    pub fn convert_node<N>(&self, node: &SearchNodeId<N>) -> Pose
     where
         N: Unsigned + PowerOfTwo,
     {

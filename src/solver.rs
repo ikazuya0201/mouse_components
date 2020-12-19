@@ -7,8 +7,28 @@ use heap::BinaryHeap;
 use heapless::{consts::*, Vec};
 use num::{Bounded, Saturating};
 
-use super::administrator;
+use crate::operators::search_operator::SearchSolver;
 use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
+
+pub trait GraphConverter<Node> {
+    type SearchNode;
+    type SearchNodes: IntoIterator<Item = Self::SearchNode>;
+
+    ///checker nodes are search nodes on which agent can check
+    ///if walls on the given path exist.
+    fn convert_to_checker_nodes<Nodes: IntoIterator<Item = Node>>(
+        &self,
+        path: Nodes,
+    ) -> Self::SearchNodes;
+}
+
+pub trait Graph<Node> {
+    type Cost;
+    type Edges: IntoIterator<Item = (Node, Self::Cost)>;
+
+    fn successors(&self, node: &Node) -> Self::Edges;
+    fn predecessors(&self, node: &Node) -> Self::Edges;
+}
 
 pub struct Solver<Node, SearchNode, Max, GSize>
 where
@@ -34,7 +54,7 @@ where
     }
 }
 
-impl<Node, SearchNode, Cost, Graph, Max, GSize> administrator::Solver<Node, SearchNode, Cost, Graph>
+impl<Node, SearchNode, Cost, Maze, Max, GSize> SearchSolver<SearchNode, Maze>
     for Solver<Node, SearchNode, Max, GSize>
 where
     Max: ArrayLength<Node>
@@ -50,16 +70,13 @@ where
     Node: Ord + Copy + Debug + Into<usize>,
     SearchNode: Ord + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-    Graph: administrator::Graph<Node, Cost>,
+    Maze: Graph<Node, Cost = Cost>
+        + Graph<SearchNode, Cost = Cost>
+        + GraphConverter<Node, SearchNode = SearchNode>,
 {
-    type Nodes = Vec<Node, Max>;
-    type SearchNodes = Vec<SearchNode, U4>;
+    type Nodes = Vec<SearchNode, U4>;
 
-    fn next_node_candidates(&self, current: SearchNode, graph: &Graph) -> Option<Self::SearchNodes>
-    where
-        Graph: administrator::Graph<SearchNode, Cost>
-            + administrator::GraphConverter<Node, SearchNode>,
-    {
+    fn next_node_candidates(&self, current: &SearchNode, graph: &Maze) -> Option<Self::Nodes> {
         let shortest_path = self.compute_shortest_path(graph)?;
         let checker_nodes = graph.convert_to_checker_nodes(shortest_path);
 
@@ -79,7 +96,7 @@ where
             if candidates.iter().any(|&(cand, _)| cand == node) {
                 continue;
             }
-            for (next, edge_cost) in graph.predecessors(node) {
+            for (next, edge_cost) in graph.predecessors(&node) {
                 let next_cost = cost.saturating_add(edge_cost);
                 if dists[next.into()] > next_cost {
                     dists[next.into()] = next_cost;
@@ -101,8 +118,28 @@ where
         candidates.sort_unstable_by_key(|elem| elem.1);
         Some(candidates.into_iter().map(|(node, _)| node).collect())
     }
+}
 
-    fn compute_shortest_path(&self, graph: &Graph) -> Option<Self::Nodes> {
+impl<Node, SearchNode, Max, GSize> Solver<Node, SearchNode, Max, GSize>
+where
+    Max: ArrayLength<Node>
+        + ArrayLength<SearchNode>
+        + ArrayLength<Option<Node>>
+        + ArrayLength<Option<usize>>
+        + typenum::Unsigned,
+    GSize: ArrayLength<Node>,
+    Node: Ord + Copy + Debug + Into<usize>,
+    SearchNode: Ord + Copy + Debug + Into<usize>,
+{
+    pub fn compute_shortest_path<Cost, Maze>(&self, graph: &Maze) -> Option<Vec<Node, Max>>
+    where
+        Max: ArrayLength<Cost>
+            + ArrayLength<Reverse<Cost>>
+            + ArrayLength<(Node, Reverse<Cost>)>
+            + ArrayLength<(SearchNode, Reverse<Cost>)>,
+        Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+        Maze: Graph<Node, Cost = Cost>,
+    {
         let mut dists = repeat_n(Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
         dists[self.start.into()] = Cost::min_value();
 
@@ -134,7 +171,7 @@ where
                     return construct_path(goal, prev);
                 }
             }
-            for (next, edge_cost) in graph.successors(node) {
+            for (next, edge_cost) in graph.successors(&node) {
                 let next_cost = cost.saturating_add(edge_cost);
                 if next_cost < dists[next.into()] {
                     dists[next.into()] = next_cost;
@@ -149,11 +186,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::administrator::Graph;
-    use super::Solver;
-    use crate::maze::MazeBuilder;
-
+    use generic_array::arr;
     use heapless::consts::*;
+
+    use super::{Graph, SearchSolver, Solver};
+    use crate::maze::MazeBuilder;
 
     struct IGraph {
         n: usize,
@@ -170,23 +207,24 @@ mod tests {
         }
     }
 
-    impl Graph<usize, usize> for IGraph {
+    impl Graph<usize> for IGraph {
+        type Cost = usize;
         type Edges = Vec<(usize, usize)>;
 
-        fn successors(&self, node: usize) -> Self::Edges {
+        fn successors(&self, node: &usize) -> Self::Edges {
             let mut result = Vec::new();
             for i in 0..self.n {
-                if let Some(cost) = self.mat[node][i] {
+                if let Some(cost) = self.mat[*node][i] {
                     result.push((i, cost));
                 }
             }
             result
         }
 
-        fn predecessors(&self, node: usize) -> Self::Edges {
+        fn predecessors(&self, node: &usize) -> Self::Edges {
             let mut result = Vec::new();
             for i in 0..self.n {
-                if let Some(cost) = self.mat[i][node] {
+                if let Some(cost) = self.mat[i][*node] {
                     result.push((i, cost));
                 }
             }
@@ -218,7 +256,7 @@ mod tests {
 
         let solver = Solver::<usize, usize, U9, _>::new(start, goals);
 
-        let path = crate::administrator::Solver::compute_shortest_path(&solver, &graph);
+        let path = Solver::compute_shortest_path(&solver, &graph);
         let expected = [0, 1, 3, 5, 7, 8];
 
         assert!(path.is_some());
@@ -233,7 +271,6 @@ mod tests {
                     use generic_array::arr;
                     use crate::maze::{AbsoluteDirection::*, WallPosition, WallDirection::*, NodeId, SearchNodeId};
                     use crate::utils::math::MathFake;
-                    use crate::prelude::*;
                     use crate::data_types::Pattern;
 
                     fn cost(pattern: Pattern) -> u16 {
@@ -280,7 +317,7 @@ mod tests {
                         maze.check_wall(wall, exists);
                     }
                     let expected = expected.into_iter().map(|input| new_search(input.0, input.1, input.2)).collect::<Vec<_>>();
-                    let candidates = solver.next_node_candidates(current, &maze);
+                    let candidates = solver.next_node_candidates(&current, &maze);
                     assert_eq!(candidates.expect("Failed to unwrap candidates"), expected.as_slice());
                 }
             )*

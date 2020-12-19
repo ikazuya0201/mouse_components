@@ -12,12 +12,11 @@ use generic_array::GenericArray;
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::administrator::{
-    DirectionInstructor, Graph, GraphConverter, NodeConverter, ObstacleInterpreter,
-};
 use crate::agent::Pose;
 use crate::obstacle_detector::Obstacle;
+use crate::operators::search_operator::{DirectionInstructor, NodeConverter, ObstacleInterpreter};
 use crate::pattern::Pattern;
+use crate::solver::{Graph, GraphConverter};
 use crate::traits::Math;
 use crate::utils::{array_length::ArrayLength, itertools::repeat_n, mutex::Mutex};
 pub use direction::{AbsoluteDirection, RelativeDirection};
@@ -411,7 +410,7 @@ where
         &self,
         node_id: NodeId<N>,
         is_successors: bool,
-    ) -> <Self as Graph<NodeId<N>, u16>>::Edges {
+    ) -> <Self as Graph<NodeId<N>>>::Edges {
         use AbsoluteDirection::*;
         use Location::*;
 
@@ -453,7 +452,7 @@ where
         &self,
         node_id: SearchNodeId<N>,
         is_successors: bool,
-    ) -> <Self as Graph<SearchNodeId<N>, u16>>::Edges {
+    ) -> <Self as Graph<SearchNodeId<N>>>::Edges {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -489,7 +488,7 @@ where
     }
 }
 
-impl<N, F, M> Graph<NodeId<N>, u16> for Maze<N, F, M>
+impl<N, F, M> Graph<NodeId<N>> for Maze<N, F, M>
 where
     N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
     <N as Mul<U2>>::Output: Add<U10>,
@@ -500,18 +499,19 @@ where
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
+    type Cost = u16;
     type Edges = Vec<(NodeId<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output>;
 
-    fn successors(&self, node_id: NodeId<N>) -> Self::Edges {
-        self.neighbors(node_id, true)
+    fn successors(&self, node_id: &NodeId<N>) -> Self::Edges {
+        self.neighbors(*node_id, true)
     }
 
-    fn predecessors(&self, node_id: NodeId<N>) -> Self::Edges {
-        self.neighbors(node_id, false)
+    fn predecessors(&self, node_id: &NodeId<N>) -> Self::Edges {
+        self.neighbors(*node_id, false)
     }
 }
 
-impl<N, F, M> Graph<SearchNodeId<N>, u16> for Maze<N, F, M>
+impl<N, F, M> Graph<SearchNodeId<N>> for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -519,14 +519,15 @@ where
     F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
+    type Cost = u16;
     type Edges = Vec<(SearchNodeId<N>, u16), U4>;
 
-    fn successors(&self, node: SearchNodeId<N>) -> Self::Edges {
-        self.search_node_neighbors(node, true)
+    fn successors(&self, node: &SearchNodeId<N>) -> Self::Edges {
+        self.search_node_neighbors(*node, true)
     }
 
-    fn predecessors(&self, node: SearchNodeId<N>) -> Self::Edges {
-        self.search_node_neighbors(node, false)
+    fn predecessors(&self, node: &SearchNodeId<N>) -> Self::Edges {
+        self.search_node_neighbors(*node, false)
     }
 }
 
@@ -662,7 +663,7 @@ where
     }
 }
 
-impl<N, F, M> GraphConverter<NodeId<N>, SearchNodeId<N>> for Maze<N, F, M>
+impl<N, F, M> GraphConverter<NodeId<N>> for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
@@ -672,6 +673,7 @@ where
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
     F: Fn(Pattern) -> u16,
 {
+    type SearchNode = SearchNodeId<N>;
     type SearchNodes = Vec<SearchNodeId<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>;
 
     //NOTE: Suppose that one of the cells nearest to start and goal is not need to be visited.
@@ -774,13 +776,15 @@ where
     }
 }
 
-impl<N, F, M> DirectionInstructor<SearchNodeId<N>, RelativeDirection> for Maze<N, F, M>
+impl<N, F, M> DirectionInstructor<SearchNodeId<N>> for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
+    type Direction = RelativeDirection;
+
     fn update_node_candidates<SearchNodes: IntoIterator<Item = SearchNodeId<N>>>(
         &self,
         candidates: SearchNodes,
@@ -788,7 +792,7 @@ where
         *self.candidates.lock() = candidates.into_iter().collect();
     }
 
-    fn instruct(&self, current: SearchNodeId<N>) -> Option<(RelativeDirection, SearchNodeId<N>)> {
+    fn instruct(&self, current: &SearchNodeId<N>) -> Option<(RelativeDirection, SearchNodeId<N>)> {
         if let Ok(mut candidates) = self.candidates.try_lock() {
             for &node_id in &*candidates {
                 let node = node_id.as_node();
@@ -859,14 +863,16 @@ where
     }
 }
 
-impl<N, F, M> NodeConverter<SearchNodeId<N>, Pose> for Maze<N, F, M>
+impl<N, F, M> NodeConverter<SearchNodeId<N>> for Maze<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    fn convert(&self, node: SearchNodeId<N>) -> Pose {
+    type Pose = Pose;
+
+    fn convert(&self, node: &SearchNodeId<N>) -> Pose {
         self.converter.convert_node(node)
     }
 }
@@ -1274,7 +1280,7 @@ mod tests {
                         let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
                         let (input, mut expected) = $value;
                         expected.sort();
-                        let mut nodes = maze.$method(input);
+                        let mut nodes = maze.$method(&input);
                         nodes.sort();
                         assert_eq!(nodes, expected.as_slice());
                     }
@@ -1413,7 +1419,7 @@ mod tests {
 
         for (src, mut expected) in test_data {
             expected.sort();
-            let mut successors = maze.successors(src);
+            let mut successors = maze.successors(&src);
             successors.sort();
             assert_eq!(successors, expected.as_slice());
         }
@@ -1451,7 +1457,7 @@ mod tests {
 
         for (src, mut expected) in test_data {
             expected.sort();
-            let mut predecessors = maze.predecessors(src);
+            let mut predecessors = maze.predecessors(&src);
             predecessors.sort();
             assert_eq!(predecessors, expected.as_slice());
         }
@@ -1597,13 +1603,13 @@ mod tests {
 
         for ((src, dsts, walls), expected) in test_data {
             let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
-            assert_eq!(maze.instruct(src), None);
+            assert_eq!(maze.instruct(&src), None);
             maze.update_node_candidates(dsts);
             for (wall, exists) in walls {
                 maze.check_wall(wall, exists);
             }
-            assert_eq!(maze.instruct(src), expected);
-            assert_eq!(maze.instruct(src), None);
+            assert_eq!(maze.instruct(&src), expected);
+            assert_eq!(maze.instruct(&src), None);
         }
     }
 
