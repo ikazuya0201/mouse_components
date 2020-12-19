@@ -13,7 +13,7 @@ pub trait ObstacleDetector<State> {
     type Obstacle;
     type Obstacles: IntoIterator<Item = Self::Obstacle>;
 
-    fn detect(&mut self, state: State) -> Self::Obstacles;
+    fn detect(&mut self, state: &State) -> Self::Obstacles;
 }
 
 pub trait StateEstimator {
@@ -33,7 +33,7 @@ pub trait TrajectoryGenerator<Pose, Direction> {
 
 pub trait Tracker<State, Target> {
     fn init(&mut self);
-    fn track(&mut self, state: State, target: Target);
+    fn track(&mut self, state: &State, target: &Target);
     fn stop(&mut self);
 }
 
@@ -117,7 +117,7 @@ where
 
     fn get_existing_obstacles(&self) -> Self::Obstacles {
         let state = self.state_estimator.borrow_mut().estimate();
-        self.obstacle_detector.borrow_mut().detect(state)
+        self.obstacle_detector.borrow_mut().detect(&state)
     }
 
     fn set_instructed_direction(&self, pose: &Pose, direction: &Direction) {
@@ -145,7 +145,7 @@ where
             }
         };
         if let Some(target) = target {
-            self.tracker.borrow_mut().track(state, target);
+            self.tracker.borrow_mut().track(&state, &target);
             self.last_target.set(Some(target));
         }
     }

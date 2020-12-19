@@ -88,7 +88,7 @@ where
         self.rotation_controller.init();
     }
 
-    fn track(&mut self, state: State, target: Target) {
+    fn track(&mut self, state: &State, target: &Target) {
         #[cfg(feature = "log")]
         self.logger.log(&state, &target);
         let (left, right) = self.track_move(state, target);
@@ -127,10 +127,10 @@ where
 
     fn track_move(
         &mut self,
-        state: State,
-        target: Target,
+        state: &State,
+        target: &Target,
     ) -> (ElectricPotential, ElectricPotential) {
-        self.fail_safe(&state, &target);
+        self.fail_safe(state, target);
 
         let (sin_th, cos_th) = M::sincos(state.theta.x);
 

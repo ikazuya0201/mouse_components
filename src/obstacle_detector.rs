@@ -41,7 +41,7 @@ where
     type Obstacle = Obstacle;
     type Obstacles = Vec<Obstacle, N>;
 
-    fn detect(&mut self, state: State) -> Self::Obstacles {
+    fn detect(&mut self, state: &State) -> Self::Obstacles {
         let mut obstacles = Vec::new();
         for distance_sensor in &mut self.distance_sensors {
             let pose = distance_sensor.pose();
@@ -143,8 +143,10 @@ mod tests {
             },
         ];
 
+        use crate::prelude::*;
+
         let mut detector = ObstacleDetector::new(sensors);
-        let obstacles = agent::ObstacleDetector::detect(&mut detector, Default::default());
+        let obstacles = detector.detect(&Default::default());
         for (obstacle, expected) in obstacles.into_iter().zip(expected.into_iter()) {
             assert_relative_eq!(obstacle.source.x.get::<meter>(), expected.x.get::<meter>());
             assert_relative_eq!(obstacle.source.y.get::<meter>(), expected.y.get::<meter>());
