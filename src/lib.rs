@@ -32,7 +32,7 @@ pub mod sensors {
     use super::*;
 
     pub use estimator::{Encoder, IMU};
-    pub use obstacle_detector::distance_sensor::DistanceSensor;
+    pub use obstacle_detector::DistanceSensor;
     pub use tracker::Motor;
 }
 
