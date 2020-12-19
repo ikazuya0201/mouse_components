@@ -9,7 +9,7 @@ mod controller;
 mod estimator;
 mod maze;
 mod obstacle_detector;
-pub mod operators;
+mod operators;
 mod pattern;
 pub mod prelude;
 mod solver;
@@ -40,6 +40,7 @@ pub mod sensors {
 pub mod data_types {
     use super::*;
 
+    pub use administrator::SelectMode;
     pub use agent::Pose;
     pub use maze::{
         AbsoluteDirection, NodeId, Position, RelativeDirection, SearchNodeId, WallDirection,

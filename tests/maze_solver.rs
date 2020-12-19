@@ -16,10 +16,9 @@ use components::{
         AbsoluteDirection, NodeId, Obstacle, Pattern, Pose, Position, RelativeDirection,
         SearchNodeId, WallDirection, WallPosition,
     },
-    impls::{Maze, MazeBuilder, Solver},
-    operators::search_operator::{SearchAgent, SearchOperator},
+    impls::{Maze, MazeBuilder, SearchOperator, Solver},
     prelude::*,
-    traits::Math,
+    traits::{Math, SearchAgent},
     utils::{array_length::ArrayLength, sample::Sample},
 };
 
