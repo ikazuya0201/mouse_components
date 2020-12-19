@@ -16,9 +16,9 @@ use components::{
         AbsoluteDirection, NodeId, Obstacle, Pattern, Pose, Position, RelativeDirection,
         SearchNodeId, WallDirection, WallPosition,
     },
-    impls::{Maze, MazeBuilder, SearchOperator, Solver},
-    prelude::*,
-    traits::{Agent, Math},
+    impls::{Maze, MazeBuilder, Solver},
+    operators::search_operator::{SearchAgent, SearchOperator},
+    traits::Math,
     utils::{array_length::ArrayLength, sample::Sample},
 };
 
@@ -207,18 +207,19 @@ where
     }
 }
 
-impl<N, F, M> Agent<Obstacle, Pose, RelativeDirection> for AgentMock<N, F, M>
+impl<N, F, M> SearchAgent<Pose, RelativeDirection> for AgentMock<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + core::fmt::Debug,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    type Obstacles = Vec<Obstacle>;
+    type Obstacle = Obstacle;
+    type Obstacles = Vec<Self::Obstacle>;
 
-    fn init(&self, pose: Pose) {
+    fn init(&self, pose: &Pose) {
         self.current.replace(
-            self.pose_to_node(pose)
+            self.pose_to_node(*pose)
                 .as_node()
                 .to_search_node_id()
                 .expect("cannot convert to search node id"),
@@ -240,14 +241,14 @@ where
         obstacles
     }
 
-    fn set_instructed_direction(&self, pose: Pose, direction: RelativeDirection) {
+    fn set_instructed_direction(&self, pose: &Pose, direction: &RelativeDirection) {
         use RelativeDirection::*;
 
-        let current = self.pose_to_node(pose).as_node();
+        let current = self.pose_to_node(*pose).as_node();
 
-        let relative = |x: i16, y: i16, dir: RelativeDirection| {
+        let relative = |x: i16, y: i16, dir: &RelativeDirection| {
             current
-                .relative_node(x, y, dir, AbsoluteDirection::North)
+                .relative_node(x, y, *dir, AbsoluteDirection::North)
                 .expect("failed to convert to relative node")
                 .to_search_node_id()
                 .unwrap_or_else(|| {
@@ -333,9 +334,8 @@ macro_rules! search_tests {
                     theta: Angle::new::<degree>(90.0),
                 };
                 let operator = SearchOperator::<
-                    NodeId<$size>,
+                    (),
                     SearchNodeId<$size>,
-                    u16,
                     RelativeDirection,
                     Obstacle,
                     _,
@@ -348,7 +348,10 @@ macro_rules! search_tests {
                     Rc::clone(&maze),
                     agent,
                     Rc::clone(&solver),
+                    ()
                 );
+                use components::operators::Operator;
+
                 while operator.run().is_err() {
                     operator.tick();
                 }

@@ -9,6 +9,7 @@ mod controller;
 mod estimator;
 mod maze;
 mod obstacle_detector;
+pub mod operators;
 mod pattern;
 pub mod prelude;
 mod solver;

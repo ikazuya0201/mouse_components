@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 use heapless::{consts::*, spsc::Queue};
 
-use super::administrator;
+use crate::operators::search_operator::SearchAgent;
 use crate::utils::mutex::Mutex;
 pub use pose::Pose;
 
@@ -23,8 +23,8 @@ pub trait StateEstimator<State> {
 pub trait TrajectoryGenerator<Pose, Target, Direction> {
     type Trajectory: Iterator<Item = Target>;
 
-    fn generate_search_init(&self, pose: Pose) -> Self::Trajectory;
-    fn generate_search(&self, pose: Pose, direction: Direction) -> Self::Trajectory;
+    fn generate_search_init(&self, pose: &Pose) -> Self::Trajectory;
+    fn generate_search(&self, pose: &Pose, direction: &Direction) -> Self::Trajectory;
 }
 
 pub trait Tracker<State, Target> {
@@ -124,7 +124,7 @@ impl<
         IStateEstimator,
         ITracker,
         ITrajectoryGenerator,
-    > administrator::Agent<Obstacle, Pose, Direction>
+    > SearchAgent<Pose, Direction>
     for Agent<
         State,
         Target,
@@ -144,9 +144,10 @@ where
     ITracker: Tracker<State, Target>,
     ITrajectoryGenerator: TrajectoryGenerator<Pose, Target, Direction>,
 {
+    type Obstacle = Obstacle;
     type Obstacles = IObstacleDetector::Obstacles;
 
-    fn init(&self, pose: Pose) {
+    fn init(&self, pose: &Pose) {
         self.state_estimator.borrow_mut().init();
         self.tracker.borrow_mut().init();
         self.last_target.set(None);
@@ -161,7 +162,7 @@ where
         self.obstacle_detector.borrow_mut().detect(state)
     }
 
-    fn set_instructed_direction(&self, pose: Pose, direction: Direction) {
+    fn set_instructed_direction(&self, pose: &Pose, direction: &Direction) {
         let trajectory = self.trajectory_generator.generate_search(pose, direction);
         let mut trajectories = self.trajectories.lock();
         trajectories.enqueue(trajectory).ok();
