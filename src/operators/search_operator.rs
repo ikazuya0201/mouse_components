@@ -42,32 +42,33 @@ pub trait SearchSolver<Node, Graph> {
     fn next_node_candidates(&self, current: &Node, graph: &Graph) -> Option<Self::Nodes>;
 }
 
-pub struct SearchOperator<Mode, Node, Direction, Obstacle, Pose, Maze, IAgent, ISolver> {
-    start_pose: Pose,
+pub struct SearchOperator<Mode, Node, Obstacle, Maze, Agent, Solver>
+where
+    Maze: NodeConverter<Node>,
+{
+    start_pose: Maze::Pose,
     start_node: Node,
     current: Cell<Node>,
     is_updated: AtomicBool,
     maze: Rc<Maze>,
-    agent: Rc<IAgent>,
-    solver: Rc<ISolver>,
+    agent: Rc<Agent>,
+    solver: Rc<Solver>,
     next_mode: Mode,
-    _node: PhantomData<fn() -> Node>,
-    _direction: PhantomData<fn() -> Direction>,
     _obstacle: PhantomData<fn() -> Obstacle>,
-    _pose: PhantomData<fn() -> Pose>,
 }
 
-impl<Mode, Node, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
-    SearchOperator<Mode, Node, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+impl<Mode, Node, Obstacle, Maze, Agent, Solver>
+    SearchOperator<Mode, Node, Obstacle, Maze, Agent, Solver>
 where
     Node: Clone,
+    Maze: NodeConverter<Node>,
 {
     pub fn new(
-        start_pose: Pose,
+        start_pose: Maze::Pose,
         start_node: Node,
         maze: Rc<Maze>,
-        agent: Rc<IAgent>,
-        solver: Rc<ISolver>,
+        agent: Rc<Agent>,
+        solver: Rc<Solver>,
         next_mode: Mode,
     ) -> Self {
         Self {
@@ -79,24 +80,19 @@ where
             agent,
             solver,
             next_mode,
-            _node: PhantomData,
-            _direction: PhantomData,
             _obstacle: PhantomData,
-            _pose: PhantomData,
         }
     }
 }
 
-impl<Mode, Node, Direction, Obstacle, Pose, Maze, IAgent, ISolver> Operator
-    for SearchOperator<Mode, Node, Direction, Obstacle, Pose, Maze, IAgent, ISolver>
+impl<Mode, Node, Obstacle, Maze, Agent, Solver> Operator
+    for SearchOperator<Mode, Node, Obstacle, Maze, Agent, Solver>
 where
     Mode: Copy,
     Node: Copy,
-    Maze: ObstacleInterpreter<Obstacle>
-        + DirectionInstructor<Node, Direction = Direction>
-        + NodeConverter<Node, Pose = Pose>,
-    IAgent: SearchAgent<Pose, Direction, Obstacle = Obstacle>,
-    ISolver: SearchSolver<Node, Maze>,
+    Maze: ObstacleInterpreter<Obstacle> + DirectionInstructor<Node> + NodeConverter<Node>,
+    Agent: SearchAgent<Maze::Pose, Maze::Direction, Obstacle = Obstacle>,
+    Solver: SearchSolver<Node, Maze>,
 {
     type Mode = Mode;
 

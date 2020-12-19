@@ -336,9 +336,7 @@ macro_rules! search_tests {
                 let operator = SearchOperator::<
                     (),
                     SearchNodeId<$size>,
-                    RelativeDirection,
                     Obstacle,
-                    _,
                     _,
                     _,
                     _,
