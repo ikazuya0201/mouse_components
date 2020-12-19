@@ -42,7 +42,6 @@ pub struct Administrator<Mode, AtomicMode, ISelector, Store> {
 
 impl<Mode, AtomicMode, ISelector, Store> Administrator<Mode, AtomicMode, ISelector, Store>
 where
-    Mode: Default + From<u8>,
     AtomicMode: Atomic<SelectMode<Mode>>,
     ISelector: Selector<Mode>,
     Store: OperatorStore<Mode>,
