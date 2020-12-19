@@ -16,9 +16,9 @@ use components::{
         AbsoluteDirection, NodeId, Obstacle, Pattern, Pose, Position, RelativeDirection,
         SearchNodeId, WallDirection, WallPosition,
     },
-    impls::{Maze, MazeBuilder, Solver},
-    operators::search_operator::{SearchAgent, SearchOperator},
-    traits::Math,
+    impls::{Maze, MazeBuilder, SearchOperator, Solver},
+    prelude::*,
+    traits::{Math, SearchAgent},
     utils::{array_length::ArrayLength, sample::Sample},
 };
 
@@ -350,7 +350,6 @@ macro_rules! search_tests {
                     Rc::clone(&solver),
                     ()
                 );
-                use components::operators::Operator;
 
                 while operator.run().is_err() {
                     operator.tick();

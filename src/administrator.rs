@@ -1,94 +1,93 @@
-mod agent;
-mod counter;
-mod maze;
-mod mode;
-pub mod operator;
-mod solver;
-mod switch;
-
-use core::sync::atomic::Ordering::Relaxed;
-
-pub use agent::Agent;
-pub use counter::Counter;
-pub use maze::{DirectionInstructor, Graph, GraphConverter, NodeConverter, ObstacleInterpreter};
-use mode::{AtomicMode, Mode};
-pub use mode::{FastRun, Idle, Search, Select};
-pub use operator::Operator;
-pub use solver::Solver;
-pub use switch::Switch;
+use alloc::rc::Rc;
+use core::marker::PhantomData;
+use core::sync::atomic::Ordering;
 
 #[derive(Debug, Clone, Copy)]
 pub struct NotFinishError;
 
-pub struct Administrator<ISwitch, ICounter, SearchOperator> {
-    mode: AtomicMode,
-    switch: ISwitch,
-    counter: ICounter,
-    search_operator: SearchOperator,
+pub trait Operator {
+    type Mode;
+
+    fn init(&self);
+    fn tick(&self);
+    fn run(&self) -> Result<Self::Mode, NotFinishError>;
 }
 
-impl<ISwitch, ICounter, SearchOperator> Administrator<ISwitch, ICounter, SearchOperator>
+pub trait OperatorStore<Mode> {
+    fn get_operator(&self, mode: Mode) -> Rc<dyn Operator<Mode = Mode>>;
+}
+
+pub trait Atomic<T> {
+    fn load(&self, order: Ordering) -> T;
+    fn store(&self, val: T, order: Ordering);
+}
+
+pub enum SelectMode<Mode> {
+    Select,
+    Other(Mode),
+}
+
+pub trait Selector<Mode> {
+    fn reset(&self);
+    fn mode(&self) -> Mode;
+    fn is_enabled(&self) -> bool;
+}
+
+pub struct Administrator<Mode, AtomicMode, ISelector, Store> {
+    mode: AtomicMode,
+    selector: ISelector,
+    store: Store,
+    _mode: PhantomData<fn() -> Mode>,
+}
+
+impl<Mode, AtomicMode, ISelector, Store> Administrator<Mode, AtomicMode, ISelector, Store>
 where
-    ISwitch: Switch,
-    ICounter: Counter,
-    SearchOperator: Operator<Search>,
+    AtomicMode: Atomic<SelectMode<Mode>>,
+    ISelector: Selector<Mode>,
+    Store: OperatorStore<Mode>,
 {
-    pub fn new(switch: ISwitch, counter: ICounter, search_operator: SearchOperator) -> Self {
+    pub fn new(mode: AtomicMode, selector: ISelector, store: Store) -> Self {
         Self {
-            mode: AtomicMode::new(Mode::Idle(Idle)),
-            switch,
-            counter,
-            search_operator,
+            mode,
+            selector,
+            store,
+            _mode: PhantomData,
         }
     }
 
     //called by periodic interrupt
     pub fn tick(&self) {
-        match self.mode.load(Relaxed) {
-            Mode::Idle(_) => (),
-            Mode::Search(_) => self.search_operator.tick(),
-            Mode::Select(_) => return,
-            _ => (),
+        match self.mode.load(Ordering::Relaxed) {
+            SelectMode::Select => return,
+            SelectMode::Other(mode) => self.store.get_operator(mode).tick(),
         }
-        self.store_if_switch_enabled(Mode::Select(Select));
-    }
-
-    fn store_if_switch_enabled(&self, mode: Mode) {
-        if self.switch.is_enabled() {
-            self.mode.store(mode, Relaxed);
+        if self.selector.is_enabled() {
+            self.mode.store(SelectMode::Select, Ordering::Relaxed);
         }
     }
 
     pub fn run(&self) {
         loop {
-            if let Ok(mode) = match self.mode.load(Relaxed) {
-                Mode::Idle(_) => Err(NotFinishError),
-                Mode::Search(_) => self.search_operator.run(),
-                Mode::FastRun(_) => self.fast_run(),
-                Mode::Select(_) => self.mode_select(),
+            if let Ok(mode) = match self.mode.load(Ordering::Relaxed) {
+                SelectMode::Select => self.mode_select(),
+                SelectMode::Other(mode) => self.store.get_operator(mode).run(),
             } {
-                self.mode.store(mode, Relaxed);
+                self.mode.store(SelectMode::Other(mode), Ordering::Relaxed);
             }
         }
     }
 
-    fn fast_run(&self) -> Result<Mode, NotFinishError> {
-        Ok(Mode::Idle(Idle))
-    }
-
     fn mode_select(&self) -> Result<Mode, NotFinishError> {
-        self.counter.reset();
-        let mut mode = Mode::Idle(Idle);
         //waiting for switch off
-        while self.switch.is_enabled() {}
+        while self.selector.is_enabled() {}
 
-        while !self.switch.is_enabled() {
-            let count = self.counter.count();
-            mode = Mode::from(count % Mode::size());
-        }
+        self.selector.reset();
 
-        while self.switch.is_enabled() {}
+        //waiting for switch on
+        while !self.selector.is_enabled() {}
+        //waiting for switch off
+        while self.selector.is_enabled() {}
 
-        Ok(mode)
+        Ok(self.selector.mode())
     }
 }
