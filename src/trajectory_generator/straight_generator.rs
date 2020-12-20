@@ -441,12 +441,12 @@ where
     }
 
     pub fn generate_constant(
-        &self,
         x_start: Length,
         y_start: Length,
         x_end: Length,
         y_end: Length,
         v: Velocity,
+        period: Time,
     ) -> StraightTrajectory {
         let (x_ratio, y_ratio, dist, theta) =
             Self::calculate_parameters(x_start, y_start, x_end, y_end);
@@ -456,7 +456,7 @@ where
         StraightTrajectory::new(
             StraightTrajectoryCalculator::Constant(trajectory_fn),
             t_end,
-            self.period,
+            period,
             x_ratio,
             y_ratio,
             x_start,

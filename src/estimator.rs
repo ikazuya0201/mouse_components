@@ -444,6 +444,7 @@ mod tests {
         data_types::{Pose, RelativeDirection, Target},
         impls::{TrajectoryGenerator, TrajectoryGeneratorBuilder},
         prelude::*,
+        trajectory_generator::parameters_map,
         utils::math::MathFake,
     };
     use approx::assert_abs_diff_eq;
@@ -457,7 +458,7 @@ mod tests {
         jerk::meter_per_second_cubed, length::meter, velocity::meter_per_second,
     };
 
-    const EPSILON: f32 = 1e-3;
+    const EPSILON: f32 = 1e-2;
 
     struct AgentSimulator<T> {
         inner: Rc<RefCell<AgentSimulatorInner<T>>>,
@@ -604,12 +605,12 @@ mod tests {
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
-            .angular_velocity_ref(AngularVelocity::new::<degree_per_second>(180.0))
+            .angular_velocity_ref(AngularVelocity::new::<degree_per_second>(540.0))
             .angular_acceleration_ref(AngularAcceleration::new::<degree_per_second_squared>(
-                1800.0,
+                6480.0,
             ))
-            .angular_jerk_ref(AngularJerk::new::<degree_per_second_cubed>(18000.0))
-            .slalom_velocity_ref(Velocity::new::<meter_per_second>(0.6))
+            .angular_jerk_ref(AngularJerk::new::<degree_per_second_cubed>(216000.0))
+            .slalom_parameters_map(parameters_map)
             .period(PERIOD)
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
             .build()
@@ -667,14 +668,14 @@ mod tests {
             .generate_straight(
                 Default::default(),
                 Default::default(),
-                Length::new::<meter>(3.0),
+                Length::new::<meter>(0.09),
                 Default::default(),
                 Default::default(),
                 Velocity::new::<meter_per_second>(0.6),
             )
             .chain(trajectory_generator.generate_search(
                 &Pose {
-                    x: Length::new::<meter>(3.0),
+                    x: Length::new::<meter>(0.09),
                     y: Default::default(),
                     theta: Default::default(),
                 },
@@ -683,9 +684,9 @@ mod tests {
     }
 
     estimator_tests! {
-        test_estimator1: straight_trajectory(),
-        test_estimator2: straight_and_search_trajectory(RelativeDirection::Right),
-        test_estimator3: straight_and_search_trajectory(RelativeDirection::Left),
-        test_estimator4: straight_and_search_trajectory(RelativeDirection::Front),
+        test_estimator_straight1: straight_trajectory(),
+        test_estimator_straight_right: straight_and_search_trajectory(RelativeDirection::Right),
+        test_estimator_straight_left: straight_and_search_trajectory(RelativeDirection::Left),
+        test_estimator_straight2: straight_and_search_trajectory(RelativeDirection::Front),
     }
 }
