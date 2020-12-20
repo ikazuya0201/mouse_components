@@ -49,12 +49,12 @@ impl Pose {
 }
 
 pub struct Agent<
-    Pose,
-    Direction,
     IObstacleDetector,
     IStateEstimator,
     ITracker,
     ITrajectoryGenerator,
+    Pose = crate::data_types::Pose,
+    Direction = crate::data_types::RelativeDirection,
 > where
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
@@ -72,7 +72,7 @@ pub struct Agent<
 }
 
 impl<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
-    Agent<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
+    Agent<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Pose, Direction>
 where
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
@@ -104,7 +104,7 @@ where
 
 impl<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
     SearchAgent<Pose, Direction>
-    for Agent<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
+    for Agent<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Pose, Direction>
 where
     Pose: Copy,
     ITrajectoryGenerator::Target: Copy,

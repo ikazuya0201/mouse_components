@@ -12,7 +12,7 @@ use generic_array::GenericArray;
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::agent::Pose;
+use crate::data_types::Pose;
 use crate::obstacle_detector::Obstacle;
 use crate::operators::search_operator::{DirectionInstructor, NodeConverter, ObstacleInterpreter};
 use crate::solver::{Graph, GraphConverter};

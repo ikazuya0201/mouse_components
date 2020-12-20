@@ -7,7 +7,8 @@ use core::iter::Chain;
 
 use auto_enums::auto_enum;
 
-use crate::agent::{Pose, SearchTrajectoryGenerator};
+use crate::agent::SearchTrajectoryGenerator;
+use crate::data_types::Pose;
 use crate::maze::RelativeDirection;
 use crate::traits::Math;
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
