@@ -127,7 +127,7 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    maze: Rc<Maze<N, F, M>>,
+    maze: Rc<Maze<N, M, F>>,
     current: RefCell<SearchNodeId<N>>,
     square_width: Length,
     wall_width: Length,
@@ -141,7 +141,7 @@ where
     F: Fn(Pattern) -> u16,
 {
     fn new(
-        maze: Rc<Maze<N, F, M>>,
+        maze: Rc<Maze<N, M, F>>,
         current: SearchNodeId<N>,
         square_width: Length,
         wall_width: Length,

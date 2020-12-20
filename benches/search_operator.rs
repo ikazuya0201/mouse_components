@@ -102,11 +102,10 @@ use std::rc::Rc;
 
 use components::{
     data_types::{AbsoluteDirection, NodeId, Pattern, Pose, SearchNodeId},
-    defaults::{DefaultSearchOperator, DefaultSolver},
+    defaults::{SearchOperator, Solver},
     impls::{
-        Agent, EstimatorBuilder, MazeBuilder, NullLogger, ObstacleDetector,
-        RotationControllerBuilder, TrackerBuilder, TrajectoryGeneratorBuilder,
-        TranslationControllerBuilder,
+        Agent, EstimatorBuilder, MazeBuilder, ObstacleDetector, RotationControllerBuilder,
+        TrackerBuilder, TrajectoryGeneratorBuilder, TranslationControllerBuilder,
     },
     prelude::*,
     traits::Math,
@@ -201,18 +200,18 @@ fn bench_run(c: &mut Criterion) {
 criterion_group!(benches, bench_tick, bench_run);
 criterion_main!(benches);
 
-fn create_search_operator() -> DefaultSearchOperator<
-    IMotor,
-    IMotor,
+fn create_search_operator() -> SearchOperator<
     IEncoder,
     IEncoder,
     Imu,
+    IMotor,
+    IMotor,
     IDistanceSensor,
     DistanceSensorNum,
     MazeWidth,
     MaxSize,
     GoalSize,
-    NullLogger,
+    (),
     MathFake,
 > {
     let period = Time::new::<second>(0.001);
@@ -228,8 +227,8 @@ fn create_search_operator() -> DefaultSearchOperator<
                 .initial_posture(Angle::new::<degree>(90.0))
                 .initial_x(Length::new::<meter>(0.045))
                 .initial_y(Length::new::<meter>(0.045))
-                // .wheel_interval(Length::new::<meter>(0.0335))
-                .build()
+                .wheel_interval(Length::new::<meter>(0.0335))
+                .build::<MathFake>()
         };
 
         let tracker = {
@@ -328,7 +327,7 @@ fn create_search_operator() -> DefaultSearchOperator<
             .build::<MazeWidth, MathFake>(),
     );
 
-    let solver = Rc::new(DefaultSolver::<MazeWidth, MaxSize, GoalSize>::new(
+    let solver = Rc::new(Solver::<MazeWidth, MaxSize, GoalSize>::new(
         NodeId::new(0, 0, AbsoluteDirection::North).unwrap(),
         arr![
             NodeId<MazeWidth>;
@@ -337,7 +336,7 @@ fn create_search_operator() -> DefaultSearchOperator<
         ],
     ));
 
-    let operator = DefaultSearchOperator::new(
+    let operator = SearchOperator::new(
         Pose::new(
             Length::new::<meter>(0.045),
             Length::new::<meter>(0.045),
@@ -347,6 +346,7 @@ fn create_search_operator() -> DefaultSearchOperator<
         maze,
         agent,
         solver,
+        (),
     );
     operator.init();
     operator

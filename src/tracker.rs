@@ -47,7 +47,14 @@ impl Logger for NullLogger {
     fn log(&self, _state: &State, _target: &Target) {}
 }
 
-pub struct Tracker<LM, RM, TC, RC, L, M> {
+pub struct Tracker<
+    LM,
+    RM,
+    M,
+    TC = crate::impls::TranslationController,
+    RC = crate::impls::RotationController,
+    L = NullLogger,
+> {
     kx: GainType,
     kdx: Frequency,
     ky: GainType,
@@ -67,7 +74,7 @@ pub struct Tracker<LM, RM, TC, RC, L, M> {
     _phantom: PhantomData<fn() -> M>,
 }
 
-impl<LM, RM, TC, RC, L, M> agent::Tracker<State, Target> for Tracker<LM, RM, TC, RC, L, M>
+impl<LM, RM, M, TC, RC, L> agent::Tracker<State, Target> for Tracker<LM, RM, M, TC, RC, L>
 where
     LM: Motor,
     RM: Motor,
@@ -99,7 +106,7 @@ where
     }
 }
 
-impl<LM, RM, TC, RC, L, M> Tracker<LM, RM, TC, RC, L, M>
+impl<LM, RM, M, TC, RC, L> Tracker<LM, RM, M, TC, RC, L>
 where
     LM: Motor,
     RM: Motor,
@@ -265,7 +272,7 @@ where
     RC: RotationController,
     L: Logger,
 {
-    pub fn build<M>(self) -> Tracker<LM, RM, TC, RC, L, M>
+    pub fn build<M>(self) -> Tracker<LM, RM, M, TC, RC, L>
     where
         M: Math,
     {
@@ -315,7 +322,7 @@ where
     RC: RotationController,
     L: Logger,
 {
-    pub fn build<M>(self) -> Tracker<LM, RM, TC, RC, L, M>
+    pub fn build<M>(self) -> Tracker<LM, RM, M, TC, RC, L>
     where
         M: Math,
     {
@@ -364,7 +371,7 @@ where
     TC: TranslationController,
     RC: RotationController,
 {
-    pub fn build<M>(self) -> Tracker<LM, RM, TC, RC, L, M>
+    pub fn build<M>(self) -> Tracker<LM, RM, M, TC, RC, L>
     where
         M: Math,
     {
@@ -414,7 +421,7 @@ where
     RC: RotationController,
     L: Logger,
 {
-    pub fn build<M>(self) -> Tracker<LM, RM, TC, RC, L, M>
+    pub fn build<M>(self) -> Tracker<LM, RM, M, TC, RC, L>
     where
         M: Math,
     {
@@ -915,7 +922,7 @@ mod tests {
 
     fn build_tracker<L>(
         logger: L,
-    ) -> Tracker<IMotor, IMotor, ITranslationController, IRotationController, L, MathFake>
+    ) -> Tracker<IMotor, IMotor, MathFake, ITranslationController, IRotationController, L>
     where
         L: Logger,
     {

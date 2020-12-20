@@ -68,3 +68,71 @@ pub mod impls {
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{TrajectoryGenerator, TrajectoryGeneratorBuilder};
 }
+
+pub mod defaults {
+    use super::*;
+
+    pub type Agent<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        DistanceSensorNum,
+        Math,
+        Logger = impls::NullLogger,
+    > = impls::Agent<
+        impls::ObstacleDetector<DistanceSensor, DistanceSensorNum>,
+        impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
+        impls::Tracker<
+            LeftMotor,
+            RightMotor,
+            Math,
+            impls::TranslationController,
+            impls::RotationController,
+            Logger,
+        >,
+        impls::TrajectoryGenerator<Math>,
+    >;
+
+    pub type Solver<MazeWidth, MaxPathLength, GoalSize> = impls::Solver<
+        data_types::NodeId<MazeWidth>,
+        data_types::SearchNodeId<MazeWidth>,
+        MaxPathLength,
+        GoalSize,
+    >;
+
+    pub type SearchOperator<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        DistanceSensorNum,
+        MazeWidth,
+        MaxPathLength,
+        GoalSize,
+        Mode,
+        Math,
+        Logger = impls::NullLogger,
+    > = impls::SearchOperator<
+        Mode,
+        data_types::SearchNodeId<MazeWidth>,
+        data_types::Obstacle,
+        impls::Maze<MazeWidth, Math>,
+        Agent<
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            LeftMotor,
+            RightMotor,
+            DistanceSensor,
+            DistanceSensorNum,
+            Math,
+            Logger,
+        >,
+        Solver<MazeWidth, MaxPathLength, GoalSize>,
+    >;
+}

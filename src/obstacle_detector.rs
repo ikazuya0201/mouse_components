@@ -1,10 +1,11 @@
 use generic_array::GenericArray;
 use heapless::Vec;
+use uom::si::f32::Length;
 
-use crate::agent::{self, Pose};
+use crate::agent;
+use crate::data_types::Pose;
 use crate::tracker::State;
 use crate::utils::{array_length::ArrayLength, sample::Sample};
-use uom::si::f32::Length;
 
 pub trait DistanceSensor {
     type Error;
@@ -69,7 +70,7 @@ mod tests {
     use approx::assert_relative_eq;
 
     use super::*;
-    use crate::agent::Pose;
+    use crate::data_types::Pose;
     use uom::si::{angle::degree, f32::Angle, length::meter};
 
     struct IDistanceSensor {

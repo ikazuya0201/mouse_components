@@ -9,7 +9,7 @@ use uom::si::{
 };
 
 use super::{AbsoluteDirection, Obstacle, SearchNodeId, WallDirection, WallPosition};
-use crate::agent::Pose;
+use crate::data_types::Pose;
 use crate::traits::Math;
 use crate::utils::total::Total;
 
