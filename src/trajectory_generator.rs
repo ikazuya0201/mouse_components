@@ -11,7 +11,7 @@ use crate::agent::SearchTrajectoryGenerator;
 use crate::data_types::Pose;
 use crate::maze::RelativeDirection;
 use crate::traits::Math;
-pub use slalom_generator::{SlalomDirection, SlalomKind, SlalomParameters};
+pub use slalom_generator::{slalom_parameters_map, SlalomDirection, SlalomKind, SlalomParameters};
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use spin_generator::{SpinGenerator, SpinTrajectory};
 use straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
@@ -455,9 +455,6 @@ impl<TV, TA, TJ, SPM, V, A, J, T> TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V,
 }
 
 #[cfg(test)]
-pub use slalom_generator::parameters_map;
-
-#[cfg(test)]
 mod tests {
     use super::*;
     use crate::utils::math::MathFake;
@@ -483,7 +480,7 @@ mod tests {
                 1800.0,
             ))
             .angular_jerk_ref(AngularJerk::new::<degree_per_second_cubed>(18000.0))
-            .slalom_parameters_map(parameters_map)
+            .slalom_parameters_map(slalom_parameters_map)
             .period(Time::new::<second>(0.001))
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
             .build()
@@ -512,7 +509,7 @@ mod tests {
                         .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
                         .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
                         .search_velocity(search_velocity)
-                        .slalom_parameters_map(parameters_map)
+                        .slalom_parameters_map(slalom_parameters_map)
                         .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
                         .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
                             36.0 * PI,

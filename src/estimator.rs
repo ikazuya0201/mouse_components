@@ -444,7 +444,7 @@ mod tests {
         data_types::{Pose, RelativeDirection, Target},
         impls::{TrajectoryGenerator, TrajectoryGeneratorBuilder},
         prelude::*,
-        trajectory_generator::parameters_map,
+        trajectory_generator::slalom_parameters_map,
         utils::math::MathFake,
     };
     use approx::assert_abs_diff_eq;
@@ -610,7 +610,7 @@ mod tests {
                 6480.0,
             ))
             .angular_jerk_ref(AngularJerk::new::<degree_per_second_cubed>(216000.0))
-            .slalom_parameters_map(parameters_map)
+            .slalom_parameters_map(slalom_parameters_map)
             .period(PERIOD)
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
             .build()

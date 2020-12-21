@@ -227,8 +227,44 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
     }
 }
 
-#[cfg(test)]
-pub use tests::parameters_map;
+pub fn slalom_parameters_map(kind: SlalomKind, dir: SlalomDirection) -> SlalomParameters {
+    use uom::si::{angle::degree, length::millimeter, velocity::millimeter_per_second};
+    use SlalomDirection::*;
+    use SlalomKind::*;
+
+    let params = match kind {
+        Search90 => (5.000001, 0.0, 45.0, 40.0, 45.0, 45.0, 241.59, 90.0),
+        FastRun45 => (2.57365, 0.0, 75.0, 30.0, 90.0, 45.0, 411.636, 45.0),
+        FastRun90 => (20.0, 0.0, 90.0, 70.0, 90.0, 90.0, 422.783, 90.0),
+        FastRun135 => (21.8627, 0.0, 55.0, 80.0, 45.0, 90.0, 353.609, 135.0),
+        FastRun180 => (24.0, 0.0, 24.0, 90.0, 0.0, 90.0, 412.228, 180.0),
+        FastRunDiagonal90 => (15.6396, 0.0, 63.6396, 48.0, 63.6396, 63.6396, 289.908, 90.0),
+    };
+    let params = match dir {
+        Left => params,
+        Right => (
+            params.0, params.1, params.2, -params.3, params.4, -params.5, params.6, -params.7,
+        ),
+    };
+    SlalomParameters {
+        xy: [
+            (
+                Length::new::<millimeter>(params.0),
+                Length::new::<millimeter>(params.1),
+            ),
+            (
+                Length::new::<millimeter>(params.2),
+                Length::new::<millimeter>(params.3),
+            ),
+            (
+                Length::new::<millimeter>(params.4),
+                Length::new::<millimeter>(params.5),
+            ),
+        ],
+        v_ref: Velocity::new::<millimeter_per_second>(params.6),
+        theta: Angle::new::<degree>(params.7),
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -240,7 +276,7 @@ mod tests {
         angular_acceleration::{degree_per_second_squared, radian_per_second_squared},
         angular_jerk::{degree_per_second_cubed, radian_per_second_cubed},
         angular_velocity::{degree_per_second, radian_per_second},
-        length::{meter, millimeter},
+        length::meter,
         time::second,
         velocity::meter_per_second,
     };
@@ -265,7 +301,8 @@ mod tests {
         let v_ref = Velocity::new::<meter_per_second>(v_ref);
         let period = Time::new::<second>(period);
 
-        let generator = SlalomGenerator::new(dtheta, ddtheta, dddtheta, period, parameters_map);
+        let generator =
+            SlalomGenerator::new(dtheta, ddtheta, dddtheta, period, slalom_parameters_map);
         let v_target = Velocity::new::<meter_per_second>(v_target);
         generator.generate_curve(
             Length::new::<meter>(x),
@@ -275,45 +312,6 @@ mod tests {
             v_target,
             v_ref,
         )
-    }
-
-    pub fn parameters_map(kind: SlalomKind, dir: SlalomDirection) -> SlalomParameters {
-        use uom::si::velocity::millimeter_per_second;
-        use SlalomDirection::*;
-        use SlalomKind::*;
-
-        let params = match kind {
-            Search90 => (5.000001, 0.0, 45.0, 40.0, 45.0, 45.0, 241.59, 90.0),
-            FastRun45 => (2.57365, 0.0, 75.0, 30.0, 90.0, 45.0, 411.636, 45.0),
-            FastRun90 => (20.0, 0.0, 90.0, 70.0, 90.0, 90.0, 422.783, 90.0),
-            FastRun135 => (21.8627, 0.0, 55.0, 80.0, 45.0, 90.0, 353.609, 135.0),
-            FastRun180 => (24.0, 0.0, 24.0, 90.0, 0.0, 90.0, 412.228, 180.0),
-            FastRunDiagonal90 => (15.6396, 0.0, 63.6396, 48.0, 63.6396, 63.6396, 289.908, 90.0),
-        };
-        let params = match dir {
-            Left => params,
-            Right => (
-                params.0, params.1, params.2, -params.3, params.4, -params.5, params.6, -params.7,
-            ),
-        };
-        SlalomParameters {
-            xy: [
-                (
-                    Length::new::<millimeter>(params.0),
-                    Length::new::<millimeter>(params.1),
-                ),
-                (
-                    Length::new::<millimeter>(params.2),
-                    Length::new::<millimeter>(params.3),
-                ),
-                (
-                    Length::new::<millimeter>(params.4),
-                    Length::new::<millimeter>(params.5),
-                ),
-            ],
-            v_ref: Velocity::new::<millimeter_per_second>(params.6),
-            theta: Angle::new::<degree>(params.7),
-        }
     }
 
     proptest! {
@@ -326,7 +324,7 @@ mod tests {
                 AngularAcceleration::new::<degree_per_second_squared>(6480.0),
                 AngularJerk::new::<degree_per_second_cubed>(216000.0),
                 Time::new::<second>(0.001),
-                parameters_map,
+                slalom_parameters_map,
             );
             let v_target = Velocity::new::<meter_per_second>(0.5);
 
