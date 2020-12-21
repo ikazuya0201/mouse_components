@@ -169,17 +169,17 @@ macro_rules! impl_calculator_generator {
                     <$t>::from((v_start + v_end) * t / 2.0)
                 }
 
-                fn generate_constant(
+                pub fn generate_constant(
                     x_start: $t,
                     distance: $t,
                     v: $dt,
-                ) -> (ContantCalculator, Time) {
+                ) -> (ConstantCalculator, Time) {
                     let t_end = if (distance / v).get::<second>() < 0.0 {
                         Default::default()
                     } else {
                         distance / v
                     };
-                    (ContantCalculator { t_end, x_start, v }, t_end)
+                    (ConstantCalculator { t_end, x_start, v }, t_end)
                 }
 
                 //TODO: devise faster algorithm
@@ -286,14 +286,14 @@ macro_rules! impl_calculator_generator {
             }
 
             #[derive(Clone)]
-            struct ContantCalculator {
+            pub struct ConstantCalculator {
                 t_end: Time,
                 x_start: $t,
                 v: $dt,
             }
 
-            impl ContantCalculator {
-                fn calculate(&self, t: Time) -> $target {
+            impl ConstantCalculator {
+                pub fn calculate(&self, t: Time) -> $target {
                     if t > self.t_end || t.get::<second>() < 0.0 {
                         $target {
                             x: self.x_start + <$t>::from(self.v * self.t_end),
@@ -322,7 +322,7 @@ macro_rules! impl_calculator_generator {
                 distance: $t,
                 v_end: $dt,
                 accel_calculator: AccelerationCalculator,
-                const_calculator: ContantCalculator,
+                const_calculator: ConstantCalculator,
                 decel_calculator: AccelerationCalculator,
                 sign: f32,
             }
@@ -363,7 +363,7 @@ macro_rules! impl_calculator_generator {
 }
 
 pub use length_calculator::{
-    OverallCalculator as LengthOverallCalculator,
+    ConstantCalculator as LengthConstantCalculator, OverallCalculator as LengthOverallCalculator,
     StraightCalculatorGenerator as LengthStraightCalculatorGenerator,
 };
 impl_calculator_generator!(
@@ -422,22 +422,14 @@ where
         v_start: Velocity,
         v_end: Velocity,
     ) -> StraightTrajectory {
-        let x_dist = x_end - x_start;
-        let y_dist = y_end - y_start;
-
-        let dist = Self::calculate_distance(x_dist, y_dist);
-
+        let (x_ratio, y_ratio, dist, theta) =
+            Self::calculate_parameters(x_start, y_start, x_end, y_end);
         let (trajectory_fn, t_end) =
             self.function_generator
                 .generate(Default::default(), dist, v_start, v_end);
 
-        let x_ratio = (x_dist / dist).get::<ratio>();
-        let y_ratio = (y_dist / dist).get::<ratio>();
-
-        let theta = Angle::new::<radian>(M::atan2f(y_dist.get::<meter>(), x_dist.get::<meter>()));
-
         StraightTrajectory::new(
-            trajectory_fn,
+            StraightTrajectoryCalculator::Accel(trajectory_fn),
             t_end,
             self.period,
             x_ratio,
@@ -447,11 +439,62 @@ where
             theta,
         )
     }
+
+    pub fn generate_constant(
+        x_start: Length,
+        y_start: Length,
+        x_end: Length,
+        y_end: Length,
+        v: Velocity,
+        period: Time,
+    ) -> StraightTrajectory {
+        let (x_ratio, y_ratio, dist, theta) =
+            Self::calculate_parameters(x_start, y_start, x_end, y_end);
+        let (trajectory_fn, t_end) =
+            LengthStraightCalculatorGenerator::<M>::generate_constant(Default::default(), dist, v);
+
+        StraightTrajectory::new(
+            StraightTrajectoryCalculator::Constant(trajectory_fn),
+            t_end,
+            period,
+            x_ratio,
+            y_ratio,
+            x_start,
+            y_start,
+            theta,
+        )
+    }
+
+    #[inline]
+    fn calculate_parameters(
+        x_start: Length,
+        y_start: Length,
+        x_end: Length,
+        y_end: Length,
+    ) -> (f32, f32, Length, Angle) {
+        let x_dist = x_end - x_start;
+        let y_dist = y_end - y_start;
+
+        let dist = Self::calculate_distance(x_dist, y_dist);
+
+        let x_ratio = (x_dist / dist).get::<ratio>();
+        let y_ratio = (y_dist / dist).get::<ratio>();
+
+        let theta = Angle::new::<radian>(M::atan2f(y_dist.get::<meter>(), x_dist.get::<meter>()));
+
+        (x_ratio, y_ratio, dist, theta)
+    }
+}
+
+#[derive(Clone)]
+pub enum StraightTrajectoryCalculator {
+    Accel(LengthOverallCalculator),
+    Constant(LengthConstantCalculator),
 }
 
 #[derive(Clone)]
 pub struct StraightTrajectory {
-    trajectory_calculator: LengthOverallCalculator,
+    trajectory_calculator: StraightTrajectoryCalculator,
     t: Time,
     t_end: Time,
     period: Time,
@@ -464,7 +507,7 @@ pub struct StraightTrajectory {
 
 impl StraightTrajectory {
     fn new(
-        trajectory_calculator: LengthOverallCalculator,
+        trajectory_calculator: StraightTrajectoryCalculator,
         t_end: Time,
         period: Time,
         x_ratio: f32,
@@ -496,7 +539,10 @@ impl Iterator for StraightTrajectory {
         }
         let t = self.t;
         self.t += self.period;
-        let target = self.trajectory_calculator.calculate(t);
+        let target = match &self.trajectory_calculator {
+            StraightTrajectoryCalculator::Accel(calculator) => calculator.calculate(t),
+            StraightTrajectoryCalculator::Constant(calculator) => calculator.calculate(t),
+        };
         Some(Target {
             x: LengthTarget {
                 x: self.x_start + target.x * self.x_ratio,

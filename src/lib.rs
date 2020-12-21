@@ -66,7 +66,9 @@ pub mod impls {
     pub use operators::search_operator::SearchOperator;
     pub use solver::Solver;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
-    pub use trajectory_generator::{TrajectoryGenerator, TrajectoryGeneratorBuilder};
+    pub use trajectory_generator::{
+        slalom_parameters_map, TrajectoryGenerator, TrajectoryGeneratorBuilder,
+    };
 }
 
 pub mod defaults {

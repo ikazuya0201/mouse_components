@@ -104,8 +104,9 @@ use components::{
     data_types::{AbsoluteDirection, NodeId, Pattern, Pose, SearchNodeId},
     defaults::{SearchOperator, Solver},
     impls::{
-        Agent, EstimatorBuilder, MazeBuilder, ObstacleDetector, RotationControllerBuilder,
-        TrackerBuilder, TrajectoryGeneratorBuilder, TranslationControllerBuilder,
+        slalom_parameters_map, Agent, EstimatorBuilder, MazeBuilder, ObstacleDetector,
+        RotationControllerBuilder, TrackerBuilder, TrajectoryGeneratorBuilder,
+        TranslationControllerBuilder,
     },
     prelude::*,
     traits::Math,
@@ -275,7 +276,7 @@ fn create_search_operator() -> SearchOperator<
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
             .search_velocity(search_velocity)
-            .slalom_velocity_ref(Velocity::new::<meter_per_second>(0.27178875))
+            .slalom_parameters_map(slalom_parameters_map)
             .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
             .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
                 36.0 * PI,

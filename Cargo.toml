@@ -31,6 +31,7 @@ git = "https://github.com/ikazuya0201/heap"
 approx = "0.3.2"
 criterion = "0.3.3"
 proptest = "0.10.1"
+proptest-derive = "0.2.0"
 
 [features]
 log = []
