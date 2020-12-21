@@ -3,6 +3,8 @@ pub use crate::administrator::Operator as _components_administrator_Operator;
 pub use crate::administrator::OperatorStore as _components_administrator_OperatorStore;
 pub use crate::administrator::Selector as _components_administrator_Selector;
 
+pub use crate::operators::run_operator::RunAgent as _components_operators_run_operator_RunAgent;
+pub use crate::operators::run_operator::RunSolver as _components_operators_run_operator_RunSolver;
 pub use crate::operators::search_operator::DirectionInstructor as _components_operators_search_operator_DirectionInstructor;
 pub use crate::operators::search_operator::NodeConverter as _components_operators_search_operator_NodeConverter;
 pub use crate::operators::search_operator::ObstacleInterpreter as _components_operators_search_operator_ObstacleInterpreter;
