@@ -7,7 +7,7 @@ pub trait RunSolver<Graph> {
     type Node;
     type Nodes: IntoIterator<Item = Self::Node>;
 
-    fn compute_shortest_path(&self, graph: &Graph) -> Self::Nodes;
+    fn compute_shortest_path(&self, graph: &Graph) -> Option<Self::Nodes>;
 }
 
 pub trait RunAgent<Node> {
@@ -46,7 +46,8 @@ where
     type Mode = Mode;
 
     fn init(&self) {
-        let path = self.solver.compute_shortest_path(&self.maze);
+        //TODO: modify to return Result in init. remove this unwrap.
+        let path = self.solver.compute_shortest_path(&self.maze).unwrap();
         self.agent.init_run(path);
     }
 
