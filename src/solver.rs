@@ -7,7 +7,7 @@ use heap::BinaryHeap;
 use heapless::{consts::*, Vec};
 use num::{Bounded, Saturating};
 
-use crate::operators::search_operator::SearchSolver;
+use crate::operators::{run_operator::RunSolver, search_operator::SearchSolver};
 use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
 
 pub trait GraphConverter<Node> {
@@ -120,7 +120,7 @@ where
     }
 }
 
-impl<Node, SearchNode, Max, GSize> Solver<Node, SearchNode, Max, GSize>
+impl<Node, SearchNode, Max, GSize, Maze> RunSolver<Maze> for Solver<Node, SearchNode, Max, GSize>
 where
     Max: ArrayLength<Node>
         + ArrayLength<SearchNode>
@@ -130,23 +130,26 @@ where
     GSize: ArrayLength<Node>,
     Node: Ord + Copy + Debug + Into<usize>,
     SearchNode: Ord + Copy + Debug + Into<usize>,
+    Max: ArrayLength<Maze::Cost>
+        + ArrayLength<Reverse<Maze::Cost>>
+        + ArrayLength<(Node, Reverse<Maze::Cost>)>
+        + ArrayLength<(SearchNode, Reverse<Maze::Cost>)>,
+    Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Maze: Graph<Node>,
 {
-    pub fn compute_shortest_path<Cost, Maze>(&self, graph: &Maze) -> Option<Vec<Node, Max>>
-    where
-        Max: ArrayLength<Cost>
-            + ArrayLength<Reverse<Cost>>
-            + ArrayLength<(Node, Reverse<Cost>)>
-            + ArrayLength<(SearchNode, Reverse<Cost>)>,
-        Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-        Maze: Graph<Node, Cost = Cost>,
-    {
-        let mut dists = repeat_n(Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
-        dists[self.start.into()] = Cost::min_value();
+    type Node = Node;
+    type Nodes = Vec<Node, Max>;
+
+    fn compute_shortest_path(&self, graph: &Maze) -> Option<Vec<Node, Max>> {
+        let mut dists =
+            repeat_n(Maze::Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
+        dists[self.start.into()] = Maze::Cost::min_value();
 
         let mut prev = repeat_n(None, Max::USIZE).collect::<GenericArray<Option<Node>, Max>>();
 
-        let mut heap = BinaryHeap::<Node, Reverse<Cost>, Max>::new();
-        heap.push(self.start, Reverse(Cost::min_value())).unwrap();
+        let mut heap = BinaryHeap::<Node, Reverse<Maze::Cost>, Max>::new();
+        heap.push(self.start, Reverse(Maze::Cost::min_value()))
+            .unwrap();
 
         let construct_path = |goal: Node, prev: GenericArray<_, _>| {
             let mut current = prev[goal.into()]?;
@@ -256,7 +259,9 @@ mod tests {
 
         let solver = Solver::<usize, usize, U9, _>::new(start, goals);
 
-        let path = Solver::compute_shortest_path(&solver, &graph);
+        use crate::prelude::*;
+
+        let path = solver.compute_shortest_path(&graph);
         let expected = [0, 1, 3, 5, 7, 8];
 
         assert!(path.is_some());
