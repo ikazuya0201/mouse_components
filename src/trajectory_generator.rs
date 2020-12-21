@@ -183,7 +183,7 @@ impl
         AngularVelocity,
         AngularAcceleration,
         AngularJerk,
-        fn(SlalomKind) -> SlalomParameters,
+        fn(SlalomKind, SlalomDirection) -> SlalomParameters,
         Velocity,
         Acceleration,
         Jerk,
@@ -214,11 +214,13 @@ impl
 
         let pose = Pose::default();
         let right_trajectory = slalom_generator.generate_slalom(
-            SlalomKind::Search90(SlalomDirection::Right),
+            SlalomKind::Search90,
+            SlalomDirection::Right,
             self.search_velocity,
         );
         let left_trajectory = slalom_generator.generate_slalom(
-            SlalomKind::Search90(SlalomDirection::Left),
+            SlalomKind::Search90,
+            SlalomDirection::Left,
             self.search_velocity,
         );
         let front_trajectory = {
@@ -331,9 +333,18 @@ impl<TV, TA, SPM, V, A, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, (), SPM, V,
 impl<TV, TA, TJ, V, A, J, T, SV> TrajectoryGeneratorBuilder<TV, TA, TJ, (), V, A, J, T, SV> {
     pub fn slalom_parameters_map(
         self,
-        slalom_parameters_map: fn(SlalomKind) -> SlalomParameters,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, fn(SlalomKind) -> SlalomParameters, V, A, J, T, SV>
-    {
+        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+    ) -> TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+        V,
+        A,
+        J,
+        T,
+        SV,
+    > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
