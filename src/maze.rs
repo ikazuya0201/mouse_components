@@ -16,7 +16,7 @@ use crate::data_types::{Pose, SearchKind};
 use crate::obstacle_detector::Obstacle;
 use crate::solver::{Graph, GraphConverter, KindInstructor, NodeConverter, ObstacleInterpreter};
 use crate::traits::Math;
-use crate::utils::{array_length::ArrayLength, itertools::repeat_n, mutex::Mutex};
+use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
 pub use direction::{AbsoluteDirection, RelativeDirection};
 pub use node::Position;
 use node::{Location, Node};
@@ -49,7 +49,6 @@ where
         RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
     wall_prob_threshold: f32,
     costs: F,
-    candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
     converter: PoseConverter<M>,
 }
 
@@ -73,7 +72,6 @@ where
             wall_prob_threshold,
             wall_existence_probs: RefCell::new(probs),
             costs,
-            candidates: Mutex::new(Vec::new()),
             converter: PoseConverter::new(square_width, wall_width, ignore_radius_from_pillar),
         }
     }
@@ -796,28 +794,22 @@ where
 {
     type Kind = SearchKind;
 
-    fn update_node_candidates<SearchNodes: IntoIterator<Item = SearchNodeId<N>>>(
-        &self,
+    fn instruct<'a, SearchNodes: Iterator<Item = &'a SearchNodeId<N>>>(
+        &'a self,
+        current: &'a SearchNodeId<N>,
         candidates: SearchNodes,
-    ) {
-        *self.candidates.lock() = candidates.into_iter().collect();
-    }
-
-    fn instruct(&self, current: &SearchNodeId<N>) -> Option<(Self::Kind, SearchNodeId<N>)> {
-        if let Ok(mut candidates) = self.candidates.try_lock() {
-            for &node_id in &*candidates {
-                let node = node_id.as_node();
-                if !self.is_checked_by_position(node.position()) {
-                    break;
-                }
-                if self.is_wall_by_position(node.position()) {
-                    continue;
-                }
-                let current = current.as_node();
-                let direction = current.direction().relative(node.direction());
-                *candidates = Vec::new();
-                return Some((SearchKind::Search(direction), node_id));
+    ) -> Option<(SearchNodeId<N>, Self::Kind)> {
+        for &node_id in candidates {
+            let node = node_id.as_node();
+            if !self.is_checked_by_position(node.position()) {
+                break;
             }
+            if self.is_wall_by_position(node.position()) {
+                continue;
+            }
+            let current = current.as_node();
+            let direction = current.direction().relative(node.direction());
+            return Some((node_id, SearchKind::Search(direction)));
         }
         None
     }
@@ -922,8 +914,7 @@ where
             }
             writeln!(f, "")?;
         }
-
-        writeln!(f, "candidates: {:?}", self.candidates.lock())
+        Ok(())
     }
 }
 
@@ -1609,18 +1600,17 @@ mod tests {
                     (new_wall(1, 0, WallDirection::Up), false),
                 ],
             ),
-            Some((SearchKind::Search(Front), new_search(2, 3, North))),
+            Some((new_search(2, 3, North), SearchKind::Search(Front))),
         )];
 
         for ((src, dsts, walls), expected) in test_data {
             let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
-            assert_eq!(maze.instruct(&src), None);
-            maze.update_node_candidates(dsts);
+            assert_eq!(maze.instruct(&src, None.into_iter()), None);
             for (wall, exists) in walls {
                 maze.check_wall(wall, exists);
             }
-            assert_eq!(maze.instruct(&src), expected);
-            assert_eq!(maze.instruct(&src), None);
+            assert_eq!(maze.instruct(&src, dsts.iter()), expected);
+            assert_eq!(maze.instruct(&src, None.into_iter()), None);
         }
     }
 

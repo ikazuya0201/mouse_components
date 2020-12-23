@@ -1,5 +1,5 @@
 use alloc::rc::Rc;
-use core::cell::Cell;
+use core::cell::{Cell, RefCell};
 use core::cmp::Reverse;
 use core::convert::TryInto;
 use core::fmt::Debug;
@@ -42,8 +42,11 @@ pub trait ObstacleInterpreter<Obstacle> {
 pub trait KindInstructor<Node> {
     type Kind;
 
-    fn update_node_candidates<Nodes: IntoIterator<Item = Node>>(&self, candidates: Nodes);
-    fn instruct(&self, current: &Node) -> Option<(Self::Kind, Node)>;
+    fn instruct<'a, Nodes: Iterator<Item = &'a Node>>(
+        &'a self,
+        current: &'a Node,
+        candidates: Nodes,
+    ) -> Option<(Node, Self::Kind)>;
 }
 
 ///convert node to pose
@@ -59,6 +62,8 @@ enum State {
     Solving,
 }
 
+type CandNum = U4;
+
 pub struct Solver<Node, SearchNode, Max, GoalSize, Maze>
 where
     GoalSize: ArrayLength<Node>,
@@ -67,6 +72,7 @@ where
     goals: GenericArray<Node, GoalSize>,
     current: Cell<SearchNode>,
     state: Cell<State>,
+    candidates: RefCell<Vec<SearchNode, CandNum>>,
     maze: Rc<Maze>,
     _node_max: PhantomData<fn() -> Max>,
 }
@@ -86,6 +92,7 @@ where
             goals,
             current: Cell::new(search_start),
             state: Cell::new(State::Solving),
+            candidates: RefCell::new(Vec::new()),
             maze,
             _node_max: PhantomData,
         }
@@ -106,6 +113,21 @@ impl TryInto<FinishError> for SolverError {
             Self::WaitingError => Err(()),
             Self::SolveFinishError => Ok(FinishError),
         }
+    }
+}
+
+impl<Node, SearchNode, Max, GoalSize, Maze> Solver<Node, SearchNode, Max, GoalSize, Maze>
+where
+    GoalSize: ArrayLength<Node>,
+{
+    //helper function generating iterator of reference from candidates.
+    //TODO: remove this function
+    fn candidates_iter<'a, I>(candidates: &'a Vec<SearchNode, CandNum>) -> I
+    where
+        &'a Vec<SearchNode, CandNum>: IntoIterator<IntoIter = I, Item = &'a SearchNode>,
+        I: Iterator<Item = &'a SearchNode>,
+    {
+        candidates.into_iter()
     }
 }
 
@@ -146,15 +168,21 @@ where
                 let candidates = self
                     .next_node_candidates(&self.current.get())
                     .ok_or(SolverError::SolveFinishError)?;
-                self.maze.update_node_candidates(candidates);
+                self.candidates.replace(candidates);
                 self.state.set(State::Waiting);
                 Err(SolverError::WaitingError)
             }
             State::Waiting => {
-                let (kind, node) = self
+                use core::ops::Deref;
+
+                let (node, kind) = self
                     .maze
-                    .instruct(&self.current.get())
+                    .instruct(
+                        &self.current.get(),
+                        Self::candidates_iter(self.candidates.borrow().deref()),
+                    )
                     .ok_or(SolverError::WaitingError)?;
+                self.candidates.replace(Vec::new());
                 let pose = self.maze.convert(&self.current.get());
                 self.current.set(node);
                 self.state.set(State::Solving);
