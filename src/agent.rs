@@ -21,12 +21,11 @@ pub trait StateEstimator {
     fn estimate(&mut self) -> Self::State;
 }
 
-pub trait SearchTrajectoryGenerator<Pose, Direction> {
+pub trait SearchTrajectoryGenerator<Pose, Kind> {
     type Target;
     type Trajectory: Iterator<Item = Self::Target>;
 
-    fn generate_search_init(&self, pose: &Pose) -> Self::Trajectory;
-    fn generate_search(&self, pose: &Pose, direction: &Direction) -> Self::Trajectory;
+    fn generate_search(&self, pose: &Pose, kind: &Kind) -> Self::Trajectory;
 }
 
 pub trait Tracker<State, Target> {
@@ -54,12 +53,12 @@ pub struct Agent<
     ITracker,
     ITrajectoryGenerator,
     Pose = crate::data_types::Pose,
-    Direction = crate::data_types::RelativeDirection,
+    Kind = crate::data_types::SearchKind,
 > where
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
-    ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Direction>,
+    ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Kind>,
 {
     obstacle_detector: RefCell<IObstacleDetector>,
     state_estimator: RefCell<IStateEstimator>,
@@ -68,7 +67,7 @@ pub struct Agent<
     trajectories: Mutex<Queue<ITrajectoryGenerator::Trajectory, U3>>,
     last_target: Cell<Option<ITrajectoryGenerator::Target>>,
     _pose: PhantomData<fn() -> Pose>,
-    _direction: PhantomData<fn() -> Direction>,
+    _direction: PhantomData<fn() -> Kind>,
 }
 
 impl<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
@@ -102,42 +101,35 @@ where
     }
 }
 
-impl<Pose, Direction, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
-    SearchAgent<Pose, Direction>
-    for Agent<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Pose, Direction>
+impl<Pose, Kind, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
+    SearchAgent<(Pose, Kind)>
+    for Agent<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Pose, Kind>
 where
     Pose: Copy,
     ITrajectoryGenerator::Target: Copy,
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
-    ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Direction>,
+    ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Kind>,
 {
+    type Error = ();
     type Obstacle = IObstacleDetector::Obstacle;
     type Obstacles = IObstacleDetector::Obstacles;
 
-    fn init(&self, pose: &Pose) {
-        self.state_estimator.borrow_mut().init();
-        self.tracker.borrow_mut().init();
-        self.last_target.set(None);
-        let trajectory = self.trajectory_generator.generate_search_init(pose);
-        let mut trajectories = self.trajectories.lock();
-        *trajectories = Queue::new();
-        trajectories.enqueue(trajectory).ok();
-    }
-
-    fn get_existing_obstacles(&self) -> Self::Obstacles {
+    fn get_obstacles(&self) -> Self::Obstacles {
         let state = self.state_estimator.borrow_mut().estimate();
         self.obstacle_detector.borrow_mut().detect(&state)
     }
 
-    fn set_instructed_direction(&self, pose: &Pose, direction: &Direction) {
-        let trajectory = self.trajectory_generator.generate_search(pose, direction);
+    fn set_command(&self, command: &(Pose, Kind)) {
+        let trajectory = self
+            .trajectory_generator
+            .generate_search(&command.0, &command.1);
         let mut trajectories = self.trajectories.lock();
         trajectories.enqueue(trajectory).ok();
     }
 
-    fn track_next(&self) {
+    fn track_next(&self) -> Result<(), Self::Error> {
         let state = self.state_estimator.borrow_mut().estimate();
         let target = {
             if let Ok(mut trajectories) = self.trajectories.try_lock() {
@@ -159,5 +151,6 @@ where
             self.tracker.borrow_mut().track(&state, &target);
             self.last_target.set(Some(target));
         }
+        Ok(())
     }
 }

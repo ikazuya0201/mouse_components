@@ -23,10 +23,9 @@ pub mod traits {
     pub use agent::{ObstacleDetector, SearchTrajectoryGenerator, StateEstimator, Tracker};
     pub use operators::{
         run_operator::{RunAgent, RunSolver},
-        search_operator::{
-            DirectionInstructor, NodeConverter, ObstacleInterpreter, SearchAgent, SearchSolver,
-        },
+        search_operator::{SearchAgent, SearchCommander},
     };
+    pub use solver::{KindInstructor, NodeConverter, ObstacleInterpreter};
     pub use tracker::{Logger, RotationController, TranslationController};
     pub use utils::math::Math;
 }
@@ -51,7 +50,7 @@ pub mod data_types {
     };
     pub use obstacle_detector::Obstacle;
     pub use tracker::{AngleState, LengthState, State};
-    pub use trajectory_generator::{AngleTarget, LengthTarget, Target};
+    pub use trajectory_generator::{AngleTarget, LengthTarget, SearchKind, Target};
 }
 
 pub mod impls {
@@ -101,11 +100,12 @@ pub mod defaults {
         impls::TrajectoryGenerator<Math>,
     >;
 
-    pub type Solver<MazeWidth, MaxPathLength, GoalSize> = impls::Solver<
+    pub type Solver<MazeWidth, MaxPathLength, GoalSize, Math> = impls::Solver<
         data_types::NodeId<MazeWidth>,
         data_types::SearchNodeId<MazeWidth>,
         MaxPathLength,
         GoalSize,
+        impls::Maze<MazeWidth, Math>,
     >;
 
     pub type SearchOperator<
@@ -124,9 +124,7 @@ pub mod defaults {
         Logger = impls::NullLogger,
     > = impls::SearchOperator<
         Mode,
-        data_types::SearchNodeId<MazeWidth>,
         data_types::Obstacle,
-        impls::Maze<MazeWidth, Math>,
         Agent<
             LeftEncoder,
             RightEncoder,
@@ -138,6 +136,6 @@ pub mod defaults {
             Math,
             Logger,
         >,
-        Solver<MazeWidth, MaxPathLength, GoalSize>,
+        Solver<MazeWidth, MaxPathLength, GoalSize, Math>,
     >;
 }

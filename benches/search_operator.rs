@@ -101,7 +101,7 @@ use std::f32::consts::PI;
 use std::rc::Rc;
 
 use components::{
-    data_types::{AbsoluteDirection, NodeId, Pattern, Pose, SearchNodeId},
+    data_types::{AbsoluteDirection, NodeId, Pattern, Pose, SearchKind, SearchNodeId},
     defaults::{SearchOperator, Solver},
     impls::{
         slalom_parameters_map, Agent, EstimatorBuilder, MazeBuilder, ObstacleDetector,
@@ -328,26 +328,30 @@ fn create_search_operator() -> SearchOperator<
             .build::<MazeWidth, MathFake>(),
     );
 
-    let solver = Rc::new(Solver::<MazeWidth, MaxSize, GoalSize>::new(
+    let search_start = SearchNodeId::new(0, 1, AbsoluteDirection::North).unwrap();
+    let solver = Rc::new(Solver::<MazeWidth, MaxSize, GoalSize, MathFake>::new(
         NodeId::new(0, 0, AbsoluteDirection::North).unwrap(),
         arr![
             NodeId<MazeWidth>;
             NodeId::new(2, 0, AbsoluteDirection::South).unwrap(),
             NodeId::new(2, 0, AbsoluteDirection::West).unwrap(),
         ],
+        search_start,
+        maze,
     ));
 
     let operator = SearchOperator::new(
-        Pose::new(
-            Length::new::<meter>(0.045),
-            Length::new::<meter>(0.045),
-            Angle::new::<degree>(90.0),
+        (
+            Pose::new(
+                Length::new::<meter>(0.045),
+                Length::new::<meter>(0.045),
+                Angle::new::<degree>(90.0),
+            ),
+            SearchKind::Init,
         ),
-        SearchNodeId::new(0, 1, AbsoluteDirection::North).unwrap(),
-        maze,
+        (),
         agent,
         solver,
-        (),
     );
     operator.init();
     operator

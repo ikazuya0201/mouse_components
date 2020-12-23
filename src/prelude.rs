@@ -5,14 +5,14 @@ pub use crate::administrator::Selector as _components_administrator_Selector;
 
 pub use crate::operators::run_operator::RunAgent as _components_operators_run_operator_RunAgent;
 pub use crate::operators::run_operator::RunSolver as _components_operators_run_operator_RunSolver;
-pub use crate::operators::search_operator::DirectionInstructor as _components_operators_search_operator_DirectionInstructor;
-pub use crate::operators::search_operator::NodeConverter as _components_operators_search_operator_NodeConverter;
-pub use crate::operators::search_operator::ObstacleInterpreter as _components_operators_search_operator_ObstacleInterpreter;
 pub use crate::operators::search_operator::SearchAgent as _components_operators_search_operator_SearchAgent;
-pub use crate::operators::search_operator::SearchSolver as _components_operators_search_operator_SearchSolver;
+pub use crate::operators::search_operator::SearchCommander as _components_operators_search_operator_SearchSolver;
 
-pub use crate::solver::Graph as _components_administrator_Solver;
-pub use crate::solver::GraphConverter as _components_administrator_GraphConverter;
+pub use crate::solver::Graph as _components_solver_Graph;
+pub use crate::solver::GraphConverter as _components_solver_GraphConverter;
+pub use crate::solver::KindInstructor as _components_solver_DirectionInstructor;
+pub use crate::solver::NodeConverter as _components_solver_NodeConverter;
+pub use crate::solver::ObstacleInterpreter as _components_solver_ObstacleInterpreter;
 
 pub use crate::agent::ObstacleDetector as _components_agent_ObstacleDetector;
 pub use crate::agent::SearchTrajectoryGenerator as _components_agent_SearchTrajectoryGenerator;

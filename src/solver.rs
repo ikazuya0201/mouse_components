@@ -1,4 +1,7 @@
+use alloc::rc::Rc;
+use core::cell::Cell;
 use core::cmp::Reverse;
+use core::convert::TryInto;
 use core::fmt::Debug;
 use core::marker::PhantomData;
 
@@ -7,7 +10,8 @@ use heap::BinaryHeap;
 use heapless::{consts::*, Vec};
 use num::{Bounded, Saturating};
 
-use crate::operators::{run_operator::RunSolver, search_operator::SearchSolver};
+use crate::data_types::{Pose, SearchKind};
+use crate::operators::search_operator::{FinishError, SearchCommander};
 use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
 
 pub trait GraphConverter<Node> {
@@ -30,63 +34,170 @@ pub trait Graph<Node> {
     fn predecessors(&self, node: &Node) -> Self::Edges;
 }
 
-pub struct Solver<Node, SearchNode, Max, GSize>
-where
-    GSize: ArrayLength<Node>,
-{
-    start: Node,
-    goals: GenericArray<Node, GSize>,
-    _node_max: PhantomData<fn() -> Max>,
-    _search_node: PhantomData<fn() -> SearchNode>,
+pub trait ObstacleInterpreter<Obstacle> {
+    fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles);
 }
 
-impl<Node, SearchNode, Max, GSize> Solver<Node, SearchNode, Max, GSize>
+//The trait method could be called by other threads.
+pub trait KindInstructor<Node> {
+    type Kind;
+
+    fn update_node_candidates<Nodes: IntoIterator<Item = Node>>(&self, candidates: Nodes);
+    fn instruct(&self, current: &Node) -> Option<(Self::Kind, Node)>;
+}
+
+///convert node to pose
+pub trait NodeConverter<Node> {
+    type Pose;
+
+    fn convert(&self, node: &Node) -> Self::Pose;
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+enum State {
+    Waiting,
+    Solving,
+}
+
+pub struct Solver<Node, SearchNode, Max, GoalSize, Maze>
 where
-    GSize: ArrayLength<Node>,
+    GoalSize: ArrayLength<Node>,
 {
-    pub fn new(start: Node, goals: GenericArray<Node, GSize>) -> Self {
+    start: Node,
+    goals: GenericArray<Node, GoalSize>,
+    current: Cell<SearchNode>,
+    state: Cell<State>,
+    maze: Rc<Maze>,
+    _node_max: PhantomData<fn() -> Max>,
+}
+
+impl<Node, SearchNode, Max, GoalSize, Maze> Solver<Node, SearchNode, Max, GoalSize, Maze>
+where
+    GoalSize: ArrayLength<Node>,
+{
+    pub fn new(
+        start: Node,
+        goals: GenericArray<Node, GoalSize>,
+        search_start: SearchNode,
+        maze: Rc<Maze>,
+    ) -> Self {
         Self {
             start,
             goals,
+            current: Cell::new(search_start),
+            state: Cell::new(State::Solving),
+            maze,
             _node_max: PhantomData,
-            _search_node: PhantomData,
         }
     }
 }
 
-impl<Node, SearchNode, Cost, Maze, Max, GSize> SearchSolver<SearchNode, Maze>
-    for Solver<Node, SearchNode, Max, GSize>
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum SolverError {
+    WaitingError,
+    SolveFinishError,
+}
+
+impl TryInto<FinishError> for SolverError {
+    type Error = ();
+
+    fn try_into(self) -> Result<FinishError, Self::Error> {
+        match self {
+            Self::WaitingError => Err(()),
+            Self::SolveFinishError => Ok(FinishError),
+        }
+    }
+}
+
+impl<Node, Cost, Max, GoalSize, Maze, Obstacle> SearchCommander<Obstacle>
+    for Solver<Node, Maze::SearchNode, Max, GoalSize, Maze>
 where
     Max: ArrayLength<Node>
-        + ArrayLength<SearchNode>
+        + ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Reverse<Cost>>
         + ArrayLength<(Node, Reverse<Cost>)>
-        + ArrayLength<(SearchNode, Reverse<Cost>)>
+        + ArrayLength<(Maze::SearchNode, Reverse<Cost>)>
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + typenum::Unsigned,
-    GSize: ArrayLength<Node>,
+    GoalSize: ArrayLength<Node>,
     Node: Ord + Copy + Debug + Into<usize>,
-    SearchNode: Ord + Copy + Debug + Into<usize>,
+    Maze::SearchNode: Ord + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node, Cost = Cost>
-        + Graph<SearchNode, Cost = Cost>
-        + GraphConverter<Node, SearchNode = SearchNode>,
+        + Graph<<Maze as GraphConverter<Node>>::SearchNode, Cost = Cost>
+        + GraphConverter<Node>
+        + ObstacleInterpreter<Obstacle>
+        + KindInstructor<<Maze as GraphConverter<Node>>::SearchNode, Kind = SearchKind>
+        + NodeConverter<<Maze as GraphConverter<Node>>::SearchNode, Pose = Pose>,
 {
-    type Nodes = Vec<SearchNode, U4>;
+    type Error = SolverError;
+    type Command = (Pose, SearchKind);
 
-    fn next_node_candidates(&self, current: &SearchNode, graph: &Maze) -> Option<Self::Nodes> {
-        let shortest_path = self.compute_shortest_path(graph)?;
-        let checker_nodes = graph.convert_to_checker_nodes(shortest_path);
+    fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
+        self.maze.interpret_obstacles(obstacles);
+    }
 
-        let candidates = graph
+    //must return the current pose and next kind
+    fn next_command(&self) -> Result<Self::Command, Self::Error> {
+        match self.state.get() {
+            State::Solving => {
+                let candidates = self
+                    .next_node_candidates(&self.current.get())
+                    .ok_or(SolverError::SolveFinishError)?;
+                self.maze.update_node_candidates(candidates);
+                self.state.set(State::Waiting);
+                Err(SolverError::WaitingError)
+            }
+            State::Waiting => {
+                let (kind, node) = self
+                    .maze
+                    .instruct(&self.current.get())
+                    .ok_or(SolverError::WaitingError)?;
+                let pose = self.maze.convert(&self.current.get());
+                self.current.set(node);
+                self.state.set(State::Solving);
+                Ok((pose, kind))
+            }
+        }
+    }
+}
+
+impl<Node, Cost, Max, GoalSize, Maze> Solver<Node, Maze::SearchNode, Max, GoalSize, Maze>
+where
+    Max: ArrayLength<Node>
+        + ArrayLength<Maze::SearchNode>
+        + ArrayLength<Cost>
+        + ArrayLength<Reverse<Cost>>
+        + ArrayLength<(Node, Reverse<Cost>)>
+        + ArrayLength<(Maze::SearchNode, Reverse<Cost>)>
+        + ArrayLength<Option<Node>>
+        + ArrayLength<Option<usize>>
+        + typenum::Unsigned,
+    GoalSize: ArrayLength<Node>,
+    Node: Ord + Copy + Debug + Into<usize>,
+    Maze::SearchNode: Ord + Copy + Debug + Into<usize>,
+    Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Maze: Graph<Node, Cost = Cost>
+        + Graph<<Maze as GraphConverter<Node>>::SearchNode, Cost = Cost>
+        + GraphConverter<Node>,
+{
+    fn next_node_candidates(
+        &self,
+        current: &Maze::SearchNode,
+    ) -> Option<Vec<Maze::SearchNode, U4>> {
+        let shortest_path = self.compute_shortest_path()?;
+        let checker_nodes = self.maze.convert_to_checker_nodes(shortest_path);
+
+        let candidates = self
+            .maze
             .successors(current)
             .into_iter()
-            .collect::<Vec<(SearchNode, Cost), U4>>();
+            .collect::<Vec<(Maze::SearchNode, Cost), U4>>();
 
         let mut dists = repeat_n(Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
-        let mut heap = BinaryHeap::<SearchNode, Reverse<Cost>, Max>::new();
+        let mut heap = BinaryHeap::<Maze::SearchNode, Reverse<Cost>, Max>::new();
         for node in checker_nodes {
             heap.push_or_update(node, Reverse(Cost::min_value()))
                 .unwrap();
@@ -96,7 +207,7 @@ where
             if candidates.iter().any(|&(cand, _)| cand == node) {
                 continue;
             }
-            for (next, edge_cost) in graph.predecessors(&node) {
+            for (next, edge_cost) in self.maze.predecessors(&node) {
                 let next_cost = cost.saturating_add(edge_cost);
                 if dists[next.into()] > next_cost {
                     dists[next.into()] = next_cost;
@@ -109,7 +220,7 @@ where
             .into_iter()
             .map(|(node, cost)| (node, cost.saturating_add(dists[node.into()])))
             .filter(|&(_, cost)| cost < Cost::max_value())
-            .collect::<Vec<(SearchNode, Cost), U4>>();
+            .collect::<Vec<(Maze::SearchNode, Cost), U4>>();
 
         if candidates.is_empty() {
             return None;
@@ -120,27 +231,21 @@ where
     }
 }
 
-impl<Node, SearchNode, Max, GSize, Maze> RunSolver<Maze> for Solver<Node, SearchNode, Max, GSize>
+impl<Node, SearchNode, Max, GoalSize, Maze> Solver<Node, SearchNode, Max, GoalSize, Maze>
 where
     Max: ArrayLength<Node>
-        + ArrayLength<SearchNode>
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + typenum::Unsigned,
-    GSize: ArrayLength<Node>,
+    GoalSize: ArrayLength<Node>,
     Node: Ord + Copy + Debug + Into<usize>,
-    SearchNode: Ord + Copy + Debug + Into<usize>,
     Max: ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
-        + ArrayLength<(Node, Reverse<Maze::Cost>)>
-        + ArrayLength<(SearchNode, Reverse<Maze::Cost>)>,
+        + ArrayLength<(Node, Reverse<Maze::Cost>)>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
 {
-    type Node = Node;
-    type Nodes = Vec<Node, Max>;
-
-    fn compute_shortest_path(&self, graph: &Maze) -> Option<Vec<Node, Max>> {
+    pub fn compute_shortest_path(&self) -> Option<Vec<Node, Max>> {
         let mut dists =
             repeat_n(Maze::Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
         dists[self.start.into()] = Maze::Cost::min_value();
@@ -174,7 +279,7 @@ where
                     return construct_path(goal, prev);
                 }
             }
-            for (next, edge_cost) in graph.successors(&node) {
+            for (next, edge_cost) in self.maze.successors(&node) {
                 let next_cost = cost.saturating_add(edge_cost);
                 if next_cost < dists[next.into()] {
                     dists[next.into()] = next_cost;
@@ -189,10 +294,12 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloc::rc::Rc;
+
     use generic_array::arr;
     use heapless::consts::*;
 
-    use super::{Graph, SearchSolver, Solver};
+    use super::{Graph, Solver};
     use crate::maze::MazeBuilder;
 
     struct IGraph {
@@ -257,11 +364,9 @@ mod tests {
 
         let graph = IGraph::new(n, &edges);
 
-        let solver = Solver::<usize, usize, U9, _>::new(start, goals);
+        let solver = Solver::<usize, usize, U9, _, _>::new(start, goals, start, Rc::new(graph));
 
-        use crate::prelude::*;
-
-        let path = solver.compute_shortest_path(&graph);
+        let path = solver.compute_shortest_path();
         let expected = [0, 1, 3, 5, 7, 8];
 
         assert!(path.is_some());
@@ -310,8 +415,6 @@ mod tests {
                     let start = new(0, 0, North);
                     let goals = arr![NodeId<U4>; new(2,0,West), new(2,0,South)];
 
-                    let solver = Solver::<NodeId<U4>, SearchNodeId<U4>, U256, _>::new(start, goals);
-
                     let (input, expected) = $value;
                     let current = input.0;
                     let walls = input.1;
@@ -322,7 +425,9 @@ mod tests {
                         maze.check_wall(wall, exists);
                     }
                     let expected = expected.into_iter().map(|input| new_search(input.0, input.1, input.2)).collect::<Vec<_>>();
-                    let candidates = solver.next_node_candidates(&current, &maze);
+
+                    let solver = Solver::<NodeId<U4>, SearchNodeId<U4>, U256, _, _>::new(start, goals, current, Rc::new(maze));
+                    let candidates = solver.next_node_candidates(&current);
                     assert_eq!(candidates.expect("Failed to unwrap candidates"), expected.as_slice());
                 }
             )*

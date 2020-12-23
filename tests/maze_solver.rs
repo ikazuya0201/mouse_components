@@ -14,7 +14,7 @@ use uom::si::{
 use components::{
     data_types::{
         AbsoluteDirection, NodeId, Obstacle, Pattern, Pose, Position, RelativeDirection,
-        SearchNodeId, WallDirection, WallPosition,
+        SearchKind, SearchNodeId, WallDirection, WallPosition,
     },
     impls::{Maze, MazeBuilder, SearchOperator, Solver},
     prelude::*,
@@ -77,8 +77,7 @@ fn test_compute_shortest_path_u4() {
 
     let start = new(0, 0, North);
     let goals = arr![NodeId<U4>; new(2,0,West), new(2,0,South)];
-
-    let solver = Solver::<NodeId<U4>, SearchNodeId<U4>, U256, _>::new(start, goals);
+    let start_search_node = SearchNodeId::new(0, 1, North).unwrap();
 
     let right = WallDirection::Right;
     let up = WallDirection::Up;
@@ -115,7 +114,14 @@ fn test_compute_shortest_path_u4() {
         for wall in walls {
             maze.check_wall(wall, true);
         }
-        let path = solver.compute_shortest_path(&maze);
+        let solver = Solver::<NodeId<U4>, SearchNodeId<U4>, U256, _, _>::new(
+            start,
+            goals,
+            start_search_node,
+            Rc::new(maze),
+        );
+
+        let path = solver.compute_shortest_path();
         assert_eq!(path.unwrap(), expected.as_slice());
     }
 }
@@ -207,26 +213,18 @@ where
     }
 }
 
-impl<N, F, M> SearchAgent<Pose, RelativeDirection> for AgentMock<N, F, M>
+impl<N, F, M> SearchAgent<(Pose, SearchKind)> for AgentMock<N, F, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + core::fmt::Debug,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
+    type Error = ();
     type Obstacle = Obstacle;
     type Obstacles = Vec<Self::Obstacle>;
 
-    fn init(&self, pose: &Pose) {
-        self.current.replace(
-            self.pose_to_node(*pose)
-                .as_node()
-                .to_search_node_id()
-                .expect("cannot convert to search node id"),
-        );
-    }
-
-    fn get_existing_obstacles(&self) -> Self::Obstacles {
+    fn get_obstacles(&self) -> Self::Obstacles {
         let current = self.current.borrow().as_node();
         let relative = |x: i16, y: i16| {
             current
@@ -241,10 +239,10 @@ where
         obstacles
     }
 
-    fn set_instructed_direction(&self, pose: &Pose, direction: &RelativeDirection) {
+    fn set_command(&self, command: &(Pose, SearchKind)) {
         use RelativeDirection::*;
 
-        let current = self.pose_to_node(*pose).as_node();
+        let current = self.pose_to_node(command.0).as_node();
 
         let relative = |x: i16, y: i16, dir: &RelativeDirection| {
             current
@@ -259,17 +257,26 @@ where
                     )
                 })
         };
-        let next = match direction {
-            Right => relative(1, 1, direction),
-            Left => relative(-1, 1, direction),
-            Front => relative(0, 2, direction),
-            Back => relative(0, 0, direction),
-            _ => unreachable!(),
+        let next = match command.1 {
+            SearchKind::Init => self
+                .pose_to_node(command.0)
+                .as_node()
+                .to_search_node_id()
+                .expect("cannot convert to search node id"),
+            SearchKind::Search(direction) => match direction {
+                Right => relative(1, 1, &direction),
+                Left => relative(-1, 1, &direction),
+                Front => relative(0, 2, &direction),
+                Back => relative(0, 0, &direction),
+                _ => unreachable!(),
+            },
         };
         self.current.replace(next);
     }
 
-    fn track_next(&self) {}
+    fn track_next(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 macro_rules! search_tests {
@@ -313,6 +320,13 @@ macro_rules! search_tests {
                     wall_width,
                 ));
 
+                let agent_solver = Solver::<NodeId<$size>, SearchNodeId<$size>, PathLen, _,_>::new(
+                    start,
+                    goals,
+                    start_search_node,
+                    Rc::clone(&agent_maze),
+                );
+
                 let maze = Rc::new(
                     MazeBuilder::new()
                         .costs(cost)
@@ -324,8 +338,8 @@ macro_rules! search_tests {
 
                 use std::ops::Mul;
                 type PathLen = <<$size as Mul<$size>>::Output as Mul<U16>>::Output;
-                let solver = Rc::new(Solver::<NodeId<$size>, SearchNodeId<$size>, PathLen, _>::new(
-                    start, goals,
+                let solver = Rc::new(Solver::<NodeId<$size>, SearchNodeId<$size>, PathLen, _,_>::new(
+                    start, goals, start_search_node, Rc::clone(&maze),
                 ));
 
                 let start_pose = Pose {
@@ -335,26 +349,22 @@ macro_rules! search_tests {
                 };
                 let operator = SearchOperator::<
                     (),
-                    SearchNodeId<$size>,
                     Obstacle,
                     _,
                     _,
-                    _,
                 >::new(
-                    start_pose,
-                    start_search_node,
-                    Rc::clone(&maze),
-                    agent,
+                    (start_pose, SearchKind::Init),
+                    (),
+                    Rc::clone(&agent),
                     Rc::clone(&solver),
-                    ()
                 );
 
                 while operator.run().is_err() {
                     operator.tick();
                 }
                 assert_eq!(
-                    solver.compute_shortest_path(agent_maze.as_ref()),
-                    solver.compute_shortest_path(maze.as_ref())
+                    solver.compute_shortest_path(),
+                    agent_solver.compute_shortest_path()
                 );
                 Ok(())
             }
