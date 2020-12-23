@@ -1,5 +1,5 @@
 use alloc::rc::Rc;
-use core::cell::Cell;
+use core::cell::{Cell, RefCell};
 use core::cmp::Reverse;
 use core::convert::TryInto;
 use core::fmt::Debug;
@@ -38,19 +38,18 @@ pub trait ObstacleInterpreter<Obstacle> {
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles);
 }
 
-//The trait method could be called by other threads.
-pub trait KindInstructor<Node> {
-    type Kind;
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct CannotCheckError;
 
-    fn update_node_candidates<Nodes: IntoIterator<Item = Node>>(&self, candidates: Nodes);
-    fn instruct(&self, current: &Node) -> Option<(Self::Kind, Node)>;
+pub trait NodeChecker<Node> {
+    fn is_available(&self, node: &Node) -> Result<bool, CannotCheckError>;
 }
 
-///convert node to pose
-pub trait NodeConverter<Node> {
-    type Pose;
+pub trait Converter<Source> {
+    type Error;
+    type Target;
 
-    fn convert(&self, node: &Node) -> Self::Pose;
+    fn convert(&self, source: &Source) -> Result<Self::Target, Self::Error>;
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -58,6 +57,8 @@ enum State {
     Waiting,
     Solving,
 }
+
+type CandNum = U4;
 
 pub struct Solver<Node, SearchNode, Max, GoalSize, Maze>
 where
@@ -67,6 +68,7 @@ where
     goals: GenericArray<Node, GoalSize>,
     current: Cell<SearchNode>,
     state: Cell<State>,
+    candidates: RefCell<Vec<SearchNode, CandNum>>,
     maze: Rc<Maze>,
     _node_max: PhantomData<fn() -> Max>,
 }
@@ -86,6 +88,7 @@ where
             goals,
             current: Cell::new(search_start),
             state: Cell::new(State::Solving),
+            candidates: RefCell::new(Vec::new()),
             maze,
             _node_max: PhantomData,
         }
@@ -109,6 +112,21 @@ impl TryInto<FinishError> for SolverError {
     }
 }
 
+impl<Node, SearchNode, Max, GoalSize, Maze> Solver<Node, SearchNode, Max, GoalSize, Maze>
+where
+    GoalSize: ArrayLength<Node>,
+{
+    //helper function generating iterator of reference from candidates.
+    //TODO: remove this function
+    fn candidates_iter<'a, I>(candidates: &'a Vec<SearchNode, CandNum>) -> I
+    where
+        &'a Vec<SearchNode, CandNum>: IntoIterator<IntoIter = I, Item = &'a SearchNode>,
+        I: Iterator<Item = &'a SearchNode>,
+    {
+        candidates.into_iter()
+    }
+}
+
 impl<Node, Cost, Max, GoalSize, Maze, Obstacle> SearchCommander<Obstacle>
     for Solver<Node, Maze::SearchNode, Max, GoalSize, Maze>
 where
@@ -129,36 +147,78 @@ where
         + Graph<<Maze as GraphConverter<Node>>::SearchNode, Cost = Cost>
         + GraphConverter<Node>
         + ObstacleInterpreter<Obstacle>
-        + KindInstructor<<Maze as GraphConverter<Node>>::SearchNode, Kind = SearchKind>
-        + NodeConverter<<Maze as GraphConverter<Node>>::SearchNode, Pose = Pose>,
+        + NodeChecker<<Maze as GraphConverter<Node>>::SearchNode>
+        + Converter<<Maze as GraphConverter<Node>>::SearchNode, Target = Pose>
+        + Converter<
+            (
+                <Maze as GraphConverter<Node>>::SearchNode,
+                <Maze as GraphConverter<Node>>::SearchNode,
+            ),
+            Target = SearchKind,
+        >,
+    <Maze as Converter<<Maze as GraphConverter<Node>>::SearchNode>>::Error: core::fmt::Debug,
+    <Maze as Converter<(
+        <Maze as GraphConverter<Node>>::SearchNode,
+        <Maze as GraphConverter<Node>>::SearchNode,
+    )>>::Error: core::fmt::Debug,
 {
     type Error = SolverError;
     type Command = (Pose, SearchKind);
 
+    //TODO: write test
     fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
         self.maze.interpret_obstacles(obstacles);
     }
 
     //must return the current pose and next kind
+    //TODO: write test
     fn next_command(&self) -> Result<Self::Command, Self::Error> {
         match self.state.get() {
             State::Solving => {
                 let candidates = self
                     .next_node_candidates(&self.current.get())
                     .ok_or(SolverError::SolveFinishError)?;
-                self.maze.update_node_candidates(candidates);
+                self.candidates.replace(candidates);
                 self.state.set(State::Waiting);
                 Err(SolverError::WaitingError)
             }
             State::Waiting => {
-                let (kind, node) = self
-                    .maze
-                    .instruct(&self.current.get())
-                    .ok_or(SolverError::WaitingError)?;
-                let pose = self.maze.convert(&self.current.get());
-                self.current.set(node);
+                use core::ops::Deref;
+
+                let mut next = None;
+                {
+                    let candidates = self.candidates.borrow();
+                    if candidates.is_empty() {
+                        return Err(SolverError::WaitingError);
+                    }
+                    for &node in Self::candidates_iter(candidates.deref()) {
+                        let is_available = self
+                            .maze
+                            .is_available(&node)
+                            .map_err(|_| SolverError::WaitingError)?;
+                        if is_available {
+                            next = Some(node);
+                            break;
+                        }
+                    }
+                }
+                self.candidates.replace(Vec::new());
                 self.state.set(State::Solving);
-                Ok((pose, kind))
+                if let Some(next) = next {
+                    let current = self.current.get();
+                    let kind = self
+                        .maze
+                        .convert(&(current, next))
+                        .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err));
+                    let pose = self
+                        .maze
+                        .convert(&current)
+                        .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err));
+                    self.current.set(next);
+                    Ok((pose, kind))
+                } else {
+                    Err(SolverError::SolveFinishError)
+                }
             }
         }
     }

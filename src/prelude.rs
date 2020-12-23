@@ -8,10 +8,10 @@ pub use crate::operators::run_operator::RunSolver as _components_operators_run_o
 pub use crate::operators::search_operator::SearchAgent as _components_operators_search_operator_SearchAgent;
 pub use crate::operators::search_operator::SearchCommander as _components_operators_search_operator_SearchSolver;
 
+pub use crate::solver::Converter as _components_solver_NodeConverter;
 pub use crate::solver::Graph as _components_solver_Graph;
 pub use crate::solver::GraphConverter as _components_solver_GraphConverter;
-pub use crate::solver::KindInstructor as _components_solver_DirectionInstructor;
-pub use crate::solver::NodeConverter as _components_solver_NodeConverter;
+pub use crate::solver::NodeChecker as _components_solver_NodeChecker;
 pub use crate::solver::ObstacleInterpreter as _components_solver_ObstacleInterpreter;
 
 pub use crate::agent::ObstacleDetector as _components_agent_ObstacleDetector;

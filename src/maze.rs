@@ -14,13 +14,16 @@ use typenum::{PowerOfTwo, Unsigned};
 
 use crate::data_types::{Pose, SearchKind};
 use crate::obstacle_detector::Obstacle;
-use crate::solver::{Graph, GraphConverter, KindInstructor, NodeConverter, ObstacleInterpreter};
+use crate::solver::{
+    CannotCheckError, Converter, Graph, GraphConverter, NodeChecker, ObstacleInterpreter,
+};
 use crate::traits::Math;
-use crate::utils::{array_length::ArrayLength, itertools::repeat_n, mutex::Mutex};
+use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
 pub use direction::{AbsoluteDirection, RelativeDirection};
 pub use node::Position;
 use node::{Location, Node};
 pub use node::{NodeId, SearchNodeId};
+pub use pose_converter::ConversionError;
 use pose_converter::PoseConverter;
 use uom::si::{f32::Length, ratio::ratio};
 pub use wall::{WallDirection, WallPosition};
@@ -49,7 +52,6 @@ where
         RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
     wall_prob_threshold: f32,
     costs: F,
-    candidates: Mutex<Vec<SearchNodeId<N>, U4>>,
     converter: PoseConverter<M>,
 }
 
@@ -73,7 +75,6 @@ where
             wall_prob_threshold,
             wall_existence_probs: RefCell::new(probs),
             costs,
-            candidates: Mutex::new(Vec::new()),
             converter: PoseConverter::new(square_width, wall_width, ignore_radius_from_pillar),
         }
     }
@@ -787,39 +788,49 @@ where
     }
 }
 
-impl<N, M, F> KindInstructor<SearchNodeId<N>> for Maze<N, M, F>
+impl<N, M, F> NodeChecker<SearchNodeId<N>> for Maze<N, M, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    type Kind = SearchKind;
-
-    fn update_node_candidates<SearchNodes: IntoIterator<Item = SearchNodeId<N>>>(
-        &self,
-        candidates: SearchNodes,
-    ) {
-        *self.candidates.lock() = candidates.into_iter().collect();
-    }
-
-    fn instruct(&self, current: &SearchNodeId<N>) -> Option<(Self::Kind, SearchNodeId<N>)> {
-        if let Ok(mut candidates) = self.candidates.try_lock() {
-            for &node_id in &*candidates {
-                let node = node_id.as_node();
-                if !self.is_checked_by_position(node.position()) {
-                    break;
-                }
-                if self.is_wall_by_position(node.position()) {
-                    continue;
-                }
-                let current = current.as_node();
-                let direction = current.direction().relative(node.direction());
-                *candidates = Vec::new();
-                return Some((SearchKind::Search(direction), node_id));
+    //TODO: write test
+    fn is_available(&self, node: &SearchNodeId<N>) -> Result<bool, CannotCheckError> {
+        let position = node.as_node().position();
+        if self.is_checked_by_position(position) {
+            if self.is_wall_by_position(position) {
+                Ok(false)
+            } else {
+                Ok(true)
             }
+        } else {
+            Err(CannotCheckError)
         }
-        None
+    }
+}
+
+impl<N, M, F> Converter<(SearchNodeId<N>, SearchNodeId<N>)> for Maze<N, M, F>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+    F: Fn(Pattern) -> u16,
+{
+    type Error = ConversionError;
+    type Target = SearchKind;
+
+    //TODO: write test
+    fn convert(
+        &self,
+        target: &(SearchNodeId<N>, SearchNodeId<N>),
+    ) -> Result<Self::Target, Self::Error> {
+        let direction = target
+            .0
+            .as_node()
+            .direction()
+            .relative(target.1.as_node().direction());
+        Ok(SearchKind::Search(direction))
     }
 }
 
@@ -874,16 +885,18 @@ where
     }
 }
 
-impl<N, M, F> NodeConverter<SearchNodeId<N>> for Maze<N, M, F>
+impl<N, M, F> Converter<SearchNodeId<N>> for Maze<N, M, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    type Pose = Pose;
+    type Error = ConversionError;
+    type Target = Pose;
 
-    fn convert(&self, node: &SearchNodeId<N>) -> Pose {
+    //TODO: write test
+    fn convert(&self, node: &SearchNodeId<N>) -> Result<Self::Target, Self::Error> {
         self.converter.convert_node(node)
     }
 }
@@ -922,8 +935,7 @@ where
             }
             writeln!(f, "")?;
         }
-
-        writeln!(f, "candidates: {:?}", self.candidates.lock())
+        Ok(())
     }
 }
 
@@ -1583,45 +1595,6 @@ mod tests {
                     (4, 5, North),
                 ],
             ),
-    }
-
-    #[test]
-    fn test_direction_instructor() {
-        use AbsoluteDirection::*;
-        use RelativeDirection::*;
-
-        let new_search = |x, y, direction| SearchNodeId::<U4>::new(x, y, direction).unwrap();
-        let new_wall = |x, y, z| WallPosition::new(x, y, z).unwrap();
-
-        let test_data = vec![(
-            (
-                new_search(2, 1, North),
-                vec![
-                    new_search(3, 2, East),
-                    new_search(2, 3, North),
-                    new_search(1, 2, West),
-                    new_search(2, 1, South),
-                ],
-                vec![
-                    (new_wall(1, 1, WallDirection::Right), true),
-                    (new_wall(1, 1, WallDirection::Up), false),
-                    (new_wall(0, 1, WallDirection::Right), false),
-                    (new_wall(1, 0, WallDirection::Up), false),
-                ],
-            ),
-            Some((SearchKind::Search(Front), new_search(2, 3, North))),
-        )];
-
-        for ((src, dsts, walls), expected) in test_data {
-            let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
-            assert_eq!(maze.instruct(&src), None);
-            maze.update_node_candidates(dsts);
-            for (wall, exists) in walls {
-                maze.check_wall(wall, exists);
-            }
-            assert_eq!(maze.instruct(&src), expected);
-            assert_eq!(maze.instruct(&src), None);
-        }
     }
 
     proptest! {

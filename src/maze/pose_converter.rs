@@ -38,6 +38,9 @@ pub struct PoseConverter<M> {
     _phantom: PhantomData<fn() -> M>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ConversionError;
+
 impl<M> PoseConverter<M> {
     pub fn new(
         square_width: Length,
@@ -68,7 +71,7 @@ impl<M> PoseConverter<M> {
         (rem, quo)
     }
 
-    pub fn convert_node<N>(&self, node: &SearchNodeId<N>) -> Pose
+    pub fn convert_node<N>(&self, node: &SearchNodeId<N>) -> Result<Pose, ConversionError>
     where
         N: Unsigned + PowerOfTwo,
     {
@@ -78,7 +81,7 @@ impl<M> PoseConverter<M> {
         let x = node.x();
         let y = node.y();
         let direction = node.direction();
-        Pose {
+        Ok(Pose {
             x: (x + 1) as f32 * self.square_width_half,
             y: (y + 1) as f32 * self.square_width_half,
             theta: match direction {
@@ -86,9 +89,9 @@ impl<M> PoseConverter<M> {
                 North => Angle::new::<degree>(90.0),
                 West => Angle::new::<degree>(180.0),
                 South => Angle::new::<degree>(270.0),
-                _ => unreachable!(),
+                _ => return Err(ConversionError),
             },
-        }
+        })
     }
 }
 
