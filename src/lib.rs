@@ -25,7 +25,7 @@ pub mod traits {
         run_operator::{RunAgent, RunSolver},
         search_operator::{SearchAgent, SearchCommander},
     };
-    pub use solver::{KindInstructor, NodeConverter, ObstacleInterpreter};
+    pub use solver::{Converter, ObstacleInterpreter};
     pub use tracker::{Logger, RotationController, TranslationController};
     pub use utils::math::Math;
 }

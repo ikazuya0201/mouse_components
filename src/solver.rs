@@ -38,22 +38,18 @@ pub trait ObstacleInterpreter<Obstacle> {
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles);
 }
 
-//The trait method could be called by other threads.
-pub trait KindInstructor<Node> {
-    type Kind;
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct CannotCheckError;
 
-    fn instruct<'a, Nodes: Iterator<Item = &'a Node>>(
-        &'a self,
-        current: &'a Node,
-        candidates: Nodes,
-    ) -> Option<(Node, Self::Kind)>;
+pub trait NodeChecker<Node> {
+    fn is_available(&self, node: &Node) -> Result<bool, CannotCheckError>;
 }
 
-///convert node to pose
-pub trait NodeConverter<Node> {
-    type Pose;
+pub trait Converter<Source> {
+    type Error;
+    type Target;
 
-    fn convert(&self, node: &Node) -> Self::Pose;
+    fn convert(&self, source: &Source) -> Result<Self::Target, Self::Error>;
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -151,17 +147,31 @@ where
         + Graph<<Maze as GraphConverter<Node>>::SearchNode, Cost = Cost>
         + GraphConverter<Node>
         + ObstacleInterpreter<Obstacle>
-        + KindInstructor<<Maze as GraphConverter<Node>>::SearchNode, Kind = SearchKind>
-        + NodeConverter<<Maze as GraphConverter<Node>>::SearchNode, Pose = Pose>,
+        + NodeChecker<<Maze as GraphConverter<Node>>::SearchNode>
+        + Converter<<Maze as GraphConverter<Node>>::SearchNode, Target = Pose>
+        + Converter<
+            (
+                <Maze as GraphConverter<Node>>::SearchNode,
+                <Maze as GraphConverter<Node>>::SearchNode,
+            ),
+            Target = SearchKind,
+        >,
+    <Maze as Converter<<Maze as GraphConverter<Node>>::SearchNode>>::Error: core::fmt::Debug,
+    <Maze as Converter<(
+        <Maze as GraphConverter<Node>>::SearchNode,
+        <Maze as GraphConverter<Node>>::SearchNode,
+    )>>::Error: core::fmt::Debug,
 {
     type Error = SolverError;
     type Command = (Pose, SearchKind);
 
+    //TODO: write test
     fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
         self.maze.interpret_obstacles(obstacles);
     }
 
     //must return the current pose and next kind
+    //TODO: write test
     fn next_command(&self) -> Result<Self::Command, Self::Error> {
         match self.state.get() {
             State::Solving => {
@@ -175,18 +185,40 @@ where
             State::Waiting => {
                 use core::ops::Deref;
 
-                let (node, kind) = self
-                    .maze
-                    .instruct(
-                        &self.current.get(),
-                        Self::candidates_iter(self.candidates.borrow().deref()),
-                    )
-                    .ok_or(SolverError::WaitingError)?;
+                let mut next = None;
+                {
+                    let candidates = self.candidates.borrow();
+                    if candidates.is_empty() {
+                        return Err(SolverError::WaitingError);
+                    }
+                    for &node in Self::candidates_iter(candidates.deref()) {
+                        let is_available = self
+                            .maze
+                            .is_available(&node)
+                            .map_err(|_| SolverError::WaitingError)?;
+                        if is_available {
+                            next = Some(node);
+                            break;
+                        }
+                    }
+                }
                 self.candidates.replace(Vec::new());
-                let pose = self.maze.convert(&self.current.get());
-                self.current.set(node);
                 self.state.set(State::Solving);
-                Ok((pose, kind))
+                if let Some(next) = next {
+                    let current = self.current.get();
+                    let kind = self
+                        .maze
+                        .convert(&(current, next))
+                        .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err));
+                    let pose = self
+                        .maze
+                        .convert(&current)
+                        .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err));
+                    self.current.set(next);
+                    Ok((pose, kind))
+                } else {
+                    Err(SolverError::SolveFinishError)
+                }
             }
         }
     }
