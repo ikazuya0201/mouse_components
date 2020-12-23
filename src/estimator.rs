@@ -441,7 +441,7 @@ impl<LE, RE, I, P, COF, POS, X, Y> EstimatorBuilder<LE, RE, I, P, COF, POS, X, Y
 mod tests {
     use super::*;
     use crate::{
-        data_types::{Pose, RelativeDirection, Target},
+        data_types::{Pose, RelativeDirection, SearchKind, Target},
         impls::{TrajectoryGenerator, TrajectoryGeneratorBuilder},
         prelude::*,
         trajectory_generator::slalom_parameters_map,
@@ -679,7 +679,7 @@ mod tests {
                     y: Default::default(),
                     theta: Default::default(),
                 },
-                &direction,
+                &SearchKind::Search(direction),
             ))
     }
 

@@ -25,7 +25,8 @@ use uom::si::{
     length::meter,
 };
 
-enum Kind {
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SearchKind {
     Init,
     Search(RelativeDirection),
 }
@@ -47,19 +48,15 @@ pub struct TrajectoryGenerator<M> {
     back_trajectory: BackTrajectory,
 }
 
-impl<M> SearchTrajectoryGenerator<Pose, RelativeDirection> for TrajectoryGenerator<M>
+impl<M> SearchTrajectoryGenerator<Pose, SearchKind> for TrajectoryGenerator<M>
 where
     M: Math + Clone,
 {
     type Target = Target;
     type Trajectory = impl Iterator<Item = Target>;
 
-    fn generate_search_init(&self, pose: &Pose) -> Self::Trajectory {
-        self.generate_trajectory(pose, Kind::Init)
-    }
-
-    fn generate_search(&self, pose: &Pose, direction: &RelativeDirection) -> Self::Trajectory {
-        self.generate_trajectory(pose, Kind::Search(*direction))
+    fn generate_search(&self, pose: &Pose, kind: &SearchKind) -> Self::Trajectory {
+        self.generate_trajectory(pose, kind)
     }
 }
 
@@ -93,9 +90,9 @@ where
     }
 
     #[auto_enum]
-    fn generate_trajectory(&self, pose: &Pose, kind: Kind) -> impl Iterator<Item = Target> {
-        use Kind::*;
+    fn generate_trajectory(&self, pose: &Pose, kind: &SearchKind) -> impl Iterator<Item = Target> {
         use RelativeDirection::*;
+        use SearchKind::*;
 
         let shift = Self::get_shift(*pose);
         #[auto_enum(Iterator)]
@@ -525,7 +522,7 @@ mod tests {
                             Length::new::<meter>(0.09),
                             Angle::new::<degree>(90.0),
                         ),
-                        &direction,
+                        &SearchKind::Search(direction),
                     );
 
                     let mut last = trajectory.next().unwrap();

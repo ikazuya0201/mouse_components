@@ -12,10 +12,9 @@ use generic_array::GenericArray;
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::data_types::Pose;
+use crate::data_types::{Pose, SearchKind};
 use crate::obstacle_detector::Obstacle;
-use crate::operators::search_operator::{DirectionInstructor, NodeConverter, ObstacleInterpreter};
-use crate::solver::{Graph, GraphConverter};
+use crate::solver::{Graph, GraphConverter, KindInstructor, NodeConverter, ObstacleInterpreter};
 use crate::traits::Math;
 use crate::utils::{array_length::ArrayLength, itertools::repeat_n, mutex::Mutex};
 pub use direction::{AbsoluteDirection, RelativeDirection};
@@ -788,14 +787,14 @@ where
     }
 }
 
-impl<N, M, F> DirectionInstructor<SearchNodeId<N>> for Maze<N, M, F>
+impl<N, M, F> KindInstructor<SearchNodeId<N>> for Maze<N, M, F>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
 {
-    type Direction = RelativeDirection;
+    type Kind = SearchKind;
 
     fn update_node_candidates<SearchNodes: IntoIterator<Item = SearchNodeId<N>>>(
         &self,
@@ -804,7 +803,7 @@ where
         *self.candidates.lock() = candidates.into_iter().collect();
     }
 
-    fn instruct(&self, current: &SearchNodeId<N>) -> Option<(RelativeDirection, SearchNodeId<N>)> {
+    fn instruct(&self, current: &SearchNodeId<N>) -> Option<(Self::Kind, SearchNodeId<N>)> {
         if let Ok(mut candidates) = self.candidates.try_lock() {
             for &node_id in &*candidates {
                 let node = node_id.as_node();
@@ -817,7 +816,7 @@ where
                 let current = current.as_node();
                 let direction = current.direction().relative(node.direction());
                 *candidates = Vec::new();
-                return Some((direction, node_id));
+                return Some((SearchKind::Search(direction), node_id));
             }
         }
         None
@@ -1610,7 +1609,7 @@ mod tests {
                     (new_wall(1, 0, WallDirection::Up), false),
                 ],
             ),
-            Some((Front, new_search(2, 3, North))),
+            Some((SearchKind::Search(Front), new_search(2, 3, North))),
         )];
 
         for ((src, dsts, walls), expected) in test_data {

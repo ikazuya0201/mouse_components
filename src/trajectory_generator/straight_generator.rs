@@ -598,12 +598,12 @@ mod tests {
                     #[ignore]
                     #[test]
                     fn $test_name(
-                        a_max in 0.5f32..500.0f32,
-                        j_max in 0.5f32..1000.0f32,
-                        x_start in 0.0f32..288.0f32,
-                        distance in 0.01f32..288.0f32,
+                        a_max in 0.5f32..1.00f32,
+                        j_max in 0.5f32..10.0f32,
+                        x_start in 0.0f32..2.88f32,
+                        distance in 0.01f32..2.88f32,
                         period in 0.001f32..0.01f32,
-                        (v_max, v_start, v_end) in (0.5f32..100.0f32)
+                        (v_max, v_start, v_end) in (0.5f32..1.0f32)
                             .prop_flat_map(|v_max| (Just(v_max), 0.0..v_max, 0.0..v_max)),
                     ) {
                         let v_max = <$dt>::new::<$dtunit>(v_max);
@@ -631,20 +631,21 @@ mod tests {
                             let vd = (target.v - before.v).abs();
                             let ad = (target.a - before.a).abs();
 
-                            let x_max = <$t>::from(v_max * period) + epst;
-                            let v_max = <$dt>::from(a_max * period) + epsdt;
-                            let a_max = <$ddt>::from(j_max * period) + epsddt;
+                            let dx_max = <$t>::from(v_max * period) + epst;
+                            let dv_max = <$dt>::from(a_max * period) + epsdt;
+                            let da_max = <$ddt>::from(j_max * period) + epsddt;
+
                             prop_assert!(
-                                xd <= x_max,
-                                "left:{:?}, right:{:?}", xd, x_max,
+                                xd <= dx_max,
+                                "left:{:?}, right:{:?}", xd, dx_max,
                             );
                             prop_assert!(
-                                vd <= v_max,
-                                "left:{:?}, right:{:?}", vd, v_max,
+                                vd <= dv_max,
+                                "left:{:?}, right:{:?}", vd, dv_max,
                             );
                             prop_assert!(
-                                ad <= a_max,
-                                "left:{:?}, right:{:?}", ad, a_max,
+                                ad <= da_max,
+                                "left:{:?}, right:{:?}", ad, da_max,
                             );
 
                             before = target;
