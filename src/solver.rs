@@ -11,7 +11,7 @@ use heapless::{consts::*, Vec};
 use num::{Bounded, Saturating};
 
 use crate::data_types::{Pose, SearchKind};
-use crate::operators::{FinishError, SearchCommander};
+use crate::operators::{FinishError, RunCommander, SearchCommander};
 use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
 
 pub trait GraphConverter<Node> {
@@ -291,17 +291,77 @@ where
     }
 }
 
+//TODO: propagate each conversion errors
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RunCommanderError {
+    UnreachableError,
+    ConversionError,
+}
+
+///NOTO: multiple implementations of Converter<_> can exist for different Target,
+///but we assume there is only an implementation.
+//TODO: write test
+impl<Node, SearchNode, Max, GoalSize, Maze> RunCommander
+    for Solver<Node, SearchNode, Max, GoalSize, Maze>
+where
+    Max: ArrayLength<Node>
+        + ArrayLength<Option<Node>>
+        + ArrayLength<Option<usize>>
+        + ArrayLength<Maze::Cost>
+        + ArrayLength<Reverse<Maze::Cost>>
+        + ArrayLength<(Node, Reverse<Maze::Cost>)>
+        + ArrayLength<(
+            <Maze as Converter<Node>>::Target,
+            <Maze as Converter<(Node, Node)>>::Target,
+        )> + typenum::Unsigned,
+    GoalSize: ArrayLength<Node>,
+    Node: Ord + Copy + Debug + Into<usize>,
+    Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Maze: Graph<Node> + Converter<(Node, Node)> + Converter<Node>,
+{
+    type Error = RunCommanderError;
+    type Command = (
+        <Maze as Converter<Node>>::Target,
+        <Maze as Converter<(Node, Node)>>::Target,
+    );
+    type Commands = Vec<Self::Command, Max>;
+
+    fn compute_commands(&self) -> Result<Self::Commands, Self::Error> {
+        let path = self
+            .compute_shortest_path()
+            .ok_or(RunCommanderError::UnreachableError)?;
+
+        let mut commands = Vec::new();
+        if path.len() == 0 {
+            return Ok(commands);
+        }
+        for i in 0..path.len() - 1 {
+            commands
+                .push((
+                    self.maze
+                        .convert(&path[i])
+                        .map_err(|_| RunCommanderError::ConversionError)?,
+                    self.maze
+                        .convert(&(path[i], path[i + 1]))
+                        .map_err(|_| RunCommanderError::ConversionError)?,
+                ))
+                .unwrap_or_else(|_| unreachable!());
+        }
+        Ok(commands)
+    }
+}
+
 impl<Node, SearchNode, Max, GoalSize, Maze> Solver<Node, SearchNode, Max, GoalSize, Maze>
 where
     Max: ArrayLength<Node>
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
+        + ArrayLength<Maze::Cost>
+        + ArrayLength<Reverse<Maze::Cost>>
+        + ArrayLength<(Node, Reverse<Maze::Cost>)>
         + typenum::Unsigned,
     GoalSize: ArrayLength<Node>,
     Node: Ord + Copy + Debug + Into<usize>,
-    Max: ArrayLength<Maze::Cost>
-        + ArrayLength<Reverse<Maze::Cost>>
-        + ArrayLength<(Node, Reverse<Maze::Cost>)>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
 {
