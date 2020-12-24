@@ -22,7 +22,7 @@ pub mod traits {
     pub use administrator::{Atomic, Operator, OperatorStore, SelectMode, Selector};
     pub use agent::{ObstacleDetector, SearchTrajectoryGenerator, StateEstimator, Tracker};
     pub use operators::{
-        run_operator::{RunAgent, RunSolver},
+        run_operator::{RunAgent, RunCommander},
         search_operator::{SearchAgent, SearchCommander},
     };
     pub use solver::{Converter, ObstacleInterpreter};

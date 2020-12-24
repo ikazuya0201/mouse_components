@@ -3,52 +3,55 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::administrator::{NotFinishError, Operator};
 
-pub trait RunSolver<Graph> {
-    type Node;
-    type Nodes: IntoIterator<Item = Self::Node>;
+pub trait RunCommander {
+    type Error;
+    type Command;
+    type Commands: IntoIterator<Item = Self::Command>;
 
-    fn compute_shortest_path(&self, graph: &Graph) -> Option<Self::Nodes>;
+    fn compute_commands(&self) -> Result<Self::Commands, Self::Error>;
 }
 
-pub trait RunAgent<Node> {
+pub trait RunAgent<Command> {
     type Error;
 
-    fn init_run<Nodes: IntoIterator<Item = Node>>(&self, path: Nodes);
+    fn set_commands<Commands: IntoIterator<Item = Command>>(&self, path: Commands);
     fn track_next(&self) -> Result<(), Self::Error>;
 }
 
-pub struct RunOperator<Mode, Maze, Agent, Solver> {
+pub struct RunOperator<Mode, Agent, Commander> {
     next_mode: Mode,
     is_completed: AtomicBool,
-    maze: Rc<Maze>,
     agent: Rc<Agent>,
-    solver: Rc<Solver>,
+    commander: Rc<Commander>,
 }
 
-impl<Mode, Maze, Agent, Solver> RunOperator<Mode, Maze, Agent, Solver> {
-    pub fn new(next_mode: Mode, maze: Rc<Maze>, agent: Rc<Agent>, solver: Rc<Solver>) -> Self {
+impl<Mode, Agent, Commander> RunOperator<Mode, Agent, Commander> {
+    pub fn new(next_mode: Mode, agent: Rc<Agent>, solver: Rc<Commander>) -> Self {
         Self {
             next_mode,
             is_completed: AtomicBool::new(false),
-            maze,
             agent,
-            solver,
+            commander: solver,
         }
     }
 }
 
-impl<Mode, Maze, Agent, Solver> Operator for RunOperator<Mode, Maze, Agent, Solver>
+impl<Mode, Agent, Commander> Operator for RunOperator<Mode, Agent, Commander>
 where
     Mode: Copy,
-    Agent: RunAgent<Solver::Node>,
-    Solver: RunSolver<Maze>,
+    Agent: RunAgent<Commander::Command>,
+    Commander: RunCommander,
+    Commander::Error: core::fmt::Debug,
 {
     type Mode = Mode;
 
     fn init(&self) {
         //TODO: modify to return Result in init. remove this unwrap.
-        let path = self.solver.compute_shortest_path(&self.maze).unwrap();
-        self.agent.init_run(path);
+        let commands = self
+            .commander
+            .compute_commands()
+            .unwrap_or_else(|err| todo!("Error handling is not implemented: {:?}", err));
+        self.agent.set_commands(commands);
     }
 
     //TODO: correct agent position by sensor value and wall existence

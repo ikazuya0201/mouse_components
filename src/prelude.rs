@@ -4,7 +4,7 @@ pub use crate::administrator::OperatorStore as _components_administrator_Operato
 pub use crate::administrator::Selector as _components_administrator_Selector;
 
 pub use crate::operators::run_operator::RunAgent as _components_operators_run_operator_RunAgent;
-pub use crate::operators::run_operator::RunSolver as _components_operators_run_operator_RunSolver;
+pub use crate::operators::run_operator::RunCommander as _components_operators_run_operator_RunCommander;
 pub use crate::operators::search_operator::SearchAgent as _components_operators_search_operator_SearchAgent;
 pub use crate::operators::search_operator::SearchCommander as _components_operators_search_operator_SearchSolver;
 
