@@ -23,12 +23,6 @@ pub trait SearchCommander<Obstacle> {
     fn next_command(&self) -> Result<Self::Command, Self::Error>;
 }
 
-pub trait SearchSolver<Node, Graph> {
-    type Nodes: IntoIterator<Item = Node>;
-
-    fn next_node_candidates(&self, current: &Node, graph: &Graph) -> Option<Self::Nodes>;
-}
-
 pub struct SearchOperator<Mode, Obstacle, Agent, Solver>
 where
     Solver: SearchCommander<Obstacle>,

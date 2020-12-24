@@ -21,10 +21,7 @@ pub mod traits {
 
     pub use administrator::{Atomic, Operator, OperatorStore, SelectMode, Selector};
     pub use agent::{ObstacleDetector, SearchTrajectoryGenerator, StateEstimator, Tracker};
-    pub use operators::{
-        run_operator::{RunAgent, RunSolver},
-        search_operator::{SearchAgent, SearchCommander},
-    };
+    pub use operators::{RunAgent, RunCommander, SearchAgent, SearchCommander};
     pub use solver::{Converter, ObstacleInterpreter};
     pub use tracker::{Logger, RotationController, TranslationController};
     pub use utils::math::Math;
@@ -49,6 +46,7 @@ pub mod data_types {
         WallPosition,
     };
     pub use obstacle_detector::Obstacle;
+    pub use operators::FinishError;
     pub use tracker::{AngleState, LengthState, State};
     pub use trajectory_generator::{AngleTarget, LengthTarget, SearchKind, Target};
 }
@@ -65,7 +63,7 @@ pub mod impls {
     pub use estimator::{Estimator, EstimatorBuilder};
     pub use maze::{Maze, MazeBuilder};
     pub use obstacle_detector::ObstacleDetector;
-    pub use operators::{run_operator::RunOperator, search_operator::SearchOperator};
+    pub use operators::{RunOperator, SearchOperator};
     pub use solver::Solver;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{

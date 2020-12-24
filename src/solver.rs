@@ -11,7 +11,7 @@ use heapless::{consts::*, Vec};
 use num::{Bounded, Saturating};
 
 use crate::data_types::{Pose, SearchKind};
-use crate::operators::search_operator::{FinishError, SearchCommander};
+use crate::operators::{FinishError, SearchCommander};
 use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
 
 pub trait GraphConverter<Node> {

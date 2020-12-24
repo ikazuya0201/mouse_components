@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use heapless::{consts::*, spsc::Queue};
 use uom::si::f32::{Angle, Length};
 
-use crate::operators::search_operator::SearchAgent;
+use crate::operators::SearchAgent;
 use crate::utils::mutex::Mutex;
 
 pub trait ObstacleDetector<State> {
