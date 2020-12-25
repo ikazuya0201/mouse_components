@@ -31,7 +31,8 @@ pub enum SearchKind {
     Search(RelativeDirection),
 }
 
-pub type BackTrajectory = Chain<Chain<StraightTrajectory, SpinTrajectory>, StraightTrajectory>;
+pub type BackTrajectory<M> =
+    Chain<Chain<StraightTrajectory, SpinTrajectory>, ShiftTrajectory<StraightTrajectory, M>>;
 
 pub struct TrajectoryGenerator<M> {
     straight_generator: StraightTrajectoryGenerator<M>,
@@ -45,7 +46,7 @@ pub struct TrajectoryGenerator<M> {
     front_trajectory: StraightTrajectory,
     right_trajectory: SlalomTrajectory<M>,
     left_trajectory: SlalomTrajectory<M>,
-    back_trajectory: BackTrajectory,
+    back_trajectory: BackTrajectory<M>,
 }
 
 impl<M> SearchTrajectoryGenerator<Pose, SearchKind> for TrajectoryGenerator<M>
@@ -99,17 +100,8 @@ where
         match kind {
             Init => {
                 let distance = Length::new::<meter>(0.045);
-                let (sin_th, cos_th) = M::sincos(pose.theta);
-                let x_end = pose.x + distance * cos_th;
-                let y_end = pose.y + distance * sin_th;
-                self.straight_generator.generate(
-                    pose.x,
-                    pose.y,
-                    x_end,
-                    y_end,
-                    Default::default(),
-                    self.search_velocity,
-                )
+                self.straight_generator
+                    .generate(distance, Default::default(), self.search_velocity)
             }
             Search(direction) => {
                 #[auto_enum(Iterator)]
@@ -127,15 +119,11 @@ where
 
     pub fn generate_straight(
         &self,
-        x_start: Length,
-        y_start: Length,
-        x_end: Length,
-        y_end: Length,
+        distance: Length,
         v_start: Velocity,
         v_end: Velocity,
     ) -> impl Iterator<Item = Target> {
-        self.straight_generator
-            .generate(x_start, y_start, x_end, y_end, v_start, v_end)
+        self.straight_generator.generate(distance, v_start, v_end)
     }
 
     pub fn generate_spin(
@@ -222,38 +210,20 @@ impl
         );
         let front_trajectory = {
             let distance = Length::new::<meter>(0.09); //TODO: use configurable value
-            let x_end = pose.x + distance * M::cos(pose.theta);
-            let y_end = pose.y + distance * M::sin(pose.theta);
-            straight_generator.generate(
-                pose.x,
-                pose.y,
-                x_end,
-                y_end,
-                self.search_velocity,
-                self.search_velocity,
-            )
+            straight_generator.generate(distance, self.search_velocity, self.search_velocity)
         };
         let back_trajectory = {
             let distance = Length::new::<meter>(0.045); //TODO: use configurable value
-            let x_end = pose.x + distance * M::cos(pose.theta);
-            let y_end = pose.y + distance * M::sin(pose.theta);
             straight_generator
-                .generate(
-                    pose.x,
-                    pose.y,
-                    x_end,
-                    y_end,
-                    self.search_velocity,
-                    Default::default(),
-                )
+                .generate(distance, self.search_velocity, Default::default())
                 .chain(spin_generator.generate(pose.theta, Angle::new::<degree>(180.0)))
-                .chain(straight_generator.generate(
-                    x_end,
-                    y_end,
-                    pose.x,
-                    pose.y,
-                    Default::default(),
-                    self.search_velocity,
+                .chain(ShiftTrajectory::new(
+                    Pose {
+                        x: distance,
+                        y: Default::default(),
+                        theta: Angle::new::<degree>(180.0),
+                    },
+                    straight_generator.generate(distance, Default::default(), self.search_velocity),
                 ))
         };
 

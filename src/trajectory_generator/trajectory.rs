@@ -30,6 +30,7 @@ pub struct AngleTarget {
     pub j: AngularJerk,
 }
 
+#[derive(Clone)]
 pub struct ShiftTrajectory<T, M> {
     pose: Pose,
     inner: T,

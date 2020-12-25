@@ -7,7 +7,6 @@ use uom::si::{
         Velocity,
     },
     length::meter,
-    ratio::ratio,
     time::second,
 };
 
@@ -408,81 +407,36 @@ impl<M> StraightTrajectoryGenerator<M>
 where
     M: Math,
 {
-    fn calculate_distance(x_dist: Length, y_dist: Length) -> Length {
-        M::sqrt(x_dist * x_dist + y_dist * y_dist)
-    }
-
     //NOTO: v_start and v_end should not be negative
     pub fn generate(
         &self,
-        x_start: Length,
-        y_start: Length,
-        x_end: Length,
-        y_end: Length,
+        distance: Length,
         v_start: Velocity,
         v_end: Velocity,
     ) -> StraightTrajectory {
-        let (x_ratio, y_ratio, dist, theta) =
-            Self::calculate_parameters(x_start, y_start, x_end, y_end);
         let (trajectory_fn, t_end) =
             self.function_generator
-                .generate(Default::default(), dist, v_start, v_end);
+                .generate(Default::default(), distance, v_start, v_end);
 
         StraightTrajectory::new(
             StraightTrajectoryCalculator::Accel(trajectory_fn),
             t_end,
             self.period,
-            x_ratio,
-            y_ratio,
-            x_start,
-            y_start,
-            theta,
         )
     }
 
-    pub fn generate_constant(
-        x_start: Length,
-        y_start: Length,
-        x_end: Length,
-        y_end: Length,
-        v: Velocity,
-        period: Time,
-    ) -> StraightTrajectory {
-        let (x_ratio, y_ratio, dist, theta) =
-            Self::calculate_parameters(x_start, y_start, x_end, y_end);
-        let (trajectory_fn, t_end) =
-            LengthStraightCalculatorGenerator::<M>::generate_constant(Default::default(), dist, v);
+    pub fn generate_constant(distance: Length, v: Velocity, period: Time) -> StraightTrajectory {
+        let (trajectory_fn, t_end) = LengthStraightCalculatorGenerator::<M>::generate_constant(
+            Default::default(),
+            distance,
+            v,
+        );
 
         StraightTrajectory::new(
             StraightTrajectoryCalculator::Constant(trajectory_fn),
             t_end,
             period,
-            x_ratio,
-            y_ratio,
-            x_start,
-            y_start,
-            theta,
         )
-    }
-
-    #[inline]
-    fn calculate_parameters(
-        x_start: Length,
-        y_start: Length,
-        x_end: Length,
-        y_end: Length,
-    ) -> (f32, f32, Length, Angle) {
-        let x_dist = x_end - x_start;
-        let y_dist = y_end - y_start;
-
-        let dist = Self::calculate_distance(x_dist, y_dist);
-
-        let x_ratio = (x_dist / dist).get::<ratio>();
-        let y_ratio = (y_dist / dist).get::<ratio>();
-
-        let theta = Angle::new::<radian>(M::atan2f(y_dist.get::<meter>(), x_dist.get::<meter>()));
-
-        (x_ratio, y_ratio, dist, theta)
     }
 }
 
@@ -498,34 +452,15 @@ pub struct StraightTrajectory {
     t: Time,
     t_end: Time,
     period: Time,
-    x_ratio: f32,
-    y_ratio: f32,
-    x_start: Length,
-    y_start: Length,
-    theta: Angle,
 }
 
 impl StraightTrajectory {
-    fn new(
-        trajectory_calculator: StraightTrajectoryCalculator,
-        t_end: Time,
-        period: Time,
-        x_ratio: f32,
-        y_ratio: f32,
-        x_start: Length,
-        y_start: Length,
-        theta: Angle,
-    ) -> Self {
+    fn new(trajectory_calculator: StraightTrajectoryCalculator, t_end: Time, period: Time) -> Self {
         Self {
             trajectory_calculator,
-            t: Time::new::<second>(0.0),
+            t: Default::default(),
             t_end,
             period,
-            x_ratio,
-            y_ratio,
-            x_start,
-            y_start,
-            theta,
         }
     }
 }
@@ -544,22 +479,8 @@ impl Iterator for StraightTrajectory {
             StraightTrajectoryCalculator::Constant(calculator) => calculator.calculate(t),
         };
         Some(Target {
-            x: LengthTarget {
-                x: self.x_start + target.x * self.x_ratio,
-                v: target.v * self.x_ratio,
-                a: target.a * self.x_ratio,
-                j: target.j * self.x_ratio,
-            },
-            y: LengthTarget {
-                x: self.y_start + target.x * self.y_ratio,
-                v: target.v * self.y_ratio,
-                a: target.a * self.y_ratio,
-                j: target.j * self.y_ratio,
-            },
-            theta: AngleTarget {
-                x: self.theta,
-                ..Default::default()
-            },
+            x: target,
+            ..Default::default()
         })
     }
 }
@@ -687,10 +608,7 @@ mod tests {
         #[ignore]
         #[test]
         fn test_straight_trajectory(
-            x_start in 0.0f32..288.0f32,
-            y_start in 0.0f32..288.0f32,
-            x_end in 0.0f32..288.0f32,
-            y_end in 0.0f32..288.0f32,
+            distance in 0.0f32..400.0f32,
             (v_max, v_start, v_end) in (0.5f32..10.0f32)
                 .prop_flat_map(|v_max| (Just(v_max), 0.0..v_max, 0.0..v_max)),
             a_max in 0.5f32..10.0f32,
@@ -703,10 +621,7 @@ mod tests {
             let j_max = Jerk::new::<meter_per_second_cubed>(j_max);
             let generator = StraightTrajectoryGenerator::<MathFake>::new(v_max, a_max, j_max, period);
             let mut trajectory = generator.generate(
-                Length::new::<meter>(x_start),
-                Length::new::<meter>(y_start),
-                Length::new::<meter>(x_end),
-                Length::new::<meter>(y_end),
+                Length::new::<meter>(distance),
                 Velocity::new::<meter_per_second>(v_start),
                 Velocity::new::<meter_per_second>(v_end),
             );
