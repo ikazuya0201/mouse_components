@@ -5,8 +5,6 @@ mod trajectory;
 
 use core::iter::Chain;
 
-use auto_enums::auto_enum;
-
 use crate::agent::SearchTrajectoryGenerator;
 use crate::data_types::Pose;
 use crate::maze::RelativeDirection;
@@ -29,6 +27,30 @@ use uom::si::{
 pub enum SearchKind {
     Init,
     Search(RelativeDirection),
+}
+
+pub enum SearchTrajectory<M> {
+    Init(StraightTrajectory),
+    Right(SlalomTrajectory<M>),
+    Left(SlalomTrajectory<M>),
+    Front(StraightTrajectory),
+    Back(BackTrajectory<M>),
+}
+
+impl<M: Math> Iterator for SearchTrajectory<M> {
+    type Item = Target;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        use SearchTrajectory::*;
+
+        match self {
+            Init(inner) => inner.next(),
+            Right(inner) => inner.next(),
+            Left(inner) => inner.next(),
+            Front(inner) => inner.next(),
+            Back(inner) => inner.next(),
+        }
+    }
 }
 
 pub type BackTrajectory<M> =
@@ -54,7 +76,7 @@ where
     M: Math + Clone,
 {
     type Target = Target;
-    type Trajectory = impl Iterator<Item = Target>;
+    type Trajectory = ShiftTrajectory<SearchTrajectory<M>, M>;
 
     fn generate_search(&self, pose: &Pose, kind: &SearchKind) -> Self::Trajectory {
         self.generate_trajectory(pose, kind)
@@ -65,56 +87,34 @@ impl<M> TrajectoryGenerator<M>
 where
     M: Math + Clone,
 {
-    fn get_shift(pose: Pose) -> impl Fn(Target) -> Target {
-        let (sin_th, cos_th) = M::sincos(pose.theta);
-
-        move |target: Target| Target {
-            x: LengthTarget {
-                x: target.x.x * cos_th - target.y.x * sin_th + pose.x,
-                v: target.x.v * cos_th - target.y.v * sin_th,
-                a: target.x.a * cos_th - target.y.a * sin_th,
-                j: target.x.j * cos_th - target.y.j * sin_th,
-            },
-            y: LengthTarget {
-                x: target.x.x * sin_th + target.y.x * cos_th + pose.y,
-                v: target.x.v * sin_th + target.y.v * cos_th,
-                a: target.x.a * sin_th + target.y.a * cos_th,
-                j: target.x.j * sin_th + target.y.j * cos_th,
-            },
-            theta: AngleTarget {
-                x: target.theta.x + pose.theta,
-                v: target.theta.v,
-                a: target.theta.a,
-                j: target.theta.j,
-            },
-        }
-    }
-
-    #[auto_enum]
-    fn generate_trajectory(&self, pose: &Pose, kind: &SearchKind) -> impl Iterator<Item = Target> {
+    fn generate_trajectory(
+        &self,
+        pose: &Pose,
+        kind: &SearchKind,
+    ) -> ShiftTrajectory<SearchTrajectory<M>, M> {
         use RelativeDirection::*;
         use SearchKind::*;
 
-        let shift = Self::get_shift(*pose);
-        #[auto_enum(Iterator)]
-        match kind {
-            Init => {
-                let distance = Length::new::<meter>(0.045);
-                self.straight_generator
-                    .generate(distance, Default::default(), self.search_velocity)
-            }
-            Search(direction) => {
-                #[auto_enum(Iterator)]
-                match direction {
-                    Front => self.front_trajectory.clone(),
-                    Right => self.right_trajectory.clone(),
-                    Left => self.left_trajectory.clone(),
-                    Back => self.back_trajectory.clone(),
-                    _ => unreachable!(),
+        ShiftTrajectory::<_, M>::new(
+            *pose,
+            match kind {
+                Init => {
+                    let distance = Length::new::<meter>(0.045);
+                    SearchTrajectory::Init(self.straight_generator.generate(
+                        distance,
+                        Default::default(),
+                        self.search_velocity,
+                    ))
                 }
-            }
-            .map(shift),
-        }
+                Search(direction) => match direction {
+                    Front => SearchTrajectory::Front(self.front_trajectory.clone()),
+                    Right => SearchTrajectory::Right(self.right_trajectory.clone()),
+                    Left => SearchTrajectory::Left(self.left_trajectory.clone()),
+                    Back => SearchTrajectory::Back(self.back_trajectory.clone()),
+                    _ => unreachable!(),
+                },
+            },
+        )
     }
 
     pub fn generate_straight(
