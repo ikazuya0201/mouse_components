@@ -15,7 +15,7 @@ pub use slalom_generator::{slalom_parameters_map, SlalomDirection, SlalomKind, S
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use spin_generator::{SpinGenerator, SpinTrajectory};
 use straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
-pub use trajectory::{AngleTarget, LengthTarget, Target};
+pub use trajectory::{AngleTarget, LengthTarget, ShiftTrajectory, Target};
 use uom::si::{
     angle::degree,
     f32::{

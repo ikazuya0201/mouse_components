@@ -1,15 +1,20 @@
+use core::marker::PhantomData;
+
 use uom::si::f32::{
     Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Velocity,
 };
 
-#[derive(Clone, Copy, Debug, Default)]
+use crate::data_types::Pose;
+use crate::traits::Math;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Target {
     pub x: LengthTarget,
     pub y: LengthTarget,
     pub theta: AngleTarget,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct LengthTarget {
     pub x: Length,
     pub v: Velocity,
@@ -17,10 +22,172 @@ pub struct LengthTarget {
     pub j: Jerk,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct AngleTarget {
     pub x: Angle,
     pub v: AngularVelocity,
     pub a: AngularAcceleration,
     pub j: AngularJerk,
+}
+
+pub struct ShiftTrajectory<T, M> {
+    pose: Pose,
+    inner: T,
+    _math: PhantomData<fn() -> M>,
+}
+
+impl<T, M> ShiftTrajectory<T, M> {
+    pub fn new(pose: Pose, inner: T) -> Self {
+        Self {
+            pose,
+            inner,
+            _math: PhantomData,
+        }
+    }
+}
+
+impl<T, M> ShiftTrajectory<T, M>
+where
+    M: Math,
+{
+    fn shift(&self, target: Target) -> Target {
+        let (sin_th, cos_th) = M::sincos(self.pose.theta);
+        Target {
+            x: LengthTarget {
+                x: target.x.x * cos_th - target.y.x * sin_th + self.pose.x,
+                v: target.x.v * cos_th - target.y.v * sin_th,
+                a: target.x.a * cos_th - target.y.a * sin_th,
+                j: target.x.j * cos_th - target.y.j * sin_th,
+            },
+            y: LengthTarget {
+                x: target.x.x * sin_th + target.y.x * cos_th + self.pose.y,
+                v: target.x.v * sin_th + target.y.v * cos_th,
+                a: target.x.a * sin_th + target.y.a * cos_th,
+                j: target.x.j * sin_th + target.y.j * cos_th,
+            },
+            theta: AngleTarget {
+                x: target.theta.x + self.pose.theta,
+                v: target.theta.v,
+                a: target.theta.a,
+                j: target.theta.j,
+            },
+        }
+    }
+}
+
+impl<T, M> Iterator for ShiftTrajectory<T, M>
+where
+    T: Iterator<Item = Target>,
+    M: Math,
+{
+    type Item = Target;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let target = self.inner.next()?;
+        Some(self.shift(target))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use approx::assert_relative_eq;
+    use uom::si::{
+        acceleration::meter_per_second_squared, angle::degree,
+        angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
+        angular_velocity::degree_per_second, jerk::meter_per_second_cubed, length::meter,
+        velocity::meter_per_second,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_shift_trajectory() {
+        use crate::utils::math::MathFake;
+
+        let target = Target {
+            x: LengthTarget {
+                x: Length::new::<meter>(1.0),
+                v: Velocity::new::<meter_per_second>(1.0),
+                ..Default::default()
+            },
+            y: LengthTarget {
+                x: Length::new::<meter>(1.0),
+                v: Velocity::new::<meter_per_second>(1.0),
+                ..Default::default()
+            },
+            theta: AngleTarget {
+                x: Angle::new::<degree>(90.0),
+                v: AngularVelocity::new::<degree_per_second>(360.0),
+                ..Default::default()
+            },
+        };
+        let pose = Pose {
+            x: Length::new::<meter>(1.0),
+            y: Length::new::<meter>(1.0),
+            theta: Angle::new::<degree>(90.0),
+        };
+        let expected_target = Target {
+            x: LengthTarget {
+                x: Length::new::<meter>(0.0),
+                v: Velocity::new::<meter_per_second>(-1.0),
+                ..Default::default()
+            },
+            y: LengthTarget {
+                x: Length::new::<meter>(2.0),
+                v: Velocity::new::<meter_per_second>(1.0),
+                ..Default::default()
+            },
+            theta: AngleTarget {
+                x: Angle::new::<degree>(180.0),
+                v: AngularVelocity::new::<degree_per_second>(360.0),
+                ..Default::default()
+            },
+        };
+        let mut trajectory = ShiftTrajectory::<_, MathFake>::new(pose, vec![target].into_iter());
+        assert_target_relative_eq(trajectory.next().unwrap(), expected_target);
+    }
+
+    fn assert_target_relative_eq(left: Target, right: Target) {
+        assert_relative_eq!(left.x.x.get::<meter>(), right.x.x.get::<meter>());
+        assert_relative_eq!(
+            left.x.v.get::<meter_per_second>(),
+            right.x.v.get::<meter_per_second>()
+        );
+        assert_relative_eq!(
+            left.x.a.get::<meter_per_second_squared>(),
+            right.x.a.get::<meter_per_second_squared>()
+        );
+        assert_relative_eq!(
+            left.x.j.get::<meter_per_second_cubed>(),
+            right.x.j.get::<meter_per_second_cubed>()
+        );
+
+        assert_relative_eq!(left.y.x.get::<meter>(), right.y.x.get::<meter>());
+        assert_relative_eq!(
+            left.y.v.get::<meter_per_second>(),
+            right.y.v.get::<meter_per_second>()
+        );
+        assert_relative_eq!(
+            left.y.a.get::<meter_per_second_squared>(),
+            right.y.a.get::<meter_per_second_squared>()
+        );
+        assert_relative_eq!(
+            left.y.j.get::<meter_per_second_cubed>(),
+            right.y.j.get::<meter_per_second_cubed>()
+        );
+
+        assert_relative_eq!(left.theta.x.get::<degree>(), right.theta.x.get::<degree>());
+        assert_relative_eq!(
+            left.theta.v.get::<degree_per_second>(),
+            right.theta.v.get::<degree_per_second>()
+        );
+        assert_relative_eq!(
+            left.theta.a.get::<degree_per_second_squared>(),
+            right.theta.a.get::<degree_per_second_squared>()
+        );
+        assert_relative_eq!(
+            left.theta.j.get::<degree_per_second_cubed>(),
+            right.theta.j.get::<degree_per_second_cubed>()
+        );
+    }
 }

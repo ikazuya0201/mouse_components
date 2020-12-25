@@ -70,7 +70,7 @@ pub mod impls {
     pub use solver::Solver;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{
-        slalom_parameters_map, TrajectoryGenerator, TrajectoryGeneratorBuilder,
+        slalom_parameters_map, ShiftTrajectory, TrajectoryGenerator, TrajectoryGeneratorBuilder,
     };
 }
 
