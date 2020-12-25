@@ -15,6 +15,7 @@ pub use crate::solver::NodeChecker as _components_solver_NodeChecker;
 pub use crate::solver::ObstacleInterpreter as _components_solver_ObstacleInterpreter;
 
 pub use crate::agent::ObstacleDetector as _components_agent_ObstacleDetector;
+pub use crate::agent::RunTrajectoryGenerator as _components_agent_RunTrajectoryGenerator;
 pub use crate::agent::SearchTrajectoryGenerator as _components_agent_SearchTrajectoryGenerator;
 pub use crate::agent::StateEstimator as _components_agent_StateEstimator;
 pub use crate::agent::Tracker as _components_agent_Tracker;
