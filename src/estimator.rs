@@ -651,10 +651,7 @@ mod tests {
     fn straight_trajectory() -> impl Iterator<Item = Target> {
         let trajectory_generator = build_generator();
         trajectory_generator.generate_straight(
-            Default::default(),
-            Default::default(),
             Length::new::<meter>(3.0),
-            Default::default(),
             Default::default(),
             Default::default(),
         )
@@ -666,10 +663,7 @@ mod tests {
         let trajectory_generator = build_generator();
         trajectory_generator
             .generate_straight(
-                Default::default(),
-                Default::default(),
                 Length::new::<meter>(0.09),
-                Default::default(),
                 Default::default(),
                 Velocity::new::<meter_per_second>(0.6),
             )

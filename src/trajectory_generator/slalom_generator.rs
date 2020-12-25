@@ -3,17 +3,18 @@ use core::marker::PhantomData;
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;
+use uom::si::{
+    f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Length, Time, Velocity},
+    ratio::ratio,
+};
 
 use super::straight_generator::{
     AngleOverallCalculator, AngleStraightCalculatorGenerator, StraightTrajectory,
     StraightTrajectoryGenerator,
 };
-use super::trajectory::{LengthTarget, Target};
+use super::trajectory::{LengthTarget, ShiftTrajectory, Target};
+use crate::data_types::Pose;
 use crate::traits::Math;
-use uom::si::{
-    f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Length, Time, Velocity},
-    ratio::ratio,
-};
 
 #[cfg_attr(test, derive(Arbitrary))]
 #[derive(Debug)]
@@ -34,7 +35,10 @@ pub enum SlalomKind {
 }
 
 pub struct SlalomParameters {
-    pub xy: [(Length, Length); 3],
+    pub l_start: Length,
+    pub l_end: Length,
+    pub x_curve_end: Length,
+    pub y_curve_end: Length,
     pub theta: Angle,
     pub v_ref: Velocity,
 }
@@ -68,7 +72,7 @@ impl<M> SlalomGenerator<M> {
 }
 
 pub type SlalomTrajectory<M> =
-    Chain<Chain<StraightTrajectory, CurveTrajectory<M>>, StraightTrajectory>;
+    Chain<Chain<StraightTrajectory, CurveTrajectory<M>>, ShiftTrajectory<StraightTrajectory, M>>;
 
 impl<M> SlalomGenerator<M>
 where
@@ -81,29 +85,23 @@ where
         v: Velocity,
     ) -> SlalomTrajectory<M> {
         let params = (self.parameters_map)(kind, dir);
-        let straight1 = StraightTrajectoryGenerator::<M>::generate_constant(
-            Default::default(),
-            Default::default(),
-            params.xy[0].0,
-            params.xy[0].1,
-            v,
-            self.period,
-        );
+        let straight1 =
+            StraightTrajectoryGenerator::<M>::generate_constant(params.l_start, v, self.period);
         let curve = self.generate_curve(
-            params.xy[0].0,
-            params.xy[0].1,
+            params.l_start,
+            Default::default(),
             Default::default(),
             params.theta,
             v,
             params.v_ref,
         );
-        let straight2 = StraightTrajectoryGenerator::<M>::generate_constant(
-            params.xy[1].0,
-            params.xy[1].1,
-            params.xy[2].0,
-            params.xy[2].1,
-            v,
-            self.period,
+        let straight2 = ShiftTrajectory::new(
+            Pose {
+                x: params.x_curve_end,
+                y: params.y_curve_end,
+                theta: params.theta,
+            },
+            StraightTrajectoryGenerator::<M>::generate_constant(params.l_end, v, self.period),
         );
         straight1.chain(curve).chain(straight2)
     }
@@ -233,36 +231,24 @@ pub fn slalom_parameters_map(kind: SlalomKind, dir: SlalomDirection) -> SlalomPa
     use SlalomKind::*;
 
     let params = match kind {
-        Search90 => (5.000001, 0.0, 45.0, 40.0, 45.0, 45.0, 241.59, 90.0),
-        FastRun45 => (2.57365, 0.0, 75.0, 30.0, 90.0, 45.0, 411.636, 45.0),
-        FastRun90 => (20.0, 0.0, 90.0, 70.0, 90.0, 90.0, 422.783, 90.0),
-        FastRun135 => (21.8627, 0.0, 55.0, 80.0, 45.0, 90.0, 353.609, 135.0),
-        FastRun180 => (24.0, 0.0, 24.0, 90.0, 0.0, 90.0, 412.228, 180.0),
-        FastRunDiagonal90 => (15.6396, 0.0, 63.6396, 48.0, 63.6396, 63.6396, 289.908, 90.0),
+        Search90 => (5.000001, 5.0, 45.0, 40.0, 241.59, 90.0),
+        FastRun45 => (2.57365, 21.2132, 75.0, 30.0, 411.636, 45.0),
+        FastRun90 => (20.0, 20.0, 90.0, 70.0, 422.783, 90.0),
+        FastRun135 => (21.8627, 14.1421, 55.0, 80.0, 353.609, 135.0),
+        FastRun180 => (24.0, 24.0, 24.0, 90.0, 412.228, 180.0),
+        FastRunDiagonal90 => (15.6396, 15.6396, 63.6396, 48.0, 289.908, 90.0),
     };
     let params = match dir {
         Left => params,
-        Right => (
-            params.0, params.1, params.2, -params.3, params.4, -params.5, params.6, -params.7,
-        ),
+        Right => (params.0, params.1, params.2, -params.3, params.4, -params.5),
     };
     SlalomParameters {
-        xy: [
-            (
-                Length::new::<millimeter>(params.0),
-                Length::new::<millimeter>(params.1),
-            ),
-            (
-                Length::new::<millimeter>(params.2),
-                Length::new::<millimeter>(params.3),
-            ),
-            (
-                Length::new::<millimeter>(params.4),
-                Length::new::<millimeter>(params.5),
-            ),
-        ],
-        v_ref: Velocity::new::<millimeter_per_second>(params.6),
-        theta: Angle::new::<degree>(params.7),
+        l_start: Length::new::<millimeter>(params.0),
+        l_end: Length::new::<millimeter>(params.1),
+        x_curve_end: Length::new::<millimeter>(params.2),
+        y_curve_end: Length::new::<millimeter>(params.3),
+        v_ref: Velocity::new::<millimeter_per_second>(params.4),
+        theta: Angle::new::<degree>(params.5),
     }
 }
 

@@ -5,8 +5,6 @@ mod trajectory;
 
 use core::iter::Chain;
 
-use auto_enums::auto_enum;
-
 use crate::agent::SearchTrajectoryGenerator;
 use crate::data_types::Pose;
 use crate::maze::RelativeDirection;
@@ -15,7 +13,7 @@ pub use slalom_generator::{slalom_parameters_map, SlalomDirection, SlalomKind, S
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use spin_generator::{SpinGenerator, SpinTrajectory};
 use straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
-pub use trajectory::{AngleTarget, LengthTarget, Target};
+pub use trajectory::{AngleTarget, LengthTarget, ShiftTrajectory, Target};
 use uom::si::{
     angle::degree,
     f32::{
@@ -31,7 +29,32 @@ pub enum SearchKind {
     Search(RelativeDirection),
 }
 
-pub type BackTrajectory = Chain<Chain<StraightTrajectory, SpinTrajectory>, StraightTrajectory>;
+pub enum SearchTrajectory<M> {
+    Init(StraightTrajectory),
+    Right(SlalomTrajectory<M>),
+    Left(SlalomTrajectory<M>),
+    Front(StraightTrajectory),
+    Back(BackTrajectory<M>),
+}
+
+impl<M: Math> Iterator for SearchTrajectory<M> {
+    type Item = Target;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        use SearchTrajectory::*;
+
+        match self {
+            Init(inner) => inner.next(),
+            Right(inner) => inner.next(),
+            Left(inner) => inner.next(),
+            Front(inner) => inner.next(),
+            Back(inner) => inner.next(),
+        }
+    }
+}
+
+pub type BackTrajectory<M> =
+    Chain<Chain<StraightTrajectory, SpinTrajectory>, ShiftTrajectory<StraightTrajectory, M>>;
 
 pub struct TrajectoryGenerator<M> {
     straight_generator: StraightTrajectoryGenerator<M>,
@@ -45,7 +68,7 @@ pub struct TrajectoryGenerator<M> {
     front_trajectory: StraightTrajectory,
     right_trajectory: SlalomTrajectory<M>,
     left_trajectory: SlalomTrajectory<M>,
-    back_trajectory: BackTrajectory,
+    back_trajectory: BackTrajectory<M>,
 }
 
 impl<M> SearchTrajectoryGenerator<Pose, SearchKind> for TrajectoryGenerator<M>
@@ -53,7 +76,7 @@ where
     M: Math + Clone,
 {
     type Target = Target;
-    type Trajectory = impl Iterator<Item = Target>;
+    type Trajectory = ShiftTrajectory<SearchTrajectory<M>, M>;
 
     fn generate_search(&self, pose: &Pose, kind: &SearchKind) -> Self::Trajectory {
         self.generate_trajectory(pose, kind)
@@ -64,78 +87,43 @@ impl<M> TrajectoryGenerator<M>
 where
     M: Math + Clone,
 {
-    fn get_shift(pose: Pose) -> impl Fn(Target) -> Target {
-        let (sin_th, cos_th) = M::sincos(pose.theta);
-
-        move |target: Target| Target {
-            x: LengthTarget {
-                x: target.x.x * cos_th - target.y.x * sin_th + pose.x,
-                v: target.x.v * cos_th - target.y.v * sin_th,
-                a: target.x.a * cos_th - target.y.a * sin_th,
-                j: target.x.j * cos_th - target.y.j * sin_th,
-            },
-            y: LengthTarget {
-                x: target.x.x * sin_th + target.y.x * cos_th + pose.y,
-                v: target.x.v * sin_th + target.y.v * cos_th,
-                a: target.x.a * sin_th + target.y.a * cos_th,
-                j: target.x.j * sin_th + target.y.j * cos_th,
-            },
-            theta: AngleTarget {
-                x: target.theta.x + pose.theta,
-                v: target.theta.v,
-                a: target.theta.a,
-                j: target.theta.j,
-            },
-        }
-    }
-
-    #[auto_enum]
-    fn generate_trajectory(&self, pose: &Pose, kind: &SearchKind) -> impl Iterator<Item = Target> {
+    fn generate_trajectory(
+        &self,
+        pose: &Pose,
+        kind: &SearchKind,
+    ) -> ShiftTrajectory<SearchTrajectory<M>, M> {
         use RelativeDirection::*;
         use SearchKind::*;
 
-        let shift = Self::get_shift(*pose);
-        #[auto_enum(Iterator)]
-        match kind {
-            Init => {
-                let distance = Length::new::<meter>(0.045);
-                let (sin_th, cos_th) = M::sincos(pose.theta);
-                let x_end = pose.x + distance * cos_th;
-                let y_end = pose.y + distance * sin_th;
-                self.straight_generator.generate(
-                    pose.x,
-                    pose.y,
-                    x_end,
-                    y_end,
-                    Default::default(),
-                    self.search_velocity,
-                )
-            }
-            Search(direction) => {
-                #[auto_enum(Iterator)]
-                match direction {
-                    Front => self.front_trajectory.clone(),
-                    Right => self.right_trajectory.clone(),
-                    Left => self.left_trajectory.clone(),
-                    Back => self.back_trajectory.clone(),
-                    _ => unreachable!(),
+        ShiftTrajectory::<_, M>::new(
+            *pose,
+            match kind {
+                Init => {
+                    let distance = Length::new::<meter>(0.045);
+                    SearchTrajectory::Init(self.straight_generator.generate(
+                        distance,
+                        Default::default(),
+                        self.search_velocity,
+                    ))
                 }
-            }
-            .map(shift),
-        }
+                Search(direction) => match direction {
+                    Front => SearchTrajectory::Front(self.front_trajectory.clone()),
+                    Right => SearchTrajectory::Right(self.right_trajectory.clone()),
+                    Left => SearchTrajectory::Left(self.left_trajectory.clone()),
+                    Back => SearchTrajectory::Back(self.back_trajectory.clone()),
+                    _ => unreachable!(),
+                },
+            },
+        )
     }
 
     pub fn generate_straight(
         &self,
-        x_start: Length,
-        y_start: Length,
-        x_end: Length,
-        y_end: Length,
+        distance: Length,
         v_start: Velocity,
         v_end: Velocity,
     ) -> impl Iterator<Item = Target> {
-        self.straight_generator
-            .generate(x_start, y_start, x_end, y_end, v_start, v_end)
+        self.straight_generator.generate(distance, v_start, v_end)
     }
 
     pub fn generate_spin(
@@ -222,38 +210,20 @@ impl
         );
         let front_trajectory = {
             let distance = Length::new::<meter>(0.09); //TODO: use configurable value
-            let x_end = pose.x + distance * M::cos(pose.theta);
-            let y_end = pose.y + distance * M::sin(pose.theta);
-            straight_generator.generate(
-                pose.x,
-                pose.y,
-                x_end,
-                y_end,
-                self.search_velocity,
-                self.search_velocity,
-            )
+            straight_generator.generate(distance, self.search_velocity, self.search_velocity)
         };
         let back_trajectory = {
             let distance = Length::new::<meter>(0.045); //TODO: use configurable value
-            let x_end = pose.x + distance * M::cos(pose.theta);
-            let y_end = pose.y + distance * M::sin(pose.theta);
             straight_generator
-                .generate(
-                    pose.x,
-                    pose.y,
-                    x_end,
-                    y_end,
-                    self.search_velocity,
-                    Default::default(),
-                )
+                .generate(distance, self.search_velocity, Default::default())
                 .chain(spin_generator.generate(pose.theta, Angle::new::<degree>(180.0)))
-                .chain(straight_generator.generate(
-                    x_end,
-                    y_end,
-                    pose.x,
-                    pose.y,
-                    Default::default(),
-                    self.search_velocity,
+                .chain(ShiftTrajectory::new(
+                    Pose {
+                        x: distance,
+                        y: Default::default(),
+                        theta: Angle::new::<degree>(180.0),
+                    },
+                    straight_generator.generate(distance, Default::default(), self.search_velocity),
                 ))
         };
 
