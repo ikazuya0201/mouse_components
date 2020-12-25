@@ -20,7 +20,10 @@ pub mod traits {
     use super::*;
 
     pub use administrator::{Atomic, Operator, OperatorStore, SelectMode, Selector};
-    pub use agent::{ObstacleDetector, SearchTrajectoryGenerator, StateEstimator, Tracker};
+    pub use agent::{
+        ObstacleDetector, RunTrajectoryGenerator, SearchTrajectoryGenerator, StateEstimator,
+        Tracker,
+    };
     pub use operators::{RunAgent, RunCommander, SearchAgent, SearchCommander};
     pub use solver::{Converter, ObstacleInterpreter};
     pub use tracker::{Logger, RotationController, TranslationController};
@@ -96,6 +99,14 @@ pub mod defaults {
             Logger,
         >,
         impls::TrajectoryGenerator<Math>,
+        <impls::TrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<
+            data_types::Pose,
+            data_types::SearchKind,
+        >>::Trajectory,
+        <impls::TrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<
+            data_types::Pose,
+            data_types::SearchKind,
+        >>::Target,
     >;
 
     pub type Solver<MazeWidth, MaxPathLength, GoalSize, Math> = impls::Solver<
