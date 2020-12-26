@@ -426,7 +426,7 @@ where
         use AbsoluteDirection::*;
         use Location::*;
 
-        let node = node_id.as_node();
+        let node = node_id.to_node();
         let node_neighbors = match node.location() {
             Cell => match node.direction() {
                 North | East | South | West => self.cell_neighbors(node, is_successors),
@@ -469,7 +469,7 @@ where
         use Pattern::*;
         use RelativeDirection::*;
 
-        let node = node_id.as_node();
+        let node = node_id.to_node();
 
         let is_wall_relative = self.is_wall_relative_fn(&node, North, is_successors);
         let relative_node = Self::relative_node_fn(&node, North, is_successors);
@@ -700,7 +700,7 @@ where
         let mut src: Option<Node<N>> = None;
         let mut positions = Vec::<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>::new();
         for dst in path.into_iter() {
-            let dst = dst.as_node();
+            let dst = dst.to_node();
             if let Some(src) = src {
                 let positions_on_passage = match src.location() {
                     Cell => match src.direction() {
@@ -797,7 +797,7 @@ where
 {
     //TODO: write test
     fn is_available(&self, node: &SearchNodeId<N>) -> Result<bool, CannotCheckError> {
-        let position = node.as_node().position();
+        let position = node.to_node().position();
         if self.is_checked_by_position(position) {
             if self.is_wall_by_position(position) {
                 Ok(false)
@@ -827,9 +827,9 @@ where
     ) -> Result<Self::Target, Self::Error> {
         let direction = target
             .0
-            .as_node()
+            .to_node()
             .direction()
-            .relative(target.1.as_node().direction());
+            .relative(target.1.to_node().direction());
         Ok(SearchKind::Search(direction))
     }
 }

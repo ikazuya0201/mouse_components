@@ -275,7 +275,7 @@ where
         })
     }
 
-    pub fn as_node(&self) -> Node<N> {
+    pub fn to_node(&self) -> Node<N> {
         use AbsoluteDirection::*;
         let x = self.x_raw();
         let y = self.y_raw();
@@ -339,7 +339,7 @@ where
     N: Unsigned + PowerOfTwo,
 {
     fn into(self) -> Node<N> {
-        self.as_node()
+        self.to_node()
     }
 }
 
@@ -434,7 +434,7 @@ where
         })
     }
 
-    pub fn as_node(&self) -> Node<N> {
+    pub fn to_node(&self) -> Node<N> {
         use AbsoluteDirection::*;
         let x = self.x_raw();
         let y = self.y_raw();
@@ -488,7 +488,7 @@ where
     N: Unsigned + PowerOfTwo,
 {
     fn into(self) -> Node<N> {
-        self.as_node()
+        self.to_node()
     }
 }
 
@@ -552,7 +552,7 @@ mod tests {
             if !is_ok {
                 continue;
             }
-            let node = node.unwrap().as_node();
+            let node = node.unwrap().to_node();
             assert_eq!(node.x() as u16, x);
             assert_eq!(node.y() as u16, y);
             assert_eq!(node.direction(), direction);

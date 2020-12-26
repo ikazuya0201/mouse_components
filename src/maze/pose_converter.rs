@@ -77,7 +77,7 @@ impl<M> PoseConverter<M> {
     {
         use AbsoluteDirection::*;
 
-        let node = node.as_node();
+        let node = node.to_node();
         let x = node.x();
         let y = node.y();
         let direction = node.direction();

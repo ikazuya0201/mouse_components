@@ -225,7 +225,7 @@ where
     type Obstacles = Vec<Self::Obstacle>;
 
     fn get_obstacles(&self) -> Self::Obstacles {
-        let current = self.current.borrow().as_node();
+        let current = self.current.borrow().to_node();
         let relative = |x: i16, y: i16| {
             current
                 .relative_position(x, y, AbsoluteDirection::North)
@@ -242,7 +242,7 @@ where
     fn set_command(&self, command: &(Pose, SearchKind)) {
         use RelativeDirection::*;
 
-        let current = self.pose_to_node(command.0).as_node();
+        let current = self.pose_to_node(command.0).to_node();
 
         let relative = |x: i16, y: i16, dir: &RelativeDirection| {
             current
@@ -259,7 +259,7 @@ where
         let next = match command.1 {
             SearchKind::Init => self
                 .pose_to_node(command.0)
-                .as_node()
+                .to_node()
                 .to_search_node_id()
                 .expect("cannot convert to search node id"),
             SearchKind::Search(direction) => match direction {
