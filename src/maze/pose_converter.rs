@@ -239,7 +239,7 @@ where
             }
         };
 
-        if let Some(wall_position) = wall_position {
+        if let Ok(wall_position) = wall_position {
             Ok(WallInfo {
                 position: wall_position,
                 existing_distance: (axes_distance[0].1).0,

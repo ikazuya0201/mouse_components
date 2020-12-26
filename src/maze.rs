@@ -129,7 +129,7 @@ where
     }
 
     fn check_wall_by_position(&self, position: Position<N>, is_wall: bool) {
-        if let Some(wall_position) = WallPosition::from_position(position) {
+        if let Ok(wall_position) = WallPosition::from_position(position) {
             self.check_wall(wall_position, is_wall);
         }
     }
@@ -158,7 +158,7 @@ where
     }
 
     pub fn is_wall_by_position(&self, position: Position<N>) -> bool {
-        if let Some(wall_position) = WallPosition::from_position(position) {
+        if let Ok(wall_position) = WallPosition::from_position(position) {
             self.is_wall(wall_position)
         } else {
             true
@@ -172,7 +172,7 @@ where
     }
 
     fn is_checked_by_position(&self, position: Position<N>) -> bool {
-        if let Some(wall_position) = WallPosition::from_position(position) {
+        if let Ok(wall_position) = WallPosition::from_position(position) {
             self.is_checked(wall_position)
         } else {
             true

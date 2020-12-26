@@ -529,7 +529,7 @@ mod tests {
                     };
                     let new_wall = |x, y, z| {
                         WallPosition::<U4>::new(x, y, z)
-                            .unwrap_or_else(|| panic!("Failed to create wall position: {:?}", (x,y,z)))
+                            .unwrap_or_else(|err| unreachable!("invalid test parameter: {:?}", err))
                     };
 
                     let start = new(0, 0, North);
