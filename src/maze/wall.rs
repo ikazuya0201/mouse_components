@@ -10,6 +10,18 @@ pub enum WallDirection {
     Right = 0,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct WallCreationError {
+    x: u16,
+    y: u16,
+    z: WallDirection,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct WallConversionError<N> {
+    position: Position<N>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WallPosition<N> {
     x: u16,
@@ -22,15 +34,15 @@ impl<N> WallPosition<N>
 where
     N: Unsigned + PowerOfTwo,
 {
-    pub fn new(x: u16, y: u16, z: WallDirection) -> Option<Self> {
+    pub fn new(x: u16, y: u16, z: WallDirection) -> Result<Self, WallCreationError> {
         if x > Self::max() || y > Self::max() {
-            None
+            Err(WallCreationError { x, y, z })
         } else {
-            Some(Self::new_unchecked(x, y, z))
+            Ok(unsafe { Self::new_unchecked(x, y, z) })
         }
     }
 
-    fn new_unchecked(x: u16, y: u16, z: WallDirection) -> Self {
+    pub unsafe fn new_unchecked(x: u16, y: u16, z: WallDirection) -> Self {
         Self {
             x,
             y,
@@ -59,20 +71,27 @@ where
             | (self.x as usize) << Self::x_offset()
             | (self.y as usize) << Self::y_offset()
     }
+}
 
-    pub fn from_position(position: Position<N>) -> Option<Self> {
+impl<N> core::convert::TryFrom<Position<N>> for WallPosition<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    type Error = WallConversionError<N>;
+
+    fn try_from(position: Position<N>) -> Result<WallPosition<N>, Self::Error> {
         use Location::*;
         if position.x() < 0 || position.y() < 0 {
-            return None;
+            return Err(WallConversionError { position });
         }
         let x = position.x() / 2;
         let y = position.y() / 2;
         let z = match position.location() {
-            Cell => return None,
+            Cell => return Err(WallConversionError { position }),
             HorizontalBound => WallDirection::Up,
             VerticalBound => WallDirection::Right,
         };
-        Some(Self::new_unchecked(x as u16, y as u16, z))
+        Ok(unsafe { Self::new_unchecked(x as u16, y as u16, z) })
     }
 }
 
@@ -86,17 +105,19 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
+                    use core::convert::TryFrom;
+
                     let (input, expected) = $value;
                     let position = Position::<U4>::new(input.0, input.1);
                     let expected = expected.map(|(x,y,dir)| WallPosition::<U4>::new(x,y,dir).unwrap());
-                    assert_eq!(WallPosition::from_position(position), expected);
+                    assert_eq!(WallPosition::try_from(position), expected);
                 }
             )*
         }
     }
 
     from_position_tests! {
-        test_from_position1: ((2,-1), None),
-        test_from_position2: ((1,0), Some((0,0,WallDirection::Right))),
+        test_from_position1: ((2,-1), Err(WallConversionError{ position: Position::<U4>::new(2, -1) })),
+        test_from_position2: ((1,0), Ok((0,0,WallDirection::Right))),
     }
 }

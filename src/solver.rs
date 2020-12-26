@@ -521,15 +521,15 @@ mod tests {
 
                     let new = |x, y, dir| {
                         NodeId::<U4>::new(x, y, dir)
-                            .unwrap_or_else(|| panic!("Failed to create node id: {:?}", (x,y,dir)))
+                            .unwrap_or_else(|err| unreachable!("invalid test parameter: {:?}", err))
                     };
                     let new_search = |x, y, dir| {
                         SearchNodeId::<U4>::new(x, y, dir)
-                            .unwrap_or_else(|| panic!("Failed to create search node id: {:?}", (x,y,dir)))
+                            .unwrap_or_else(|err| unreachable!("invalid test parameter: {:?}", err))
                     };
                     let new_wall = |x, y, z| {
                         WallPosition::<U4>::new(x, y, z)
-                            .unwrap_or_else(|| panic!("Failed to create wall position: {:?}", (x,y,z)))
+                            .unwrap_or_else(|err| unreachable!("invalid test parameter: {:?}", err))
                     };
 
                     let start = new(0, 0, North);

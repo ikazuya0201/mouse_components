@@ -80,6 +80,14 @@ where
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RelativePositionError<N> {
+    from: Node<N>,
+    x_diff: i16,
+    y_diff: i16,
+    base_dir: AbsoluteDirection,
+}
+
 #[derive(Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Node<N> {
     position: Position<N>,
@@ -117,32 +125,37 @@ where
         self.direction
     }
 
-    pub fn relative_node(
+    pub fn get_relative_node(
         &self,
         x_diff: i16,
         y_diff: i16,
         dir_diff: RelativeDirection,
         base_dir: AbsoluteDirection,
-    ) -> Option<Self> {
-        let position = self.relative_position(x_diff, y_diff, base_dir)?;
+    ) -> Result<Self, RelativePositionError<N>> {
+        let position = self.get_relative_position(x_diff, y_diff, base_dir)?;
         let direction = self.direction.rotate(dir_diff);
-        Some(Node::<N>::new(position.x(), position.y(), direction))
+        Ok(Node::<N>::new(position.x(), position.y(), direction))
     }
 
-    pub fn relative_position(
+    pub fn get_relative_position(
         &self,
         x_diff: i16,
         y_diff: i16,
         base_dir: AbsoluteDirection,
-    ) -> Option<Position<N>> {
+    ) -> Result<Position<N>, RelativePositionError<N>> {
         use RelativeDirection::*;
         let relative_direction = base_dir.relative(self.direction);
         match relative_direction {
-            Front => Some(Position::new(self.x() + x_diff, self.y() + y_diff)),
-            Right => Some(Position::new(self.x() + y_diff, self.y() - x_diff)),
-            Back => Some(Position::new(self.x() - x_diff, self.y() - y_diff)),
-            Left => Some(Position::new(self.x() - y_diff, self.y() + x_diff)),
-            _ => None,
+            Front => Ok(Position::new(self.x() + x_diff, self.y() + y_diff)),
+            Right => Ok(Position::new(self.x() + y_diff, self.y() - x_diff)),
+            Back => Ok(Position::new(self.x() - x_diff, self.y() - y_diff)),
+            Left => Ok(Position::new(self.x() - y_diff, self.y() + x_diff)),
+            _ => Err(RelativePositionError {
+                from: self.clone(),
+                x_diff,
+                y_diff,
+                base_dir,
+            }),
         }
     }
 
@@ -167,27 +180,6 @@ where
 
     pub fn location(&self) -> Location {
         self.position.location()
-    }
-}
-
-impl<N> Node<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
-    pub fn to_node_id(&self) -> Option<NodeId<N>> {
-        if self.x() < 0 || self.y() < 0 {
-            None
-        } else {
-            NodeId::new(self.x() as u16, self.y() as u16, self.direction())
-        }
-    }
-
-    pub fn to_search_node_id(&self) -> Option<SearchNodeId<N>> {
-        if self.x() < 0 || self.y() < 0 {
-            None
-        } else {
-            SearchNodeId::new(self.x() as u16, self.y() as u16, self.direction())
-        }
     }
 }
 
@@ -216,10 +208,19 @@ impl<N> NodeId<N>
 where
     N: Unsigned + PowerOfTwo,
 {
-    pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Option<Self> {
+    pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use AbsoluteDirection::*;
+
+        let create_error = || {
+            Err(NodeCreationError {
+                x: x as i16,
+                y: y as i16,
+                direction,
+            })
+        };
+
         if x > Self::x_max() || y > Self::y_max() {
-            return None;
+            return create_error();
         }
         let direction = if x & 1 == 0 {
             if y & 1 == 0 {
@@ -228,7 +229,7 @@ where
                     East => 1,
                     South => 2,
                     West => 3,
-                    _ => return None,
+                    _ => return create_error(),
                 }
             } else {
                 match direction {
@@ -236,7 +237,7 @@ where
                     SouthEast => 1,
                     SouthWest => 2,
                     NorthWest => 3,
-                    _ => return None,
+                    _ => return create_error(),
                 }
             }
         } else {
@@ -246,19 +247,19 @@ where
                     SouthEast => 1,
                     SouthWest => 2,
                     NorthWest => 3,
-                    _ => return None,
+                    _ => return create_error(),
                 }
             } else {
-                return None;
+                return create_error();
             }
         };
-        Some(Self {
+        Ok(Self {
             raw: x | (y << Self::y_offset()) | (direction << Self::direction_offset()),
             _size: PhantomData,
         })
     }
 
-    pub fn as_node(&self) -> Node<N> {
+    pub fn to_node(&self) -> Node<N> {
         use AbsoluteDirection::*;
         let x = self.x_raw();
         let y = self.y_raw();
@@ -322,13 +323,32 @@ where
     N: Unsigned + PowerOfTwo,
 {
     fn into(self) -> Node<N> {
-        self.as_node()
+        self.to_node()
     }
 }
 
 impl<N> Into<usize> for NodeId<N> {
     fn into(self) -> usize {
         self.raw.into()
+    }
+}
+
+impl<N> core::convert::TryFrom<Node<N>> for NodeId<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    type Error = NodeCreationError;
+
+    fn try_from(value: Node<N>) -> Result<NodeId<N>, Self::Error> {
+        let x = value.x();
+        let y = value.y();
+        let direction = value.direction();
+
+        if x < 0 || y < 0 {
+            Err(NodeCreationError { x, y, direction })
+        } else {
+            NodeId::new(x as u16, y as u16, direction)
+        }
     }
 }
 
@@ -364,24 +384,39 @@ where
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct NodeCreationError {
+    x: i16,
+    y: i16,
+    direction: AbsoluteDirection,
+}
+
 impl<N> SearchNodeId<N>
 where
     N: Unsigned + PowerOfTwo,
 {
-    pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Option<Self> {
+    pub fn new(x: u16, y: u16, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use AbsoluteDirection::*;
+        let create_error = || {
+            Err(NodeCreationError {
+                x: x as i16,
+                y: y as i16,
+                direction,
+            })
+        };
+
         if x > Self::x_max() || y > Self::y_max() {
-            return None;
+            return create_error();
         }
 
         let direction = if x & 1 == 1 {
             if y & 1 == 1 {
-                return None;
+                return create_error();
             } else {
                 match direction {
                     East => 0,
                     West => 1,
-                    _ => return None,
+                    _ => return create_error(),
                 }
             }
         } else {
@@ -389,20 +424,20 @@ where
                 match direction {
                     North => 0,
                     South => 1,
-                    _ => return None,
+                    _ => return create_error(),
                 }
             } else {
-                return None;
+                return create_error();
             }
         };
 
-        Some(Self {
+        Ok(Self {
             raw: x | (y << Self::y_offset()) | (direction << Self::direction_offset()),
             _size: PhantomData,
         })
     }
 
-    pub fn as_node(&self) -> Node<N> {
+    pub fn to_node(&self) -> Node<N> {
         use AbsoluteDirection::*;
         let x = self.x_raw();
         let y = self.y_raw();
@@ -456,13 +491,32 @@ where
     N: Unsigned + PowerOfTwo,
 {
     fn into(self) -> Node<N> {
-        self.as_node()
+        self.to_node()
     }
 }
 
 impl<N> Into<usize> for SearchNodeId<N> {
     fn into(self) -> usize {
         self.raw.into()
+    }
+}
+
+impl<N> core::convert::TryFrom<Node<N>> for SearchNodeId<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    type Error = NodeCreationError;
+
+    fn try_from(value: Node<N>) -> Result<SearchNodeId<N>, Self::Error> {
+        let x = value.x();
+        let y = value.y();
+        let direction = value.direction();
+
+        if x < 0 || y < 0 {
+            Err(NodeCreationError { x, y, direction })
+        } else {
+            SearchNodeId::new(x as u16, y as u16, direction)
+        }
     }
 }
 
@@ -479,8 +533,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use core::convert::TryInto;
+
     use typenum::consts::*;
+
+    use super::*;
     use AbsoluteDirection::*;
 
     #[test]
@@ -514,13 +571,13 @@ mod tests {
             ((1, 0, North), false),
         ];
 
-        for ((x, y, direction), is_some) in test_data {
+        for ((x, y, direction), is_ok) in test_data {
             let node = NodeId::<U16>::new(x, y, direction);
-            assert_eq!(node.is_some(), is_some);
-            if !is_some {
+            assert_eq!(node.is_ok(), is_ok);
+            if !is_ok {
                 continue;
             }
-            let node = node.unwrap().as_node();
+            let node = node.unwrap().to_node();
             assert_eq!(node.x() as u16, x);
             assert_eq!(node.y() as u16, y);
             assert_eq!(node.direction(), direction);
@@ -536,14 +593,14 @@ mod tests {
             (31, 30, SouthEast, true),
         ];
 
-        for (x, y, direction, is_some) in test_data {
-            let expected = if is_some {
+        for (x, y, direction, is_ok) in test_data {
+            let expected = if is_ok {
                 NodeId::<U16>::new(x as u16, y as u16, direction)
             } else {
-                None
+                Err(NodeCreationError { x, y, direction })
             };
             let node = Node::<U16>::new(x, y, direction);
-            assert_eq!(node.to_node_id(), expected);
+            assert_eq!(node.try_into(), expected);
         }
     }
 
@@ -566,14 +623,14 @@ mod tests {
             (0, 1, SouthEast, false),
         ];
 
-        for (x, y, direction, is_some) in test_data {
-            let expected = if is_some {
+        for (x, y, direction, is_ok) in test_data {
+            let expected = if is_ok {
                 SearchNodeId::<U16>::new(x as u16, y as u16, direction)
             } else {
-                None
+                Err(NodeCreationError { x, y, direction })
             };
             let node = Node::<U16>::new(x, y, direction);
-            assert_eq!(node.to_search_node_id(), expected);
+            assert_eq!(node.try_into(), expected);
         }
     }
 }

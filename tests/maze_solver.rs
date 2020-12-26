@@ -1,6 +1,7 @@
 extern crate components;
 
 use core::cell::RefCell;
+use core::convert::TryInto;
 use core::ops::Mul;
 use std::rc::Rc;
 
@@ -209,7 +210,7 @@ where
         assert!(x >= 0);
         assert!(y >= 0);
         SearchNodeId::new(x as u16, y as u16, dir)
-            .unwrap_or_else(|| panic!("node out of bound: {:?}", (x, y, dir)))
+            .unwrap_or_else(|err| unreachable!("node out of bound: {:?}", err))
     }
 }
 
@@ -225,10 +226,10 @@ where
     type Obstacles = Vec<Self::Obstacle>;
 
     fn get_obstacles(&self) -> Self::Obstacles {
-        let current = self.current.borrow().as_node();
+        let current = self.current.borrow().to_node();
         let relative = |x: i16, y: i16| {
             current
-                .relative_position(x, y, AbsoluteDirection::North)
+                .get_relative_position(x, y, AbsoluteDirection::North)
                 .unwrap()
         };
         let positions = vec![relative(1, 1), relative(0, 2), relative(-1, 1)];
@@ -242,26 +243,25 @@ where
     fn set_command(&self, command: &(Pose, SearchKind)) {
         use RelativeDirection::*;
 
-        let current = self.pose_to_node(command.0).as_node();
+        let current = self.pose_to_node(command.0).to_node();
 
         let relative = |x: i16, y: i16, dir: &RelativeDirection| {
             current
-                .relative_node(x, y, *dir, AbsoluteDirection::North)
+                .get_relative_node(x, y, *dir, AbsoluteDirection::North)
                 .expect("failed to convert to relative node")
-                .to_search_node_id()
-                .unwrap_or_else(|| {
-                    panic!(
+                .try_into()
+                .unwrap_or_else(|err| {
+                    unreachable!(
                         "failed to convert to search node id: current: {:?}, relative: {:?}",
-                        current,
-                        (x, y, dir)
+                        current, err,
                     )
                 })
         };
         let next = match command.1 {
             SearchKind::Init => self
                 .pose_to_node(command.0)
-                .as_node()
-                .to_search_node_id()
+                .to_node()
+                .try_into()
                 .expect("cannot convert to search node id"),
             SearchKind::Search(direction) => match direction {
                 Right => relative(1, 1, &direction),
