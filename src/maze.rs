@@ -4,6 +4,7 @@ mod pose_converter;
 mod wall;
 
 use core::cell::RefCell;
+use core::convert::Infallible;
 use core::convert::{TryFrom, TryInto};
 use core::fmt::Debug;
 use core::marker::PhantomData;
@@ -13,7 +14,7 @@ use generic_array::GenericArray;
 use heapless::{consts::*, Vec};
 use typenum::{PowerOfTwo, Unsigned};
 
-use crate::data_types::{Pose, SearchKind};
+use crate::data_types::{Pose, RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::obstacle_detector::Obstacle;
 use crate::solver::{
     CannotCheckError, Converter, Graph, GraphConverter, NodeChecker, ObstacleInterpreter,
@@ -792,14 +793,66 @@ where
     //TODO: write test
     fn convert(
         &self,
-        target: &(SearchNodeId<N>, SearchNodeId<N>),
+        source: &(SearchNodeId<N>, SearchNodeId<N>),
     ) -> Result<Self::Target, Self::Error> {
-        let direction = target
+        let direction = source
             .0
             .to_node()
             .direction()
-            .relative(target.1.to_node().direction());
+            .relative(source.1.to_node().direction());
         Ok(SearchKind::Search(direction))
+    }
+}
+
+impl<N, M> Converter<(NodeId<N>, NodeId<N>)> for Maze<N, M>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+{
+    //TODO: define more complicated error type
+    type Error = ConversionError;
+    type Target = RunKind;
+
+    fn convert(&self, source: &(NodeId<N>, NodeId<N>)) -> Result<Self::Target, Self::Error> {
+        let src = source.0.to_node();
+        let dst = source.1.to_node();
+
+        use AbsoluteDirection::*;
+        use Location::*;
+        use RelativeDirection::*;
+        use RunKind::*;
+        use SlalomDirection::{Left as SlalomLeft, Right as SlalomRight};
+        use SlalomKind::*;
+
+        Ok(match src.location() {
+            Cell => match src.difference(&dst, North) {
+                (1, 2, FrontRight) => Slalom(FastRun45, SlalomRight),
+                (-1, 2, FrontLeft) => Slalom(FastRun45, SlalomLeft),
+                (2, 2, Right) => Slalom(FastRun90, SlalomRight),
+                (-2, 2, Left) => Slalom(FastRun90, SlalomLeft),
+                (2, 1, BackRight) => Slalom(FastRun135, SlalomRight),
+                (-2, 1, BackLeft) => Slalom(FastRun135, SlalomLeft),
+                (2, 0, Back) => Slalom(FastRun180, SlalomRight),
+                (-2, 0, Back) => Slalom(FastRun180, SlalomLeft),
+                (0, y, Front) if y > 0 => Straight(y as u16),
+                _ => return Err(ConversionError),
+            },
+            VerticalBound => match src.difference(&dst, NorthEast) {
+                (1, 2, FrontLeft) => Slalom(FastRun45, SlalomLeft),
+                (0, 2, Left) => Slalom(FastRunDiagonal90, SlalomLeft),
+                (-1, 2, BackLeft) => Slalom(FastRun135, SlalomLeft),
+                (x, y, Front) if x == y && x > 0 => StraightDiagonal(x as u16),
+                _ => return Err(ConversionError),
+            },
+            HorizontalBound => match src.difference(&dst, NorthEast) {
+                (2, 1, FrontRight) => Slalom(FastRun45, SlalomRight),
+                (2, 0, Right) => Slalom(FastRunDiagonal90, SlalomRight),
+                (2, -1, BackLeft) => Slalom(FastRun135, SlalomRight),
+                (x, y, Front) if x == y && x > 0 => StraightDiagonal(x as u16),
+                _ => return Err(ConversionError),
+            },
+        })
     }
 }
 
@@ -855,16 +908,31 @@ where
 
 impl<N, M> Converter<SearchNodeId<N>> for Maze<N, M>
 where
-    N: Mul<N> + Unsigned + PowerOfTwo,
+    N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
 {
-    type Error = ConversionError;
+    type Error = Infallible;
     type Target = Pose;
 
     //TODO: write test
     fn convert(&self, node: &SearchNodeId<N>) -> Result<Self::Target, Self::Error> {
-        self.converter.convert_node(node)
+        Ok(self.converter.convert_search_node(node))
+    }
+}
+
+impl<N, M> Converter<NodeId<N>> for Maze<N, M>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
+{
+    type Error = Infallible;
+    type Target = Pose;
+
+    //TODO: write test
+    fn convert(&self, node: &NodeId<N>) -> Result<Self::Target, Self::Error> {
+        Ok(self.converter.convert_node(node))
     }
 }
 
@@ -1605,5 +1673,43 @@ mod tests {
                 position
             );
         }
+    }
+
+    macro_rules! node_to_node_converter_tests {
+        ($($name:ident: $value: expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    use super::*;
+                    use AbsoluteDirection::*;
+
+                    #[allow(unused)]
+                    use RunKind::*;
+                    #[allow(unused)]
+                    use SlalomKind::*;
+                    #[allow(unused)]
+                    use SlalomDirection::*;
+
+                    let maze = MazeBuilder::new().costs(cost).build::<U4, MathFake>();
+                    let ((src, dst), expected) = $value;
+                    let src = NodeId::new(src.0, src.1, src.2).unwrap();
+                    let dst = NodeId::new(dst.0, dst.1, dst.2).unwrap();
+                    assert_eq!(maze.convert(&(src, dst)), expected);
+                }
+            )*
+        }
+    }
+
+    node_to_node_converter_tests! {
+        test_node_to_node_converter1: (((0,0,North),(1,2,NorthEast)), Ok(Slalom(FastRun45, Right))),
+        test_node_to_node_converter2: (((0,0,North),(2,1,SouthEast)), Ok(Slalom(FastRun135, Right))),
+        test_node_to_node_converter3: (((0,0,North),(2,3,NorthEast)), Err(ConversionError)),
+        test_node_to_node_converter4: (((0,1,NorthEast),(2,1,SouthEast)), Ok(Slalom(FastRunDiagonal90, Right))),
+        test_node_to_node_converter5: (((2,0,North),(0,0,South)), Ok(Slalom(FastRun180, Left))),
+        test_node_to_node_converter6: (((1,0,NorthEast),(2,2,North)), Ok(Slalom(FastRun45, Left))),
+        test_node_to_node_converter7: (((1,0,NorthEast),(3,2,NorthEast)), Ok(StraightDiagonal(2))),
+        test_node_to_node_converter8: (((1,0,NorthEast),(1,0,NorthEast)), Err(ConversionError)),
+        test_node_to_node_converter9: (((2,0,North),(0,2,West)), Ok(Slalom(FastRun90, Left))),
+        test_node_to_node_converter10: (((0,0,North),(0,4,North)), Ok(Straight(4))),
     }
 }

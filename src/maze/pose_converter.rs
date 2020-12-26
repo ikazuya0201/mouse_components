@@ -8,7 +8,7 @@ use uom::si::{
     length::meter,
 };
 
-use super::{AbsoluteDirection, Obstacle, SearchNodeId, WallDirection, WallPosition};
+use super::{AbsoluteDirection, NodeId, Obstacle, SearchNodeId, WallDirection, WallPosition};
 use crate::data_types::Pose;
 use crate::traits::Math;
 use crate::utils::total::Total;
@@ -71,27 +71,47 @@ impl<M> PoseConverter<M> {
         (rem, quo)
     }
 
-    pub fn convert_node<N>(&self, node: &SearchNodeId<N>) -> Result<Pose, ConversionError>
+    pub fn convert_search_node<N>(&self, node: &SearchNodeId<N>) -> Pose
+    where
+        N: Unsigned + PowerOfTwo + core::fmt::Debug,
+    {
+        use AbsoluteDirection::*;
+
+        let node = node.to_node();
+        Pose {
+            x: (node.x() + 1) as f32 * self.square_width_half,
+            y: (node.y() + 1) as f32 * self.square_width_half,
+            theta: Angle::new::<degree>(match node.direction() {
+                East => 0.0,
+                North => 90.0,
+                West => 180.0,
+                South => 270.0,
+                _ => unreachable!("Invariants of SearchNodeId broke: {:?}", node),
+            }),
+        }
+    }
+
+    pub fn convert_node<N>(&self, node: &NodeId<N>) -> Pose
     where
         N: Unsigned + PowerOfTwo,
     {
         use AbsoluteDirection::*;
 
         let node = node.to_node();
-        let x = node.x();
-        let y = node.y();
-        let direction = node.direction();
-        Ok(Pose {
-            x: (x + 1) as f32 * self.square_width_half,
-            y: (y + 1) as f32 * self.square_width_half,
-            theta: match direction {
-                East => Angle::new::<degree>(0.0),
-                North => Angle::new::<degree>(90.0),
-                West => Angle::new::<degree>(180.0),
-                South => Angle::new::<degree>(270.0),
-                _ => return Err(ConversionError),
-            },
-        })
+        Pose {
+            x: (node.x() + 1) as f32 * self.square_width_half,
+            y: (node.y() + 1) as f32 * self.square_width_half,
+            theta: Angle::new::<degree>(match node.direction() {
+                East => 0.0,
+                NorthEast => 45.0,
+                North => 90.0,
+                NorthWest => 135.0,
+                West => 180.0,
+                SouthWest => 225.0,
+                South => 270.0,
+                SouthEast => 315.0,
+            }),
+        }
     }
 }
 
