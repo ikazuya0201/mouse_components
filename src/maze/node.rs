@@ -349,6 +349,17 @@ impl<N> Into<usize> for NodeId<N> {
     }
 }
 
+impl<N> core::convert::TryFrom<Node<N>> for NodeId<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    type Error = NodeCreationError;
+
+    fn try_from(value: Node<N>) -> Result<NodeId<N>, Self::Error> {
+        value.to_node_id()
+    }
+}
+
 impl<N> core::fmt::Debug for NodeId<N>
 where
     N: Unsigned + PowerOfTwo,
@@ -495,6 +506,17 @@ where
 impl<N> Into<usize> for SearchNodeId<N> {
     fn into(self) -> usize {
         self.raw.into()
+    }
+}
+
+impl<N> core::convert::TryFrom<Node<N>> for SearchNodeId<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    type Error = NodeCreationError;
+
+    fn try_from(value: Node<N>) -> Result<SearchNodeId<N>, Self::Error> {
+        value.to_search_node_id()
     }
 }
 
