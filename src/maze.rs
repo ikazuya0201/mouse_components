@@ -19,7 +19,7 @@ use crate::solver::{
     CannotCheckError, Converter, Graph, GraphConverter, NodeChecker, ObstacleInterpreter,
 };
 use crate::traits::Math;
-use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
+use crate::utils::{array_length::ArrayLength, forced_vec::ForcedVec, itertools::repeat_n};
 pub use direction::{AbsoluteDirection, RelativeDirection};
 pub use node::Position;
 use node::{Location, Node};
@@ -265,73 +265,53 @@ where
         }
 
         let right_successors =
-            || -> Vec<(Node<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output> {
-                let mut succs = Vec::new();
+            || -> ForcedVec<(Node<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output> {
+                let mut succs = ForcedVec::new();
                 if is_wall_relative(1, 2) {
                     return succs;
                 }
-                succs
-                    .push((relative_node(1, 2, FrontRight), self.cost(FastRun45)))
-                    .unwrap();
-                succs
-                    .push((relative_node(2, 2, Right), self.cost(FastRun90)))
-                    .unwrap();
+                succs.push((relative_node(1, 2, FrontRight), self.cost(FastRun45)));
+                succs.push((relative_node(2, 2, Right), self.cost(FastRun90)));
 
                 if is_wall_relative(2, 1) {
                     return succs;
                 }
-                succs
-                    .push((relative_node(2, 1, BackRight), self.cost(FastRun135)))
-                    .unwrap();
-                succs
-                    .push((relative_node(2, 0, Back), self.cost(FastRun180)))
-                    .unwrap();
+                succs.push((relative_node(2, 1, BackRight), self.cost(FastRun135)));
+                succs.push((relative_node(2, 0, Back), self.cost(FastRun180)));
                 succs
             };
 
-        let left_successors = || -> Vec<(Node<N>, u16), U4> {
-            let mut succs = Vec::new();
+        let left_successors = || -> ForcedVec<(Node<N>, u16), U4> {
+            let mut succs = ForcedVec::new();
             if is_wall_relative(-1, 2) {
                 return succs;
             }
-            succs
-                .push((relative_node(-1, 2, FrontLeft), self.cost(FastRun45)))
-                .unwrap();
-            succs
-                .push((relative_node(-2, 2, Left), self.cost(FastRun90)))
-                .unwrap();
+            succs.push((relative_node(-1, 2, FrontLeft), self.cost(FastRun45)));
+            succs.push((relative_node(-2, 2, Left), self.cost(FastRun90)));
 
             if is_wall_relative(-2, 1) {
                 return succs;
             }
-            succs
-                .push((relative_node(-2, 1, BackLeft), self.cost(FastRun135)))
-                .unwrap();
-            succs
-                .push((relative_node(-2, 0, Back), self.cost(FastRun180)))
-                .unwrap();
+            succs.push((relative_node(-2, 1, BackLeft), self.cost(FastRun135)));
+            succs.push((relative_node(-2, 0, Back), self.cost(FastRun180)));
             succs
         };
 
         let mut succs = right_successors();
-        succs.extend_from_slice(&left_successors()).unwrap();
+        succs.extend_from_slice(&left_successors());
 
-        succs
-            .push((relative_node(0, 2, Front), self.cost(Straight(1))))
-            .unwrap();
+        succs.push((relative_node(0, 2, Front), self.cost(Straight(1))));
         for i in 1..N::I16 {
             if is_wall_relative(0, 2 * i + 1) {
                 break;
             }
-            succs
-                .push((
-                    relative_node(0, 2 * i + 2, Front),
-                    self.cost(Straight((i + 1) as u16)),
-                ))
-                .unwrap();
+            succs.push((
+                relative_node(0, 2 * i + 2, Front),
+                self.cost(Straight((i + 1) as u16)),
+            ));
         }
 
-        succs
+        succs.into()
     }
 
     fn horizontal_bound_diagonal_neighbors(
@@ -346,40 +326,30 @@ where
         let is_wall_relative = self.is_wall_relative_fn(&node, NorthEast, is_successors);
         let relative_node = Self::relative_node_fn(&node, NorthEast, is_successors);
 
-        let mut succs = Vec::new();
+        let mut succs = ForcedVec::new();
         if is_wall_relative(1, 1) {
-            return succs;
+            return succs.into();
         }
-        succs
-            .push((relative_node(1, 1, Front), self.cost(StraightDiagonal(1))))
-            .unwrap();
-        succs
-            .push((relative_node(2, 1, FrontRight), self.cost(FastRun45)))
-            .unwrap();
+        succs.push((relative_node(1, 1, Front), self.cost(StraightDiagonal(1))));
+        succs.push((relative_node(2, 1, FrontRight), self.cost(FastRun45)));
 
         if is_wall_relative(2, 0) {
-            return succs;
+            return succs.into();
         }
-        succs
-            .push((relative_node(2, -1, BackRight), self.cost(FastRun135)))
-            .unwrap();
-        succs
-            .push((relative_node(2, 0, Right), self.cost(FastRunDiagonal90)))
-            .unwrap();
+        succs.push((relative_node(2, -1, BackRight), self.cost(FastRun135)));
+        succs.push((relative_node(2, 0, Right), self.cost(FastRunDiagonal90)));
 
         for i in 2..N::I16 * 2 {
             if is_wall_relative(i, i) {
                 break;
             }
-            succs
-                .push((
-                    relative_node(i, i, Front),
-                    self.cost(StraightDiagonal(i as u16)),
-                ))
-                .unwrap();
+            succs.push((
+                relative_node(i, i, Front),
+                self.cost(StraightDiagonal(i as u16)),
+            ));
         }
 
-        succs
+        succs.into()
     }
 
     fn vertical_bound_diagonal_neighbors(
@@ -394,40 +364,30 @@ where
         let is_wall_relative = self.is_wall_relative_fn(&node, NorthEast, is_successors);
         let relative_node = Self::relative_node_fn(&node, NorthEast, is_successors);
 
-        let mut succs = Vec::new();
+        let mut succs = ForcedVec::new();
         if is_wall_relative(1, 1) {
-            return succs;
+            return succs.into();
         }
-        succs
-            .push((relative_node(1, 1, Front), self.cost(StraightDiagonal(1))))
-            .unwrap();
-        succs
-            .push((relative_node(1, 2, FrontLeft), self.cost(FastRun45)))
-            .unwrap();
+        succs.push((relative_node(1, 1, Front), self.cost(StraightDiagonal(1))));
+        succs.push((relative_node(1, 2, FrontLeft), self.cost(FastRun45)));
 
         if is_wall_relative(0, 2) {
-            return succs;
+            return succs.into();
         }
-        succs
-            .push((relative_node(-1, 2, BackLeft), self.cost(FastRun135)))
-            .unwrap();
-        succs
-            .push((relative_node(0, 2, Left), self.cost(FastRunDiagonal90)))
-            .unwrap();
+        succs.push((relative_node(-1, 2, BackLeft), self.cost(FastRun135)));
+        succs.push((relative_node(0, 2, Left), self.cost(FastRunDiagonal90)));
 
         for i in 2..N::I16 * 2 {
             if is_wall_relative(i, i) {
                 break;
             }
-            succs
-                .push((
-                    relative_node(i, i, Front),
-                    self.cost(StraightDiagonal(i as u16)),
-                ))
-                .unwrap();
+            succs.push((
+                relative_node(i, i, Front),
+                self.cost(StraightDiagonal(i as u16)),
+            ));
         }
 
-        succs
+        succs.into()
     }
 }
 
@@ -498,26 +458,18 @@ where
         let is_wall_relative = self.is_wall_relative_fn(&node, North, is_successors);
         let relative_node = Self::relative_node_fn(&node, North, is_successors);
 
-        let mut neighbors = Vec::<(Node<N>, u16), U4>::new();
-        neighbors
-            .push((relative_node(0, 0, Back), self.cost(SpinBack)))
-            .unwrap();
+        let mut neighbors = ForcedVec::<(Node<N>, u16), U4>::new();
+        neighbors.push((relative_node(0, 0, Back), self.cost(SpinBack)));
         if !is_wall_relative(1, 1) {
-            neighbors
-                .push((relative_node(1, 1, Right), self.cost(Search90)))
-                .unwrap();
+            neighbors.push((relative_node(1, 1, Right), self.cost(Search90)));
         }
         if !is_wall_relative(-1, 1) {
-            neighbors
-                .push((relative_node(-1, 1, Left), self.cost(Search90)))
-                .unwrap();
+            neighbors.push((relative_node(-1, 1, Left), self.cost(Search90)));
         }
         if !is_wall_relative(0, 2) {
-            neighbors
-                .push((relative_node(0, 2, Front), self.cost(Straight(1))))
-                .unwrap();
+            neighbors.push((relative_node(0, 2, Front), self.cost(Straight(1))));
         }
-        neighbors
+        <ForcedVec<(Node<N>, u16), U4> as Into<Vec<(Node<N>, u16), U4>>>::into(neighbors)
             .into_iter()
             .filter_map(|(node, cost)| node.try_into().map(|node_id| (node_id, cost)).ok())
             .collect()
@@ -579,38 +531,41 @@ where
         node: &'a Node<N>,
         base_dir: AbsoluteDirection,
     ) -> impl Fn(i16, i16) -> Position<N> + 'a {
-        move |x: i16, y: i16| -> Position<N> { node.get_relative_position(x, y, base_dir).unwrap() }
+        move |x: i16, y: i16| -> Position<N> {
+            node.get_relative_position(x, y, base_dir)
+                .unwrap_or_else(|_| unreachable!())
+        }
     }
 
     fn wall_positions_on_passage_from_cell(
         src: &Node<N>,
         dst: &Node<N>,
-    ) -> Vec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
+    ) -> ForcedVec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
         use AbsoluteDirection::*;
         use RelativeDirection::*;
 
         let relative_wall_position = Self::relative_wall_position_fn(&src, North);
 
-        let mut walls = Vec::new();
-        walls.push(relative_wall_position(0, 1)).unwrap();
+        let mut walls = ForcedVec::new();
+        walls.push(relative_wall_position(0, 1));
         match src.difference(dst, North) {
             (1, 2, FrontRight) | (2, 2, Right) => {
-                walls.push(relative_wall_position(1, 2)).unwrap();
+                walls.push(relative_wall_position(1, 2));
             }
             (2, 1, BackRight) | (2, 0, Back) => {
-                walls.push(relative_wall_position(1, 2)).unwrap();
-                walls.push(relative_wall_position(2, 1)).unwrap();
+                walls.push(relative_wall_position(1, 2));
+                walls.push(relative_wall_position(2, 1));
             }
             (-1, 2, FrontLeft) | (-2, 2, Left) => {
-                walls.push(relative_wall_position(-1, 2)).unwrap();
+                walls.push(relative_wall_position(-1, 2));
             }
             (-2, 1, BackLeft) | (-2, 0, Back) => {
-                walls.push(relative_wall_position(-1, 2)).unwrap();
-                walls.push(relative_wall_position(-2, 1)).unwrap();
+                walls.push(relative_wall_position(-1, 2));
+                walls.push(relative_wall_position(-2, 1));
             }
             (0, y, Front) => {
                 for i in (3..y + 1).step_by(2) {
-                    walls.push(relative_wall_position(0, i)).unwrap();
+                    walls.push(relative_wall_position(0, i));
                 }
             }
             _ => unreachable!(),
@@ -621,23 +576,23 @@ where
     fn wall_positions_on_passage_from_bound_straight(
         src: &Node<N>,
         dst: &Node<N>,
-    ) -> Vec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
+    ) -> ForcedVec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
         use AbsoluteDirection::*;
         use RelativeDirection::*;
 
         let relative_wall_position = Self::relative_wall_position_fn(&src, North);
 
-        let mut walls = Vec::new();
+        let mut walls = ForcedVec::new();
         match src.difference(dst, North) {
             (1, 1, Right) => {
-                walls.push(relative_wall_position(1, 1)).unwrap();
+                walls.push(relative_wall_position(1, 1));
             }
             (-1, 1, Left) => {
-                walls.push(relative_wall_position(-1, 1)).unwrap();
+                walls.push(relative_wall_position(-1, 1));
             }
             (0, y, Front) => {
                 for i in (2..y + 1).step_by(2) {
-                    walls.push(relative_wall_position(0, i)).unwrap();
+                    walls.push(relative_wall_position(0, i));
                 }
             }
             _ => unreachable!(),
@@ -648,22 +603,22 @@ where
     fn wall_positions_on_passage_from_vertical_bound_diagonal(
         src: &Node<N>,
         dst: &Node<N>,
-    ) -> Vec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
+    ) -> ForcedVec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
         use AbsoluteDirection::*;
         use RelativeDirection::*;
 
         let relative_wall_position = Self::relative_wall_position_fn(&src, NorthEast);
 
-        let mut walls = Vec::new();
-        walls.push(relative_wall_position(1, 1)).unwrap();
+        let mut walls = ForcedVec::new();
+        walls.push(relative_wall_position(1, 1));
         match src.difference(dst, NorthEast) {
             (1, 2, FrontLeft) => (),
             (0, 2, Left) | (-1, 2, BackLeft) => {
-                walls.push(relative_wall_position(0, 2)).unwrap();
+                walls.push(relative_wall_position(0, 2));
             }
             (x, y, Front) if x == y => {
                 for i in 2..x + 1 {
-                    walls.push(relative_wall_position(i, i)).unwrap();
+                    walls.push(relative_wall_position(i, i));
                 }
             }
             _ => unreachable!(),
@@ -674,22 +629,22 @@ where
     fn wall_positions_on_passage_from_horizontal_bound_diagonal(
         src: &Node<N>,
         dst: &Node<N>,
-    ) -> Vec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
+    ) -> ForcedVec<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> {
         use AbsoluteDirection::*;
         use RelativeDirection::*;
 
         let relative_wall_position = Self::relative_wall_position_fn(&src, NorthEast);
 
-        let mut walls = Vec::new();
-        walls.push(relative_wall_position(1, 1)).unwrap();
+        let mut walls = ForcedVec::new();
+        walls.push(relative_wall_position(1, 1));
         match src.difference(dst, NorthEast) {
             (2, 1, FrontRight) => (),
             (2, 0, Right) | (2, -1, BackRight) => {
-                walls.push(relative_wall_position(2, 0)).unwrap();
+                walls.push(relative_wall_position(2, 0));
             }
             (x, y, Front) if x == y => {
                 for i in 2..x + 1 {
-                    walls.push(relative_wall_position(i, i)).unwrap();
+                    walls.push(relative_wall_position(i, i));
                 }
             }
             _ => unreachable!(),
@@ -721,7 +676,8 @@ where
         use Location::*;
 
         let mut src: Option<Node<N>> = None;
-        let mut positions = Vec::<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>::new();
+        let mut positions =
+            ForcedVec::<Position<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>::new();
         for dst in path.into_iter() {
             let dst = dst.to_node();
             if let Some(src) = src {
@@ -753,21 +709,20 @@ where
                         _ => unreachable!(),
                     },
                 };
-                positions.extend_from_slice(&positions_on_passage).unwrap();
+                positions.extend_from_slice(&positions_on_passage);
             }
             src = Some(dst);
         }
 
-        let mut checker_nodes = Vec::<Node<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>::new();
+        let mut checker_nodes =
+            ForcedVec::<Node<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>::new();
         for (&src, &dst) in positions.iter().zip(positions.iter().skip(1)) {
             if self.is_checked_by_position(dst) {
                 continue;
             }
             let mut add_if_no_wall = |dx, dy, direction| {
                 if !self.is_wall_by_position(dst.relative_position(dx, dy)) {
-                    checker_nodes
-                        .push(dst.relative_node(dx, dy, direction))
-                        .unwrap();
+                    checker_nodes.push(dst.relative_node(dx, dy, direction));
                 }
             };
             match dst.location() {
@@ -804,6 +759,8 @@ where
                 Cell => unreachable!(),
             }
         }
+        let checker_nodes: Vec<Node<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output> =
+            checker_nodes.into();
         checker_nodes
             .into_iter()
             .filter_map(|node| node.try_into().ok())
@@ -940,7 +897,9 @@ where
         let prob = self.wall_existence_probs.borrow();
         for y in (0..N::U16).rev() {
             for x in 0..N::U16 {
-                let index = WallPosition::<N>::new(x, y, Up).unwrap().as_index();
+                let index = WallPosition::<N>::new(x, y, Up)
+                    .unwrap_or_else(|_| unreachable!())
+                    .as_index();
                 write!(f, " {:1.1} --+--", prob[index])?;
             }
             writeln!(f, "")?;
@@ -949,7 +908,9 @@ where
             }
             writeln!(f, "")?;
             for x in 0..N::U16 {
-                let index = WallPosition::<N>::new(x, y, Right).unwrap().as_index();
+                let index = WallPosition::<N>::new(x, y, Right)
+                    .unwrap_or_else(|_| unreachable!())
+                    .as_index();
                 write!(f, "      {:1.1} ", prob[index])?;
             }
             writeln!(f, "")?;
