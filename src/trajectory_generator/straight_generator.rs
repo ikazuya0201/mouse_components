@@ -438,6 +438,17 @@ where
             period,
         )
     }
+
+    #[allow(unused)]
+    pub fn reachable_velocity(
+        &self,
+        distance: Length,
+        v_start: Velocity,
+        v_end: Velocity,
+    ) -> Velocity {
+        self.function_generator
+            .calculate_reachable_velocity(v_start, v_end, distance)
+    }
 }
 
 #[derive(Clone)]

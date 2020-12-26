@@ -282,7 +282,8 @@ fn create_search_operator() -> SearchOperator<
                 36.0 * PI,
             ))
             .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
-            .build();
+            .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
+            .build::<_, _>();
 
         let obstacle_detector = {
             ObstacleDetector::new(arr![

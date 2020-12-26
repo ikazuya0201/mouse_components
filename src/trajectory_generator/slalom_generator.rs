@@ -17,14 +17,14 @@ use crate::data_types::Pose;
 use crate::traits::Math;
 
 #[cfg_attr(test, derive(Arbitrary))]
-#[derive(Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SlalomDirection {
     Right,
     Left,
 }
 
 #[cfg_attr(test, derive(Arbitrary))]
-#[derive(Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SlalomKind {
     Search90,
     FastRun45,

@@ -1,6 +1,6 @@
 use core::cell::{Cell, RefCell};
 
-use heapless::{consts::*, spsc::Queue};
+use heapless::{spsc::Queue, ArrayLength};
 use uom::si::f32::{Angle, Length};
 
 use crate::operators::{RunAgent, SearchAgent};
@@ -36,11 +36,12 @@ pub trait Tracker<State, Target> {
 pub trait RunTrajectoryGenerator<Command> {
     type Target;
     type Trajectory: Iterator<Item = Self::Target>;
+    type Trajectories: IntoIterator<Item = Self::Trajectory>;
 
     fn generate<Commands: IntoIterator<Item = Command>>(
         &self,
         commands: Commands,
-    ) -> Self::Trajectory;
+    ) -> Self::Trajectories;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
@@ -65,18 +66,38 @@ pub struct Agent<
     ITrajectoryGenerator,
     Trajectory,
     Target,
-> {
+    MaxLength,
+> where
+    MaxLength: ArrayLength<Trajectory>,
+{
     obstacle_detector: RefCell<IObstacleDetector>,
     state_estimator: RefCell<IStateEstimator>,
     tracker: RefCell<ITracker>,
     trajectory_generator: ITrajectoryGenerator,
-    trajectories: Mutex<Queue<Trajectory, U3>>,
-    run_trajectory: RefCell<Option<Trajectory>>,
+    trajectories: Mutex<Queue<Trajectory, MaxLength>>,
     last_target: Cell<Option<Target>>,
 }
 
-impl<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Trajectory, Target>
-    Agent<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Trajectory, Target>
+impl<
+        IObstacleDetector,
+        IStateEstimator,
+        ITracker,
+        ITrajectoryGenerator,
+        Trajectory,
+        Target,
+        MaxLength,
+    >
+    Agent<
+        IObstacleDetector,
+        IStateEstimator,
+        ITracker,
+        ITrajectoryGenerator,
+        Trajectory,
+        Target,
+        MaxLength,
+    >
+where
+    MaxLength: ArrayLength<Trajectory>,
 {
     pub fn new(
         obstacle_detector: IObstacleDetector,
@@ -90,24 +111,40 @@ impl<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Traject
             tracker: RefCell::new(tracker),
             trajectory_generator,
             trajectories: Mutex::new(Queue::new()),
-            run_trajectory: RefCell::new(None),
             last_target: Cell::new(None),
         }
     }
 }
 
-impl<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Trajectory, Target>
-    Agent<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Trajectory, Target>
+impl<
+        IObstacleDetector,
+        IStateEstimator,
+        ITracker,
+        ITrajectoryGenerator,
+        Trajectory,
+        Target,
+        MaxLength,
+    >
+    Agent<
+        IObstacleDetector,
+        IStateEstimator,
+        ITracker,
+        ITrajectoryGenerator,
+        Trajectory,
+        Target,
+        MaxLength,
+    >
 where
     ITracker: Tracker<IStateEstimator::State, Target>,
     IStateEstimator: StateEstimator,
+    MaxLength: ArrayLength<Trajectory>,
 {
     pub fn stop(&self) {
         self.tracker.borrow_mut().stop();
     }
 }
 
-impl<Pose, Kind, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
+impl<Pose, Kind, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, MaxLength>
     SearchAgent<(Pose, Kind)>
     for Agent<
         IObstacleDetector,
@@ -116,6 +153,7 @@ impl<Pose, Kind, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenera
         ITrajectoryGenerator,
         ITrajectoryGenerator::Trajectory,
         ITrajectoryGenerator::Target,
+        MaxLength,
     >
 where
     Pose: Copy,
@@ -124,6 +162,7 @@ where
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
     ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Kind>,
+    MaxLength: ArrayLength<ITrajectoryGenerator::Trajectory>,
 {
     type Error = ();
     type Obstacle = IObstacleDetector::Obstacle;
@@ -171,7 +210,8 @@ where
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct TrackFinishError;
 
-impl<Command, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator> RunAgent<Command>
+impl<Command, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, MaxLength>
+    RunAgent<Command>
     for Agent<
         IObstacleDetector,
         IStateEstimator,
@@ -179,30 +219,38 @@ impl<Command, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator
         ITrajectoryGenerator,
         ITrajectoryGenerator::Trajectory,
         ITrajectoryGenerator::Target,
+        MaxLength,
     >
 where
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
     ITrajectoryGenerator: RunTrajectoryGenerator<Command>,
+    MaxLength: ArrayLength<ITrajectoryGenerator::Trajectory>,
 {
     type Error = TrackFinishError;
 
     fn set_commands<Commands: IntoIterator<Item = Command>>(&self, commands: Commands) {
-        self.run_trajectory
-            .replace(Some(self.trajectory_generator.generate(commands)));
+        let mut queue = Queue::new();
+        for trajectory in self.trajectory_generator.generate(commands) {
+            queue.enqueue(trajectory).unwrap_or_else(|_| unreachable!());
+        }
+        *self.trajectories.lock() = queue;
     }
 
     fn track_next(&self) -> Result<(), Self::Error> {
-        use core::ops::DerefMut;
-
-        if let Some(trajectory) = self.run_trajectory.borrow_mut().deref_mut() {
+        let mut trajectories = self.trajectories.lock();
+        loop {
+            if trajectories.is_empty() {
+                return Err(TrackFinishError);
+            }
+            let trajectory = trajectories.iter_mut().next().unwrap();
             if let Some(target) = trajectory.next() {
                 let state = self.state_estimator.borrow_mut().estimate();
                 self.tracker.borrow_mut().track(&state, &target);
                 return Ok(());
             }
+            trajectories.dequeue();
         }
-        Err(TrackFinishError)
     }
 }
