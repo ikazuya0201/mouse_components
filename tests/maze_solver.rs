@@ -127,28 +127,26 @@ fn test_compute_shortest_path_u4() {
     }
 }
 
-struct AgentMock<N, F, M>
+struct AgentMock<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
-    maze: Rc<Maze<N, M, F>>,
+    maze: Rc<Maze<N, M>>,
     current: RefCell<SearchNodeId<N>>,
     square_width: Length,
     wall_width: Length,
 }
 
-impl<N, F, M> AgentMock<N, F, M>
+impl<N, M> AgentMock<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     fn new(
-        maze: Rc<Maze<N, M, F>>,
+        maze: Rc<Maze<N, M>>,
         current: SearchNodeId<N>,
         square_width: Length,
         wall_width: Length,
@@ -214,12 +212,11 @@ where
     }
 }
 
-impl<N, F, M> SearchAgent<(Pose, SearchKind)> for AgentMock<N, F, M>
+impl<N, M> SearchAgent<(Pose, SearchKind)> for AgentMock<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + core::fmt::Debug,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     type Error = ();
     type Obstacle = Obstacle;

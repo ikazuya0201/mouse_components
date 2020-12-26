@@ -42,30 +42,28 @@ pub enum Pattern {
     SpinBack,
 }
 
-pub struct Maze<N, M, F = fn(Pattern) -> u16>
+pub struct Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     pub(crate) wall_existence_probs:
         RefCell<GenericArray<f32, <<N as Mul<N>>::Output as Mul<U2>>::Output>>,
     wall_prob_threshold: f32,
-    costs: F,
+    costs: fn(Pattern) -> u16,
     converter: PoseConverter<M>,
 }
 
-impl<N, M, F> Maze<N, M, F>
+impl<N, M> Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     fn new(
         wall_prob_threshold: f32,
-        costs: F,
+        costs: fn(Pattern) -> u16,
         square_width: Length,
         wall_width: Length,
         ignore_radius_from_pillar: Length,
@@ -239,14 +237,13 @@ where
     }
 }
 
-impl<N, M, F> Maze<N, M, F>
+impl<N, M> Maze<N, M>
 where
     N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<U2>>::Output: Add<U10>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     fn cell_neighbors(
         &self,
@@ -391,7 +388,7 @@ where
     }
 }
 
-impl<N, M, F> Maze<N, M, F>
+impl<N, M> Maze<N, M>
 where
     N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<U2>>::Output: Add<U10>,
@@ -399,7 +396,6 @@ where
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
     fn neighbors(
@@ -436,12 +432,11 @@ where
     }
 }
 
-impl<N, M, F> Maze<N, M, F>
+impl<N, M> Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
     fn search_node_neighbors(
@@ -476,7 +471,7 @@ where
     }
 }
 
-impl<N, M, F> Graph<NodeId<N>> for Maze<N, M, F>
+impl<N, M> Graph<NodeId<N>> for Maze<N, M>
 where
     N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<U2>>::Output: Add<U10>,
@@ -484,7 +479,6 @@ where
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     type Cost = u16;
     type Edges = Vec<(NodeId<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output>;
@@ -498,12 +492,11 @@ where
     }
 }
 
-impl<N, M, F> Graph<SearchNodeId<N>> for Maze<N, M, F>
+impl<N, M> Graph<SearchNodeId<N>> for Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
     Node<N>: Debug,
 {
     type Cost = u16;
@@ -518,14 +511,13 @@ where
     }
 }
 
-impl<N, M, F> Maze<N, M, F>
+impl<N, M> Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<SearchNodeId<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
-    F: Fn(Pattern) -> u16,
 {
     fn relative_wall_position_fn<'a>(
         node: &'a Node<N>,
@@ -653,7 +645,7 @@ where
     }
 }
 
-impl<N, M, F> GraphConverter<NodeId<N>> for Maze<N, M, F>
+impl<N, M> GraphConverter<NodeId<N>> for Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2> + Mul<U4>,
@@ -661,7 +653,6 @@ where
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<SearchNodeId<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Node<N>>,
     <<N as Mul<N>>::Output as Mul<U4>>::Output: ArrayLength<Position<N>>,
-    F: Fn(Pattern) -> u16,
 {
     type SearchNode = SearchNodeId<N>;
     type SearchNodes = Vec<SearchNodeId<N>, <<N as Mul<N>>::Output as Mul<U4>>::Output>;
@@ -768,12 +759,11 @@ where
     }
 }
 
-impl<N, M, F> NodeChecker<SearchNodeId<N>> for Maze<N, M, F>
+impl<N, M> NodeChecker<SearchNodeId<N>> for Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     //TODO: write test
     fn is_available(&self, node: &SearchNodeId<N>) -> Result<bool, CannotCheckError> {
@@ -790,12 +780,11 @@ where
     }
 }
 
-impl<N, M, F> Converter<(SearchNodeId<N>, SearchNodeId<N>)> for Maze<N, M, F>
+impl<N, M> Converter<(SearchNodeId<N>, SearchNodeId<N>)> for Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     type Error = ConversionError;
     type Target = SearchKind;
@@ -814,12 +803,11 @@ where
     }
 }
 
-impl<N, M, F> ObstacleInterpreter<Obstacle> for Maze<N, M, F>
+impl<N, M> ObstacleInterpreter<Obstacle> for Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
     M: Math,
 {
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
@@ -865,12 +853,11 @@ where
     }
 }
 
-impl<N, M, F> Converter<SearchNodeId<N>> for Maze<N, M, F>
+impl<N, M> Converter<SearchNodeId<N>> for Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     type Error = ConversionError;
     type Target = Pose;
@@ -881,12 +868,11 @@ where
     }
 }
 
-impl<N, M, F> core::fmt::Debug for Maze<N, M, F>
+impl<N, M> core::fmt::Debug for Maze<N, M>
 where
     N: Mul<N> + Unsigned + PowerOfTwo + core::fmt::Debug,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
-    F: Fn(Pattern) -> u16,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         use WallDirection::*;
@@ -964,11 +950,8 @@ impl MazeBuilder<(), (), (), (), (), ()> {
     }
 }
 
-impl<C> MazeBuilder<C, (), (), (), (), ()>
-where
-    C: Fn(Pattern) -> u16,
-{
-    pub fn build<N, M>(self) -> Maze<N, M, C>
+impl MazeBuilder<fn(Pattern) -> u16, (), (), (), (), ()> {
+    pub fn build<N, M>(self) -> Maze<N, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
@@ -987,11 +970,8 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, (), (), Length>
-where
-    C: Fn(Pattern) -> u16,
-{
-    pub fn build<N, M>(self) -> Maze<N, M, C>
+impl MazeBuilder<fn(Pattern) -> u16, Length, Length, (), (), Length> {
+    pub fn build<N, M>(self) -> Maze<N, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
@@ -1010,11 +990,8 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, (), (), f32, (), ()>
-where
-    C: Fn(Pattern) -> u16,
-{
-    pub fn build<N, M>(self) -> Maze<N, M, C>
+impl MazeBuilder<fn(Pattern) -> u16, (), (), f32, (), ()> {
+    pub fn build<N, M>(self) -> Maze<N, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
@@ -1033,11 +1010,8 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, f32, (), Length>
-where
-    C: Fn(Pattern) -> u16,
-{
-    pub fn build<N, M>(self) -> Maze<N, M, C>
+impl MazeBuilder<fn(Pattern) -> u16, Length, Length, f32, (), Length> {
+    pub fn build<N, M>(self) -> Maze<N, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
@@ -1056,11 +1030,8 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, (), (), (), &str, ()>
-where
-    C: Fn(Pattern) -> u16,
-{
-    pub fn build<N, M>(self) -> Maze<N, M, C>
+impl MazeBuilder<fn(Pattern) -> u16, (), (), (), &str, ()> {
+    pub fn build<N, M>(self) -> Maze<N, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
@@ -1079,11 +1050,8 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, (), &str, Length>
-where
-    C: Fn(Pattern) -> u16,
-{
-    pub fn build<N, M>(self) -> Maze<N, M, C>
+impl MazeBuilder<fn(Pattern) -> u16, Length, Length, (), &str, Length> {
+    pub fn build<N, M>(self) -> Maze<N, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
@@ -1102,11 +1070,8 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, (), (), f32, &str, ()>
-where
-    C: Fn(Pattern) -> u16,
-{
-    pub fn build<N, M>(self) -> Maze<N, M, C>
+impl MazeBuilder<fn(Pattern) -> u16, (), (), f32, &str, ()> {
+    pub fn build<N, M>(self) -> Maze<N, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
@@ -1125,11 +1090,8 @@ where
     }
 }
 
-impl<C> MazeBuilder<C, Length, Length, f32, &str, Length>
-where
-    C: Fn(Pattern) -> u16,
-{
-    pub fn build<N, M>(self) -> Maze<N, M, C>
+impl MazeBuilder<fn(Pattern) -> u16, Length, Length, f32, &str, Length> {
+    pub fn build<N, M>(self) -> Maze<N, M>
     where
         N: Mul<N> + Unsigned + PowerOfTwo,
         <N as Mul<N>>::Output: Mul<U2>,
@@ -1149,10 +1111,10 @@ where
 }
 
 impl<SW, WW, WPT, S, R> MazeBuilder<(), SW, WW, WPT, S, R> {
-    pub fn costs<C>(self, costs: C) -> MazeBuilder<C, SW, WW, WPT, S, R>
-    where
-        C: Fn(Pattern) -> u16,
-    {
+    pub fn costs(
+        self,
+        costs: fn(Pattern) -> u16,
+    ) -> MazeBuilder<fn(Pattern) -> u16, SW, WW, WPT, S, R> {
         MazeBuilder {
             wall_prob_threshold: self.wall_prob_threshold,
             costs,
