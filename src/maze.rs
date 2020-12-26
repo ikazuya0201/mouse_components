@@ -113,16 +113,26 @@ where
     fn initialize(&self) {
         for i in 0..WallPosition::<N>::max() + 1 {
             self.check_wall(
-                WallPosition::new(i, WallPosition::<N>::max(), WallDirection::Up).unwrap(),
+                WallPosition::new(i, WallPosition::<N>::max(), WallDirection::Up)
+                    .unwrap_or_else(|err| unreachable!("{:?}", err)),
                 true,
             );
             self.check_wall(
-                WallPosition::new(WallPosition::<N>::max(), i, WallDirection::Right).unwrap(),
+                WallPosition::new(WallPosition::<N>::max(), i, WallDirection::Right)
+                    .unwrap_or_else(|err| unreachable!("{:?}", err)),
                 true,
             );
         }
-        self.check_wall(WallPosition::new(0, 0, WallDirection::Right).unwrap(), true);
-        self.check_wall(WallPosition::new(0, 0, WallDirection::Up).unwrap(), false);
+        self.check_wall(
+            WallPosition::new(0, 0, WallDirection::Right)
+                .unwrap_or_else(|err| unreachable!("{:?}", err)),
+            true,
+        );
+        self.check_wall(
+            WallPosition::new(0, 0, WallDirection::Up)
+                .unwrap_or_else(|err| unreachable!("{:?}", err)),
+            false,
+        );
     }
 
     pub fn check_wall(&self, position: WallPosition<N>, is_wall: bool) {
