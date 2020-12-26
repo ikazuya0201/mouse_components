@@ -4,6 +4,7 @@ mod pose_converter;
 mod wall;
 
 use core::cell::RefCell;
+use core::convert::TryFrom;
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::ops::{Add, Mul};
@@ -129,7 +130,7 @@ where
     }
 
     fn check_wall_by_position(&self, position: Position<N>, is_wall: bool) {
-        if let Ok(wall_position) = WallPosition::from_position(position) {
+        if let Ok(wall_position) = WallPosition::try_from(position) {
             self.check_wall(wall_position, is_wall);
         }
     }
@@ -158,7 +159,7 @@ where
     }
 
     pub fn is_wall_by_position(&self, position: Position<N>) -> bool {
-        if let Ok(wall_position) = WallPosition::from_position(position) {
+        if let Ok(wall_position) = WallPosition::try_from(position) {
             self.is_wall(wall_position)
         } else {
             true
@@ -172,7 +173,7 @@ where
     }
 
     fn is_checked_by_position(&self, position: Position<N>) -> bool {
-        if let Ok(wall_position) = WallPosition::from_position(position) {
+        if let Ok(wall_position) = WallPosition::try_from(position) {
             self.is_checked(wall_position)
         } else {
             true

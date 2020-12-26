@@ -71,8 +71,15 @@ where
             | (self.x as usize) << Self::x_offset()
             | (self.y as usize) << Self::y_offset()
     }
+}
 
-    pub fn from_position(position: Position<N>) -> Result<Self, WallConversionError<N>> {
+impl<N> core::convert::TryFrom<Position<N>> for WallPosition<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    type Error = WallConversionError<N>;
+
+    fn try_from(position: Position<N>) -> Result<WallPosition<N>, Self::Error> {
         use Location::*;
         if position.x() < 0 || position.y() < 0 {
             return Err(WallConversionError { position });
@@ -98,10 +105,12 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
+                    use core::convert::TryFrom;
+
                     let (input, expected) = $value;
                     let position = Position::<U4>::new(input.0, input.1);
                     let expected = expected.map(|(x,y,dir)| WallPosition::<U4>::new(x,y,dir).unwrap());
-                    assert_eq!(WallPosition::from_position(position), expected);
+                    assert_eq!(WallPosition::try_from(position), expected);
                 }
             )*
         }
