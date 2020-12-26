@@ -447,7 +447,7 @@ where
         };
         node_neighbors
             .into_iter()
-            .filter_map(|(node, cost)| node.to_node_id().map(|node_id| (node_id, cost)))
+            .filter_map(|(node, cost)| node.to_node_id().map(|node_id| (node_id, cost)).ok())
             .collect()
     }
 }
@@ -495,7 +495,7 @@ where
         }
         neighbors
             .into_iter()
-            .filter_map(|(node, cost)| node.to_search_node_id().map(|node_id| (node_id, cost)))
+            .filter_map(|(node, cost)| node.to_search_node_id().map(|node_id| (node_id, cost)).ok())
             .collect()
     }
 }
@@ -783,7 +783,7 @@ where
         }
         checker_nodes
             .into_iter()
-            .filter_map(|node| node.to_search_node_id())
+            .filter_map(|node| node.to_search_node_id().ok())
             .collect()
     }
 }

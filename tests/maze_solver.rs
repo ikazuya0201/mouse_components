@@ -209,7 +209,7 @@ where
         assert!(x >= 0);
         assert!(y >= 0);
         SearchNodeId::new(x as u16, y as u16, dir)
-            .unwrap_or_else(|| panic!("node out of bound: {:?}", (x, y, dir)))
+            .unwrap_or_else(|err| unreachable!("node out of bound: {:?}", err))
     }
 }
 
@@ -249,11 +249,10 @@ where
                 .relative_node(x, y, *dir, AbsoluteDirection::North)
                 .expect("failed to convert to relative node")
                 .to_search_node_id()
-                .unwrap_or_else(|| {
-                    panic!(
+                .unwrap_or_else(|err| {
+                    unreachable!(
                         "failed to convert to search node id: current: {:?}, relative: {:?}",
-                        current,
-                        (x, y, dir)
+                        current, err,
                     )
                 })
         };
