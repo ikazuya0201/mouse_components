@@ -600,7 +600,7 @@ mod tests {
         value: 0.001,
     };
 
-    fn build_generator() -> TrajectoryGenerator<MathFake> {
+    fn build_generator() -> TrajectoryGenerator<MathFake, ()> {
         TrajectoryGeneratorBuilder::new()
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
@@ -613,6 +613,7 @@ mod tests {
             .slalom_parameters_map(slalom_parameters_map)
             .period(PERIOD)
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
+            .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
             .build()
     }
 

@@ -50,7 +50,7 @@ pub mod data_types {
     pub use obstacle_detector::Obstacle;
     pub use operators::FinishError;
     pub use tracker::{AngleState, LengthState, State};
-    pub use trajectory_generator::{AngleTarget, LengthTarget, SearchKind, Target};
+    pub use trajectory_generator::{AngleTarget, LengthTarget, RunKind, SearchKind, Target};
 }
 
 pub mod impls {
@@ -85,6 +85,7 @@ pub mod defaults {
         DistanceSensor,
         DistanceSensorNum,
         Math,
+        MaxPathLength,
         Logger = impls::NullLogger,
     > = impls::Agent<
         impls::ObstacleDetector<DistanceSensor, DistanceSensorNum>,
@@ -97,15 +98,16 @@ pub mod defaults {
             impls::RotationController,
             Logger,
         >,
-        impls::TrajectoryGenerator<Math>,
-        <impls::TrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<
+        impls::TrajectoryGenerator<Math, MaxPathLength>,
+        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::SearchTrajectoryGenerator<
             data_types::Pose,
             data_types::SearchKind,
         >>::Trajectory,
-        <impls::TrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<
+        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::SearchTrajectoryGenerator<
             data_types::Pose,
             data_types::SearchKind,
         >>::Target,
+        MaxPathLength,
     >;
 
     pub type Solver<MazeWidth, MaxPathLength, GoalSize, Math> = impls::Solver<
@@ -142,6 +144,7 @@ pub mod defaults {
             DistanceSensor,
             DistanceSensorNum,
             Math,
+            MaxPathLength,
             Logger,
         >,
         Solver<MazeWidth, MaxPathLength, GoalSize, Math>,
