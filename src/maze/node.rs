@@ -183,35 +183,6 @@ where
     }
 }
 
-impl<N> Node<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
-    pub fn to_node_id(&self) -> Result<NodeId<N>, NodeCreationError> {
-        let x = self.x();
-        let y = self.y();
-        let direction = self.direction();
-
-        if x < 0 || y < 0 {
-            Err(NodeCreationError { x, y, direction })
-        } else {
-            NodeId::new(x as u16, y as u16, direction)
-        }
-    }
-
-    pub fn to_search_node_id(&self) -> Result<SearchNodeId<N>, NodeCreationError> {
-        let x = self.x();
-        let y = self.y();
-        let direction = self.direction();
-
-        if x < 0 || y < 0 {
-            Err(NodeCreationError { x, y, direction })
-        } else {
-            SearchNodeId::new(x as u16, y as u16, direction)
-        }
-    }
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodeId<N> {
     raw: u16,
@@ -369,7 +340,15 @@ where
     type Error = NodeCreationError;
 
     fn try_from(value: Node<N>) -> Result<NodeId<N>, Self::Error> {
-        value.to_node_id()
+        let x = value.x();
+        let y = value.y();
+        let direction = value.direction();
+
+        if x < 0 || y < 0 {
+            Err(NodeCreationError { x, y, direction })
+        } else {
+            NodeId::new(x as u16, y as u16, direction)
+        }
     }
 }
 
@@ -529,7 +508,15 @@ where
     type Error = NodeCreationError;
 
     fn try_from(value: Node<N>) -> Result<SearchNodeId<N>, Self::Error> {
-        value.to_search_node_id()
+        let x = value.x();
+        let y = value.y();
+        let direction = value.direction();
+
+        if x < 0 || y < 0 {
+            Err(NodeCreationError { x, y, direction })
+        } else {
+            SearchNodeId::new(x as u16, y as u16, direction)
+        }
     }
 }
 
@@ -546,8 +533,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use core::convert::TryInto;
+
     use typenum::consts::*;
+
+    use super::*;
     use AbsoluteDirection::*;
 
     #[test]
@@ -610,7 +600,7 @@ mod tests {
                 Err(NodeCreationError { x, y, direction })
             };
             let node = Node::<U16>::new(x, y, direction);
-            assert_eq!(node.to_node_id(), expected);
+            assert_eq!(node.try_into(), expected);
         }
     }
 
@@ -640,7 +630,7 @@ mod tests {
                 Err(NodeCreationError { x, y, direction })
             };
             let node = Node::<U16>::new(x, y, direction);
-            assert_eq!(node.to_search_node_id(), expected);
+            assert_eq!(node.try_into(), expected);
         }
     }
 }

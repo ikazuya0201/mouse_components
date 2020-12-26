@@ -1,6 +1,7 @@
 extern crate components;
 
 use core::cell::RefCell;
+use core::convert::TryInto;
 use core::ops::Mul;
 use std::rc::Rc;
 
@@ -248,7 +249,7 @@ where
             current
                 .get_relative_node(x, y, *dir, AbsoluteDirection::North)
                 .expect("failed to convert to relative node")
-                .to_search_node_id()
+                .try_into()
                 .unwrap_or_else(|err| {
                     unreachable!(
                         "failed to convert to search node id: current: {:?}, relative: {:?}",
@@ -260,7 +261,7 @@ where
             SearchKind::Init => self
                 .pose_to_node(command.0)
                 .to_node()
-                .to_search_node_id()
+                .try_into()
                 .expect("cannot convert to search node id"),
             SearchKind::Search(direction) => match direction {
                 Right => relative(1, 1, &direction),

@@ -4,7 +4,7 @@ mod pose_converter;
 mod wall;
 
 use core::cell::RefCell;
-use core::convert::TryFrom;
+use core::convert::{TryFrom, TryInto};
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::ops::{Add, Mul};
@@ -471,7 +471,7 @@ where
         };
         node_neighbors
             .into_iter()
-            .filter_map(|(node, cost)| node.to_node_id().map(|node_id| (node_id, cost)).ok())
+            .filter_map(|(node, cost)| node.try_into().map(|node_id| (node_id, cost)).ok())
             .collect()
     }
 }
@@ -519,7 +519,7 @@ where
         }
         neighbors
             .into_iter()
-            .filter_map(|(node, cost)| node.to_search_node_id().map(|node_id| (node_id, cost)).ok())
+            .filter_map(|(node, cost)| node.try_into().map(|node_id| (node_id, cost)).ok())
             .collect()
     }
 }
@@ -806,7 +806,7 @@ where
         }
         checker_nodes
             .into_iter()
-            .filter_map(|node| node.to_search_node_id().ok())
+            .filter_map(|node| node.try_into().ok())
             .collect()
     }
 }
