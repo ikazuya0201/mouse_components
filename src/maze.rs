@@ -200,12 +200,21 @@ where
         node: &'a Node<N>,
         base_dir: AbsoluteDirection,
         is_successors: bool,
-    ) -> impl Fn(i16, i16) -> bool + 'a {
+    ) -> impl Fn(i16, i16) -> bool + 'a
+    where
+        N: core::fmt::Debug,
+    {
         move |x: i16, y: i16| -> bool {
             if is_successors {
-                self.is_wall_by_position(node.relative_position(x, y, base_dir).unwrap())
+                self.is_wall_by_position(
+                    node.get_relative_position(x, y, base_dir)
+                        .unwrap_or_else(|err| unreachable!("This is a bug: {:?}", err)),
+                )
             } else {
-                self.is_wall_by_position(node.relative_position(-x, -y, base_dir).unwrap())
+                self.is_wall_by_position(
+                    node.get_relative_position(-x, -y, base_dir)
+                        .unwrap_or_else(|err| unreachable!("This is a bug: {:?}", err)),
+                )
             }
         }
     }
@@ -214,12 +223,17 @@ where
         node: &'a Node<N>,
         base_dir: AbsoluteDirection,
         is_successors: bool,
-    ) -> impl Fn(i16, i16, RelativeDirection) -> Node<N> + 'a {
+    ) -> impl Fn(i16, i16, RelativeDirection) -> Node<N> + 'a
+    where
+        N: core::fmt::Debug,
+    {
         move |x: i16, y: i16, direction: RelativeDirection| -> Node<N> {
             if is_successors {
-                node.relative_node(x, y, direction, base_dir).unwrap()
+                node.get_relative_node(x, y, direction, base_dir)
+                    .unwrap_or_else(|err| unreachable!("This is a bug: {:?}", err))
             } else {
-                node.relative_node(-x, -y, direction, base_dir).unwrap()
+                node.get_relative_node(-x, -y, direction, base_dir)
+                    .unwrap_or_else(|err| unreachable!("This is a bug: {:?}", err))
             }
         }
     }
@@ -227,13 +241,12 @@ where
 
 impl<N, M, F> Maze<N, M, F>
 where
-    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
+    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<U2>>::Output: Add<U10>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
-    Node<N>: Debug,
 {
     fn cell_neighbors(
         &self,
@@ -420,7 +433,7 @@ where
 
 impl<N, M, F> Maze<N, M, F>
 where
-    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
+    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<U2>>::Output: Add<U10>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
@@ -465,7 +478,7 @@ where
 
 impl<N, M, F> Maze<N, M, F>
 where
-    N: Mul<N> + Unsigned + PowerOfTwo,
+    N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
@@ -513,14 +526,13 @@ where
 
 impl<N, M, F> Graph<NodeId<N>> for Maze<N, M, F>
 where
-    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo,
+    N: Mul<N> + Mul<U2> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<U2>>::Output: Add<U10>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(Node<N>, u16)>,
     <<N as Mul<U2>>::Output as Add<U10>>::Output: ArrayLength<(NodeId<N>, u16)>,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
-    Node<N>: Debug,
 {
     type Cost = u16;
     type Edges = Vec<(NodeId<N>, u16), <<N as Mul<U2>>::Output as Add<U10>>::Output>;
@@ -536,7 +548,7 @@ where
 
 impl<N, M, F> Graph<SearchNodeId<N>> for Maze<N, M, F>
 where
-    N: Mul<N> + Unsigned + PowerOfTwo,
+    N: Mul<N> + Unsigned + PowerOfTwo + Debug,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
     F: Fn(Pattern) -> u16,
@@ -567,7 +579,7 @@ where
         node: &'a Node<N>,
         base_dir: AbsoluteDirection,
     ) -> impl Fn(i16, i16) -> Position<N> + 'a {
-        move |x: i16, y: i16| -> Position<N> { node.relative_position(x, y, base_dir).unwrap() }
+        move |x: i16, y: i16| -> Position<N> { node.get_relative_position(x, y, base_dir).unwrap() }
     }
 
     fn wall_positions_on_passage_from_cell(

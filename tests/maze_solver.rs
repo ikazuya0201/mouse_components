@@ -228,7 +228,7 @@ where
         let current = self.current.borrow().to_node();
         let relative = |x: i16, y: i16| {
             current
-                .relative_position(x, y, AbsoluteDirection::North)
+                .get_relative_position(x, y, AbsoluteDirection::North)
                 .unwrap()
         };
         let positions = vec![relative(1, 1), relative(0, 2), relative(-1, 1)];
@@ -246,7 +246,7 @@ where
 
         let relative = |x: i16, y: i16, dir: &RelativeDirection| {
             current
-                .relative_node(x, y, *dir, AbsoluteDirection::North)
+                .get_relative_node(x, y, *dir, AbsoluteDirection::North)
                 .expect("failed to convert to relative node")
                 .to_search_node_id()
                 .unwrap_or_else(|err| {

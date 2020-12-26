@@ -80,6 +80,14 @@ where
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RelativePositionError<N> {
+    from: Node<N>,
+    x_diff: i16,
+    y_diff: i16,
+    base_dir: AbsoluteDirection,
+}
+
 #[derive(Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Node<N> {
     position: Position<N>,
@@ -117,32 +125,37 @@ where
         self.direction
     }
 
-    pub fn relative_node(
+    pub fn get_relative_node(
         &self,
         x_diff: i16,
         y_diff: i16,
         dir_diff: RelativeDirection,
         base_dir: AbsoluteDirection,
-    ) -> Option<Self> {
-        let position = self.relative_position(x_diff, y_diff, base_dir)?;
+    ) -> Result<Self, RelativePositionError<N>> {
+        let position = self.get_relative_position(x_diff, y_diff, base_dir)?;
         let direction = self.direction.rotate(dir_diff);
-        Some(Node::<N>::new(position.x(), position.y(), direction))
+        Ok(Node::<N>::new(position.x(), position.y(), direction))
     }
 
-    pub fn relative_position(
+    pub fn get_relative_position(
         &self,
         x_diff: i16,
         y_diff: i16,
         base_dir: AbsoluteDirection,
-    ) -> Option<Position<N>> {
+    ) -> Result<Position<N>, RelativePositionError<N>> {
         use RelativeDirection::*;
         let relative_direction = base_dir.relative(self.direction);
         match relative_direction {
-            Front => Some(Position::new(self.x() + x_diff, self.y() + y_diff)),
-            Right => Some(Position::new(self.x() + y_diff, self.y() - x_diff)),
-            Back => Some(Position::new(self.x() - x_diff, self.y() - y_diff)),
-            Left => Some(Position::new(self.x() - y_diff, self.y() + x_diff)),
-            _ => None,
+            Front => Ok(Position::new(self.x() + x_diff, self.y() + y_diff)),
+            Right => Ok(Position::new(self.x() + y_diff, self.y() - x_diff)),
+            Back => Ok(Position::new(self.x() - x_diff, self.y() - y_diff)),
+            Left => Ok(Position::new(self.x() - y_diff, self.y() + x_diff)),
+            _ => Err(RelativePositionError {
+                from: self.clone(),
+                x_diff,
+                y_diff,
+                base_dir,
+            }),
         }
     }
 
