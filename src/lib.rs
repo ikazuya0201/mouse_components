@@ -50,7 +50,9 @@ pub mod data_types {
     pub use obstacle_detector::Obstacle;
     pub use operators::FinishError;
     pub use tracker::{AngleState, LengthState, State};
-    pub use trajectory_generator::{AngleTarget, LengthTarget, RunKind, SearchKind, Target};
+    pub use trajectory_generator::{
+        AngleTarget, LengthTarget, RunKind, SearchKind, SlalomDirection, SlalomKind, Target,
+    };
 }
 
 pub mod impls {
