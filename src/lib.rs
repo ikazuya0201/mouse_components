@@ -4,6 +4,7 @@ extern crate alloc;
 
 mod administrator;
 mod agent;
+pub mod commander;
 mod controller;
 mod estimator;
 mod maze;
