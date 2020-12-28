@@ -11,6 +11,7 @@ mod maze;
 mod obstacle_detector;
 mod operators;
 pub mod prelude;
+pub mod simple_maze;
 mod solver;
 mod tracker;
 mod trajectory_generator;
