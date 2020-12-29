@@ -43,8 +43,11 @@ pub enum WallNode<Wall, Node> {
     Node(Node),
 }
 
-pub trait GraphNode: Sized {
+pub trait WallSpaceNode {
     type Wall;
+}
+
+pub trait GraphNode: Sized + WallSpaceNode {
     type Cost;
     type WallNodes: IntoIterator<Item = WallNode<Self::Wall, (Self, Self::Cost)>>;
     type WallNodesList: IntoIterator<Item = Self::WallNodes>;
@@ -53,11 +56,10 @@ pub trait GraphNode: Sized {
     fn predecessors(&self) -> Self::WallNodesList;
 }
 
-pub trait WallEnumerator {
-    type Wall;
+pub trait WallFinderNode: WallSpaceNode {
     type Walls: IntoIterator<Item = Self::Wall>;
 
-    fn walls_between(&self, to: &Self) -> Self::Walls;
+    fn walls_between(&self, other: &Self) -> Self::Walls;
 }
 
 pub struct WallInfo<Wall> {
@@ -146,12 +148,11 @@ where
     }
 }
 
-//TODO: Write test
 impl<Node, SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
     GraphConverter<Node>
     for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
 where
-    Node: WallEnumerator,
+    Node: WallFinderNode,
     Node::Wall: Into<[SearchNode; 2]>,
     Manager: WallManager<Node::Wall, bool>,
     SearchNodeNum: ArrayLength<SearchNode>,
@@ -182,7 +183,7 @@ where
 impl<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType> NodeChecker<SearchNode>
     for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
 where
-    SearchNode: GraphNode + Into<<SearchNode as GraphNode>::Wall> + Clone,
+    SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
     Manager: WallManager<SearchNode::Wall, bool>,
 {
     fn is_available(&self, node: &SearchNode) -> Result<bool, CannotCheckError> {
@@ -267,8 +268,11 @@ mod tests {
     fn test_graph() {
         use std::vec::Vec;
 
-        impl GraphNode for usize {
+        impl WallSpaceNode for usize {
             type Wall = usize;
+        }
+
+        impl GraphNode for usize {
             type Cost = usize;
             type WallNodes = Vec<WallNode<usize, (usize, usize)>>;
             type WallNodesList = Vec<Self::WallNodes>;
@@ -326,5 +330,71 @@ mod tests {
         let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
         assert_eq!(maze.successors(&0), expected.as_slice());
         assert_eq!(maze.predecessors(&0), expected.as_slice());
+    }
+
+    #[test]
+    fn test_graph_converter() {
+        use std::vec::Vec;
+
+        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        struct Node(usize);
+
+        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        struct SearchNode(usize);
+
+        #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+        struct Wall(usize);
+
+        impl WallSpaceNode for Node {
+            type Wall = Wall;
+        }
+
+        impl WallFinderNode for Node {
+            type Walls = Vec<Self::Wall>;
+
+            fn walls_between(&self, other: &Self) -> Self::Walls {
+                if self.0 % 2 == 0 {
+                    vec![Wall(self.0), Wall(other.0)]
+                } else {
+                    vec![Wall(other.0)]
+                }
+            }
+        }
+
+        impl Into<[SearchNode; 2]> for Wall {
+            fn into(self) -> [SearchNode; 2] {
+                [SearchNode(self.0), SearchNode(self.0 + 1)]
+            }
+        }
+
+        struct WallManagerType;
+
+        impl WallManager<Wall, bool> for WallManagerType {
+            type Error = core::convert::Infallible;
+
+            fn try_existence(&self, _wall: &Wall) -> Result<bool, Self::Error> {
+                unimplemented!()
+            }
+
+            fn try_check(&self, wall: &Wall) -> Result<bool, Self::Error> {
+                Ok(wall.0 % 2 == 1)
+            }
+
+            fn try_update(&self, _wall: &Wall, _state: &bool) -> Result<(), Self::Error> {
+                unimplemented!()
+            }
+        }
+
+        let maze = Maze::<SearchNode, (), U10, _, (), ()>::new(WallManagerType, ());
+
+        let path = vec![0, 1, 1, 2, 3, 5, 8]
+            .into_iter()
+            .map(|e| Node(e))
+            .collect::<Vec<_>>();
+        let expected = vec![0, 1, 2, 3, 2, 3, 8, 9]
+            .into_iter()
+            .map(|e| SearchNode(e))
+            .collect::<Vec<_>>();
+        assert_eq!(maze.convert_to_checker_nodes(path), expected.as_slice());
     }
 }
