@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use heapless::{consts::*, ArrayLength, Vec};
+use heapless::{ArrayLength, Vec};
 use uom::si::f32::Length;
 
 use crate::commander::{CannotCheckError, Graph, GraphConverter, NodeChecker, ObstacleInterpreter};
@@ -46,12 +46,17 @@ pub enum WallNode<Wall, Node> {
 pub trait GraphNode: Sized {
     type Wall;
     type Cost;
-    type Walls: IntoIterator<Item = Self::Wall>;
-    type WallNodes: Iterator<Item = WallNode<Self::Wall, (Self, Self::Cost)>>;
+    type WallNodes: IntoIterator<Item = WallNode<Self::Wall, (Self, Self::Cost)>>;
     type WallNodesList: IntoIterator<Item = Self::WallNodes>;
 
     fn successors(&self) -> Self::WallNodesList;
     fn predecessors(&self) -> Self::WallNodesList;
+}
+
+pub trait WallEnumerator {
+    type Wall;
+    type Walls: IntoIterator<Item = Self::Wall>;
+
     fn walls_between(&self, to: &Self) -> Self::Walls;
 }
 
@@ -92,7 +97,6 @@ impl<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
     }
 }
 
-//TODO: Write test
 impl<Node, SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType> Graph<Node>
     for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
 where
@@ -147,9 +151,8 @@ impl<Node, SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
     GraphConverter<Node>
     for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
 where
-    Node: GraphNode,
-    SearchNode: GraphNode<Wall = Node::Wall>,
-    SearchNode::Wall: Into<[SearchNode; 2]>,
+    Node: WallEnumerator,
+    Node::Wall: Into<[SearchNode; 2]>,
     Manager: WallManager<Node::Wall, bool>,
     SearchNodeNum: ArrayLength<SearchNode>,
 {
@@ -251,5 +254,77 @@ where
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use heapless::consts::*;
+
+    use super::*;
+
+    #[test]
+    fn test_graph() {
+        use std::vec::Vec;
+
+        impl GraphNode for usize {
+            type Wall = usize;
+            type Cost = usize;
+            type WallNodes = Vec<WallNode<usize, (usize, usize)>>;
+            type WallNodesList = Vec<Self::WallNodes>;
+
+            fn successors(&self) -> Self::WallNodesList {
+                let mut res = Vec::new();
+                let mut tmp = Vec::new();
+                tmp.push(WallNode::Wall(0));
+                tmp.push(WallNode::Node((2, 2)));
+                tmp.push(WallNode::Wall(1));
+                tmp.push(WallNode::Wall(2));
+                tmp.push(WallNode::Node((5, 3)));
+                res.push(tmp);
+
+                let mut tmp = Vec::new();
+                tmp.push(WallNode::Wall(3));
+                tmp.push(WallNode::Node((2, 1)));
+                tmp.push(WallNode::Wall(4));
+                tmp.push(WallNode::Node((4, 2)));
+                tmp.push(WallNode::Wall(5));
+                tmp.push(WallNode::Node((6, 3)));
+                res.push(tmp);
+                res
+            }
+
+            fn predecessors(&self) -> Self::WallNodesList {
+                self.successors()
+            }
+        }
+
+        struct WallManagerType;
+
+        impl WallManager<usize, bool> for WallManagerType {
+            type Error = core::convert::Infallible;
+
+            fn try_existence(&self, wall: &usize) -> Result<bool, Self::Error> {
+                match wall {
+                    2 | 5 => Ok(true),
+                    _ => Ok(false),
+                }
+            }
+
+            fn try_check(&self, _wall: &usize) -> Result<bool, Self::Error> {
+                unimplemented!()
+            }
+
+            fn try_update(&self, _wall: &usize, _state: &bool) -> Result<(), Self::Error> {
+                unimplemented!()
+            }
+        }
+
+        let manager = WallManagerType;
+
+        let maze = Maze::<(), U10, (), _, (), ()>::new(manager, ());
+        let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
+        assert_eq!(maze.successors(&0), expected.as_slice());
+        assert_eq!(maze.predecessors(&0), expected.as_slice());
     }
 }
