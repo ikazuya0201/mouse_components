@@ -7,33 +7,48 @@ use crate::commander::{CannotCheckError, Graph, GraphConverter, NodeChecker, Obs
 use crate::obstacle_detector::Obstacle;
 use crate::utils::{forced_vec::ForcedVec, math::Math, probability::Probability};
 
+macro_rules! block {
+    ($expr: expr) => {
+        loop {
+            if let Ok(val) = $expr {
+                break val;
+            }
+        }
+    };
+}
+
 ///This trait should be implemented as thread safe.
-pub trait WallManager<Wall, State> {
+pub trait WallManager<Wall> {
     type Error;
+    const EXISTENCE_THRESHOLD: Probability = Probability::zero(); //[0.0, 0.5)
 
-    //State can take values such as boolean or float (probability)
-    fn try_existence(&self, wall: &Wall) -> Result<State, Self::Error>; //existence state
-    fn try_check(&self, wall: &Wall) -> Result<State, Self::Error>; //check state
-    fn try_update(&self, wall: &Wall, state: &State) -> Result<(), Self::Error>; //update state
+    fn try_existence_probability(&self, wall: &Wall) -> Result<Probability, Self::Error>;
+    fn try_update(&self, wall: &Wall, probablity: &Probability) -> Result<(), Self::Error>;
 
-    fn existence(&self, wall: &Wall) -> State {
-        loop {
-            if let Ok(state) = self.try_existence(wall) {
-                break state;
-            }
-        }
+    fn try_is_checked(&self, wall: &Wall) -> Result<bool, Self::Error> {
+        let prob = self.try_existence_probability(wall)?;
+        Ok(prob < Self::EXISTENCE_THRESHOLD || prob > Self::EXISTENCE_THRESHOLD.reverse())
     }
 
-    fn check(&self, wall: &Wall) -> State {
-        loop {
-            if let Ok(state) = self.try_check(wall) {
-                break state;
-            }
-        }
+    fn try_exists(&self, wall: &Wall) -> Result<bool, Self::Error> {
+        let prob = self.try_existence_probability(wall)?;
+        Ok(prob > Self::EXISTENCE_THRESHOLD.reverse())
     }
 
-    fn update(&self, wall: &Wall, state: &State) {
-        while self.try_update(wall, state).is_err() {}
+    fn existence_probablity(&self, wall: &Wall) -> Probability {
+        block!(self.try_existence_probability(wall))
+    }
+
+    fn is_checked(&self, wall: &Wall) -> bool {
+        block!(self.try_is_checked(wall))
+    }
+
+    fn exists(&self, wall: &Wall) -> bool {
+        block!(self.try_exists(wall))
+    }
+
+    fn update(&self, wall: &Wall, state: &Probability) {
+        block!(self.try_update(wall, state))
     }
 }
 
@@ -103,7 +118,7 @@ impl<Node, SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
     for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
 where
     Node: GraphNode,
-    Manager: WallManager<Node::Wall, bool>,
+    Manager: WallManager<Node::Wall>,
     NeighborNum: ArrayLength<(Node, Node::Cost)>,
 {
     type Cost = Node::Cost;
@@ -115,7 +130,7 @@ where
             for wall_node in wall_nodes {
                 match wall_node {
                     WallNode::Wall(wall) => {
-                        if self.manager.existence(&wall) {
+                        if self.manager.exists(&wall) {
                             break;
                         }
                     }
@@ -134,7 +149,7 @@ where
             for wall_node in wall_nodes {
                 match wall_node {
                     WallNode::Wall(wall) => {
-                        if self.manager.existence(&wall) {
+                        if self.manager.exists(&wall) {
                             break;
                         }
                     }
@@ -154,7 +169,7 @@ impl<Node, SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
 where
     Node: WallFinderNode,
     Node::Wall: Into<[SearchNode; 2]>,
-    Manager: WallManager<Node::Wall, bool>,
+    Manager: WallManager<Node::Wall>,
     SearchNodeNum: ArrayLength<SearchNode>,
 {
     type SearchNode = SearchNode;
@@ -167,7 +182,7 @@ where
         let mut nodes = ForcedVec::new();
         for i in 0..path.len() - 1 {
             for wall in path[i].walls_between(&path[i + 1]) {
-                if self.manager.check(&wall) {
+                if self.manager.is_checked(&wall) {
                     continue;
                 }
                 let [node1, node2] = wall.into();
@@ -183,13 +198,13 @@ impl<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType> NodeC
     for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
 where
     SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
-    Manager: WallManager<SearchNode::Wall, bool>,
+    Manager: WallManager<SearchNode::Wall>,
 {
     fn is_available(&self, node: &SearchNode) -> Result<bool, CannotCheckError> {
         let wall = node.clone().into();
-        if let Ok(check) = self.manager.try_check(&wall) {
+        if let Ok(check) = self.manager.try_is_checked(&wall) {
             if check {
-                if let Ok(existence) = self.manager.try_existence(&wall) {
+                if let Ok(existence) = self.manager.try_exists(&wall) {
                     return Ok(!existence);
                 }
             }
@@ -204,7 +219,7 @@ impl<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
     for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
 where
     Converter: ObstacleConverter,
-    Manager: WallManager<Converter::Wall, Probability>,
+    Manager: WallManager<Converter::Wall>,
     MathType: Math,
 {
     type Error = core::cell::BorrowMutError;
@@ -217,7 +232,7 @@ where
 
         for obstacle in obstacles {
             if let Ok(wall_info) = self.converter.convert(&obstacle) {
-                if let Ok(existence) = self.manager.try_existence(&wall_info.wall) {
+                if let Ok(existence) = self.manager.try_existence_probability(&wall_info.wall) {
                     let exist_val = {
                         let tmp = ((wall_info.existing_distance - obstacle.distance.mean)
                             / obstacle.distance.standard_deviation)
@@ -304,21 +319,25 @@ mod tests {
 
         struct WallManagerType;
 
-        impl WallManager<usize, bool> for WallManagerType {
+        impl WallManager<usize> for WallManagerType {
             type Error = core::convert::Infallible;
 
-            fn try_existence(&self, wall: &usize) -> Result<bool, Self::Error> {
+            fn try_existence_probability(&self, _wall: &usize) -> Result<Probability, Self::Error> {
+                unimplemented!()
+            }
+
+            fn try_update(&self, _wall: &usize, _prob: &Probability) -> Result<(), Self::Error> {
+                unimplemented!()
+            }
+
+            fn try_exists(&self, wall: &usize) -> Result<bool, Self::Error> {
                 match wall {
                     2 | 5 => Ok(true),
                     _ => Ok(false),
                 }
             }
 
-            fn try_check(&self, _wall: &usize) -> Result<bool, Self::Error> {
-                unimplemented!()
-            }
-
-            fn try_update(&self, _wall: &usize, _state: &bool) -> Result<(), Self::Error> {
+            fn try_is_checked(&self, _wall: &usize) -> Result<bool, Self::Error> {
                 unimplemented!()
             }
         }
@@ -368,18 +387,18 @@ mod tests {
 
         struct WallManagerType;
 
-        impl WallManager<Wall, bool> for WallManagerType {
+        impl WallManager<Wall> for WallManagerType {
             type Error = core::convert::Infallible;
 
-            fn try_existence(&self, _wall: &Wall) -> Result<bool, Self::Error> {
+            fn try_existence_probability(&self, _wall: &Wall) -> Result<Probability, Self::Error> {
                 unimplemented!()
             }
 
-            fn try_check(&self, wall: &Wall) -> Result<bool, Self::Error> {
+            fn try_is_checked(&self, wall: &Wall) -> Result<bool, Self::Error> {
                 Ok(wall.0 % 2 == 1)
             }
 
-            fn try_update(&self, _wall: &Wall, _state: &bool) -> Result<(), Self::Error> {
+            fn try_update(&self, _wall: &Wall, _state: &Probability) -> Result<(), Self::Error> {
                 unimplemented!()
             }
         }
@@ -401,24 +420,28 @@ mod tests {
     fn test_is_available() {
         struct WallManagerType;
 
-        impl WallManager<usize, bool> for WallManagerType {
+        impl WallManager<usize> for WallManagerType {
             type Error = core::convert::Infallible;
 
-            fn try_existence(&self, wall: &usize) -> Result<bool, Self::Error> {
+            fn try_existence_probability(&self, _wall: &usize) -> Result<Probability, Self::Error> {
+                unimplemented!()
+            }
+
+            fn try_exists(&self, wall: &usize) -> Result<bool, Self::Error> {
                 Ok(match wall {
                     0 | 3 => true,
                     _ => false,
                 })
             }
 
-            fn try_check(&self, wall: &usize) -> Result<bool, Self::Error> {
+            fn try_is_checked(&self, wall: &usize) -> Result<bool, Self::Error> {
                 Ok(match wall {
                     0 | 1 | 3 | 5 => true,
                     _ => false,
                 })
             }
 
-            fn try_update(&self, _wall: &usize, _state: &bool) -> Result<(), Self::Error> {
+            fn try_update(&self, _wall: &usize, _state: &Probability) -> Result<(), Self::Error> {
                 unimplemented!()
             }
         }

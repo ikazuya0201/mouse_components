@@ -15,11 +15,15 @@ impl Probability {
         }
     }
 
-    pub fn one() -> Self {
+    pub const unsafe fn new_unchecked(val: f32) -> Self {
+        Self(val)
+    }
+
+    pub const fn one() -> Self {
         Probability(1.0)
     }
 
-    pub fn zero() -> Self {
+    pub const fn zero() -> Self {
         Probability(0.0)
     }
 
