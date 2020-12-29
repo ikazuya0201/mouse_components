@@ -179,7 +179,6 @@ where
     }
 }
 
-//TODO: Write test
 impl<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType> NodeChecker<SearchNode>
     for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
 where
@@ -396,5 +395,43 @@ mod tests {
             .map(|e| SearchNode(e))
             .collect::<Vec<_>>();
         assert_eq!(maze.convert_to_checker_nodes(path), expected.as_slice());
+    }
+
+    #[test]
+    fn test_is_available() {
+        struct WallManagerType;
+
+        impl WallManager<usize, bool> for WallManagerType {
+            type Error = core::convert::Infallible;
+
+            fn try_existence(&self, wall: &usize) -> Result<bool, Self::Error> {
+                Ok(match wall {
+                    0 | 3 => true,
+                    _ => false,
+                })
+            }
+
+            fn try_check(&self, wall: &usize) -> Result<bool, Self::Error> {
+                Ok(match wall {
+                    0 | 1 | 3 | 5 => true,
+                    _ => false,
+                })
+            }
+
+            fn try_update(&self, _wall: &usize, _state: &bool) -> Result<(), Self::Error> {
+                unimplemented!()
+            }
+        }
+
+        let maze = Maze::<usize, (), (), _, (), ()>::new(WallManagerType, ());
+        let test_cases = vec![
+            (0, Ok(false)),
+            (1, Ok(true)),
+            (2, Err(CannotCheckError)),
+            (3, Ok(false)),
+        ];
+        for (node, expected) in test_cases {
+            assert_eq!(maze.is_available(&node), expected);
+        }
     }
 }
