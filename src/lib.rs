@@ -4,16 +4,19 @@ extern crate alloc;
 
 mod administrator;
 mod agent;
+pub mod commander;
 mod controller;
 mod estimator;
 mod maze;
 mod obstacle_detector;
 mod operators;
 pub mod prelude;
+pub mod simple_maze;
 mod solver;
 mod tracker;
 mod trajectory_generator;
 pub mod utils;
+pub mod wall_manager;
 
 pub mod traits {
     use super::*;
