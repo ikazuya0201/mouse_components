@@ -16,6 +16,7 @@ mod solver;
 mod tracker;
 mod trajectory_generator;
 pub mod utils;
+pub mod wall_manager;
 
 pub mod traits {
     use super::*;

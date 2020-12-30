@@ -20,19 +20,23 @@ macro_rules! block {
 ///This trait should be implemented as thread safe.
 pub trait WallManager<Wall> {
     type Error;
-    const EXISTENCE_THRESHOLD: Probability = Probability::zero(); //[0.0, 0.5)
 
     fn try_existence_probability(&self, wall: &Wall) -> Result<Probability, Self::Error>;
     fn try_update(&self, wall: &Wall, probablity: &Probability) -> Result<(), Self::Error>;
 
+    #[inline]
+    fn existence_threshold(&self) -> Probability {
+        Probability::zero()
+    }
+
     fn try_is_checked(&self, wall: &Wall) -> Result<bool, Self::Error> {
         let prob = self.try_existence_probability(wall)?;
-        Ok(prob < Self::EXISTENCE_THRESHOLD || prob > Self::EXISTENCE_THRESHOLD.reverse())
+        Ok(prob < self.existence_threshold() || prob > self.existence_threshold().reverse())
     }
 
     fn try_exists(&self, wall: &Wall) -> Result<bool, Self::Error> {
         let prob = self.try_existence_probability(wall)?;
-        Ok(prob > Self::EXISTENCE_THRESHOLD.reverse())
+        Ok(prob > self.existence_threshold().reverse())
     }
 
     fn existence_probablity(&self, wall: &Wall) -> Probability {
