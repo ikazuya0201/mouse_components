@@ -49,11 +49,11 @@ pub trait NodeChecker<Node> {
     fn is_available(&self, node: &Node) -> Result<bool, CannotCheckError>;
 }
 
-pub trait Converter<Source> {
+pub trait NodeConverter<Node> {
     type Error;
     type Target;
 
-    fn convert(&self, source: &Source) -> Result<Self::Target, Self::Error>;
+    fn convert(&self, source: &Node) -> Result<Self::Target, Self::Error>;
 }
 
 pub trait RouteNode {
@@ -143,13 +143,13 @@ where
         + GraphConverter<Node>
         + ObstacleInterpreter<Obstacle>
         + NodeChecker<<Maze as GraphConverter<Node>>::SearchNode>,
-    ConverterType: Converter<<Maze as GraphConverter<Node>>::SearchNode>,
-    <ConverterType as Converter<Maze::SearchNode>>::Error: core::fmt::Debug,
+    ConverterType: NodeConverter<<Maze as GraphConverter<Node>>::SearchNode>,
+    <ConverterType as NodeConverter<Maze::SearchNode>>::Error: core::fmt::Debug,
     <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
 {
     type Error = CommanderError;
     type Command = (
-        <ConverterType as Converter<Maze::SearchNode>>::Target,
+        <ConverterType as NodeConverter<Maze::SearchNode>>::Target,
         <Maze::SearchNode as RouteNode>::Route,
     );
 
@@ -297,16 +297,16 @@ where
         + ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
         + ArrayLength<(Node, Reverse<Maze::Cost>)>
-        + ArrayLength<(<ConverterType as Converter<Node>>::Target, Node::Route)>
+        + ArrayLength<(<ConverterType as NodeConverter<Node>>::Target, Node::Route)>
         + typenum::Unsigned,
     Nodes: Deref<Target = [Node]>,
     Node: Ord + Copy + Debug + Into<usize> + RouteNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
-    ConverterType: Converter<Node>,
+    ConverterType: NodeConverter<Node>,
 {
     type Error = RunCommanderError;
-    type Command = (<ConverterType as Converter<Node>>::Target, Node::Route);
+    type Command = (<ConverterType as NodeConverter<Node>>::Target, Node::Route);
     type Commands = Vec<Self::Command, Max>;
 
     fn compute_commands(&self) -> Result<Self::Commands, Self::Error> {
