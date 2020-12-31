@@ -480,16 +480,22 @@ where
     <N::Output as Add<U10>>::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
 {
     fn neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
-        if self.0.x & 1 == 0 {
-            if self.0.y & 1 == 0 {
-                self.cell_neighbors(is_succ)
-            } else {
-                self.horizontal_bound_neighbors(is_succ)
-            }
-        } else if self.0.y & 1 == 0 {
-            self.vertical_bound_neighbors(is_succ)
-        } else {
-            unreachable!()
+        use AbsoluteDirection::*;
+        use Location::*;
+
+        match self.0.location() {
+            Cell => self.cell_neighbors(is_succ),
+            HorizontalBound => match self.0.direction {
+                NorthEast | SouthWest => self.right_diagonal_neighbors(is_succ),
+                NorthWest | SouthEast => self.left_diagonal_neighbors(is_succ),
+                _ => unreachable!(),
+            },
+            VerticalBound => match self.0.direction {
+                NorthEast | SouthWest => self.left_diagonal_neighbors(is_succ),
+                NorthWest | SouthEast => self.right_diagonal_neighbors(is_succ),
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
         }
     }
 
@@ -595,7 +601,7 @@ where
         list.into()
     }
 
-    fn vertical_bound_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
+    fn left_diagonal_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -629,7 +635,7 @@ where
         list.into()
     }
 
-    fn horizontal_bound_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
+    fn right_diagonal_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -1142,6 +1148,24 @@ mod tests {
                         WallNode::Wall((1, 0, true)),
                         WallNode::Node((2, 2, North, 6)),
                         WallNode::Wall((1, 1, true)),
+                    ],
+                ],
+            ),
+            (
+                (2, 1, NorthWest),
+                vec![
+                    vec![
+                        WallNode::Wall((0, 1, false)),
+                        WallNode::Node((0, 2, West, 1)),
+                        WallNode::Wall((0, 0, true)),
+                        WallNode::Node((0, 1, SouthWest, 5)),
+                        WallNode::Node((0, 0, South, 3)),
+                    ],
+                    vec![
+                        WallNode::Wall((0, 1, false)),
+                        WallNode::Node((1, 2, NorthWest, 7)),
+                        WallNode::Wall((0, 1, true)),
+                        WallNode::Node((0, 3, NorthWest, 8)),
                     ],
                 ],
             ),
