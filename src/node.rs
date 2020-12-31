@@ -4,8 +4,10 @@ use core::ops::{Add, Mul};
 use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
+use crate::commander::RouteNode;
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
 use crate::simple_maze::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
+use crate::trajectory_generator::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
 
@@ -87,6 +89,25 @@ impl<N> Node<N> {
             Pillar
         }
     }
+
+    fn difference(
+        &self,
+        other: &Self,
+        base_dir: AbsoluteDirection,
+    ) -> (i16, i16, RelativeDirection) {
+        use RelativeDirection::*;
+
+        let dx = other.x - self.x;
+        let dy = other.y - self.y;
+        let (dx, dy) = match base_dir.relative(self.direction) {
+            Front => (dx, dy),
+            Right => (-dy, dx),
+            Back => (-dx, -dy),
+            Left => (dy, -dx),
+            _ => unreachable!(),
+        };
+        (dx, dy, self.direction.relative(other.direction))
+    }
 }
 
 impl<N> Node<N>
@@ -133,25 +154,6 @@ where
             self.direction.rotate(ddir),
             self.cost,
         )
-    }
-
-    fn difference(
-        &self,
-        other: &Self,
-        base_dir: AbsoluteDirection,
-    ) -> (i16, i16, RelativeDirection) {
-        use RelativeDirection::*;
-
-        let dx = other.x - self.x;
-        let dy = other.y - self.y;
-        let (dx, dy) = match base_dir.relative(self.direction) {
-            Front => (dx, dy),
-            Right => (-dy, dx),
-            Back => (-dx, -dy),
-            Left => (dy, -dx),
-            _ => unreachable!(),
-        };
-        (dx, dy, self.direction.relative(other.direction))
     }
 }
 
@@ -336,6 +338,82 @@ where
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RouteError<T> {
+    src: T,
+    dst: T,
+}
+
+impl<N: Clone> RouteNode for SearchNode<N> {
+    type Error = RouteError<SearchNode<N>>;
+    type Route = SearchKind;
+
+    fn route(&self, to: &Self) -> Result<Self::Route, Self::Error> {
+        use RelativeDirection::*;
+        use SearchKind::*;
+
+        Ok(match self.0.difference(&to.0, AbsoluteDirection::North) {
+            (1, 1, Right) => Search(Right),
+            (0, 2, Front) => Search(Front),
+            (-1, 1, Left) => Search(Left),
+            (0, 0, Back) => Search(Back),
+            _ => {
+                return Err(RouteError {
+                    src: self.clone(),
+                    dst: to.clone(),
+                })
+            }
+        })
+    }
+}
+
+impl<N: Clone> RouteNode for RunNode<N> {
+    type Error = RouteError<RunNode<N>>;
+    type Route = RunKind;
+
+    fn route(&self, to: &Self) -> Result<Self::Route, Self::Error> {
+        use AbsoluteDirection::*;
+        use Location::*;
+        use RelativeDirection::*;
+        use RunKind::*;
+        use SlalomDirection::{Left as SLeft, Right as SRight};
+        use SlalomKind::*;
+
+        let create_error = || {
+            Err(RouteError {
+                src: self.clone(),
+                dst: to.clone(),
+            })
+        };
+
+        Ok(match self.0.location() {
+            Cell => match self.0.difference(&to.0, North) {
+                (1, 2, FrontRight) => Slalom(FastRun45, SRight),
+                (-1, 2, FrontLeft) => Slalom(FastRun45, SLeft),
+                (2, 2, Right) => Slalom(FastRun90, SRight),
+                (-2, 2, Left) => Slalom(FastRun90, SLeft),
+                (2, 1, BackRight) => Slalom(FastRun135, SRight),
+                (-2, 1, BackLeft) => Slalom(FastRun135, SLeft),
+                (2, 0, Back) => Slalom(FastRun180, SRight),
+                (-2, 0, Back) => Slalom(FastRun180, SLeft),
+                (0, x, Front) if x > 0 => Straight(x as u16 / 2),
+                _ => return create_error(),
+            },
+            HorizontalBound | VerticalBound => match self.0.difference(&to.0, NorthEast) {
+                (2, 1, FrontRight) => Slalom(FastRun45, SRight),
+                (2, 0, Right) => Slalom(FastRunDiagonal90, SRight),
+                (2, -1, BackRight) => Slalom(FastRun135, SRight),
+                (1, 2, FrontLeft) => Slalom(FastRun45, SLeft),
+                (0, 2, Left) => Slalom(FastRunDiagonal90, SLeft),
+                (-1, 2, BackLeft) => Slalom(FastRun135, SLeft),
+                (x, y, Front) if x == y && x > 0 => StraightDiagonal(x as u16),
+                _ => return create_error(),
+            },
+            _ => unreachable!("Should never be on the pillar"),
+        })
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RunNode<N>(Node<N>);
 
 impl<N> RunNode<N> {
@@ -402,16 +480,22 @@ where
     <N::Output as Add<U10>>::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
 {
     fn neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
-        if self.0.x & 1 == 0 {
-            if self.0.y & 1 == 0 {
-                self.cell_neighbors(is_succ)
-            } else {
-                self.horizontal_bound_neighbors(is_succ)
-            }
-        } else if self.0.y & 1 == 0 {
-            self.vertical_bound_neighbors(is_succ)
-        } else {
-            unreachable!()
+        use AbsoluteDirection::*;
+        use Location::*;
+
+        match self.0.location() {
+            Cell => self.cell_neighbors(is_succ),
+            HorizontalBound => match self.0.direction {
+                NorthEast | SouthWest => self.right_diagonal_neighbors(is_succ),
+                NorthWest | SouthEast => self.left_diagonal_neighbors(is_succ),
+                _ => unreachable!(),
+            },
+            VerticalBound => match self.0.direction {
+                NorthEast | SouthWest => self.left_diagonal_neighbors(is_succ),
+                NorthWest | SouthEast => self.right_diagonal_neighbors(is_succ),
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
         }
     }
 
@@ -517,7 +601,7 @@ where
         list.into()
     }
 
-    fn vertical_bound_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
+    fn left_diagonal_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -551,7 +635,7 @@ where
         list.into()
     }
 
-    fn horizontal_bound_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
+    fn right_diagonal_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
         use AbsoluteDirection::*;
         use Pattern::*;
         use RelativeDirection::*;
@@ -1067,6 +1151,24 @@ mod tests {
                     ],
                 ],
             ),
+            (
+                (2, 1, NorthWest),
+                vec![
+                    vec![
+                        WallNode::Wall((0, 1, false)),
+                        WallNode::Node((0, 2, West, 1)),
+                        WallNode::Wall((0, 0, true)),
+                        WallNode::Node((0, 1, SouthWest, 5)),
+                        WallNode::Node((0, 0, South, 3)),
+                    ],
+                    vec![
+                        WallNode::Wall((0, 1, false)),
+                        WallNode::Node((1, 2, NorthWest, 7)),
+                        WallNode::Wall((0, 1, true)),
+                        WallNode::Node((0, 3, NorthWest, 8)),
+                    ],
+                ],
+            ),
         ];
 
         use std::vec::Vec;
@@ -1152,6 +1254,97 @@ mod tests {
                 .collect();
             let walls: Vec<Wall<Size>> = src.walls_between(&dst).into_iter().collect();
             assert_eq!(walls, expected);
+        }
+    }
+
+    #[test]
+    fn test_search_node_route() {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+        use SearchKind::*;
+
+        fn cost(_pattern: Pattern) -> u16 {
+            unreachable!()
+        }
+
+        let test_cases = vec![
+            ((0, 1, North), (1, 2, East), Ok(Search(Right))),
+            ((0, 1, North), (0, 3, North), Ok(Search(Front))),
+            ((0, 1, North), (2, 1, North), Err(())),
+            ((2, 1, North), (1, 2, West), Ok(Search(Left))),
+            ((0, 1, North), (0, 1, South), Ok(Search(Back))),
+        ];
+
+        type Size = U4;
+
+        for (src, dst, expected) in test_cases {
+            let src = SearchNode::<Size>::new(src.0, src.1, src.2, cost).unwrap();
+            let dst = SearchNode::<Size>::new(dst.0, dst.1, dst.2, cost).unwrap();
+            let expected = expected.map_err(|_| RouteError {
+                src: src.clone(),
+                dst: dst.clone(),
+            });
+            assert_eq!(src.route(&dst), expected);
+        }
+    }
+
+    #[test]
+    fn test_run_node_route() {
+        use AbsoluteDirection::*;
+        use RunKind::*;
+        use SlalomDirection::{Left as SLeft, Right as SRight};
+        use SlalomKind::*;
+
+        fn cost(_pattern: Pattern) -> u16 {
+            unreachable!()
+        }
+
+        let test_cases = vec![
+            (
+                (0, 0, North),
+                (1, 2, NorthEast),
+                Ok(Slalom(FastRun45, SRight)),
+            ),
+            ((0, 0, North), (2, 0, South), Ok(Slalom(FastRun180, SRight))),
+            ((0, 0, North), (3, 0, SouthEast), Err(())),
+            (
+                (1, 0, NorthEast),
+                (0, 2, West),
+                Ok(Slalom(FastRun135, SLeft)),
+            ),
+            ((0, 0, North), (0, 6, North), Ok(Straight(3))),
+            (
+                (0, 1, NorthEast),
+                (2, 3, NorthEast),
+                Ok(StraightDiagonal(2)),
+            ),
+            (
+                (2, 1, NorthWest),
+                (0, 1, SouthWest),
+                Ok(Slalom(FastRunDiagonal90, SLeft)),
+            ),
+            (
+                (2, 0, East),
+                (3, 2, NorthWest),
+                Ok(Slalom(FastRun135, SLeft)),
+            ),
+            (
+                (1, 2, SouthWest),
+                (0, 0, South),
+                Ok(Slalom(FastRun45, SLeft)),
+            ),
+        ];
+
+        type Size = U4;
+
+        for (src, dst, expected) in test_cases {
+            let src = RunNode::<Size>::new(src.0, src.1, src.2, cost).unwrap();
+            let dst = RunNode::<Size>::new(dst.0, dst.1, dst.2, cost).unwrap();
+            let expected = expected.map_err(|_| RouteError {
+                src: src.clone(),
+                dst: dst.clone(),
+            });
+            assert_eq!(src.route(&dst), expected);
         }
     }
 }
