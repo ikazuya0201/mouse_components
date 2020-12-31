@@ -9,6 +9,7 @@ mod controller;
 mod estimator;
 mod maze;
 pub mod node;
+pub mod obstacle_converter;
 mod obstacle_detector;
 mod operators;
 pub mod prelude;
