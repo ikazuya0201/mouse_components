@@ -5,7 +5,7 @@ use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
-use crate::simple_maze::{GraphNode, WallNode, WallSpaceNode};
+use crate::simple_maze::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
 
@@ -48,6 +48,14 @@ struct RelativeWallError {
     base_dir: AbsoluteDirection,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Location {
+    Cell,
+    VerticalBound,
+    HorizontalBound,
+    Pillar,
+}
+
 impl<N> Node<N> {
     unsafe fn new_unchecked(
         x: i16,
@@ -61,6 +69,22 @@ impl<N> Node<N> {
             direction,
             cost,
             _maze_width: PhantomData,
+        }
+    }
+
+    fn location(&self) -> Location {
+        use Location::*;
+
+        if self.x & 1 == 0 {
+            if self.y & 1 == 0 {
+                Cell
+            } else {
+                HorizontalBound
+            }
+        } else if self.y & 1 == 0 {
+            VerticalBound
+        } else {
+            Pillar
         }
     }
 }
@@ -109,6 +133,25 @@ where
             self.direction.rotate(ddir),
             self.cost,
         )
+    }
+
+    fn difference(
+        &self,
+        other: &Self,
+        base_dir: AbsoluteDirection,
+    ) -> (i16, i16, RelativeDirection) {
+        use RelativeDirection::*;
+
+        let dx = other.x - self.x;
+        let dy = other.y - self.y;
+        let (dx, dy) = match base_dir.relative(self.direction) {
+            Front => (dx, dy),
+            Right => (-dy, dx),
+            Back => (-dx, -dy),
+            Left => (dy, -dx),
+            _ => unreachable!(),
+        };
+        (dx, dy, self.direction.relative(other.direction))
     }
 }
 
@@ -354,7 +397,7 @@ where
 
 impl<N> RunNode<N>
 where
-    N: Unsigned + PowerOfTwo + Mul<U2> + 'static,
+    N: Unsigned + PowerOfTwo + Mul<U2>,
     N::Output: Add<U10>,
     <N::Output as Add<U10>>::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
 {
@@ -566,7 +609,7 @@ impl<N> WallSpaceNode for RunNode<N> {
 //TODO: use iterator instead of vec
 impl<N> GraphNode for RunNode<N>
 where
-    N: Unsigned + PowerOfTwo + Mul<U2> + 'static,
+    N: Unsigned + PowerOfTwo + Mul<U2>,
     N::Output: Add<U10>,
     <N::Output as Add<U10>>::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
 {
@@ -580,6 +623,103 @@ where
 
     fn predecessors(&self) -> Self::WallNodesList {
         self.neighbors(false)
+    }
+}
+
+impl<N> WallFinderNode for RunNode<N>
+where
+    N: Unsigned + PowerOfTwo + Mul<U2>,
+    N::Output: ArrayLength<Wall<N>>,
+{
+    type Walls = Vec<Self::Wall, N::Output>;
+
+    fn walls_between(&self, other: &Self) -> Self::Walls {
+        use AbsoluteDirection::*;
+        use Location::*;
+        use RelativeDirection::*;
+
+        let mut walls = ForcedVec::new();
+        match self.0.location() {
+            Cell => {
+                let mut add = |x: i16, y: i16| {
+                    if let Ok(wall) = self.0.relative_wall(x, y, North) {
+                        walls.push(wall);
+                    }
+                };
+                match self.0.difference(&other.0, North) {
+                    (1, 2, FrontRight) | (2, 2, Right) => {
+                        add(0, 1);
+                        add(1, 2);
+                    }
+                    (2, 1, BackRight) | (2, 0, Back) => {
+                        add(0, 1);
+                        add(1, 2);
+                        add(2, 1);
+                    }
+                    (-1, 2, FrontLeft) | (-2, 2, Left) => {
+                        add(0, 1);
+                        add(-1, 2);
+                    }
+                    (-2, 1, BackRight) | (-2, 0, Back) => {
+                        add(0, 1);
+                        add(-1, 2);
+                        add(-2, 1);
+                    }
+                    (0, y, Front) => {
+                        for dy in 0..y / 2 {
+                            add(0, 2 * dy + 1);
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            HorizontalBound => {
+                let mut add = |x: i16, y: i16| {
+                    if let Ok(wall) = self.0.relative_wall(x, y, NorthEast) {
+                        walls.push(wall);
+                    }
+                };
+                match self.0.difference(&other.0, NorthEast) {
+                    (2, 1, FrontRight) => {
+                        add(1, 1);
+                    }
+                    (2, 0, Right) | (2, -1, BackRight) => {
+                        add(1, 1);
+                        add(2, 0);
+                    }
+                    (x, y, Front) if x == y => {
+                        for dx in 1..x + 1 {
+                            add(dx, dx);
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            VerticalBound => {
+                let mut add = |x: i16, y: i16| {
+                    if let Ok(wall) = self.0.relative_wall(x, y, NorthEast) {
+                        walls.push(wall);
+                    }
+                };
+                match self.0.difference(&other.0, NorthEast) {
+                    (1, 2, FrontLeft) => {
+                        add(1, 1);
+                    }
+                    (0, 2, Left) | (-1, 2, BackLeft) => {
+                        add(1, 1);
+                        add(0, 2);
+                    }
+                    (x, y, Front) if x == y => {
+                        for dx in 1..x + 1 {
+                            add(dx, dx);
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        }
+        walls.into()
     }
 }
 
@@ -959,6 +1099,59 @@ mod tests {
                 .collect();
 
             assert_eq!(successors, expected, "{:?}", (x, y, dir));
+        }
+    }
+
+    #[test]
+    fn test_run_node_wall_finder() {
+        use AbsoluteDirection::*;
+
+        fn cost(_pattern: Pattern) -> u16 {
+            unreachable!();
+        }
+
+        type Size = U4;
+
+        let test_cases = vec![
+            (
+                (0, 0, North),
+                (1, 2, NorthEast),
+                vec![(0, 0, true), (0, 1, false)],
+            ),
+            (
+                (0, 1, NorthEast),
+                (2, 0, South),
+                vec![(0, 1, false), (1, 0, true)],
+            ),
+            (
+                (1, 0, NorthEast),
+                (1, 2, NorthWest),
+                vec![(1, 0, true), (0, 1, false)],
+            ),
+            ((2, 1, SouthWest), (1, 0, SouthWest), vec![(0, 0, false)]),
+            (
+                (2, 0, North),
+                (0, 0, South),
+                vec![(1, 0, true), (0, 1, false), (0, 0, true)],
+            ),
+            (
+                (0, 0, North),
+                (0, 4, North),
+                vec![(0, 0, true), (0, 1, true)],
+            ),
+        ];
+
+        use std::vec::Vec;
+
+        for (src, dst, expected) in test_cases {
+            let src = RunNode::<Size>::new(src.0, src.1, src.2, cost).unwrap();
+            let dst = RunNode::<Size>::new(dst.0, dst.1, dst.2, cost).unwrap();
+            let expected: Vec<Wall<Size>> = expected
+                .into_iter()
+                .map(|(x, y, top)| Wall::<Size>::new(x, y, top).unwrap())
+                .collect();
+            let walls: Vec<Wall<Size>> = src.walls_between(&dst).into_iter().collect();
+            assert_eq!(walls, expected);
         }
     }
 }
