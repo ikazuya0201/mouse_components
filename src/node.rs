@@ -7,7 +7,7 @@ use typenum::{consts::*, PowerOfTwo, Unsigned};
 use crate::commander::RouteNode;
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
 use crate::simple_maze::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
-use crate::trajectory_generator::SearchKind;
+use crate::trajectory_generator::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
 
@@ -362,6 +362,53 @@ impl<N: Clone> RouteNode for SearchNode<N> {
                     dst: to.clone(),
                 })
             }
+        })
+    }
+}
+
+impl<N: Clone> RouteNode for RunNode<N> {
+    type Error = RouteError<RunNode<N>>;
+    type Route = RunKind;
+
+    fn route(&self, to: &Self) -> Result<Self::Route, Self::Error> {
+        use AbsoluteDirection::*;
+        use Location::*;
+        use RelativeDirection::*;
+        use RunKind::*;
+        use SlalomDirection::{Left as SLeft, Right as SRight};
+        use SlalomKind::*;
+
+        let create_error = || {
+            Err(RouteError {
+                src: self.clone(),
+                dst: to.clone(),
+            })
+        };
+
+        Ok(match self.0.location() {
+            Cell => match self.0.difference(&to.0, North) {
+                (1, 2, FrontRight) => Slalom(FastRun45, SRight),
+                (-1, 2, FrontLeft) => Slalom(FastRun45, SLeft),
+                (2, 2, Right) => Slalom(FastRun90, SRight),
+                (-2, 2, Left) => Slalom(FastRun90, SLeft),
+                (2, 1, BackRight) => Slalom(FastRun135, SRight),
+                (-2, 1, BackLeft) => Slalom(FastRun135, SLeft),
+                (2, 0, Back) => Slalom(FastRun180, SRight),
+                (-2, 0, Back) => Slalom(FastRun180, SLeft),
+                (0, x, Front) if x > 0 => Straight(x as u16 / 2),
+                _ => return create_error(),
+            },
+            HorizontalBound | VerticalBound => match self.0.difference(&to.0, NorthEast) {
+                (2, 1, FrontRight) => Slalom(FastRun45, SRight),
+                (2, 0, Right) => Slalom(FastRunDiagonal90, SRight),
+                (2, -1, BackRight) => Slalom(FastRun135, SRight),
+                (1, 2, FrontLeft) => Slalom(FastRun45, SLeft),
+                (0, 2, Left) => Slalom(FastRunDiagonal90, SLeft),
+                (-1, 2, BackLeft) => Slalom(FastRun135, SLeft),
+                (x, y, Front) if x == y && x > 0 => StraightDiagonal(x as u16),
+                _ => return create_error(),
+            },
+            _ => unreachable!("Should never be on the pillar"),
         })
     }
 }
@@ -1209,6 +1256,66 @@ mod tests {
         for (src, dst, expected) in test_cases {
             let src = SearchNode::<Size>::new(src.0, src.1, src.2, cost).unwrap();
             let dst = SearchNode::<Size>::new(dst.0, dst.1, dst.2, cost).unwrap();
+            let expected = expected.map_err(|_| RouteError {
+                src: src.clone(),
+                dst: dst.clone(),
+            });
+            assert_eq!(src.route(&dst), expected);
+        }
+    }
+
+    #[test]
+    fn test_run_node_route() {
+        use AbsoluteDirection::*;
+        use RunKind::*;
+        use SlalomDirection::{Left as SLeft, Right as SRight};
+        use SlalomKind::*;
+
+        fn cost(_pattern: Pattern) -> u16 {
+            unreachable!()
+        }
+
+        let test_cases = vec![
+            (
+                (0, 0, North),
+                (1, 2, NorthEast),
+                Ok(Slalom(FastRun45, SRight)),
+            ),
+            ((0, 0, North), (2, 0, South), Ok(Slalom(FastRun180, SRight))),
+            ((0, 0, North), (3, 0, SouthEast), Err(())),
+            (
+                (1, 0, NorthEast),
+                (0, 2, West),
+                Ok(Slalom(FastRun135, SLeft)),
+            ),
+            ((0, 0, North), (0, 6, North), Ok(Straight(3))),
+            (
+                (0, 1, NorthEast),
+                (2, 3, NorthEast),
+                Ok(StraightDiagonal(2)),
+            ),
+            (
+                (2, 1, NorthWest),
+                (0, 1, SouthWest),
+                Ok(Slalom(FastRunDiagonal90, SLeft)),
+            ),
+            (
+                (2, 0, East),
+                (3, 2, NorthWest),
+                Ok(Slalom(FastRun135, SLeft)),
+            ),
+            (
+                (1, 2, SouthWest),
+                (0, 0, South),
+                Ok(Slalom(FastRun45, SLeft)),
+            ),
+        ];
+
+        type Size = U4;
+
+        for (src, dst, expected) in test_cases {
+            let src = RunNode::<Size>::new(src.0, src.1, src.2, cost).unwrap();
+            let dst = RunNode::<Size>::new(dst.0, dst.1, dst.2, cost).unwrap();
             let expected = expected.map_err(|_| RouteError {
                 src: src.clone(),
                 dst: dst.clone(),
