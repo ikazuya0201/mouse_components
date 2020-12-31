@@ -22,7 +22,7 @@ pub enum Pattern {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct SearchNode<N> {
+struct Node<N> {
     x: i16,
     y: i16,
     direction: AbsoluteDirection,
@@ -47,40 +47,8 @@ struct RelativeWallError {
     base_dir: AbsoluteDirection,
 }
 
-impl<N> SearchNode<N>
-where
-    N: Unsigned,
-{
-    pub fn new(
-        x: i16,
-        y: i16,
-        direction: AbsoluteDirection,
-        cost: fn(Pattern) -> u16,
-    ) -> Result<Self, NodeCreationError> {
-        let create_error = || Err(NodeCreationError { x, y, direction });
-
-        if x < 0 || y < 0 || x > Self::max() || y > Self::max() {
-            return create_error();
-        }
-
-        use AbsoluteDirection::*;
-        if (x ^ y) & 1 == 0 {
-            return create_error();
-        } else if x & 1 == 1 {
-            match direction {
-                East | West => (),
-                _ => return create_error(),
-            }
-        } else {
-            match direction {
-                North | South => (),
-                _ => return create_error(),
-            }
-        }
-        Ok(unsafe { Self::new_unchecked(x, y, direction, cost) })
-    }
-
-    pub unsafe fn new_unchecked(
+impl<N> Node<N> {
+    unsafe fn new_unchecked(
         x: i16,
         y: i16,
         direction: AbsoluteDirection,
@@ -92,6 +60,24 @@ where
             direction,
             cost,
             _maze_width: PhantomData,
+        }
+    }
+}
+
+impl<N> Node<N>
+where
+    N: Unsigned,
+{
+    fn new(
+        x: i16,
+        y: i16,
+        direction: AbsoluteDirection,
+        cost: fn(Pattern) -> u16,
+    ) -> Result<Self, NodeCreationError> {
+        if x < 0 || y < 0 || x > Self::max() || y > Self::max() {
+            Err(NodeCreationError { x, y, direction })
+        } else {
+            Ok(unsafe { Self::new_unchecked(x, y, direction, cost) })
         }
     }
 
@@ -125,7 +111,7 @@ where
     }
 }
 
-impl<N> SearchNode<N>
+impl<N> Node<N>
 where
     N: Unsigned + PowerOfTwo,
 {
@@ -174,7 +160,71 @@ where
         }
         .map_err(|_| create_error())
     }
+}
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SearchNode<N>(Node<N>);
+
+impl<N> SearchNode<N> {
+    pub unsafe fn new_unchecked(
+        x: i16,
+        y: i16,
+        direction: AbsoluteDirection,
+        cost: fn(Pattern) -> u16,
+    ) -> Self {
+        Self(Node::<N>::new_unchecked(x, y, direction, cost))
+    }
+
+    #[inline]
+    fn is_valid_direction(x: i16, y: i16, direction: AbsoluteDirection) -> bool {
+        use AbsoluteDirection::*;
+
+        if (x ^ y) & 1 == 0 {
+            false
+        } else if x & 1 == 1 {
+            match direction {
+                East | West => true,
+                _ => false,
+            }
+        } else {
+            match direction {
+                North | South => true,
+                _ => false,
+            }
+        }
+    }
+}
+
+impl<N> SearchNode<N>
+where
+    N: Unsigned,
+{
+    pub fn new(
+        x: i16,
+        y: i16,
+        direction: AbsoluteDirection,
+        cost: fn(Pattern) -> u16,
+    ) -> Result<Self, NodeCreationError> {
+        use core::convert::TryInto;
+        Node::<N>::new(x, y, direction, cost)?.try_into()
+    }
+
+    fn relative(
+        &self,
+        dx: i16,
+        dy: i16,
+        ddir: RelativeDirection,
+        base_dir: AbsoluteDirection,
+    ) -> Result<Self, NodeCreationError> {
+        use core::convert::TryInto;
+        self.0.relative(dx, dy, ddir, base_dir)?.try_into()
+    }
+}
+
+impl<N> SearchNode<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
     fn neighbors(&self, succs: bool) -> <Self as GraphNode>::WallNodesList {
         use Pattern::*;
         use RelativeDirection::*;
@@ -183,13 +233,13 @@ where
         let mut update = |dx: i16, dy: i16, ddir: RelativeDirection, pattern: Pattern| {
             use AbsoluteDirection::*;
             let (dx, dy) = if succs { (dx, dy) } else { (-dx, -dy) };
-            if let Ok(wall) = self.relative_wall(dx, dy, North) {
+            if let Ok(wall) = self.0.relative_wall(dx, dy, North) {
                 let mut wall_nodes = ForcedVec::new();
                 wall_nodes.push(WallNode::Wall(wall));
                 wall_nodes.push(WallNode::Node((
                     self.relative(dx, dy, ddir, North)
                         .expect("Should never panic!"),
-                    (self.cost)(pattern),
+                    (self.0.cost)(pattern),
                 )));
                 list.push(wall_nodes.into());
             }
@@ -201,6 +251,22 @@ where
         update(0, 0, Back, SpinBack);
 
         list.into()
+    }
+}
+
+impl<N: Unsigned> core::convert::TryFrom<Node<N>> for SearchNode<N> {
+    type Error = NodeCreationError;
+
+    fn try_from(value: Node<N>) -> Result<Self, Self::Error> {
+        if Self::is_valid_direction(value.x, value.y, value.direction) {
+            Ok(Self(value))
+        } else {
+            Err(NodeCreationError {
+                x: value.x,
+                y: value.y,
+                direction: value.direction,
+            })
+        }
     }
 }
 
@@ -264,25 +330,25 @@ mod tests {
                 0,
                 1,
                 North,
-                Ok(SearchNode {
+                Ok(SearchNode(Node {
                     x: 0,
                     y: 1,
                     direction: North,
                     cost,
                     _maze_width: PhantomData,
-                }),
+                })),
             ),
             (
                 0,
                 1,
                 South,
-                Ok(SearchNode {
+                Ok(SearchNode(Node {
                     x: 0,
                     y: 1,
                     direction: South,
                     cost,
                     _maze_width: PhantomData,
-                }),
+                })),
             ),
             (
                 0,
@@ -298,13 +364,13 @@ mod tests {
                 1,
                 0,
                 East,
-                Ok(SearchNode {
+                Ok(SearchNode(Node {
                     x: 1,
                     y: 0,
                     direction: East,
                     cost,
                     _maze_width: PhantomData,
-                }),
+                })),
             ),
             (
                 1,
