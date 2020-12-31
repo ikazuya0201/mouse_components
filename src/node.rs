@@ -25,7 +25,7 @@ pub enum Pattern {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-struct Node<N> {
+pub struct Node<N> {
     x: i16,
     y: i16,
     direction: AbsoluteDirection,
@@ -72,6 +72,18 @@ impl<N> Node<N> {
             cost,
             _maze_width: PhantomData,
         }
+    }
+
+    pub fn x(&self) -> u16 {
+        self.x as u16
+    }
+
+    pub fn y(&self) -> u16 {
+        self.y as u16
+    }
+
+    pub fn direction(&self) -> AbsoluteDirection {
+        self.direction
     }
 
     fn location(&self) -> Location {
@@ -238,6 +250,14 @@ impl<N> SearchNode<N> {
                 _ => false,
             }
         }
+    }
+}
+
+impl<N> core::ops::Deref for SearchNode<N> {
+    type Target = Node<N>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -444,6 +464,14 @@ impl<N> RunNode<N> {
         } else {
             false
         }
+    }
+}
+
+impl<N> core::ops::Deref for RunNode<N> {
+    type Target = Node<N>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
