@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
+use core::ops::{Add, Mul};
 
-use heapless::Vec;
+use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
@@ -291,6 +292,297 @@ where
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RunNode<N>(Node<N>);
+
+impl<N> RunNode<N> {
+    pub unsafe fn new_unchecked(
+        x: i16,
+        y: i16,
+        direction: AbsoluteDirection,
+        cost: fn(Pattern) -> u16,
+    ) -> Self {
+        Self(Node::<N>::new_unchecked(x, y, direction, cost))
+    }
+
+    #[inline]
+    fn is_valid_direction(x: i16, y: i16, direction: AbsoluteDirection) -> bool {
+        use AbsoluteDirection::*;
+
+        if (x ^ y) & 1 == 1 {
+            //on a wall
+            match direction {
+                NorthEast | SouthEast | SouthWest | NorthWest => true,
+                _ => false,
+            }
+        } else if (x | y) & 1 == 0 {
+            match direction {
+                North | East | South | West => true,
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+}
+
+impl<N> RunNode<N>
+where
+    N: Unsigned,
+{
+    pub fn new(
+        x: i16,
+        y: i16,
+        direction: AbsoluteDirection,
+        cost: fn(Pattern) -> u16,
+    ) -> Result<Self, NodeCreationError> {
+        use core::convert::TryInto;
+        Node::<N>::new(x, y, direction, cost)?.try_into()
+    }
+
+    fn relative(
+        &self,
+        dx: i16,
+        dy: i16,
+        ddir: RelativeDirection,
+        base_dir: AbsoluteDirection,
+    ) -> Result<Self, NodeCreationError> {
+        use core::convert::TryInto;
+        self.0.relative(dx, dy, ddir, base_dir)?.try_into()
+    }
+}
+
+impl<N> RunNode<N>
+where
+    N: Unsigned + PowerOfTwo + Mul<U2> + 'static,
+    N::Output: Add<U10>,
+    <N::Output as Add<U10>>::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
+{
+    fn neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
+        if self.0.x & 1 == 0 {
+            if self.0.y & 1 == 0 {
+                self.cell_neighbors(is_succ)
+            } else {
+                self.horizontal_bound_neighbors(is_succ)
+            }
+        } else if self.0.y & 1 == 0 {
+            self.vertical_bound_neighbors(is_succ)
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn add_wall_fn<'a>(
+        &'a self,
+        is_succ: bool,
+        base_dir: AbsoluteDirection,
+    ) -> impl 'a
+           + Fn(
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, <N::Output as Add<U10>>::Output>,
+        i16,
+        i16,
+    ) -> Result<(), ()> {
+        move |list: &mut ForcedVec<
+            WallNode<Wall<N>, (RunNode<N>, u16)>,
+            <N::Output as Add<U10>>::Output,
+        >,
+              dx: i16,
+              dy: i16| {
+            let (dx, dy) = if is_succ { (dx, dy) } else { (-dx, -dy) };
+            let wall = self.0.relative_wall(dx, dy, base_dir).map_err(|_| ())?;
+            list.push(WallNode::Wall(wall));
+            Ok(())
+        }
+    }
+
+    fn add_node_fn<'a>(
+        &'a self,
+        is_succ: bool,
+        base_dir: AbsoluteDirection,
+    ) -> impl 'a
+           + Fn(
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, <N::Output as Add<U10>>::Output>,
+        i16,
+        i16,
+        RelativeDirection,
+        Pattern,
+    ) -> Result<(), ()> {
+        move |list: &mut ForcedVec<
+            WallNode<Wall<N>, (RunNode<N>, u16)>,
+            <N::Output as Add<U10>>::Output,
+        >,
+              dx: i16,
+              dy: i16,
+              ddir: RelativeDirection,
+              pattern: Pattern| {
+            let (dx, dy) = if is_succ { (dx, dy) } else { (-dx, -dy) };
+            let node = self.relative(dx, dy, ddir, base_dir).map_err(|_| ())?;
+            list.push(WallNode::Node((node, (self.0.cost)(pattern))));
+            Ok(())
+        }
+    }
+
+    fn cell_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+        use RelativeDirection::*;
+
+        let mut list = ForcedVec::new();
+
+        let add_wall = self.add_wall_fn(is_succ, North);
+        let add_node = self.add_node_fn(is_succ, North);
+
+        //right slalom
+        let mut tmp = ForcedVec::new();
+        let _: Result<(), ()> = (|| {
+            add_wall(&mut tmp, 0, 1)?;
+            add_wall(&mut tmp, 1, 2)?;
+            add_node(&mut tmp, 1, 2, FrontRight, FastRun45)?;
+            add_node(&mut tmp, 2, 2, Right, FastRun90)?;
+            add_wall(&mut tmp, 2, 1)?;
+            add_node(&mut tmp, 2, 1, BackRight, FastRun135)?;
+            add_node(&mut tmp, 2, 0, Back, FastRun180)?;
+            Ok(())
+        })();
+        list.push(tmp.into());
+
+        //left slalom
+        let mut tmp = ForcedVec::new();
+        let _: Result<(), ()> = (|| {
+            add_wall(&mut tmp, 0, 1)?;
+            add_wall(&mut tmp, -1, 2)?;
+            add_node(&mut tmp, -1, 2, FrontLeft, FastRun45)?;
+            add_node(&mut tmp, -2, 2, Left, FastRun90)?;
+            add_wall(&mut tmp, -2, 1)?;
+            add_node(&mut tmp, -2, 1, BackLeft, FastRun135)?;
+            add_node(&mut tmp, -2, 0, Back, FastRun180)?;
+            Ok(())
+        })();
+        list.push(tmp.into());
+
+        //straight
+        let mut tmp = ForcedVec::new();
+        let _: Result<(), ()> = (|| {
+            for dy in 1.. {
+                add_wall(&mut tmp, 0, 2 * dy - 1)?;
+                add_node(&mut tmp, 0, 2 * dy, Front, Straight(dy as u16))?;
+            }
+            Ok(())
+        })();
+        list.push(tmp.into());
+
+        list.into()
+    }
+
+    fn vertical_bound_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+        use RelativeDirection::*;
+
+        let mut list = ForcedVec::new();
+
+        let add_node = self.add_node_fn(is_succ, NorthEast);
+        let add_wall = self.add_wall_fn(is_succ, NorthEast);
+
+        let mut tmp = ForcedVec::new();
+        let _: Result<(), ()> = (|| {
+            add_wall(&mut tmp, 1, 1)?;
+            add_node(&mut tmp, 1, 2, FrontLeft, FastRun45)?;
+            add_wall(&mut tmp, 0, 2)?;
+            add_node(&mut tmp, 0, 2, Left, FastRunDiagonal90)?;
+            add_node(&mut tmp, -1, 2, BackLeft, FastRun135)?;
+            Ok(())
+        })();
+        list.push(tmp.into());
+
+        let mut tmp = ForcedVec::new();
+        let _: Result<(), ()> = (|| {
+            for i in 1.. {
+                add_wall(&mut tmp, i, i)?;
+                add_node(&mut tmp, i, i, Front, StraightDiagonal(i as u16))?;
+            }
+            Ok(())
+        })();
+        list.push(tmp.into());
+
+        list.into()
+    }
+
+    fn horizontal_bound_neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
+        use AbsoluteDirection::*;
+        use Pattern::*;
+        use RelativeDirection::*;
+
+        let mut list = ForcedVec::new();
+
+        let add_node = self.add_node_fn(is_succ, NorthEast);
+        let add_wall = self.add_wall_fn(is_succ, NorthEast);
+
+        let mut tmp = ForcedVec::new();
+        let _: Result<(), ()> = (|| {
+            add_wall(&mut tmp, 1, 1)?;
+            add_node(&mut tmp, 2, 1, FrontRight, FastRun45)?;
+            add_wall(&mut tmp, 2, 0)?;
+            add_node(&mut tmp, 2, 0, Right, FastRunDiagonal90)?;
+            add_node(&mut tmp, 2, -1, BackRight, FastRun135)?;
+            Ok(())
+        })();
+        list.push(tmp.into());
+
+        let mut tmp = ForcedVec::new();
+        let _: Result<(), ()> = (|| {
+            for i in 1.. {
+                add_wall(&mut tmp, i, i)?;
+                add_node(&mut tmp, i, i, Front, StraightDiagonal(i as u16))?;
+            }
+            Ok(())
+        })();
+        list.push(tmp.into());
+
+        list.into()
+    }
+}
+
+impl<N: Unsigned> core::convert::TryFrom<Node<N>> for RunNode<N> {
+    type Error = NodeCreationError;
+
+    fn try_from(value: Node<N>) -> Result<Self, Self::Error> {
+        if Self::is_valid_direction(value.x, value.y, value.direction) {
+            Ok(Self(value))
+        } else {
+            Err(NodeCreationError {
+                x: value.x,
+                y: value.y,
+                direction: value.direction,
+            })
+        }
+    }
+}
+
+impl<N> WallSpaceNode for RunNode<N> {
+    type Wall = Wall<N>;
+}
+
+//TODO: use iterator instead of vec
+impl<N> GraphNode for RunNode<N>
+where
+    N: Unsigned + PowerOfTwo + Mul<U2> + 'static,
+    N::Output: Add<U10>,
+    <N::Output as Add<U10>>::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
+{
+    type Cost = u16;
+    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Cost)>, <N::Output as Add<U10>>::Output>;
+    type WallNodesList = Vec<Self::WallNodes, U3>;
+
+    fn successors(&self) -> Self::WallNodesList {
+        self.neighbors(true)
+    }
+
+    fn predecessors(&self) -> Self::WallNodesList {
+        self.neighbors(false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use typenum::consts::*;
@@ -382,6 +674,16 @@ mod tests {
                     direction: South,
                 }),
             ),
+            (
+                -1,
+                0,
+                East,
+                Err(NodeCreationError {
+                    x: -1,
+                    y: 0,
+                    direction: East,
+                }),
+            ),
         ];
 
         for (x, y, dir, expected) in test_cases {
@@ -390,7 +692,7 @@ mod tests {
     }
 
     #[test]
-    fn test_graph_search_node() {
+    fn test_search_node_graph() {
         use AbsoluteDirection::*;
 
         fn cost(pattern: Pattern) -> u16 {
@@ -471,6 +773,191 @@ mod tests {
                         .collect()
                 })
                 .collect();
+            assert_eq!(successors, expected, "{:?}", (x, y, dir));
+        }
+    }
+
+    #[test]
+    fn test_run_node_new() {
+        use AbsoluteDirection::*;
+
+        fn cost(_pattern: Pattern) -> u16 {
+            unreachable!()
+        }
+
+        let test_cases = vec![
+            (
+                0,
+                0,
+                North,
+                Ok(RunNode(Node {
+                    x: 0,
+                    y: 0,
+                    direction: North,
+                    cost,
+                    _maze_width: PhantomData,
+                })),
+            ),
+            (
+                0,
+                1,
+                NorthEast,
+                Ok(RunNode(Node {
+                    x: 0,
+                    y: 1,
+                    direction: NorthEast,
+                    cost,
+                    _maze_width: PhantomData,
+                })),
+            ),
+            (
+                0,
+                0,
+                NorthEast,
+                Err(NodeCreationError {
+                    x: 0,
+                    y: 0,
+                    direction: NorthEast,
+                }),
+            ),
+        ];
+
+        for (x, y, dir, expected) in test_cases {
+            assert_eq!(RunNode::<U4>::new(x, y, dir, cost), expected);
+        }
+    }
+
+    #[test]
+    fn test_run_node_graph() {
+        use AbsoluteDirection::*;
+
+        fn cost(pattern: Pattern) -> u16 {
+            use Pattern::*;
+
+            match pattern {
+                FastRun45 => 1,
+                FastRun90 => 2,
+                FastRun135 => 3,
+                FastRun180 => 4,
+                FastRunDiagonal90 => 5,
+                Straight(x) => x + 5,
+                StraightDiagonal(x) => x + 6,
+                _ => unreachable!(),
+            }
+        }
+
+        let test_cases = vec![
+            (
+                (0, 0, North),
+                vec![
+                    vec![
+                        WallNode::Wall((0, 0, true)),
+                        WallNode::Wall((0, 1, false)),
+                        WallNode::Node((1, 2, NorthEast, 1)),
+                        WallNode::Node((2, 2, East, 2)),
+                        WallNode::Wall((1, 0, true)),
+                        WallNode::Node((2, 1, SouthEast, 3)),
+                        WallNode::Node((2, 0, South, 4)),
+                    ],
+                    vec![WallNode::Wall((0, 0, true))],
+                    vec![
+                        WallNode::Wall((0, 0, true)),
+                        WallNode::Node((0, 2, North, 6)),
+                        WallNode::Wall((0, 1, true)),
+                    ],
+                ],
+            ),
+            (
+                (0, 1, NorthEast),
+                vec![
+                    vec![
+                        WallNode::Wall((0, 1, false)),
+                        WallNode::Node((2, 2, East, 1)),
+                        WallNode::Wall((1, 0, true)),
+                        WallNode::Node((2, 1, SouthEast, 5)),
+                        WallNode::Node((2, 0, South, 3)),
+                    ],
+                    vec![
+                        WallNode::Wall((0, 1, false)),
+                        WallNode::Node((1, 2, NorthEast, 7)),
+                        WallNode::Wall((1, 1, true)),
+                        WallNode::Node((2, 3, NorthEast, 8)),
+                    ],
+                ],
+            ),
+            (
+                (1, 0, NorthEast),
+                vec![
+                    vec![
+                        WallNode::Wall((1, 0, true)),
+                        WallNode::Node((2, 2, North, 1)),
+                        WallNode::Wall((0, 1, false)),
+                        WallNode::Node((1, 2, NorthWest, 5)),
+                        WallNode::Node((0, 2, West, 3)),
+                    ],
+                    vec![
+                        WallNode::Wall((1, 0, true)),
+                        WallNode::Node((2, 1, NorthEast, 7)),
+                        WallNode::Wall((1, 1, false)),
+                        WallNode::Node((3, 2, NorthEast, 8)),
+                    ],
+                ],
+            ),
+            (
+                (2, 0, North),
+                vec![
+                    vec![
+                        WallNode::Wall((1, 0, true)),
+                        WallNode::Wall((1, 1, false)),
+                        WallNode::Node((3, 2, NorthEast, 1)),
+                    ],
+                    vec![
+                        WallNode::Wall((1, 0, true)),
+                        WallNode::Wall((0, 1, false)),
+                        WallNode::Node((1, 2, NorthWest, 1)),
+                        WallNode::Node((0, 2, West, 2)),
+                        WallNode::Wall((0, 0, true)),
+                        WallNode::Node((0, 1, SouthWest, 3)),
+                        WallNode::Node((0, 0, South, 4)),
+                    ],
+                    vec![
+                        WallNode::Wall((1, 0, true)),
+                        WallNode::Node((2, 2, North, 6)),
+                        WallNode::Wall((1, 1, true)),
+                    ],
+                ],
+            ),
+        ];
+
+        use std::vec::Vec;
+
+        type Size = U2;
+        type List = Vec<Vec<WallNode<Wall<Size>, (RunNode<Size>, u16)>>>;
+
+        for ((x, y, dir), expected) in test_cases {
+            let node = RunNode::<Size>::new(x, y, dir, cost).unwrap();
+            let successors: List = node
+                .successors()
+                .into_iter()
+                .map(|e| e.into_iter().collect())
+                .collect();
+
+            let expected: List = expected
+                .into_iter()
+                .map(|e| {
+                    e.into_iter()
+                        .map(|wall_nodes| match wall_nodes {
+                            WallNode::Wall((x, y, top)) => {
+                                WallNode::Wall(Wall::<Size>::new(x, y, top).unwrap())
+                            }
+                            WallNode::Node((x, y, dir, c)) => {
+                                WallNode::Node((RunNode::<Size>::new(x, y, dir, cost).unwrap(), c))
+                            }
+                        })
+                        .collect()
+                })
+                .collect();
+
             assert_eq!(successors, expected, "{:?}", (x, y, dir));
         }
     }
