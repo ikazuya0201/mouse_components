@@ -56,6 +56,13 @@ pub trait Converter<Source> {
     fn convert(&self, source: &Source) -> Result<Self::Target, Self::Error>;
 }
 
+pub trait RouteNode {
+    type Error;
+    type Route;
+
+    fn route(&self, to: &Self) -> Result<Self::Route, Self::Error>;
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 enum State {
     Waiting,
@@ -129,22 +136,21 @@ where
         + typenum::Unsigned,
     Nodes: Deref<Target = [Node]>,
     Node: Ord + Copy + Debug + Into<usize>,
-    Maze::SearchNode: Ord + Copy + Debug + Into<usize>,
+    Maze::SearchNode: Ord + Copy + Debug + Into<usize> + RouteNode,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node, Cost = Cost>
         + Graph<<Maze as GraphConverter<Node>>::SearchNode, Cost = Cost>
         + GraphConverter<Node>
         + ObstacleInterpreter<Obstacle>
         + NodeChecker<<Maze as GraphConverter<Node>>::SearchNode>,
-    ConverterType: Converter<<Maze as GraphConverter<Node>>::SearchNode>
-        + Converter<(Maze::SearchNode, Maze::SearchNode)>,
+    ConverterType: Converter<<Maze as GraphConverter<Node>>::SearchNode>,
     <ConverterType as Converter<Maze::SearchNode>>::Error: core::fmt::Debug,
-    <ConverterType as Converter<(Maze::SearchNode, Maze::SearchNode)>>::Error: core::fmt::Debug,
+    <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
 {
     type Error = CommanderError;
     type Command = (
         <ConverterType as Converter<Maze::SearchNode>>::Target,
-        <ConverterType as Converter<(Maze::SearchNode, Maze::SearchNode)>>::Target,
+        <Maze::SearchNode as RouteNode>::Route,
     );
 
     //TODO: write test
@@ -186,9 +192,8 @@ where
                 self.state.set(State::Solving);
                 if let Some(next) = next {
                     let current = self.current.get();
-                    let kind = self
-                        .converter
-                        .convert(&(current, next))
+                    let kind = current
+                        .route(&next)
                         .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err));
                     let pose = self
                         .converter
@@ -292,21 +297,16 @@ where
         + ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
         + ArrayLength<(Node, Reverse<Maze::Cost>)>
-        + ArrayLength<(
-            <ConverterType as Converter<Node>>::Target,
-            <ConverterType as Converter<(Node, Node)>>::Target,
-        )> + typenum::Unsigned,
+        + ArrayLength<(<ConverterType as Converter<Node>>::Target, Node::Route)>
+        + typenum::Unsigned,
     Nodes: Deref<Target = [Node]>,
-    Node: Ord + Copy + Debug + Into<usize>,
+    Node: Ord + Copy + Debug + Into<usize> + RouteNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
-    ConverterType: Converter<(Node, Node)> + Converter<Node>,
+    ConverterType: Converter<Node>,
 {
     type Error = RunCommanderError;
-    type Command = (
-        <ConverterType as Converter<Node>>::Target,
-        <ConverterType as Converter<(Node, Node)>>::Target,
-    );
+    type Command = (<ConverterType as Converter<Node>>::Target, Node::Route);
     type Commands = Vec<Self::Command, Max>;
 
     fn compute_commands(&self) -> Result<Self::Commands, Self::Error> {
@@ -324,8 +324,8 @@ where
                     self.converter
                         .convert(&path[i])
                         .map_err(|_| RunCommanderError::ConversionError)?,
-                    self.converter
-                        .convert(&(path[i], path[i + 1]))
+                    path[i]
+                        .route(&path[i + 1])
                         .map_err(|_| RunCommanderError::ConversionError)?,
                 ))
                 .unwrap_or_else(|_| unreachable!());
