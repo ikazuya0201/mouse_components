@@ -4,8 +4,10 @@ use core::ops::{Add, Mul};
 use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
+use crate::commander::RouteNode;
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
 use crate::simple_maze::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
+use crate::trajectory_generator::SearchKind;
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
 
@@ -87,6 +89,25 @@ impl<N> Node<N> {
             Pillar
         }
     }
+
+    fn difference(
+        &self,
+        other: &Self,
+        base_dir: AbsoluteDirection,
+    ) -> (i16, i16, RelativeDirection) {
+        use RelativeDirection::*;
+
+        let dx = other.x - self.x;
+        let dy = other.y - self.y;
+        let (dx, dy) = match base_dir.relative(self.direction) {
+            Front => (dx, dy),
+            Right => (-dy, dx),
+            Back => (-dx, -dy),
+            Left => (dy, -dx),
+            _ => unreachable!(),
+        };
+        (dx, dy, self.direction.relative(other.direction))
+    }
 }
 
 impl<N> Node<N>
@@ -133,25 +154,6 @@ where
             self.direction.rotate(ddir),
             self.cost,
         )
-    }
-
-    fn difference(
-        &self,
-        other: &Self,
-        base_dir: AbsoluteDirection,
-    ) -> (i16, i16, RelativeDirection) {
-        use RelativeDirection::*;
-
-        let dx = other.x - self.x;
-        let dy = other.y - self.y;
-        let (dx, dy) = match base_dir.relative(self.direction) {
-            Front => (dx, dy),
-            Right => (-dy, dx),
-            Back => (-dx, -dy),
-            Left => (dy, -dx),
-            _ => unreachable!(),
-        };
-        (dx, dy, self.direction.relative(other.direction))
     }
 }
 
@@ -332,6 +334,35 @@ where
 
     fn predecessors(&self) -> Self::WallNodesList {
         self.neighbors(false)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RouteError<T> {
+    src: T,
+    dst: T,
+}
+
+impl<N: Clone> RouteNode for SearchNode<N> {
+    type Error = RouteError<SearchNode<N>>;
+    type Route = SearchKind;
+
+    fn route(&self, to: &Self) -> Result<Self::Route, Self::Error> {
+        use RelativeDirection::*;
+        use SearchKind::*;
+
+        Ok(match self.0.difference(&to.0, AbsoluteDirection::North) {
+            (1, 1, Right) => Search(Right),
+            (0, 2, Front) => Search(Front),
+            (-1, 1, Left) => Search(Left),
+            (0, 0, Back) => Search(Back),
+            _ => {
+                return Err(RouteError {
+                    src: self.clone(),
+                    dst: to.clone(),
+                })
+            }
+        })
     }
 }
 
@@ -1152,6 +1183,37 @@ mod tests {
                 .collect();
             let walls: Vec<Wall<Size>> = src.walls_between(&dst).into_iter().collect();
             assert_eq!(walls, expected);
+        }
+    }
+
+    #[test]
+    fn test_search_node_route() {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+        use SearchKind::*;
+
+        fn cost(_pattern: Pattern) -> u16 {
+            unreachable!()
+        }
+
+        let test_cases = vec![
+            ((0, 1, North), (1, 2, East), Ok(Search(Right))),
+            ((0, 1, North), (0, 3, North), Ok(Search(Front))),
+            ((0, 1, North), (2, 1, North), Err(())),
+            ((2, 1, North), (1, 2, West), Ok(Search(Left))),
+            ((0, 1, North), (0, 1, South), Ok(Search(Back))),
+        ];
+
+        type Size = U4;
+
+        for (src, dst, expected) in test_cases {
+            let src = SearchNode::<Size>::new(src.0, src.1, src.2, cost).unwrap();
+            let dst = SearchNode::<Size>::new(dst.0, dst.1, dst.2, cost).unwrap();
+            let expected = expected.map_err(|_| RouteError {
+                src: src.clone(),
+                dst: dst.clone(),
+            });
+            assert_eq!(src.route(&dst), expected);
         }
     }
 }
