@@ -30,4 +30,5 @@ pub use crate::sensors::IMU as _components_sensors_IMU;
 
 pub use crate::utils::math::Math as _utils_math_Math;
 
+pub use crate::simple_maze::PoseConverter as _components_simple_maze_PoseConverter;
 pub use crate::simple_maze::WallManager as _components_simple_maze_WallManager;
