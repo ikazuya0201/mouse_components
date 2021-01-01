@@ -1,4 +1,5 @@
 use core::convert::Infallible;
+use core::marker::PhantomData;
 
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, Length};
@@ -17,6 +18,20 @@ impl NodeConverter {
         Self {
             square_width_half: square_width / 2.0,
         }
+    }
+}
+
+impl NodeConverter {
+    const DEFAULT_SQUARE_WIDTH: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.09,
+    };
+}
+
+impl Default for NodeConverter {
+    fn default() -> Self {
+        Self::new(Self::DEFAULT_SQUARE_WIDTH)
     }
 }
 
