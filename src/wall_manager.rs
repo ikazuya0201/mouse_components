@@ -23,12 +23,26 @@ pub struct OutOfBoundError {
     top: bool,
 }
 
-impl<N: Unsigned + PowerOfTwo> Wall<N> {
+impl<N> Wall<N> {
+    pub fn x(&self) -> u16 {
+        self.x
+    }
+
+    pub fn y(&self) -> u16 {
+        self.y
+    }
+
+    pub fn is_top(&self) -> bool {
+        self.top
+    }
+
     #[inline]
     fn y_offset() -> usize {
         1
     }
+}
 
+impl<N: Unsigned + PowerOfTwo> Wall<N> {
     #[inline]
     fn x_offset() -> usize {
         N::USIZE.trailing_zeros() as usize + Self::y_offset()
