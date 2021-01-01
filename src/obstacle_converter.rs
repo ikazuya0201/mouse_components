@@ -10,6 +10,7 @@ use crate::simple_maze::{ObstacleConverter as IObstacleConverter, WallInfo};
 use crate::utils::{math::Math, total::Total};
 use crate::wall_manager::Wall;
 
+#[derive(Clone, PartialEq, Debug)]
 pub struct ObstacleConverter<N, M> {
     i_square_width: i32, //[mm]
     square_width_half: Length,
@@ -21,6 +22,34 @@ pub struct ObstacleConverter<N, M> {
     n2: Length,
     _maze_width: PhantomData<fn() -> N>,
     _math: PhantomData<fn() -> M>,
+}
+
+impl<N, M> ObstacleConverter<N, M> {
+    const DEFAULT_SQUARE_WIDTH: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.09,
+    };
+    const DEFAULT_WALL_WIDTH: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.006,
+    };
+    const DEFAULT_IGNORE_RADIUS: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.01,
+    };
+}
+
+impl<N, M> Default for ObstacleConverter<N, M> {
+    fn default() -> Self {
+        Self::new(
+            Self::DEFAULT_SQUARE_WIDTH,
+            Self::DEFAULT_WALL_WIDTH,
+            Self::DEFAULT_IGNORE_RADIUS,
+        )
+    }
 }
 
 impl<N, M> ObstacleConverter<N, M> {
