@@ -24,7 +24,8 @@ pub enum Pattern {
     SpinBack,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+//TODO: Create new data type to reduce copy cost.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Node<N> {
     x: i16,
     y: i16,
@@ -433,8 +434,76 @@ impl<N: Clone> RouteNode for RunNode<N> {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+//TODO: Create new data type to reduce copy cost.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct RunNode<N>(Node<N>);
+
+//NOTO: Just compare x because this comparison is used only for binary heap
+impl<N> PartialOrd for RunNode<N>
+where
+    N: PartialEq,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.x.cmp(&other.x))
+    }
+}
+
+impl<N> Ord for RunNode<N>
+where
+    N: Eq,
+{
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.x.cmp(&other.x)
+    }
+}
+
+impl<N> Into<usize> for RunNode<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    fn into(self) -> usize {
+        use AbsoluteDirection::*;
+
+        let direction = if (self.x ^ self.y) & 1 == 1 {
+            match self.direction {
+                NorthEast => 0,
+                SouthEast => 1,
+                SouthWest => 2,
+                NorthWest => 3,
+                _ => unreachable!(),
+            }
+        } else if (self.x | self.y) & 1 == 0 {
+            match self.direction {
+                North => 0,
+                East => 1,
+                South => 2,
+                West => 3,
+                _ => unreachable!(),
+            }
+        } else {
+            unreachable!()
+        };
+
+        self.x as usize
+            | ((self.y as usize) << Self::y_offset())
+            | (direction << Self::direction_offset())
+    }
+}
+
+impl<N> RunNode<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    #[inline]
+    fn y_offset() -> u32 {
+        (N::USIZE * 2).trailing_zeros()
+    }
+
+    #[inline]
+    fn direction_offset() -> u32 {
+        2 * (N::USIZE * 2).trailing_zeros()
+    }
+}
 
 impl<N> RunNode<N> {
     pub unsafe fn new_unchecked(
