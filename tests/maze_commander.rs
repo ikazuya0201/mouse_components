@@ -7,7 +7,7 @@ use components::{
     data_types::AbsoluteDirection,
     node::{Pattern, RunNode, SearchNode},
     node_converter::NodeConverter,
-    obstacle_converter::ObstacleConverter,
+    pose_converter::PoseConverter,
     prelude::*,
     simple_maze::Maze,
     traits::Math,
@@ -111,11 +111,11 @@ fn test_compute_shortest_path_u4() {
             wall_manager.update(&wall, &Probability::one());
         }
 
-        let obstacle_converter = ObstacleConverter::<Size, MathFake>::default();
+        let pose_converter = PoseConverter::<Size, MathFake>::default();
         let wall_converter = WallConverter::new(cost);
         let maze = Maze::<NeighborNum, SearchNodeNum, _, _, _, MathFake>::new(
             wall_manager,
-            obstacle_converter,
+            pose_converter,
             wall_converter,
         );
         let node_converter = NodeConverter::default();

@@ -5,13 +5,13 @@ use typenum::{consts::*, PowerOfTwo, Unsigned};
 use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
 
-use crate::obstacle_detector::Obstacle;
-use crate::simple_maze::{ObstacleConverter as IObstacleConverter, WallInfo};
+use crate::data_types::Pose;
+use crate::simple_maze::{PoseConverter as IPoseConverter, WallInfo};
 use crate::utils::{math::Math, total::Total};
 use crate::wall_manager::Wall;
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct ObstacleConverter<N, M> {
+pub struct PoseConverter<N, M> {
     i_square_width: i32, //[mm]
     square_width_half: Length,
     square_width: Length,
@@ -24,7 +24,7 @@ pub struct ObstacleConverter<N, M> {
     _math: PhantomData<fn() -> M>,
 }
 
-impl<N, M> ObstacleConverter<N, M> {
+impl<N, M> PoseConverter<N, M> {
     const DEFAULT_SQUARE_WIDTH: Length = Length {
         dimension: PhantomData,
         units: PhantomData,
@@ -42,7 +42,7 @@ impl<N, M> ObstacleConverter<N, M> {
     };
 }
 
-impl<N, M> Default for ObstacleConverter<N, M> {
+impl<N, M> Default for PoseConverter<N, M> {
     fn default() -> Self {
         Self::new(
             Self::DEFAULT_SQUARE_WIDTH,
@@ -52,7 +52,7 @@ impl<N, M> Default for ObstacleConverter<N, M> {
     }
 }
 
-impl<N, M> ObstacleConverter<N, M> {
+impl<N, M> PoseConverter<N, M> {
     pub fn new(
         square_width: Length,
         wall_width: Length,
@@ -84,41 +84,51 @@ impl<N, M> ObstacleConverter<N, M> {
     }
 }
 
-impl<N, M> ObstacleConverter<N, M>
+impl<N, M> PoseConverter<N, M>
 where
     M: Math,
 {
-    fn is_near_pillar(&self, obstacle: &Obstacle) -> bool {
-        let pose = obstacle.source;
-        let distance = obstacle.distance.mean;
-
-        let x = pose.x + distance * M::cos(pose.theta);
-        let y = pose.y + distance * M::sin(pose.theta);
-
-        let (x, _) = self.remquof_with_width(x);
-        let (y, _) = self.remquof_with_width(y);
-
-        let diff_from_pillar = |x: Length| {
-            let pillar = if x < self.square_width_half {
-                Length::default()
-            } else {
-                self.square_width
-            };
-            x - pillar
+    fn is_near_pillar(&self, pose: &Pose) -> bool {
+        let rot = M::rem_euclidf(pose.theta.get::<revolution>(), 1.0);
+        let pillars = if rot < 0.125 || rot > 0.875 {
+            [
+                (self.square_width, Length::default()),
+                (self.square_width, self.square_width),
+            ]
+        } else if rot < 0.375 {
+            [
+                (self.square_width, self.square_width),
+                (Length::default(), self.square_width),
+            ]
+        } else if rot < 0.625 {
+            [
+                (Length::default(), self.square_width),
+                (Length::default(), Length::default()),
+            ]
+        } else {
+            [
+                (Length::default(), Length::default()),
+                (self.square_width, Length::default()),
+            ]
         };
 
-        let xd = diff_from_pillar(x);
-        let yd = diff_from_pillar(y);
+        let (sin_th, cos_th) = M::sincos(pose.theta);
+        let mind = pillars
+            .iter()
+            .map(|pillar| {
+                Total((sin_th * (pose.x - pillar.0) - cos_th * (pose.y - pillar.1)).abs())
+            })
+            .min()
+            .expect("Should never panic")
+            .0;
 
-        let distance = M::sqrt(xd * xd + yd * yd);
-
-        distance < self.ignore_radius_from_pillar
+        mind < self.ignore_radius_from_pillar
     }
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct OutOfBoundError {
-    obstacle: Obstacle,
+    pose: Pose,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -139,7 +149,7 @@ impl From<OutOfBoundError> for ConversionError {
     }
 }
 
-impl<N, M> IObstacleConverter for ObstacleConverter<N, M>
+impl<N, M> IPoseConverter<Pose> for PoseConverter<N, M>
 where
     N: Unsigned + PowerOfTwo,
     M: Math,
@@ -147,7 +157,7 @@ where
     type Error = ConversionError;
     type Wall = Wall<N>;
 
-    fn convert(&self, obstacle: &Obstacle) -> Result<WallInfo<Self::Wall>, Self::Error> {
+    fn convert(&self, pose: &Pose) -> Result<WallInfo<Self::Wall>, Self::Error> {
         #[derive(Clone, Copy, Debug)]
         enum Axis {
             X(Length),
@@ -166,18 +176,22 @@ where
 
         let create_error = || {
             Err(ConversionError::OutOfBound(OutOfBoundError {
-                obstacle: obstacle.clone(),
+                pose: pose.clone(),
             }))
         };
 
-        if self.is_near_pillar(obstacle) {
-            return create_error();
-        }
-
-        let pose = obstacle.source;
-
         let (x_rem, x_quo) = self.remquof_with_width(pose.x);
         let (y_rem, y_quo) = self.remquof_with_width(pose.y);
+
+        let pose = Pose {
+            x: x_rem,
+            y: y_rem,
+            theta: pose.theta,
+        };
+
+        if self.is_near_pillar(&pose) {
+            return create_error();
+        }
 
         if x_rem <= self.n1 || x_rem >= self.p1 || y_rem <= self.n1 || y_rem >= self.p1 {
             return create_error();
@@ -288,16 +302,10 @@ mod tests {
                 #[test]
                 fn $name() {
                     let (input, expected) = $value;
-                    let input = Obstacle {
-                        source: Pose{
-                            x: Length::new::<meter>(input.0),
-                            y: Length::new::<meter>(input.1),
-                            theta: Angle::new::<degree>(input.2),
-                        },
-                        distance: Sample{
-                            mean: Length::new::<meter>(input.3),
-                            standard_deviation: Length::new::<meter>(0.001),
-                        },
+                    let input = Pose{
+                        x: Length::new::<meter>(input.0),
+                        y: Length::new::<meter>(input.1),
+                        theta: Angle::new::<degree>(input.2),
                     };
                     let expected = WallInfo{
                         wall: Wall::<$size>::new(expected.0, expected.1, expected.2).unwrap(),
@@ -305,7 +313,7 @@ mod tests {
                         not_existing_distance: Length::new::<meter>(expected.4),
                     };
 
-                    let converter = ObstacleConverter::<$size, MathFake>::new(
+                    let converter = PoseConverter::<$size, MathFake>::new(
                         Length::new::<meter>(0.09),
                         Length::new::<meter>(0.006),
                         Length::new::<meter>(0.01),
@@ -331,19 +339,13 @@ mod tests {
                 #[test]
                 fn $name() {
                     let input = $value;
-                    let input = Obstacle {
-                        source: Pose{
+                    let input = Pose{
                             x: Length::new::<meter>(input.0),
                             y: Length::new::<meter>(input.1),
                             theta: Angle::new::<degree>(input.2),
-                        },
-                        distance: Sample{
-                            mean: Length::new::<meter>(input.3),
-                            standard_deviation: Length::new::<meter>(0.001),
-                        },
                     };
 
-                    let converter = ObstacleConverter::<$size, MathFake>::new(
+                    let converter = PoseConverter::<$size, MathFake>::new(
                         Length::new::<meter>(0.09),
                         Length::new::<meter>(0.006),
                         Length::new::<meter>(0.01),
@@ -356,39 +358,39 @@ mod tests {
 
     convert_ok_tests! {
         convert_ok_test1: (U4, (
-            (0.045, 0.045, 0.0, 0.045),
+            (0.045, 0.045, 0.0),
             (0, 0, false, 0.042, 0.132),
         )),
         convert_ok_test2: (U4, (
-            (0.077, 0.045, 45.0, 0.045),
+            (0.077, 0.045, 45.0),
             (0, 0, false, 2.0f32.sqrt() * 0.01, 2.0f32.sqrt() * 0.042),
         )),
         convert_ok_test3: (U4, (
-            (0.135, 0.045, 180.0, 0.045),
+            (0.135, 0.045, 180.0),
             (0, 0, false, 0.042, 0.132),
         )),
         convert_ok_test4: (U4, (
-            (0.045, 0.135, 270.0, 0.045),
+            (0.045, 0.135, 270.0),
             (0, 0, true, 0.042, 0.132),
         )),
         convert_ok_test5: (U4, (
-            (0.135, 0.135, 90.0, 0.045),
+            (0.135, 0.135, 90.0),
             (1, 1, true, 0.042, 0.132),
         )),
         convert_ok_test6: (U4, (
-            (0.135, 0.135, 180.0, 0.045),
+            (0.135, 0.135, 180.0),
             (0, 1, false, 0.042, 0.132),
         )),
         convert_ok_test7: (U4, (
-            (0.045, 0.135, 0.0, 0.045),
+            (0.045, 0.135, 0.0),
             (0, 1, false, 0.042, 0.132),
         )),
     }
 
     convert_err_tests! {
-        convert_err_test1: (U4, (0.0, 0.0, 0.0, 0.045)),
-        convert_err_test2: (U4, (0.405, 0.045, 0.0, 0.045)),
-        convert_err_test3: (U4, (-0.045, 0.045, 0.0, 0.045)),
-        convert_err_test4: (U4, (0.045, 0.045, 45.0, 0.0636)),
+        convert_err_test1: (U4, (0.0, 0.0, 0.0)),
+        convert_err_test2: (U4, (0.405, 0.045, 0.0)),
+        convert_err_test3: (U4, (-0.045, 0.045, 0.0)),
+        convert_err_test4: (U4, (0.045, 0.045, 45.0)),
     }
 }

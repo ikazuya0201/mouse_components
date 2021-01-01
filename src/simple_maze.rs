@@ -4,6 +4,7 @@ use heapless::{ArrayLength, Vec};
 use uom::si::f32::Length;
 
 use crate::commander::{CannotCheckError, Graph, GraphConverter, NodeChecker, ObstacleInterpreter};
+use crate::data_types::Pose;
 use crate::obstacle_detector::Obstacle;
 use crate::utils::{forced_vec::ForcedVec, math::Math, probability::Probability};
 
@@ -87,11 +88,11 @@ pub struct WallInfo<Wall> {
     pub not_existing_distance: Length,
 }
 
-pub trait ObstacleConverter {
+pub trait PoseConverter<Pose> {
     type Error;
     type Wall;
 
-    fn convert(&self, obstacle: &Obstacle) -> Result<WallInfo<Self::Wall>, Self::Error>;
+    fn convert(&self, pose: &Pose) -> Result<WallInfo<Self::Wall>, Self::Error>;
 }
 
 pub trait WallConverter<Wall> {
@@ -102,33 +103,27 @@ pub trait WallConverter<Wall> {
     fn convert(&self, wall: &Wall) -> Result<Self::SearchNodes, Self::Error>;
 }
 
-pub struct Maze<
-    NeighborNum,
-    SearchNodeNum,
-    Manager,
-    ObstacleConverterType,
-    WallConverterType,
-    MathType,
-> {
+pub struct Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+{
     manager: Manager,
-    obstacle_converter: ObstacleConverterType,
+    pose_converter: PoseConverterType,
     wall_converter: WallConverterType,
     _math: PhantomData<fn() -> MathType>,
     _search_node_num: PhantomData<fn() -> SearchNodeNum>,
     _neighbor_num: PhantomData<fn() -> NeighborNum>,
 }
 
-impl<NeighborNum, SearchNodeNum, Manager, ObstacleConverterType, WallConverterType, MathType>
-    Maze<NeighborNum, SearchNodeNum, Manager, ObstacleConverterType, WallConverterType, MathType>
+impl<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+    Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
 {
     pub fn new(
         manager: Manager,
-        obstacle_converter: ObstacleConverterType,
+        obstacle_converter: PoseConverterType,
         wall_converter: WallConverterType,
     ) -> Self {
         Self {
             manager,
-            obstacle_converter,
+            pose_converter: obstacle_converter,
             wall_converter,
             _math: PhantomData,
             _search_node_num: PhantomData,
@@ -137,23 +132,9 @@ impl<NeighborNum, SearchNodeNum, Manager, ObstacleConverterType, WallConverterTy
     }
 }
 
-impl<
-        Node,
-        NeighborNum,
-        SearchNodeNum,
-        Manager,
-        ObstacleConverterType,
-        WallConverterType,
-        MathType,
-    > Graph<Node>
-    for Maze<
-        NeighborNum,
-        SearchNodeNum,
-        Manager,
-        ObstacleConverterType,
-        WallConverterType,
-        MathType,
-    >
+impl<Node, NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+    Graph<Node>
+    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
 where
     Node: GraphNode,
     Manager: WallManager<Node::Wall>,
@@ -201,23 +182,9 @@ where
     }
 }
 
-impl<
-        Node,
-        NeighborNum,
-        SearchNodeNum,
-        Manager,
-        ObstacleConverterType,
-        WallConverterType,
-        MathType,
-    > GraphConverter<Node>
-    for Maze<
-        NeighborNum,
-        SearchNodeNum,
-        Manager,
-        ObstacleConverterType,
-        WallConverterType,
-        MathType,
-    >
+impl<Node, NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+    GraphConverter<Node>
+    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
 where
     Node: WallFinderNode,
     WallConverterType: WallConverter<Node::Wall>,
@@ -253,18 +220,11 @@ impl<
         NeighborNum,
         SearchNodeNum,
         Manager,
-        ObstacleConverterType,
+        PoseConverterType,
         WallConverterType,
         MathType,
     > NodeChecker<SearchNode>
-    for Maze<
-        NeighborNum,
-        SearchNodeNum,
-        Manager,
-        ObstacleConverterType,
-        WallConverterType,
-        MathType,
-    >
+    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
 where
     SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
     Manager: WallManager<SearchNode::Wall>,
@@ -283,19 +243,12 @@ where
 }
 
 //TODO: Write test
-impl<NeighborNum, SearchNodeNum, Manager, ObstacleConverterType, WallConverterType, MathType>
+impl<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
     ObstacleInterpreter<Obstacle>
-    for Maze<
-        NeighborNum,
-        SearchNodeNum,
-        Manager,
-        ObstacleConverterType,
-        WallConverterType,
-        MathType,
-    >
+    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
 where
-    ObstacleConverterType: ObstacleConverter,
-    Manager: WallManager<ObstacleConverterType::Wall>,
+    PoseConverterType: PoseConverter<Pose>,
+    Manager: WallManager<PoseConverterType::Wall>,
     MathType: Math,
 {
     type Error = core::cell::BorrowMutError;
@@ -307,7 +260,7 @@ where
         use uom::si::ratio::ratio;
 
         for obstacle in obstacles {
-            if let Ok(wall_info) = self.obstacle_converter.convert(&obstacle) {
+            if let Ok(wall_info) = self.pose_converter.convert(&obstacle.source) {
                 if let Ok(existence) = self.manager.try_existence_probability(&wall_info.wall) {
                     let exist_val = {
                         let tmp = ((wall_info.existing_distance - obstacle.distance.mean)
