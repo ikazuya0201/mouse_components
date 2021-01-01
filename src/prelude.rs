@@ -29,3 +29,5 @@ pub use crate::sensors::Motor as _components_sensors_Motor;
 pub use crate::sensors::IMU as _components_sensors_IMU;
 
 pub use crate::utils::math::Math as _utils_math_Math;
+
+pub use crate::simple_maze::WallManager as _components_simple_maze_WallManager;
