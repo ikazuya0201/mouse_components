@@ -294,7 +294,7 @@ mod tests {
 
     use super::*;
     use crate::data_types::Pose;
-    use crate::utils::{math::MathFake, sample::Sample};
+    use crate::utils::math::MathFake;
 
     macro_rules! convert_ok_tests {
         ($($name:ident: ($size:ty, $value: expr),)*) => {
