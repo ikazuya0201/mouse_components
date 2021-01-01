@@ -135,8 +135,8 @@ where
         + ArrayLength<Option<usize>>
         + typenum::Unsigned,
     Nodes: Deref<Target = [Node]>,
-    Node: Ord + Copy + Debug + Into<usize>,
-    Maze::SearchNode: Ord + Copy + Debug + Into<usize> + RouteNode,
+    Node: PartialEq + Copy + Debug + Into<usize>,
+    Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node, Cost = Cost>
         + Graph<<Maze as GraphConverter<Node>>::SearchNode, Cost = Cost>
@@ -223,8 +223,8 @@ where
         + ArrayLength<Option<usize>>
         + typenum::Unsigned,
     Nodes: Deref<Target = [Node]>,
-    Node: Ord + Copy + Debug + Into<usize>,
-    Maze::SearchNode: Ord + Copy + Debug + Into<usize>,
+    Node: PartialEq + Copy + Debug + Into<usize>,
+    Maze::SearchNode: PartialEq + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node, Cost = Cost>
         + Graph<<Maze as GraphConverter<Node>>::SearchNode, Cost = Cost>
@@ -300,7 +300,7 @@ where
         + ArrayLength<(<ConverterType as NodeConverter<Node>>::Target, Node::Route)>
         + typenum::Unsigned,
     Nodes: Deref<Target = [Node]>,
-    Node: Ord + Copy + Debug + Into<usize> + RouteNode,
+    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
     ConverterType: NodeConverter<Node>,
@@ -345,7 +345,7 @@ where
         + ArrayLength<(Node, Reverse<Maze::Cost>)>
         + typenum::Unsigned,
     Nodes: Deref<Target = [Node]>,
-    Node: Ord + Copy + Debug + Into<usize>,
+    Node: PartialEq + Copy + Debug + Into<usize>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
 {

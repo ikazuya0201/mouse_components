@@ -438,25 +438,6 @@ impl<N: Clone> RouteNode for RunNode<N> {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct RunNode<N>(Node<N>);
 
-//NOTO: Just compare x because this comparison is used only for binary heap
-impl<N> PartialOrd for RunNode<N>
-where
-    N: PartialEq,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        Some(self.x.cmp(&other.x))
-    }
-}
-
-impl<N> Ord for RunNode<N>
-where
-    N: Eq,
-{
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.x.cmp(&other.x)
-    }
-}
-
 impl<N> Into<usize> for RunNode<N>
 where
     N: Unsigned + PowerOfTwo,
