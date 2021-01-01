@@ -94,23 +94,42 @@ pub trait ObstacleConverter {
     fn convert(&self, obstacle: &Obstacle) -> Result<WallInfo<Self::Wall>, Self::Error>;
 }
 
-pub struct Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType> {
+pub trait WallConverter<Wall> {
+    type Error;
+    type SearchNode;
+    type SearchNodes: IntoIterator<Item = Self::SearchNode>;
+
+    fn convert(&self, wall: &Wall) -> Result<Self::SearchNodes, Self::Error>;
+}
+
+pub struct Maze<
+    NeighborNum,
+    SearchNodeNum,
+    Manager,
+    ObstacleConverterType,
+    WallConverterType,
+    MathType,
+> {
     manager: Manager,
-    converter: Converter,
-    _search_node: PhantomData<fn() -> SearchNode>,
+    obstacle_converter: ObstacleConverterType,
+    wall_converter: WallConverterType,
     _math: PhantomData<fn() -> MathType>,
     _search_node_num: PhantomData<fn() -> SearchNodeNum>,
     _neighbor_num: PhantomData<fn() -> NeighborNum>,
 }
 
-impl<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
-    Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
+impl<NeighborNum, SearchNodeNum, Manager, ObstacleConverterType, WallConverterType, MathType>
+    Maze<NeighborNum, SearchNodeNum, Manager, ObstacleConverterType, WallConverterType, MathType>
 {
-    pub fn new(manager: Manager, converter: Converter) -> Self {
+    pub fn new(
+        manager: Manager,
+        obstacle_converter: ObstacleConverterType,
+        wall_converter: WallConverterType,
+    ) -> Self {
         Self {
             manager,
-            converter,
-            _search_node: PhantomData,
+            obstacle_converter,
+            wall_converter,
             _math: PhantomData,
             _search_node_num: PhantomData,
             _neighbor_num: PhantomData,
@@ -118,8 +137,23 @@ impl<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
     }
 }
 
-impl<Node, SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType> Graph<Node>
-    for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
+impl<
+        Node,
+        NeighborNum,
+        SearchNodeNum,
+        Manager,
+        ObstacleConverterType,
+        WallConverterType,
+        MathType,
+    > Graph<Node>
+    for Maze<
+        NeighborNum,
+        SearchNodeNum,
+        Manager,
+        ObstacleConverterType,
+        WallConverterType,
+        MathType,
+    >
 where
     Node: GraphNode,
     Manager: WallManager<Node::Wall>,
@@ -167,16 +201,30 @@ where
     }
 }
 
-impl<Node, SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
-    GraphConverter<Node>
-    for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
+impl<
+        Node,
+        NeighborNum,
+        SearchNodeNum,
+        Manager,
+        ObstacleConverterType,
+        WallConverterType,
+        MathType,
+    > GraphConverter<Node>
+    for Maze<
+        NeighborNum,
+        SearchNodeNum,
+        Manager,
+        ObstacleConverterType,
+        WallConverterType,
+        MathType,
+    >
 where
     Node: WallFinderNode,
-    Node::Wall: Into<[SearchNode; 2]>,
+    WallConverterType: WallConverter<Node::Wall>,
     Manager: WallManager<Node::Wall>,
-    SearchNodeNum: ArrayLength<SearchNode>,
+    SearchNodeNum: ArrayLength<WallConverterType::SearchNode>,
 {
-    type SearchNode = SearchNode;
+    type SearchNode = WallConverterType::SearchNode;
     type SearchNodes = Vec<Self::SearchNode, SearchNodeNum>;
 
     fn convert_to_checker_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
@@ -189,17 +237,34 @@ where
                 if self.manager.is_checked(&wall) {
                     continue;
                 }
-                let [node1, node2] = wall.into();
-                nodes.push(node1);
-                nodes.push(node2);
+                if let Ok(wall_nodes) = self.wall_converter.convert(&wall) {
+                    for node in wall_nodes {
+                        nodes.push(node);
+                    }
+                }
             }
         }
         nodes.into()
     }
 }
 
-impl<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType> NodeChecker<SearchNode>
-    for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
+impl<
+        SearchNode,
+        NeighborNum,
+        SearchNodeNum,
+        Manager,
+        ObstacleConverterType,
+        WallConverterType,
+        MathType,
+    > NodeChecker<SearchNode>
+    for Maze<
+        NeighborNum,
+        SearchNodeNum,
+        Manager,
+        ObstacleConverterType,
+        WallConverterType,
+        MathType,
+    >
 where
     SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
     Manager: WallManager<SearchNode::Wall>,
@@ -218,12 +283,19 @@ where
 }
 
 //TODO: Write test
-impl<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
+impl<NeighborNum, SearchNodeNum, Manager, ObstacleConverterType, WallConverterType, MathType>
     ObstacleInterpreter<Obstacle>
-    for Maze<SearchNode, NeighborNum, SearchNodeNum, Manager, Converter, MathType>
+    for Maze<
+        NeighborNum,
+        SearchNodeNum,
+        Manager,
+        ObstacleConverterType,
+        WallConverterType,
+        MathType,
+    >
 where
-    Converter: ObstacleConverter,
-    Manager: WallManager<Converter::Wall>,
+    ObstacleConverterType: ObstacleConverter,
+    Manager: WallManager<ObstacleConverterType::Wall>,
     MathType: Math,
 {
     type Error = core::cell::BorrowMutError;
@@ -235,7 +307,7 @@ where
         use uom::si::ratio::ratio;
 
         for obstacle in obstacles {
-            if let Ok(wall_info) = self.converter.convert(&obstacle) {
+            if let Ok(wall_info) = self.obstacle_converter.convert(&obstacle) {
                 if let Ok(existence) = self.manager.try_existence_probability(&wall_info.wall) {
                     let exist_val = {
                         let tmp = ((wall_info.existing_distance - obstacle.distance.mean)
@@ -348,7 +420,7 @@ mod tests {
 
         let manager = WallManagerType;
 
-        let maze = Maze::<(), U10, (), _, (), ()>::new(manager, ());
+        let maze = Maze::<U10, (), _, (), (), ()>::new(manager, (), ());
         let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
         assert_eq!(maze.successors(&0), expected.as_slice());
         assert_eq!(maze.predecessors(&0), expected.as_slice());
@@ -389,6 +461,18 @@ mod tests {
             }
         }
 
+        struct WallConverterType;
+
+        impl WallConverter<Wall> for WallConverterType {
+            type Error = core::convert::Infallible;
+            type SearchNode = SearchNode;
+            type SearchNodes = Vec<Self::SearchNode>;
+
+            fn convert(&self, wall: &Wall) -> Result<Self::SearchNodes, Self::Error> {
+                Ok(vec![SearchNode(wall.0), SearchNode(wall.0 + 1)])
+            }
+        }
+
         struct WallManagerType;
 
         impl WallManager<Wall> for WallManagerType {
@@ -407,7 +491,7 @@ mod tests {
             }
         }
 
-        let maze = Maze::<SearchNode, (), U10, _, (), ()>::new(WallManagerType, ());
+        let maze = Maze::<(), U10, _, (), _, ()>::new(WallManagerType, (), WallConverterType);
 
         let path = vec![0, 1, 1, 2, 3, 5, 8]
             .into_iter()
@@ -450,7 +534,7 @@ mod tests {
             }
         }
 
-        let maze = Maze::<usize, (), (), _, (), ()>::new(WallManagerType, ());
+        let maze = Maze::<(), (), _, (), (), ()>::new(WallManagerType, (), ());
         let test_cases = vec![
             (0, Ok(false)),
             (1, Ok(true)),
