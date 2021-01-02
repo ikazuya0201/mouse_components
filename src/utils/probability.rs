@@ -46,6 +46,12 @@ impl core::convert::TryFrom<f32> for Probability {
     }
 }
 
+impl From<Probability> for f32 {
+    fn from(value: Probability) -> Self {
+        value.0
+    }
+}
+
 impl core::ops::Mul<Probability> for f32 {
     type Output = f32;
 
