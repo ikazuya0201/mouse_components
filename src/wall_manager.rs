@@ -40,6 +40,15 @@ impl<N> Wall<N> {
     fn y_offset() -> usize {
         1
     }
+
+    pub unsafe fn new_unchecked(x: u16, y: u16, top: bool) -> Self {
+        Self {
+            x,
+            y,
+            top,
+            _maze_width: PhantomData,
+        }
+    }
 }
 
 impl<N: Unsigned + PowerOfTwo> Wall<N> {
@@ -66,15 +75,6 @@ impl<N: Unsigned + PowerOfTwo> Wall<N> {
             Err(OutOfBoundError { x, y, top })
         }
     }
-
-    pub unsafe fn new_unchecked(x: u16, y: u16, top: bool) -> Self {
-        Self {
-            x,
-            y,
-            top,
-            _maze_width: PhantomData,
-        }
-    }
 }
 
 pub struct WallStorage<N>
@@ -85,6 +85,52 @@ where
 {
     walls: GenericArray<RefCell<Probability>, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
     existence_threshold: Probability,
+}
+
+impl<N> core::fmt::Debug for WallStorage<N>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let prob = |x: u16, y: u16, is_top: bool| -> Probability {
+            let wall = Wall::<N>::new(x, y, is_top).unwrap();
+            self.walls[wall.to_index()].borrow().clone()
+        };
+        writeln!(f, "")?;
+        for y in (0..N::U16).rev() {
+            write!(f, " +--")?;
+            for x in 0..N::U16 - 1 {
+                write!(f, "{:1.1}--+--", f32::from(prob(x, y, true)))?;
+            }
+            writeln!(f, "{:1.1}--+", f32::from(prob(N::U16 - 1, y, true)))?;
+
+            write!(f, " |  ")?;
+            for _ in 0..N::U16 {
+                write!(f, "     |  ")?;
+            }
+            writeln!(f, "")?;
+
+            write!(f, "1.0 ")?;
+            for x in 0..N::U16 {
+                write!(f, "    {:1.1} ", f32::from(prob(x, y, false)))?;
+            }
+            writeln!(f, "")?;
+
+            write!(f, " |  ")?;
+            for _ in 0..N::U16 {
+                write!(f, "     |  ")?;
+            }
+            writeln!(f, "")?;
+        }
+        write!(f, " +--")?;
+        for _ in 0..N::U16 - 1 {
+            write!(f, "1.0--+--")?;
+        }
+        writeln!(f, "1.0--+")?;
+        Ok(())
+    }
 }
 
 impl<N> WallStorage<N>
