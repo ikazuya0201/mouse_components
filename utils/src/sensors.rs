@@ -75,6 +75,7 @@ where
         wheel_interval: Length,
     ) -> (
         Stepper,
+        Observer,
         Encoder,
         Encoder,
         IMU,
@@ -94,6 +95,9 @@ where
             .collect();
         (
             Stepper {
+                inner: Rc::clone(&self.inner),
+            },
+            Observer {
                 inner: Rc::clone(&self.inner),
             },
             Encoder {
@@ -129,6 +133,21 @@ pub struct Stepper {
 impl Stepper {
     pub fn step(&self) {
         self.inner.borrow_mut().step()
+    }
+}
+
+pub struct Observer {
+    inner: Rc<RefCell<AgentSimulatorInner>>,
+}
+
+impl Observer {
+    pub fn state(&self) -> State {
+        self.inner.borrow().current.clone()
+    }
+
+    pub fn voltage(&self) -> (ElectricPotential, ElectricPotential) {
+        let inner = self.inner.borrow();
+        (inner.right_voltage, inner.left_voltage)
     }
 }
 
@@ -307,7 +326,7 @@ where
         };
         Ok(Sample {
             mean: distance,
-            standard_deviation: Length::default(),
+            standard_deviation: Length::new::<meter>(0.001),
         })
     }
 }
