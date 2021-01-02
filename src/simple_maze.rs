@@ -114,6 +114,17 @@ pub struct Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConv
 }
 
 impl<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+    core::fmt::Debug
+    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+where
+    Manager: core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.manager.fmt(f)
+    }
+}
+
+impl<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
     Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
 {
     pub fn new(
@@ -274,6 +285,9 @@ where
                             .get::<ratio>();
                         -tmp * tmp / 2.0
                     };
+
+                    debug_assert!(!exist_val.is_nan());
+                    debug_assert!(!not_exist_val.is_nan());
 
                     let min = if exist_val < not_exist_val {
                         exist_val
