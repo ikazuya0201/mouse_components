@@ -33,7 +33,8 @@ where
     D: DistanceSensor,
     N: ArrayLength<D>,
 {
-    pub fn new(distance_sensors: GenericArray<D, N>) -> Self {
+    pub fn new<I: IntoIterator<Item = D>>(distance_sensors: I) -> Self {
+        let distance_sensors = distance_sensors.into_iter().collect();
         Self { distance_sensors }
     }
 }
@@ -150,7 +151,7 @@ mod tests {
 
         use crate::prelude::*;
 
-        let mut detector = ObstacleDetector::new(sensors);
+        let mut detector = ObstacleDetector::<_, typenum::consts::U3>::new(sensors);
         let obstacles = detector.detect(&Default::default());
         for (obstacle, expected) in obstacles.into_iter().zip(expected.into_iter()) {
             assert_relative_eq!(obstacle.source.x.get::<meter>(), expected.x.get::<meter>());
