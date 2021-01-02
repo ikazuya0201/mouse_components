@@ -221,7 +221,8 @@ where
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+//TODO: Remove Copy
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct SearchNode<N>(Node<N>);
 
 impl<N> SearchNode<N> {
@@ -251,6 +252,60 @@ impl<N> SearchNode<N> {
                 _ => false,
             }
         }
+    }
+}
+impl<N> SearchNode<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    #[inline]
+    fn y_offset() -> u32 {
+        (N::USIZE * 2).trailing_zeros()
+    }
+
+    #[inline]
+    fn direction_offset() -> u32 {
+        2 * (N::USIZE * 2).trailing_zeros()
+    }
+}
+
+impl<N> Into<usize> for SearchNode<N>
+where
+    N: Unsigned + PowerOfTwo,
+{
+    fn into(self) -> usize {
+        use AbsoluteDirection::*;
+
+        let direction = if self.x() & 1 == 0 {
+            if self.y() & 1 == 0 {
+                unreachable!()
+            } else {
+                match self.direction() {
+                    North => 0,
+                    South => 1,
+                    _ => unreachable!(),
+                }
+            }
+        } else {
+            if self.y() & 1 == 0 {
+                match self.direction() {
+                    East => 0,
+                    West => 1,
+                    _ => unreachable!(),
+                }
+            } else {
+                unreachable!()
+            }
+        };
+        self.x() as usize
+            | ((self.y() as usize) << Self::y_offset())
+            | (direction << Self::direction_offset())
+    }
+}
+
+impl<N> Into<Wall<N>> for SearchNode<N> {
+    fn into(self) -> Wall<N> {
+        unsafe { Wall::new_unchecked(self.x() / 2, self.y() / 2, self.x() & 1 == 1) }
     }
 }
 
