@@ -238,19 +238,40 @@ pub struct Encoder {
     direction: Direction,
 }
 
+impl Encoder {
+    fn translational_velocity(state: &State) -> Velocity {
+        state.x.v * state.theta.x.value.cos() + state.y.v * state.theta.x.value.sin()
+    }
+
+    fn rotational_velocity(state: &State) -> AngularVelocity {
+        state.theta.v
+    }
+
+    fn average<T, F>(&self, f: &F) -> T
+    where
+        F: Fn(&State) -> T,
+        T: core::ops::Add<T, Output = T> + core::ops::Div<f32, Output = T>,
+    {
+        let current = f(&self.inner.borrow().current);
+        let prev = f(&self.inner.borrow().prev);
+        (current + prev) / 2.0
+    }
+}
+
 impl IEncoder for Encoder {
     type Error = Infallible;
 
     fn get_relative_distance(&mut self) -> nb::Result<Length, Self::Error> {
-        let current = &self.inner.borrow().current;
-        let prev = &self.inner.borrow().prev;
-        let angle = current.theta.x - prev.theta.x;
-        let x = (current.x.x - prev.x.x).get::<meter>();
-        let y = (current.y.x - prev.y.x).get::<meter>();
-        let d = Length::new::<meter>((x * x + y * y).sqrt());
+        let average_trans = self.average(&Self::translational_velocity);
+        let average_rot = self.average(&Self::rotational_velocity);
+        let period = self.inner.borrow().period;
         match self.direction {
-            Direction::Right => Ok(d + self.wheel_interval * angle / 2.0),
-            Direction::Left => Ok(d - self.wheel_interval * angle / 2.0),
+            Direction::Right => Ok((average_trans
+                + Velocity::from(average_rot * self.wheel_interval / 2.0))
+                * period),
+            Direction::Left => Ok((average_trans
+                - Velocity::from(average_rot * self.wheel_interval / 2.0))
+                * period),
         }
     }
 }
