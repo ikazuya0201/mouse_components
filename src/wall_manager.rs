@@ -93,40 +93,124 @@ where
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
 {
-    pub fn new(existence_threshold: Probability) -> Self {
+    fn _new(existence_threshold: Probability) -> Self {
         let walls = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
             .map(|p| RefCell::new(unsafe { Probability::new_unchecked(p) }))
             .collect();
-        let storage = Self {
+        Self {
             walls,
             existence_threshold,
-        };
+        }
+    }
+
+    ///Initialize walls like following.
+    ///- All walls surrounding the maze exist with probability 1.
+    ///- A wall just rightside of the start position exists with probability 1
+    ///(the start position is left-bottom of the maze).
+    ///- A wall just forward of the start position does not exist (probability 0).
+    ///- Otherwise exist with probability 0.5.
+    pub fn new(existence_threshold: Probability) -> Self {
+        let storage = Self::_new(existence_threshold);
         storage.init();
         storage
     }
 
-    pub fn init(&self) {
+    fn init(&self) {
         let max = Wall::<N>::max();
-
-        let update = |x: u16, y: u16, top: bool, prob: Probability| {
-            *self.walls[Wall::<N>::new(x, y, top)
-                .unwrap_or_else(|_| unreachable!())
-                .to_index()]
-            .borrow_mut() = prob;
-        };
 
         for i in 0..max + 1 {
             //Walls on the top of maze exist.
-            update(i, max, true, Probability::one());
+            self.update(i, max, true, Probability::one());
 
             //Walls on the right of maze exist.
-            update(max, i, false, Probability::one());
+            self.update(max, i, false, Probability::one());
         }
         //A wall on the just right of start exists.
-        update(0, 0, false, Probability::one());
+        self.update(0, 0, false, Probability::one());
 
         //A wall on the just top of start does not exist.
-        update(0, 0, true, Probability::zero());
+        self.update(0, 0, true, Probability::zero());
+    }
+
+    fn update(&self, x: u16, y: u16, top: bool, prob: Probability) {
+        *self.walls[Wall::<N>::new(x, y, top)
+            .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
+            .to_index()]
+        .borrow_mut() = prob;
+    }
+
+    ///NOTE: Input str of this method must be formatted like following.
+    ///- Input str should not have unnecessary characters.
+    ///- All walls are initialized with existence probability 0 or 1.
+    ///- Pillars must be notated as `+`.
+    ///- Horizontal walls must be notated as `---` (3 hyphens).
+    ///- Vertical walls must be notated as `|`.
+    ///- If a wall does not exist in that position,
+    ///replace the corresponding wall characters with the same number of spaces.
+    ///(`---` is replaced with `   `, `|` is replaced with ` `)
+    ///- All squares must be notated as `   ` (3 spaces).
+    ///- Regulations of micro mouse contests can be ignored.
+    ///
+    ///examples:
+    ///```example1
+    ///+---+---+
+    ///|   |   |
+    ///+---+   +
+    ///|       |
+    ///+---+---+
+    ///```
+    ///```example2
+    ///+---+---+---+---+
+    ///|               |
+    ///+   +---+---+   +
+    ///|   |       |   |
+    ///+   +   +   +   +
+    ///|   |   |       |
+    ///+   +   +---+   +
+    ///|   |       |   |
+    ///+---+---+---+---+
+    ///```
+    pub fn with_str(existence_threshold: Probability, input: &str) -> Self {
+        let storage = Self::_new(existence_threshold);
+        storage.init_with_str(input);
+        storage
+    }
+
+    fn init_with_str(&self, input: &str) {
+        input
+            .lines()
+            .enumerate()
+            .take(2 * N::USIZE) //not consider bottom line
+            .for_each(|(y, line)| {
+                let y = y as u16;
+                line.chars().enumerate().skip(1).for_each(|(x, c)| {
+                    //not consider left line
+                    let x = x as u16;
+                    if y % 2 == 0 {
+                        //check top walls
+                        if x % 4 != 1 {
+                            return;
+                        }
+                        let x = x / 4;
+                        if c == '-' {
+                            self.update(x, N::U16 - y / 2 - 1, true, Probability::one());
+                        } else {
+                            self.update(x, N::U16 - y / 2 - 1, true, Probability::zero());
+                        }
+                    } else {
+                        //check right walls
+                        if x % 4 != 0 {
+                            return;
+                        }
+                        let x = x / 4;
+                        if c == '|' {
+                            self.update(x - 1, N::U16 - y / 2 - 1, false, Probability::one());
+                        } else {
+                            self.update(x - 1, N::U16 - y / 2 - 1, false, Probability::zero());
+                        }
+                    }
+                });
+            });
     }
 }
 
@@ -189,6 +273,35 @@ mod tests {
         for (x, y, top, expected) in test_cases {
             let wall = Wall::<U4>::new(x, y, top).unwrap();
             assert_eq!(wall.to_index(), expected);
+        }
+    }
+
+    #[test]
+    fn test_with_str() {
+        let input = "+---+---+
+|   |   |
++---+   +
+|       |
++---+---+";
+
+        type Size = U2;
+
+        let wall_manager = WallStorage::<Size>::with_str(Probability::new(0.1).unwrap(), input);
+
+        let walls = vec![
+            ((0, 0, false), false),
+            ((0, 0, true), true),
+            ((0, 1, false), true),
+            ((0, 1, true), true),
+            ((1, 0, false), true),
+            ((1, 0, true), false),
+            ((1, 1, false), true),
+            ((1, 1, true), true),
+        ];
+
+        for (wall, expected) in walls {
+            let wall = Wall::<Size>::new(wall.0, wall.1, wall.2).unwrap();
+            assert_eq!(wall_manager.exists(&wall), expected, "{:?}", wall);
         }
     }
 }
