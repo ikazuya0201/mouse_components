@@ -6,7 +6,7 @@ pub use crate::administrator::Selector as _components_administrator_Selector;
 pub use crate::operators::RunAgent as _components_operators_run_operator_RunAgent;
 pub use crate::operators::RunCommander as _components_operators_run_operator_RunCommander;
 pub use crate::operators::SearchAgent as _components_operators_search_operator_SearchAgent;
-pub use crate::operators::SearchCommander as _components_operators_search_operator_SearchSolver;
+pub use crate::operators::SearchCommander as _components_operators_search_operator_SearchCommander;
 
 pub use crate::solver::Converter as _components_solver_NodeConverter;
 pub use crate::solver::Graph as _components_solver_Graph;
