@@ -35,7 +35,6 @@ proptest-derive = "0.2.0"
 utils = { path = "./utils" }
 
 [features]
-log = []
 
 [[bench]]
 name = "search_operator"

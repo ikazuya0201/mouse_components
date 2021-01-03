@@ -106,7 +106,6 @@ where
     }
 
     fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error> {
-        #[cfg(feature = "log")]
         self.logger.log(&state, &target);
         let (left, right) = self.track_move(state, target)?;
         self.left_motor.apply(left);
@@ -961,7 +960,6 @@ mod tests {
         let _tracker = build_tracker(NullLogger);
     }
 
-    #[cfg(feature = "log")]
     mod log_tests {
         use super::*;
         use std::cell::RefCell;
@@ -992,7 +990,7 @@ mod tests {
             let state = State::default();
             let target = Target::default();
             let mut tracker = build_tracker(ILogger::new(Rc::clone(&log)));
-            tracker.track(state.clone(), target.clone());
+            tracker.track(&state, &target);
             assert_eq!(log.borrow().as_ref(), format!("{:?},{:?}", state, target));
         }
     }
