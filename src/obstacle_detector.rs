@@ -110,7 +110,7 @@ mod tests {
                     y: Length::new::<meter>(0.015),
                     theta: Angle::new::<degree>(0.0),
                 },
-                Some( Sample{
+                Some(Sample{
                     mean: Length::new::<meter>(0.03),
                     standard_deviation,
                 }),
@@ -132,8 +132,7 @@ mod tests {
                 Some(Sample{
                     mean:Length::new::<meter>(0.02),
                     standard_deviation,
-                }
-                    ),
+                }),
             ),
         ];
         let expected = vec![

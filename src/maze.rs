@@ -45,7 +45,7 @@ pub enum Pattern {
 
 pub struct Maze<N, M>
 where
-    N: Mul<N> + Unsigned + PowerOfTwo,
+    N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<f32>,
 {

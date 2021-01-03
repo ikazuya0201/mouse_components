@@ -25,6 +25,7 @@ pub mod wall_manager;
 pub mod traits {
     use super::*;
 
+    pub use crate::utils::math::Math;
     pub use administrator::{Atomic, Operator, OperatorStore, SelectMode, Selector};
     pub use agent::{
         ObstacleDetector, RunTrajectoryGenerator, SearchTrajectoryGenerator, StateEstimator,
@@ -33,7 +34,6 @@ pub mod traits {
     pub use operators::{RunAgent, RunCommander, SearchAgent, SearchCommander};
     pub use solver::{Converter, ObstacleInterpreter};
     pub use tracker::{Logger, RotationController, TranslationController};
-    pub use utils::math::Math;
 }
 
 pub mod sensors {

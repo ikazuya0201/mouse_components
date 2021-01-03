@@ -30,6 +30,14 @@ impl Probability {
     pub fn reverse(&self) -> Self {
         Probability(1.0 - self.0)
     }
+
+    pub fn is_one(&self) -> bool {
+        self.0 == 1.0
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
 }
 
 impl Default for Probability {
@@ -43,6 +51,12 @@ impl core::convert::TryFrom<f32> for Probability {
 
     fn try_from(value: f32) -> Result<Self, Self::Error> {
         Self::new(value)
+    }
+}
+
+impl From<Probability> for f32 {
+    fn from(value: Probability) -> Self {
+        value.0
     }
 }
 

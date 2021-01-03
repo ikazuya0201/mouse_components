@@ -105,6 +105,18 @@ impl<Node, Nodes, SearchNode, Max, Maze, ConverterType>
     }
 }
 
+impl<Node, Nodes, SearchNode, Max, Maze, ConverterType> core::fmt::Debug
+    for Commander<Node, Nodes, SearchNode, Max, Maze, ConverterType>
+where
+    Maze: core::fmt::Debug,
+    SearchNode: core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(f, "candidates: {:?}", self.candidates.borrow())?;
+        writeln!(f, "maze: {:?}", &self.maze)
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum CommanderError {
     WaitingError,
@@ -143,8 +155,8 @@ where
         + GraphConverter<Node>
         + ObstacleInterpreter<Obstacle>
         + NodeChecker<<Maze as GraphConverter<Node>>::SearchNode>,
-    ConverterType: NodeConverter<<Maze as GraphConverter<Node>>::SearchNode>,
-    <ConverterType as NodeConverter<Maze::SearchNode>>::Error: core::fmt::Debug,
+    ConverterType: NodeConverter<Maze::SearchNode>,
+    ConverterType::Error: core::fmt::Debug,
     <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
 {
     type Error = CommanderError;
