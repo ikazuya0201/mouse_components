@@ -313,9 +313,9 @@ where
     }
 }
 
-impl<N> Into<Wall<N>> for SearchNode<N> {
-    fn into(self) -> Wall<N> {
-        unsafe { Wall::new_unchecked(self.x() / 2, self.y() / 2, self.x() & 1 == 1) }
+impl<N> From<SearchNode<N>> for Wall<N> {
+    fn from(value: SearchNode<N>) -> Self {
+        unsafe { Wall::new_unchecked(value.x() / 2, value.y() / 2, value.x() & 1 == 0) }
     }
 }
 
@@ -1488,6 +1488,31 @@ mod tests {
                 dst: dst.clone(),
             });
             assert_eq!(src.route(&dst), expected);
+        }
+    }
+
+    #[test]
+    fn test_search_node_into_wall() {
+        use AbsoluteDirection::*;
+
+        type Size = U4;
+
+        fn cost(_pattern: Pattern) -> u16 {
+            unreachable!()
+        }
+
+        let test_cases = vec![
+            ((1, 0, East), (0, 0, false)),
+            ((0, 1, North), (0, 0, true)),
+            ((1, 0, West), (0, 0, false)),
+            ((2, 1, South), (1, 0, true)),
+            ((3, 2, East), (1, 1, false)),
+        ];
+
+        for (node, expected) in test_cases {
+            let node = SearchNode::<Size>::new(node.0, node.1, node.2, cost).unwrap();
+            let expected = Wall::<Size>::new(expected.0, expected.1, expected.2).unwrap();
+            assert_eq!(Wall::from(node), expected);
         }
     }
 }
