@@ -25,13 +25,23 @@ pub enum Pattern {
 }
 
 //TODO: Create new data type to reduce copy cost.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Node<N> {
     x: i16,
     y: i16,
     direction: AbsoluteDirection,
     cost: fn(Pattern) -> u16,
     _maze_width: PhantomData<fn() -> N>,
+}
+
+impl<N> core::fmt::Debug for Node<N> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "Node{{ x:{}, y:{}, direction:{:?} }}",
+            self.x, self.y, self.direction
+        )
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
