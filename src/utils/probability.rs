@@ -30,6 +30,14 @@ impl Probability {
     pub fn reverse(&self) -> Self {
         Probability(1.0 - self.0)
     }
+
+    pub fn is_one(&self) -> bool {
+        self.0 == 1.0
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
 }
 
 impl Default for Probability {
