@@ -7,14 +7,19 @@ pub struct NotFinishError;
 
 pub trait Operator {
     type Mode;
+    type Error;
 
     fn init(&self);
-    fn tick(&self);
+    fn tick(&self) -> Result<(), Self::Error>;
     fn run(&self) -> Result<Self::Mode, NotFinishError>;
 }
 
+//TODO: Remove this trait.
 pub trait OperatorStore<Mode> {
-    fn get_operator(&self, mode: Mode) -> Rc<dyn Operator<Mode = Mode>>;
+    fn get_operator(
+        &self,
+        mode: Mode,
+    ) -> Rc<dyn Operator<Mode = Mode, Error = core::convert::Infallible>>;
 }
 
 pub trait Atomic<T> {
@@ -59,7 +64,7 @@ where
     pub fn tick(&self) {
         match self.mode.load(Ordering::Relaxed) {
             SelectMode::Select => return,
-            SelectMode::Other(mode) => self.store.get_operator(mode).tick(),
+            SelectMode::Other(mode) => self.store.get_operator(mode).tick().unwrap(),
         }
         if self.selector.is_enabled() {
             self.mode.store(SelectMode::Select, Ordering::Relaxed);

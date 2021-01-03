@@ -43,6 +43,7 @@ where
     Commander: RunCommander,
     Commander::Error: core::fmt::Debug,
 {
+    type Error = core::convert::Infallible;
     type Mode = Mode;
 
     fn init(&self) {
@@ -55,10 +56,11 @@ where
     }
 
     //TODO: correct agent position by sensor value and wall existence
-    fn tick(&self) {
+    fn tick(&self) -> Result<(), Self::Error> {
         if self.agent.track_next().is_err() {
             self.is_completed.store(true, Ordering::Relaxed);
         }
+        Ok(())
     }
 
     fn run(&self) -> Result<Mode, NotFinishError> {

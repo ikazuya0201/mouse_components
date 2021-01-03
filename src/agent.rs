@@ -28,8 +28,10 @@ pub trait SearchTrajectoryGenerator<Pose, Kind> {
 }
 
 pub trait Tracker<State, Target> {
+    type Error;
+
     fn init(&mut self);
-    fn track(&mut self, state: &State, target: &Target);
+    fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error>;
     fn stop(&mut self);
 }
 
@@ -164,7 +166,7 @@ where
     ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Kind>,
     MaxLength: ArrayLength<ITrajectoryGenerator::Trajectory>,
 {
-    type Error = ();
+    type Error = ITracker::Error;
     type Obstacle = IObstacleDetector::Obstacle;
     type Obstacles = IObstacleDetector::Obstacles;
 
@@ -200,7 +202,7 @@ where
             }
         };
         if let Some(target) = target {
-            self.tracker.borrow_mut().track(&state, &target);
+            self.tracker.borrow_mut().track(&state, &target)?;
             self.last_target.set(Some(target));
         }
         Ok(())
@@ -225,6 +227,7 @@ where
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
+    ITracker::Error: core::fmt::Debug,
     ITrajectoryGenerator: RunTrajectoryGenerator<Command>,
     MaxLength: ArrayLength<ITrajectoryGenerator::Trajectory>,
 {
@@ -247,7 +250,12 @@ where
             let trajectory = trajectories.iter_mut().next().unwrap();
             if let Some(target) = trajectory.next() {
                 let state = self.state_estimator.borrow_mut().estimate();
-                self.tracker.borrow_mut().track(&state, &target);
+                self.tracker
+                    .borrow_mut()
+                    .track(&state, &target)
+                    .unwrap_or_else(|err| {
+                        unimplemented!("This error handling is unimplemented: {:?}", err)
+                    });
                 return Ok(());
             }
             trajectories.dequeue();
