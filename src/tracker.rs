@@ -990,7 +990,7 @@ mod tests {
             let state = State::default();
             let target = Target::default();
             let mut tracker = build_tracker(ILogger::new(Rc::clone(&log)));
-            tracker.track(&state, &target);
+            tracker.track(&state, &target).unwrap();
             assert_eq!(log.borrow().as_ref(), format!("{:?},{:?}", state, target));
         }
     }
