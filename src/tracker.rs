@@ -13,7 +13,7 @@ use uom::si::{
 };
 use uom::{typenum::*, Kind};
 
-use super::agent;
+use super::agent::Tracker as ITracker;
 use super::trajectory_generator::Target;
 use crate::traits::Math;
 pub use state::{AngleState, LengthState, State};
@@ -74,7 +74,13 @@ pub struct Tracker<
     _phantom: PhantomData<fn() -> M>,
 }
 
-impl<LM, RM, M, TC, RC, L> agent::Tracker<State, Target> for Tracker<LM, RM, M, TC, RC, L>
+#[derive(Clone, PartialEq, Debug)]
+pub struct FailSafeError {
+    state: State,
+    target: Target,
+}
+
+impl<LM, RM, M, TC, RC, L> ITracker<State, Target> for Tracker<LM, RM, M, TC, RC, L>
 where
     LM: Motor,
     RM: Motor,
@@ -83,6 +89,8 @@ where
     L: Logger,
     M: Math,
 {
+    type Error = FailSafeError;
+
     fn stop(&mut self)
     where
         LM: Motor,
@@ -97,12 +105,13 @@ where
         self.rotation_controller.init();
     }
 
-    fn track(&mut self, state: &State, target: &Target) {
+    fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error> {
         #[cfg(feature = "log")]
         self.logger.log(&state, &target);
-        let (left, right) = self.track_move(state, target);
+        let (left, right) = self.track_move(state, target)?;
         self.left_motor.apply(left);
         self.right_motor.apply(right);
+        Ok(())
     }
 }
 
@@ -121,16 +130,18 @@ where
         xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
     }
 
-    fn fail_safe(&mut self, state: &State, target: &Target) {
-        use agent::Tracker;
-
+    fn fail_safe(&mut self, state: &State, target: &Target) -> Result<(), FailSafeError> {
         let x_diff = state.x.x - target.x.x;
         let y_diff = state.y.x - target.y.x;
 
         let distance = M::sqrt(x_diff * x_diff + y_diff * y_diff);
         if distance >= self.fail_safe_distance {
-            self.stop();
-            panic!("state: {:?}, target: {:?}", state, target);
+            Err(FailSafeError {
+                state: state.clone(),
+                target: target.clone(),
+            })
+        } else {
+            Ok(())
         }
     }
 
@@ -138,8 +149,8 @@ where
         &mut self,
         state: &State,
         target: &Target,
-    ) -> (ElectricPotential, ElectricPotential) {
-        self.fail_safe(state, target);
+    ) -> Result<(ElectricPotential, ElectricPotential), FailSafeError> {
+        self.fail_safe(state, target)?;
 
         let (sin_th, cos_th) = M::sincos(state.theta.x);
 
@@ -193,7 +204,7 @@ where
         let vol_w = self
             .rotation_controller
             .calculate(uw, duw, state.theta.v, state.theta.a);
-        (vol_v - vol_w, vol_v + vol_w)
+        Ok((vol_v - vol_w, vol_v + vol_w))
     }
 }
 

@@ -61,21 +61,20 @@ impl<Mode, Obstacle, Agent, Solver> Operator for SearchOperator<Mode, Obstacle, 
 where
     Mode: Copy,
     Agent: SearchAgent<Solver::Command, Obstacle = Obstacle>,
-    Agent::Error: core::fmt::Debug,
     Solver: SearchCommander<Obstacle>,
     Solver::Error: TryInto<FinishError>,
 {
+    type Error = Agent::Error;
     type Mode = Mode;
 
     fn init(&self) {
         self.agent.set_command(&self.start_command);
     }
 
-    fn tick(&self) {
+    fn tick(&self) -> Result<(), Self::Error> {
         let obstacles = self.agent.get_obstacles();
         self.solver.update_obstacles(obstacles);
-        //TODO: implement error handling
-        self.agent.track_next().unwrap();
+        self.agent.track_next()
     }
 
     fn run(&self) -> Result<Mode, NotFinishError> {

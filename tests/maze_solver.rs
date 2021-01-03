@@ -357,7 +357,7 @@ macro_rules! search_tests {
                 );
 
                 while operator.run().is_err() {
-                    operator.tick();
+                    operator.tick().expect("Should never panic.");
                 }
                 assert_eq!(
                     solver.compute_shortest_path(),
