@@ -273,6 +273,10 @@ where
         for obstacle in obstacles {
             if let Ok(wall_info) = self.pose_converter.convert(&obstacle.source) {
                 if let Ok(existence) = self.manager.try_existence_probability(&wall_info.wall) {
+                    if existence.is_zero() || existence.is_one() {
+                        continue;
+                    }
+
                     let exist_val = {
                         let tmp = ((wall_info.existing_distance - obstacle.distance.mean)
                             / obstacle.distance.standard_deviation)
