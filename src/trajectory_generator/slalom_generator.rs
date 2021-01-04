@@ -133,7 +133,6 @@ where
     }
 }
 
-#[derive(Clone)]
 pub struct CurveTrajectory<M> {
     angle_calculator: AngleOverallCalculator,
     t: Time,
@@ -143,6 +142,21 @@ pub struct CurveTrajectory<M> {
     y: Length,
     v: Velocity,
     _phantom: PhantomData<fn() -> M>,
+}
+
+impl<M> Clone for CurveTrajectory<M> {
+    fn clone(&self) -> Self {
+        Self {
+            angle_calculator: self.angle_calculator.clone(),
+            t: self.t.clone(),
+            t_end: self.t_end.clone(),
+            period: self.period.clone(),
+            x: self.x.clone(),
+            y: self.y.clone(),
+            v: self.v.clone(),
+            _phantom: PhantomData,
+        }
+    }
 }
 
 impl<M> CurveTrajectory<M> {

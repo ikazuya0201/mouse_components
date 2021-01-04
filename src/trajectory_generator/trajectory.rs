@@ -30,11 +30,23 @@ pub struct AngleTarget {
     pub j: AngularJerk,
 }
 
-#[derive(Clone)]
 pub struct ShiftTrajectory<T, M> {
     pose: Pose,
     inner: T,
     _math: PhantomData<fn() -> M>,
+}
+
+impl<T, M> Clone for ShiftTrajectory<T, M>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            pose: self.pose.clone(),
+            inner: self.inner.clone(),
+            _math: PhantomData,
+        }
+    }
 }
 
 impl<T, M> ShiftTrajectory<T, M> {
