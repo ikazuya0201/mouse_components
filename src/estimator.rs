@@ -42,6 +42,7 @@ pub struct Estimator<LE, RE, I, M> {
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
+    state: State,
     _phantom: PhantomData<fn() -> M>,
 }
 
@@ -81,7 +82,11 @@ where
         self.bias = Default::default();
     }
 
-    fn estimate(&mut self) -> State {
+    fn state(&self) -> State {
+        self.state.clone()
+    }
+
+    fn estimate(&mut self) {
         //velocity estimation
         let left_distance = block!(self.left_encoder.get_relative_distance()).unwrap();
         let right_distance = block!(self.right_encoder.get_relative_distance()).unwrap();
@@ -110,12 +115,13 @@ where
 
         //pose estimation
         let trans_distance = trans_velocity * self.period;
-        let middle_theta = self.theta + Angle::from(angular_velocity * self.period / 2.0);
+        let angle = Angle::from(angular_velocity * self.period);
+        let middle_theta = self.theta + angle / 2.0;
         let (sin_mth, cos_mth) = M::sincos(middle_theta);
         self.x += trans_distance * cos_mth;
         self.y += trans_distance * sin_mth;
 
-        self.theta += Angle::from(angular_velocity * self.period);
+        self.theta += angle;
         //------
 
         let (sin_th, cos_th) = M::sincos(self.theta);
@@ -124,12 +130,13 @@ where
         let ax = trans_acceleration * cos_th;
         let ay = trans_acceleration * sin_th;
 
-        let angular_acceleration = (angular_velocity - self.angular_velocity) / self.period;
+        let angular_acceleration =
+            AngularAcceleration::from((angular_velocity - self.angular_velocity) / self.period);
 
         self.trans_velocity = trans_velocity;
         self.angular_velocity = angular_velocity;
 
-        State {
+        self.state = State {
             x: LengthState {
                 x: self.x,
                 v: vx,
@@ -143,9 +150,9 @@ where
             theta: AngleState {
                 x: self.theta,
                 v: angular_velocity,
-                a: AngularAcceleration::from(angular_acceleration),
+                a: angular_acceleration,
             },
-        }
+        };
     }
 }
 
@@ -159,6 +166,25 @@ pub struct EstimatorBuilder<LE, RE, I, P, COF, POS, X, Y, WI> {
     initial_x: X,
     initial_y: Y,
     wheel_interval: WI,
+}
+
+impl<LE, RE, I, P, COF, POS, X, Y, WI> EstimatorBuilder<LE, RE, I, P, COF, POS, X, Y, WI> {
+    fn initial_state(x: Length, y: Length, theta: Angle) -> State {
+        State {
+            x: LengthState {
+                x,
+                ..Default::default()
+            },
+            y: LengthState {
+                x: y,
+                ..Default::default()
+            },
+            theta: AngleState {
+                x: theta,
+                ..Default::default()
+            },
+        }
+    }
 }
 
 impl EstimatorBuilder<(), (), (), (), (), (), (), (), ()> {
@@ -177,40 +203,6 @@ impl EstimatorBuilder<(), (), (), (), (), (), (), (), ()> {
     }
 }
 
-impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, Angle, (), (), Length>
-where
-    LE: Encoder,
-    RE: Encoder,
-    I: IMU,
-{
-    pub fn build<M>(self) -> Estimator<LE, RE, I, M>
-    where
-        M: Math,
-    {
-        let alpha = 1.0
-            / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
-                + 1.0);
-        Estimator {
-            initial_x: Default::default(),
-            initial_y: Default::default(),
-            initial_theta: self.initial_posture,
-            x: Default::default(),
-            y: Default::default(),
-            theta: self.initial_posture,
-            period: self.period,
-            alpha,
-            trans_velocity: Default::default(),
-            angular_velocity: Default::default(),
-            left_encoder: self.left_encoder,
-            right_encoder: self.right_encoder,
-            imu: self.imu,
-            bias: Default::default(),
-            wheel_interval: self.wheel_interval,
-            _phantom: PhantomData,
-        }
-    }
-}
-
 impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, Angle, Length, Length, Length>
 where
     LE: Encoder,
@@ -224,6 +216,9 @@ where
         let alpha = 1.0
             / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
                 + 1.0);
+
+        let state = Self::initial_state(self.initial_x, self.initial_y, self.initial_posture);
+
         Estimator {
             initial_x: self.initial_x,
             initial_y: self.initial_y,
@@ -240,6 +235,7 @@ where
             imu: self.imu,
             bias: Default::default(),
             wheel_interval: self.wheel_interval,
+            state,
             _phantom: PhantomData,
         }
     }
@@ -258,6 +254,9 @@ where
         let alpha = 1.0
             / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
                 + 1.0);
+
+        let state = Self::initial_state(Default::default(), Default::default(), Default::default());
+
         Estimator {
             initial_x: Default::default(),
             initial_y: Default::default(),
@@ -274,6 +273,7 @@ where
             imu: self.imu,
             bias: Default::default(),
             wheel_interval: self.wheel_interval,
+            state,
             _phantom: PhantomData,
         }
     }
@@ -577,9 +577,10 @@ mod tests {
             let current = self.inner.borrow().current.clone();
             let prev = self.inner.borrow().prev.clone();
             let angle = current.theta.x - prev.theta.x;
-            let x = (current.x.x - prev.x.x).get::<meter>();
-            let y = (current.y.x - prev.y.x).get::<meter>();
-            let d = Length::new::<meter>((x * x + y * y).sqrt());
+            let xd = current.x.x - prev.x.x;
+            let yd = current.y.x - prev.y.x;
+            let middle_angle = (current.theta.x + prev.theta.x) / 2.0;
+            let d = xd * MathFake::cos(middle_angle) + yd * MathFake::sin(middle_angle);
             match self.direction {
                 Direction::Right => Ok(d + self.wheel_interval * angle / 2.0),
                 Direction::Left => Ok(d - self.wheel_interval * angle / 2.0),
@@ -656,7 +657,8 @@ mod tests {
                         .build::<MathFake>();
 
                     while let Ok(expected_state) = simulator.step() {
-                        let estimated_state = estimator.estimate();
+                        estimator.estimate();
+                        let estimated_state = estimator.state();
                         assert_abs_diff_eq!(expected_state, estimated_state, epsilon = EPSILON);
                     }
                 }

@@ -9,6 +9,8 @@ pub trait SearchAgent<Command> {
     type Obstacle;
     type Obstacles: IntoIterator<Item = Self::Obstacle>;
 
+    //update estimated state
+    fn update_state(&self);
     fn set_command(&self, command: &Command);
     fn get_obstacles(&self) -> Self::Obstacles;
     //This method is called by interrupt.
@@ -72,6 +74,7 @@ where
     }
 
     fn tick(&self) -> Result<(), Self::Error> {
+        self.agent.update_state();
         let obstacles = self.agent.get_obstacles();
         self.solver.update_obstacles(obstacles);
         self.agent.track_next()
