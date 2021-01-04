@@ -204,7 +204,7 @@ where
         };
         let (trajectory, terminal_velocity) = match kind {
             RunKind::Straight(len) => {
-                let distance = *len as f32 * Length::new::<meter>(0.045);
+                let distance = *len as f32 * Length::new::<meter>(0.09);
                 generate_straight(distance)
             }
             RunKind::StraightDiagonal(len) => {
