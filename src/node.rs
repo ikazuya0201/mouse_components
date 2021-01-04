@@ -6,7 +6,7 @@ use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use crate::commander::RouteNode;
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
-use crate::simple_maze::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
+use crate::simple_maze::{BoundedNode, GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generator::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
@@ -406,10 +406,19 @@ impl<N> WallSpaceNode for SearchNode<N> {
     type Wall = Wall<N>;
 }
 
+impl<N> BoundedNode for SearchNode<N>
+where
+    N: Mul<N>,
+    N::Output: Mul<U4>,
+{
+    type NodeNum = <N::Output as Mul<U4>>::Output;
+}
+
 impl<N> GraphNode for SearchNode<N>
 where
     N: Unsigned + PowerOfTwo,
 {
+    type NeighborNum = U4;
     type Cost = u16;
     type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Cost)>, U2>;
     type WallNodesList = Vec<Self::WallNodes, U4>;
@@ -840,6 +849,7 @@ where
     N::Output: Add<U10>,
     <N::Output as Add<U10>>::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
 {
+    type NeighborNum = <N::Output as Add<U10>>::Output;
     type Cost = u16;
     type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Cost)>, <N::Output as Add<U10>>::Output>;
     type WallNodesList = Vec<Self::WallNodes, U3>;
