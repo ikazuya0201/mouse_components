@@ -77,6 +77,7 @@ impl<N: Unsigned + PowerOfTwo> Wall<N> {
     }
 }
 
+#[derive(Clone)]
 pub struct WallStorage<N>
 where
     N: Mul<N>,
