@@ -1,0 +1,290 @@
+extern crate alloc;
+
+#[macro_use]
+extern crate typenum;
+
+use alloc::rc::Rc;
+use core::f32::consts::PI;
+
+use components::{
+    commander::Commander,
+    data_types::{AbsoluteDirection, AngleState, LengthState, Pose, SearchKind, State},
+    defaults,
+    impls::{
+        slalom_parameters_map, Agent, EstimatorBuilder, ObstacleDetector,
+        RotationControllerBuilder, SearchOperator, TrackerBuilder, TrajectoryGeneratorBuilder,
+        TranslationControllerBuilder,
+    },
+    node::{Pattern, RunNode, SearchNode},
+    node_converter::NodeConverter,
+    pose_converter::PoseConverter,
+    prelude::*,
+    simple_maze::Maze,
+    utils::probability::Probability,
+    wall_converter::WallConverter,
+    wall_manager::WallStorage,
+};
+use typenum::consts::*;
+use uom::si::f32::{
+    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Frequency, Jerk,
+    Length, Time, Velocity,
+};
+use uom::si::{
+    acceleration::meter_per_second_squared,
+    angle::degree,
+    angular_acceleration::radian_per_second_squared,
+    angular_jerk::radian_per_second_cubed,
+    angular_velocity::radian_per_second,
+    frequency::hertz,
+    jerk::meter_per_second_cubed,
+    length::{meter, millimeter},
+    time::{millisecond, second},
+    velocity::meter_per_second,
+};
+use utils::math::MathFake;
+use utils::sensors::{AgentSimulator, DistanceSensor, Encoder, Motor, IMU};
+
+fn cost(pattern: Pattern) -> u16 {
+    use Pattern::*;
+
+    match pattern {
+        Straight(x) => 10 * x,
+        StraightDiagonal(x) => 7 * x,
+        Search90 => 8,
+        FastRun45 => 12,
+        FastRun90 => 15,
+        FastRun135 => 20,
+        FastRun180 => 25,
+        FastRunDiagonal90 => 15,
+        SpinBack => 15,
+    }
+}
+
+#[test]
+fn test_search_operator() {
+    type Size = U4;
+    type MaxPathLength = op!(Size * Size);
+
+    let start_state = State {
+        x: LengthState {
+            x: Length::new::<millimeter>(45.0),
+            ..Default::default()
+        },
+        y: LengthState {
+            x: Length::new::<millimeter>(45.0),
+            ..Default::default()
+        },
+        theta: AngleState {
+            x: Angle::new::<degree>(90.0),
+            ..Default::default()
+        },
+    };
+    let period = Time::new::<millisecond>(1.0);
+    let trans_model_gain = 1.0;
+    let trans_model_time_constant = Time::new::<second>(0.3694);
+    let rot_model_gain = 10.0;
+    let rot_model_time_constant = Time::new::<second>(0.1499);
+    let distance_sensors_poses = vec![
+        Pose {
+            x: Length::new::<millimeter>(0.0),
+            y: Length::new::<millimeter>(23.0),
+            theta: Angle::new::<degree>(0.0),
+        },
+        Pose {
+            x: Length::new::<millimeter>(8.0),
+            y: Length::new::<millimeter>(20.0),
+            theta: Angle::new::<degree>(-45.0),
+        },
+        Pose {
+            x: Length::new::<millimeter>(-8.0),
+            y: Length::new::<millimeter>(20.0),
+            theta: Angle::new::<degree>(45.0),
+        },
+        Pose {
+            x: Length::new::<millimeter>(-11.5),
+            y: Length::new::<millimeter>(13.0),
+            theta: Angle::new::<degree>(90.0),
+        },
+        Pose {
+            x: Length::new::<millimeter>(11.5),
+            y: Length::new::<millimeter>(13.0),
+            theta: Angle::new::<degree>(-90.0),
+        },
+    ];
+    let existence_threshold = Probability::new(0.1).unwrap();
+    let wheel_interval = Length::new::<millimeter>(33.5);
+
+    let input_str = "+---+---+---+---+
+|               |
++   +---+---+   +
+|   |       |   |
++   +   +   +   +
+|   |   |       |
++   +   +---+   +
+|   |       |   |
++---+---+---+---+";
+
+    let wall_storage = WallStorage::<Size>::with_str(existence_threshold, input_str);
+
+    let simulator = AgentSimulator::new(
+        start_state.clone(),
+        period,
+        trans_model_gain,
+        trans_model_time_constant,
+        rot_model_gain,
+        rot_model_time_constant,
+        wall_storage.clone(),
+        distance_sensors_poses,
+    );
+
+    let (
+        stepper,
+        _observer,
+        right_encoder,
+        left_encoder,
+        imu,
+        right_motor,
+        left_motor,
+        distance_sensors,
+    ) = simulator.split(wheel_interval);
+
+    type DistanceSensorNum = U5;
+
+    let agent: Rc<
+        defaults::Agent<
+            Encoder,
+            Encoder,
+            IMU,
+            Motor,
+            Motor,
+            DistanceSensor<Size>,
+            DistanceSensorNum,
+            MathFake,
+            MaxPathLength,
+            _,
+        >,
+    > = {
+        let estimator = {
+            EstimatorBuilder::new()
+                .left_encoder(left_encoder)
+                .right_encoder(right_encoder)
+                .imu(imu)
+                .period(period)
+                .cut_off_frequency(Frequency::new::<hertz>(50.0))
+                .initial_posture(start_state.theta.x)
+                .initial_x(start_state.x.x)
+                .initial_y(start_state.y.x)
+                .wheel_interval(wheel_interval)
+                .build::<MathFake>()
+        };
+
+        let tracker = {
+            let trans_controller = TranslationControllerBuilder::new()
+                .kp(0.9)
+                .ki(0.05)
+                .kd(0.01)
+                .period(period)
+                .model_gain(trans_model_gain)
+                .model_time_constant(trans_model_time_constant)
+                .build();
+
+            let rot_controller = RotationControllerBuilder::new()
+                .kp(0.2)
+                .ki(0.2)
+                .kd(0.0)
+                .period(period)
+                .model_gain(rot_model_gain)
+                .model_time_constant(rot_model_time_constant)
+                .build();
+
+            TrackerBuilder::new()
+                .right_motor(right_motor)
+                .left_motor(left_motor)
+                .period(period)
+                .kx(15.0)
+                .kdx(4.0)
+                .ky(15.0)
+                .kdy(4.0)
+                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
+                .translation_controller(trans_controller)
+                .rotation_controller(rot_controller)
+                .low_zeta(1.0)
+                .low_b(1e-3)
+                .fail_safe_distance(Length::new::<meter>(0.05))
+                .build::<MathFake>()
+        };
+
+        let search_velocity = Velocity::new::<meter_per_second>(0.12);
+
+        let trajectory_generator = TrajectoryGeneratorBuilder::new()
+            .period(period)
+            .max_velocity(Velocity::new::<meter_per_second>(2.0))
+            .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
+            .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
+            .search_velocity(search_velocity)
+            .slalom_parameters_map(slalom_parameters_map)
+            .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
+            .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
+                36.0 * PI,
+            ))
+            .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
+            .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
+            .build::<MathFake, MaxPathLength>();
+
+        let obstacle_detector = ObstacleDetector::<_, DistanceSensorNum>::new(distance_sensors);
+        Rc::new(Agent::new(
+            obstacle_detector,
+            estimator,
+            tracker,
+            trajectory_generator,
+        ))
+    };
+
+    use AbsoluteDirection::*;
+
+    let create_commander = |wall_storage| {
+        let pose_converter = PoseConverter::<Size, MathFake>::default();
+        let wall_converter = WallConverter::new(cost);
+        type RunNodeNum = op!(Size * Size * U16);
+        let maze = Maze::<_, _, _, MathFake>::new(wall_storage, pose_converter, wall_converter);
+        let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
+        let goals = vec![
+            RunNode::<Size>::new(2, 0, South, cost).unwrap(),
+            RunNode::<Size>::new(2, 0, West, cost).unwrap(),
+        ];
+        let search_start = SearchNode::<Size>::new(0, 1, North, cost).unwrap();
+        let node_converter = NodeConverter::default();
+        Rc::new(Commander::<_, _, _, RunNodeNum, _, _>::new(
+            start,
+            goals,
+            search_start,
+            maze,
+            node_converter,
+        ))
+    };
+
+    let commander = create_commander(WallStorage::<Size>::new(existence_threshold));
+    let expected_commander = create_commander(wall_storage);
+
+    let start_pose = Pose {
+        x: start_state.x.x,
+        y: start_state.y.x,
+        theta: start_state.theta.x,
+    };
+
+    let operator = SearchOperator::new(
+        (start_pose, SearchKind::Init),
+        (),
+        Rc::clone(&agent),
+        Rc::clone(&commander),
+    );
+    operator.init();
+    while operator.run().is_err() {
+        stepper.step();
+        assert!(!operator.tick().is_err());
+    }
+    assert_eq!(
+        commander.compute_shortest_path(),
+        expected_commander.compute_shortest_path()
+    );
+}

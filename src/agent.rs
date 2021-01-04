@@ -17,7 +17,8 @@ pub trait StateEstimator {
     type State;
 
     fn init(&mut self);
-    fn estimate(&mut self) -> Self::State;
+    fn estimate(&mut self);
+    fn state(&self) -> Self::State;
 }
 
 pub trait SearchTrajectoryGenerator<Pose, Kind> {
@@ -202,8 +203,12 @@ where
     type Obstacle = IObstacleDetector::Obstacle;
     type Obstacles = IObstacleDetector::Obstacles;
 
+    fn update_state(&self) {
+        self.state_estimator.borrow_mut().estimate();
+    }
+
     fn get_obstacles(&self) -> Self::Obstacles {
-        let state = self.state_estimator.borrow_mut().estimate();
+        let state = self.state_estimator.borrow().state();
         self.obstacle_detector.borrow_mut().detect(&state)
     }
 
@@ -216,7 +221,7 @@ where
     }
 
     fn track_next(&self) -> Result<(), Self::Error> {
-        let state = self.state_estimator.borrow_mut().estimate();
+        let state = self.state_estimator.borrow().state();
         let target = {
             if let Ok(mut trajectories) = self.trajectories.try_lock() {
                 loop {
@@ -281,7 +286,8 @@ where
             }
             let trajectory = trajectories.iter_mut().next().unwrap();
             if let Some(target) = trajectory.next() {
-                let state = self.state_estimator.borrow_mut().estimate();
+                self.state_estimator.borrow_mut().estimate();
+                let state = self.state_estimator.borrow().state();
                 self.tracker
                     .borrow_mut()
                     .track(&state, &target)

@@ -232,8 +232,14 @@ where
 }
 
 //TODO: Remove Copy
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct SearchNode<N>(Node<N>);
+
+impl<N> core::fmt::Debug for SearchNode<N> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(f, "RunNode({:?})", self.0)
+    }
+}
 
 impl<N> SearchNode<N> {
     pub unsafe fn new_unchecked(
@@ -509,8 +515,14 @@ impl<N: Clone> RouteNode for RunNode<N> {
 }
 
 //TODO: Create new data type to reduce copy cost.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct RunNode<N>(Node<N>);
+
+impl<N> core::fmt::Debug for RunNode<N> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(f, "RunNode({:?})", self.0)
+    }
+}
 
 impl<N> Into<usize> for RunNode<N>
 where
@@ -876,8 +888,8 @@ where
         use RelativeDirection::*;
 
         let mut walls = ForcedVec::new();
-        match self.0.location() {
-            Cell => {
+        match (self.0.location(), self.direction()) {
+            (Cell, _) => {
                 let mut add = |x: i16, y: i16| {
                     if let Ok(wall) = self.0.relative_wall(x, y, North) {
                         walls.push(wall);
@@ -910,7 +922,10 @@ where
                     _ => unreachable!(),
                 }
             }
-            HorizontalBound => {
+            (HorizontalBound, NorthEast)
+            | (HorizontalBound, SouthWest)
+            | (VerticalBound, SouthEast)
+            | (VerticalBound, NorthWest) => {
                 let mut add = |x: i16, y: i16| {
                     if let Ok(wall) = self.0.relative_wall(x, y, NorthEast) {
                         walls.push(wall);
@@ -929,10 +944,13 @@ where
                             add(dx, dx);
                         }
                     }
-                    _ => unreachable!(),
+                    _ => unreachable!("from: {:?}, to: {:?}", self, other),
                 }
             }
-            VerticalBound => {
+            (VerticalBound, NorthEast)
+            | (VerticalBound, SouthWest)
+            | (HorizontalBound, SouthEast)
+            | (HorizontalBound, NorthWest) => {
                 let mut add = |x: i16, y: i16| {
                     if let Ok(wall) = self.0.relative_wall(x, y, NorthEast) {
                         walls.push(wall);

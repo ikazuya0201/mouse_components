@@ -222,6 +222,8 @@ where
     type Obstacle = Obstacle;
     type Obstacles = Vec<Self::Obstacle>;
 
+    fn update_state(&self) {}
+
     fn get_obstacles(&self) -> Self::Obstacles {
         let current = self.current.borrow().to_node();
         let relative = |x: i16, y: i16| {
