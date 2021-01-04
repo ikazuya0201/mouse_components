@@ -12,7 +12,7 @@ use components::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
     },
     utils::{array_length::ArrayLength, probability::Probability, sample::Sample},
-    wall_manager::WallStorage,
+    wall_manager::WallManager,
 };
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 use uom::si::f32::{
@@ -33,7 +33,7 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
 {
     inner: Rc<RefCell<AgentSimulatorInner>>,
-    wall_storage: Rc<WallStorage<N>>,
+    wall_storage: Rc<WallManager<N>>,
     distance_sensors_poses: Vec<Pose>,
 }
 
@@ -50,7 +50,7 @@ where
         trans_model_time_constant: Time,
         rot_model_gain: f32,
         rot_model_time_constant: Time,
-        wall_storage: WallStorage<N>,
+        wall_storage: WallManager<N>,
         distance_sensors_poses: Vec<Pose>,
     ) -> Self {
         Self {
@@ -316,7 +316,7 @@ where
 {
     inner: Rc<RefCell<AgentSimulatorInner>>,
     pose: Pose,
-    wall_storage: Rc<WallStorage<N>>,
+    wall_storage: Rc<WallManager<N>>,
     pose_converter: PoseConverter<N, MathFake>,
 }
 

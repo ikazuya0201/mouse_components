@@ -22,7 +22,7 @@ use components::{
     simple_maze::Maze,
     utils::probability::Probability,
     wall_converter::WallConverter,
-    wall_manager::WallStorage,
+    wall_manager::WallManager,
 };
 use typenum::consts::*;
 use uom::si::f32::{
@@ -124,7 +124,7 @@ fn test_search_operator() {
 |   |       |   |
 +---+---+---+---+";
 
-    let wall_storage = WallStorage::<Size>::with_str(existence_threshold, input_str);
+    let wall_storage = WallManager::<Size>::with_str(existence_threshold, input_str);
 
     let simulator = AgentSimulator::new(
         start_state.clone(),
@@ -263,7 +263,7 @@ fn test_search_operator() {
         ))
     };
 
-    let commander = create_commander(WallStorage::<Size>::new(existence_threshold));
+    let commander = create_commander(WallManager::<Size>::new(existence_threshold));
     let expected_commander = create_commander(wall_storage);
 
     let start_pose = Pose {
