@@ -173,7 +173,7 @@ where
             target.y.j + self.kdy * (target.y.a - state.y.a) + self.ky * (target.y.v - state.y.v);
 
         let dxi = ux * cos_th + uy * sin_th;
-        let (uv, uw, duv, duw) = if self.xi > self.xi_threshold {
+        let (uv, uw, duv, duw) = if self.xi.abs() > self.xi_threshold {
             let uv = self.xi;
             let uw = AngularVelocity::from((uy * cos_th - ux * sin_th) / self.xi);
             let duv = dxi;
