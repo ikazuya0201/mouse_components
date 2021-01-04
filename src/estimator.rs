@@ -27,12 +27,6 @@ pub trait Encoder {
 }
 
 pub struct Estimator<LE, RE, I, M> {
-    initial_x: Length,
-    initial_y: Length,
-    initial_theta: Angle,
-    x: Length,
-    y: Length,
-    theta: Angle,
     period: Time,
     alpha: f32,
     trans_velocity: Velocity,
@@ -42,6 +36,7 @@ pub struct Estimator<LE, RE, I, M> {
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
+    initial_state: State,
     state: State,
     _phantom: PhantomData<fn() -> M>,
 }
@@ -50,13 +45,8 @@ impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(
             f,
-            "Estimator {{ x:{:?}, y:{:?}, theta:{:?}, trans_velocity:{:?}, angular_velocity:{:?}, bias:{:?} }}", 
-            self.x,
-            self.y,
-            self.theta,
-            self.trans_velocity,
-            self.angular_velocity,
-            self.bias,
+            "Estimator {{ state:{:?}, trans_velocity:{:?}, angular_velocity:{:?}, bias:{:?} }}",
+            self.state, self.trans_velocity, self.angular_velocity, self.bias,
         )
     }
 }
@@ -74,9 +64,7 @@ where
     type State = State;
 
     fn init(&mut self) {
-        self.x = self.initial_x;
-        self.y = self.initial_y;
-        self.theta = self.initial_theta;
+        self.state = self.initial_state.clone();
         self.trans_velocity = Default::default();
         self.angular_velocity = Default::default();
         self.bias = Default::default();
@@ -116,43 +104,26 @@ where
         //pose estimation
         let trans_distance = trans_velocity * self.period;
         let angle = Angle::from(angular_velocity * self.period);
-        let middle_theta = self.theta + angle / 2.0;
+        let middle_theta = self.state.theta.x + angle / 2.0;
         let (sin_mth, cos_mth) = M::sincos(middle_theta);
-        self.x += trans_distance * cos_mth;
-        self.y += trans_distance * sin_mth;
+        self.state.x.x += trans_distance * cos_mth;
+        self.state.y.x += trans_distance * sin_mth;
 
-        self.theta += angle;
+        self.state.theta.x += angle;
         //------
 
-        let (sin_th, cos_th) = M::sincos(self.theta);
-        let vx = trans_velocity * cos_th;
-        let vy = trans_velocity * sin_th;
-        let ax = trans_acceleration * cos_th;
-        let ay = trans_acceleration * sin_th;
+        let (sin_th, cos_th) = M::sincos(self.state.theta.x);
+        self.state.x.v = trans_velocity * cos_th;
+        self.state.y.v = trans_velocity * sin_th;
+        self.state.x.a = trans_acceleration * cos_th;
+        self.state.y.a = trans_acceleration * sin_th;
 
-        let angular_acceleration =
+        self.state.theta.v = angular_velocity;
+        self.state.theta.a =
             AngularAcceleration::from((angular_velocity - self.angular_velocity) / self.period);
 
         self.trans_velocity = trans_velocity;
         self.angular_velocity = angular_velocity;
-
-        self.state = State {
-            x: LengthState {
-                x: self.x,
-                v: vx,
-                a: ax,
-            },
-            y: LengthState {
-                x: self.y,
-                v: vy,
-                a: ay,
-            },
-            theta: AngleState {
-                x: self.theta,
-                v: angular_velocity,
-                a: angular_acceleration,
-            },
-        };
     }
 }
 
@@ -220,12 +191,6 @@ where
         let state = Self::initial_state(self.initial_x, self.initial_y, self.initial_posture);
 
         Estimator {
-            initial_x: self.initial_x,
-            initial_y: self.initial_y,
-            initial_theta: self.initial_posture,
-            x: self.initial_x,
-            y: self.initial_y,
-            theta: self.initial_posture,
             period: self.period,
             alpha,
             trans_velocity: Default::default(),
@@ -235,6 +200,7 @@ where
             imu: self.imu,
             bias: Default::default(),
             wheel_interval: self.wheel_interval,
+            initial_state: state.clone(),
             state,
             _phantom: PhantomData,
         }
@@ -258,12 +224,6 @@ where
         let state = Self::initial_state(Default::default(), Default::default(), Default::default());
 
         Estimator {
-            initial_x: Default::default(),
-            initial_y: Default::default(),
-            initial_theta: Default::default(),
-            x: Default::default(),
-            y: Default::default(),
-            theta: Default::default(),
             period: self.period,
             alpha,
             trans_velocity: Default::default(),
@@ -273,6 +233,7 @@ where
             imu: self.imu,
             bias: Default::default(),
             wheel_interval: self.wheel_interval,
+            initial_state: state.clone(),
             state,
             _phantom: PhantomData,
         }
