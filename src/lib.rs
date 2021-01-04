@@ -66,7 +66,7 @@ pub mod impls {
     use super::*;
 
     pub use administrator::Administrator;
-    pub use agent::Agent;
+    pub use agent::{RunAgent, SearchAgent};
     pub use controller::{
         RotationController, RotationControllerBuilder, TranslationController,
         TranslationControllerBuilder,
@@ -85,7 +85,7 @@ pub mod impls {
 pub mod defaults {
     use super::*;
 
-    pub type Agent<
+    pub type SearchAgent<
         LeftEncoder,
         RightEncoder,
         Imu,
@@ -96,7 +96,7 @@ pub mod defaults {
         Math,
         MaxPathLength,
         Logger = impls::NullLogger,
-    > = impls::Agent<
+    > = impls::SearchAgent<
         impls::ObstacleDetector<DistanceSensor, DistanceSensorNum>,
         impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
         impls::Tracker<
@@ -116,6 +116,35 @@ pub mod defaults {
             data_types::Pose,
             data_types::SearchKind,
         >>::Target,
+    >;
+
+    pub type RunAgent<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        DistanceSensorNum,
+        Math,
+        MaxPathLength,
+        Logger = impls::NullLogger,
+    > = impls::RunAgent<
+        impls::ObstacleDetector<DistanceSensor, DistanceSensorNum>,
+        impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
+        impls::Tracker<
+            LeftMotor,
+            RightMotor,
+            Math,
+            impls::TranslationController,
+            impls::RotationController,
+            Logger,
+        >,
+        impls::TrajectoryGenerator<Math, MaxPathLength>,
+        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::SearchTrajectoryGenerator<
+            data_types::Pose,
+            data_types::SearchKind,
+        >>::Trajectory,
         MaxPathLength,
     >;
 
@@ -144,7 +173,7 @@ pub mod defaults {
     > = impls::SearchOperator<
         Mode,
         data_types::Obstacle,
-        Agent<
+        SearchAgent<
             LeftEncoder,
             RightEncoder,
             Imu,

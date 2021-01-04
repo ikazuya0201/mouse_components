@@ -11,8 +11,8 @@ use components::{
     data_types::{AbsoluteDirection, AngleState, LengthState, Pose, SearchKind, State},
     defaults,
     impls::{
-        slalom_parameters_map, Agent, EstimatorBuilder, ObstacleDetector,
-        RotationControllerBuilder, SearchOperator, TrackerBuilder, TrajectoryGeneratorBuilder,
+        slalom_parameters_map, EstimatorBuilder, ObstacleDetector, RotationControllerBuilder,
+        SearchAgent, SearchOperator, TrackerBuilder, TrajectoryGeneratorBuilder,
         TranslationControllerBuilder,
     },
     node::{Pattern, RunNode, SearchNode},
@@ -151,7 +151,7 @@ fn test_search_operator() {
     type DistanceSensorNum = U5;
 
     let agent: Rc<
-        defaults::Agent<
+        defaults::SearchAgent<
             Encoder,
             Encoder,
             IMU,
@@ -232,7 +232,7 @@ fn test_search_operator() {
             .build::<MathFake, MaxPathLength>();
 
         let obstacle_detector = ObstacleDetector::<_, DistanceSensorNum>::new(distance_sensors);
-        Rc::new(Agent::new(
+        Rc::new(SearchAgent::new(
             obstacle_detector,
             estimator,
             tracker,
