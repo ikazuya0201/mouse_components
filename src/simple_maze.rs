@@ -67,7 +67,12 @@ pub trait WallSpaceNode {
     type Wall;
 }
 
+pub trait BoundedNode {
+    type NodeNum;
+}
+
 pub trait GraphNode: Sized + WallSpaceNode {
+    type NeighborNum;
     type Cost;
     type WallNodes: IntoIterator<Item = WallNode<Self::Wall, (Self, Self::Cost)>>;
     type WallNodesList: IntoIterator<Item = Self::WallNodes>;
@@ -103,19 +108,15 @@ pub trait WallConverter<Wall> {
     fn convert(&self, wall: &Wall) -> Result<Self::SearchNodes, Self::Error>;
 }
 
-pub struct Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
-{
+pub struct Maze<Manager, PoseConverterType, WallConverterType, MathType> {
     manager: Manager,
     pose_converter: PoseConverterType,
     wall_converter: WallConverterType,
     _math: PhantomData<fn() -> MathType>,
-    _search_node_num: PhantomData<fn() -> SearchNodeNum>,
-    _neighbor_num: PhantomData<fn() -> NeighborNum>,
 }
 
-impl<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
-    core::fmt::Debug
-    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+impl<Manager, PoseConverterType, WallConverterType, MathType> core::fmt::Debug
+    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
 where
     Manager: core::fmt::Debug,
 {
@@ -124,8 +125,8 @@ where
     }
 }
 
-impl<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
-    Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+impl<Manager, PoseConverterType, WallConverterType, MathType>
+    Maze<Manager, PoseConverterType, WallConverterType, MathType>
 {
     pub fn new(
         manager: Manager,
@@ -137,22 +138,19 @@ impl<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, 
             pose_converter: obstacle_converter,
             wall_converter,
             _math: PhantomData,
-            _search_node_num: PhantomData,
-            _neighbor_num: PhantomData,
         }
     }
 }
 
-impl<Node, NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
-    Graph<Node>
-    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+impl<Node, Manager, PoseConverterType, WallConverterType, MathType> Graph<Node>
+    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
 where
     Node: GraphNode,
     Manager: WallManager<Node::Wall>,
-    NeighborNum: ArrayLength<(Node, Node::Cost)>,
+    Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
 {
     type Cost = Node::Cost;
-    type Edges = Vec<(Node, Self::Cost), NeighborNum>;
+    type Edges = Vec<(Node, Self::Cost), Node::NeighborNum>;
 
     fn successors(&self, node: &Node) -> Self::Edges {
         let mut successors = ForcedVec::new();
@@ -193,17 +191,19 @@ where
     }
 }
 
-impl<Node, NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
-    GraphConverter<Node>
-    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+impl<Node, Manager, PoseConverterType, WallConverterType, MathType> GraphConverter<Node>
+    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
 where
     Node: WallFinderNode,
     WallConverterType: WallConverter<Node::Wall>,
+    WallConverterType::SearchNode: BoundedNode,
     Manager: WallManager<Node::Wall>,
-    SearchNodeNum: ArrayLength<WallConverterType::SearchNode>,
+    <WallConverterType::SearchNode as BoundedNode>::NodeNum:
+        ArrayLength<WallConverterType::SearchNode>,
 {
     type SearchNode = WallConverterType::SearchNode;
-    type SearchNodes = Vec<Self::SearchNode, SearchNodeNum>;
+    type SearchNodes =
+        Vec<Self::SearchNode, <WallConverterType::SearchNode as BoundedNode>::NodeNum>;
 
     fn convert_to_checker_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
         &self,
@@ -226,16 +226,8 @@ where
     }
 }
 
-impl<
-        SearchNode,
-        NeighborNum,
-        SearchNodeNum,
-        Manager,
-        PoseConverterType,
-        WallConverterType,
-        MathType,
-    > NodeChecker<SearchNode>
-    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+impl<SearchNode, Manager, PoseConverterType, WallConverterType, MathType> NodeChecker<SearchNode>
+    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
 where
     SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
     Manager: WallManager<SearchNode::Wall>,
@@ -254,9 +246,8 @@ where
 }
 
 //TODO: Write test
-impl<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
-    ObstacleInterpreter<Obstacle>
-    for Maze<NeighborNum, SearchNodeNum, Manager, PoseConverterType, WallConverterType, MathType>
+impl<Manager, PoseConverterType, WallConverterType, MathType> ObstacleInterpreter<Obstacle>
+    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
 where
     PoseConverterType: PoseConverter<Pose>,
     Manager: WallManager<PoseConverterType::Wall>,
@@ -334,6 +325,7 @@ mod tests {
         }
 
         impl GraphNode for usize {
+            type NeighborNum = U10;
             type Cost = usize;
             type WallNodes = Vec<WallNode<usize, (usize, usize)>>;
             type WallNodesList = Vec<Self::WallNodes>;
@@ -391,7 +383,7 @@ mod tests {
 
         let manager = WallManagerType;
 
-        let maze = Maze::<U10, (), _, (), (), ()>::new(manager, (), ());
+        let maze = Maze::<_, (), (), ()>::new(manager, (), ());
         let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
         assert_eq!(maze.successors(&0), expected.as_slice());
         assert_eq!(maze.predecessors(&0), expected.as_slice());
@@ -412,6 +404,10 @@ mod tests {
 
         impl WallSpaceNode for Node {
             type Wall = Wall;
+        }
+
+        impl BoundedNode for SearchNode {
+            type NodeNum = U10;
         }
 
         impl WallFinderNode for Node {
@@ -462,7 +458,7 @@ mod tests {
             }
         }
 
-        let maze = Maze::<(), U10, _, (), _, ()>::new(WallManagerType, (), WallConverterType);
+        let maze = Maze::<_, (), _, ()>::new(WallManagerType, (), WallConverterType);
 
         let path = vec![0, 1, 1, 2, 3, 5, 8]
             .into_iter()
@@ -505,7 +501,7 @@ mod tests {
             }
         }
 
-        let maze = Maze::<(), (), _, (), (), ()>::new(WallManagerType, (), ());
+        let maze = Maze::<_, (), (), ()>::new(WallManagerType, (), ());
         let test_cases = vec![
             (0, Ok(false)),
             (1, Ok(true)),
