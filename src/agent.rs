@@ -88,6 +88,38 @@ impl<
         Trajectory,
         Target,
         MaxLength,
+    > core::fmt::Debug
+    for Agent<
+        IObstacleDetector,
+        IStateEstimator,
+        ITracker,
+        ITrajectoryGenerator,
+        Trajectory,
+        Target,
+        MaxLength,
+    >
+where
+    MaxLength: ArrayLength<Trajectory>,
+    ITracker: core::fmt::Debug,
+    IStateEstimator: core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(
+            f,
+            "Agent{{ tracker:{:?}, estimator: {:?} }}",
+            self.tracker, self.state_estimator,
+        )
+    }
+}
+
+impl<
+        IObstacleDetector,
+        IStateEstimator,
+        ITracker,
+        ITrajectoryGenerator,
+        Trajectory,
+        Target,
+        MaxLength,
     >
     Agent<
         IObstacleDetector,

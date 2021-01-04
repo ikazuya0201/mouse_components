@@ -45,6 +45,21 @@ pub struct Estimator<LE, RE, I, M> {
     _phantom: PhantomData<fn() -> M>,
 }
 
+impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(
+            f,
+            "Estimator {{ x:{:?}, y:{:?}, theta:{:?}, trans_velocity:{:?}, angular_velocity:{:?}, bias:{:?} }}", 
+            self.x,
+            self.y,
+            self.theta,
+            self.trans_velocity,
+            self.angular_velocity,
+            self.bias,
+        )
+    }
+}
+
 impl<LE, RE, I, M> StateEstimator for Estimator<LE, RE, I, M>
 where
     LE: Encoder,
