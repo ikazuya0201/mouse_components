@@ -13,7 +13,7 @@ use components::{
     traits::Math,
     utils::probability::Probability,
     wall_converter::WallConverter,
-    wall_manager::{Wall, WallStorage},
+    wall_manager::{Wall, WallManager},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,7 +104,7 @@ fn test_compute_shortest_path_u4() {
     ];
 
     for (walls, expected) in test_data {
-        let wall_manager = WallStorage::new(Probability::new(0.1).unwrap());
+        let wall_manager = WallManager::new(Probability::new(0.1).unwrap());
         for wall in walls {
             wall_manager.update(&wall, &Probability::one());
         }

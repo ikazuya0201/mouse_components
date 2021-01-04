@@ -5,7 +5,7 @@ use core::ops::Mul;
 use generic_array::{ArrayLength, GenericArray};
 use typenum::{consts::U2, PowerOfTwo, Unsigned};
 
-use crate::simple_maze::WallManager;
+use crate::simple_maze::WallManager as IWallManager;
 use crate::utils::{itertools::repeat_n, probability::Probability};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -78,7 +78,7 @@ impl<N: Unsigned + PowerOfTwo> Wall<N> {
 }
 
 #[derive(Clone)]
-pub struct WallStorage<N>
+pub struct WallManager<N>
 where
     N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -88,7 +88,7 @@ where
     existence_threshold: Probability,
 }
 
-impl<N> core::fmt::Debug for WallStorage<N>
+impl<N> core::fmt::Debug for WallManager<N>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -134,7 +134,7 @@ where
     }
 }
 
-impl<N> WallStorage<N>
+impl<N> WallManager<N>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -279,7 +279,7 @@ impl From<core::cell::BorrowMutError> for WallStorageError {
 }
 
 //TODO: Write test.
-impl<N> WallManager<Wall<N>> for WallStorage<N>
+impl<N> IWallManager<Wall<N>> for WallManager<N>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -333,7 +333,7 @@ mod tests {
 
         type Size = U2;
 
-        let wall_manager = WallStorage::<Size>::with_str(Probability::new(0.1).unwrap(), input);
+        let wall_manager = WallManager::<Size>::with_str(Probability::new(0.1).unwrap(), input);
 
         let walls = vec![
             ((0, 0, false), false),
