@@ -74,6 +74,12 @@ pub struct Tracker<
     _phantom: PhantomData<fn() -> M>,
 }
 
+impl<LM, RM, M, TC, RC, L> core::fmt::Debug for Tracker<LM, RM, M, TC, RC, L> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(f, "Tracker{{ xi:{:?} }}", self.xi)
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct FailSafeError {
     state: State,
