@@ -7,18 +7,18 @@ mod agent;
 mod commander;
 mod controller;
 mod estimator;
-pub mod maze;
-pub mod node;
-pub mod node_converter;
+mod maze;
+mod node;
+mod node_converter;
 mod obstacle_detector;
 mod operators;
-pub mod pose_converter;
+mod pose_converter;
 pub mod prelude;
 mod tracker;
 mod trajectory_generator;
 pub mod utils;
-pub mod wall_converter;
-pub mod wall_manager;
+mod wall_converter;
+mod wall_manager;
 
 pub mod traits {
     use super::*;
@@ -49,14 +49,14 @@ pub mod data_types {
 
     pub use administrator::SelectMode;
     pub use agent::Pose;
-    pub use commander::{CannotCheckError, CommanderError, RunCommanderError};
     pub use maze::{AbsoluteDirection, RelativeDirection};
+    pub use node::{Node, Pattern, RunNode, SearchNode};
     pub use obstacle_detector::Obstacle;
-    pub use operators::FinishError;
     pub use tracker::{AngleState, LengthState, State};
     pub use trajectory_generator::{
         AngleTarget, LengthTarget, RunKind, SearchKind, SlalomDirection, SlalomKind, Target,
     };
+    pub use wall_manager::Wall;
 }
 
 pub mod impls {
@@ -70,12 +70,25 @@ pub mod impls {
         TranslationControllerBuilder,
     };
     pub use estimator::{Estimator, EstimatorBuilder};
+    pub use maze::Maze;
+    pub use node_converter::NodeConverter;
     pub use obstacle_detector::ObstacleDetector;
     pub use operators::{RunOperator, SearchOperator};
+    pub use pose_converter::PoseConverter;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{
         slalom_parameters_map, ShiftTrajectory, TrajectoryGenerator, TrajectoryGeneratorBuilder,
     };
+    pub use wall_converter::WallConverter;
+    pub use wall_manager::WallManager;
+}
+
+pub mod errors {
+    use super::*;
+
+    pub use commander::{CannotCheckError, CommanderError, RunCommanderError};
+    pub use operators::FinishError;
+    pub use pose_converter::ConversionError;
 }
 
 pub mod defaults {

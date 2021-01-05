@@ -7,21 +7,17 @@ use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
-    data_types::{AbsoluteDirection, AngleState, LengthState, Pose, State},
+    data_types::{
+        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RunNode, SearchNode, State,
+    },
     defaults,
     impls::{
-        slalom_parameters_map, Commander, EstimatorBuilder, ObstacleDetector,
-        RotationControllerBuilder, RunAgent, RunOperator, TrackerBuilder,
-        TrajectoryGeneratorBuilder, TranslationControllerBuilder,
+        slalom_parameters_map, Commander, EstimatorBuilder, Maze, NodeConverter, ObstacleDetector,
+        PoseConverter, RotationControllerBuilder, RunAgent, RunOperator, TrackerBuilder,
+        TrajectoryGeneratorBuilder, TranslationControllerBuilder, WallConverter, WallManager,
     },
-    maze::Maze,
-    node::{Pattern, RunNode, SearchNode},
-    node_converter::NodeConverter,
-    pose_converter::PoseConverter,
     prelude::*,
     utils::probability::Probability,
-    wall_converter::WallConverter,
-    wall_manager::WallManager,
 };
 use typenum::consts::*;
 use uom::si::f32::{
