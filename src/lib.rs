@@ -156,4 +156,81 @@ pub mod defaults {
         )>>::Trajectory,
         MaxPathLength,
     >;
+
+    pub type Commander<Size, Goals, Math, MaxPathLength> = impls::Commander<
+        data_types::RunNode<Size>,
+        Goals,
+        data_types::SearchNode<Size>,
+        MaxPathLength,
+        impls::Maze<
+            impls::WallManager<Size>,
+            impls::PoseConverter<Size, Math>,
+            impls::WallConverter,
+            Math,
+        >,
+        impls::NodeConverter,
+    >;
+
+    pub type SearchOperator<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        DistanceSensorNum,
+        Math,
+        MaxPathLength,
+        Mode,
+        Size,
+        Goals,
+        Logger = impls::NullLogger,
+    > = impls::SearchOperator<
+        Mode,
+        data_types::Obstacle,
+        SearchAgent<
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            LeftMotor,
+            RightMotor,
+            DistanceSensor,
+            DistanceSensorNum,
+            Math,
+            MaxPathLength,
+            Logger,
+        >,
+        Commander<Size, Goals, Math, MaxPathLength>,
+    >;
+
+    pub type RunOperator<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        DistanceSensorNum,
+        Math,
+        MaxPathLength,
+        Mode,
+        Size,
+        Goals,
+        Logger = impls::NullLogger,
+    > = impls::RunOperator<
+        Mode,
+        RunAgent<
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            LeftMotor,
+            RightMotor,
+            DistanceSensor,
+            DistanceSensorNum,
+            Math,
+            MaxPathLength,
+            Logger,
+        >,
+        Commander<Size, Goals, Math, MaxPathLength>,
+    >;
 }
