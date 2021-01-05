@@ -309,6 +309,7 @@ where
         let mut trajectories = self.trajectories.borrow_mut();
         loop {
             if trajectories.is_empty() {
+                self.tracker.borrow_mut().stop();
                 return Err(TrackFinishError);
             }
             let trajectory = trajectories.iter_mut().next().unwrap();
