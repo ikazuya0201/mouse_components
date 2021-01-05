@@ -8,11 +8,11 @@ pub use crate::operators::RunCommander as _components_operators_run_operator_Run
 pub use crate::operators::SearchAgent as _components_operators_search_operator_SearchAgent;
 pub use crate::operators::SearchCommander as _components_operators_search_operator_SearchCommander;
 
-pub use crate::solver::Converter as _components_solver_NodeConverter;
-pub use crate::solver::Graph as _components_solver_Graph;
-pub use crate::solver::GraphConverter as _components_solver_GraphConverter;
-pub use crate::solver::NodeChecker as _components_solver_NodeChecker;
-pub use crate::solver::ObstacleInterpreter as _components_solver_ObstacleInterpreter;
+pub use crate::commander::Graph as _components_commander_Graph;
+pub use crate::commander::GraphConverter as _components_commander_GraphConverter;
+pub use crate::commander::NodeChecker as _components_commander_NodeChecker;
+pub use crate::commander::NodeConverter as _components_commander_NodeConverter;
+pub use crate::commander::ObstacleInterpreter as _components_commander_ObstacleInterpreter;
 
 pub use crate::agent::ObstacleDetector as _components_agent_ObstacleDetector;
 pub use crate::agent::RunTrajectoryGenerator as _components_agent_RunTrajectoryGenerator;
@@ -30,5 +30,5 @@ pub use crate::sensors::IMU as _components_sensors_IMU;
 
 pub use crate::utils::math::Math as _utils_math_Math;
 
-pub use crate::simple_maze::PoseConverter as _components_simple_maze_PoseConverter;
-pub use crate::simple_maze::WallManager as _components_simple_maze_WallManager;
+pub use crate::maze::PoseConverter as _components_simple_maze_PoseConverter;
+pub use crate::maze::WallManager as _components_simple_maze_WallManager;

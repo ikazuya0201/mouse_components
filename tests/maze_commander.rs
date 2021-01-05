@@ -3,13 +3,13 @@ extern crate components;
 use typenum::consts::*;
 
 use components::{
-    commander::Commander,
     data_types::AbsoluteDirection,
+    impls::Commander,
+    maze::Maze,
     node::{Pattern, RunNode, SearchNode},
     node_converter::NodeConverter,
     pose_converter::PoseConverter,
     prelude::*,
-    simple_maze::Maze,
     traits::Math,
     utils::probability::Probability,
     wall_converter::WallConverter,

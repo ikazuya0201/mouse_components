@@ -18,15 +18,6 @@ where
             .push(item)
             .unwrap_or_else(|_| unreachable!("Should never exceed the max length"));
     }
-
-    pub fn extend_from_slice(&mut self, other: &[T])
-    where
-        T: Clone,
-    {
-        self.0
-            .extend_from_slice(other)
-            .unwrap_or_else(|_| unreachable!("Should never exceed the max length"));
-    }
 }
 
 impl<T, N> core::ops::Deref for ForcedVec<T, N>

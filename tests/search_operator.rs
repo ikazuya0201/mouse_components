@@ -7,19 +7,18 @@ use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
-    commander::Commander,
     data_types::{AbsoluteDirection, AngleState, LengthState, Pose, SearchKind, State},
     defaults,
     impls::{
-        slalom_parameters_map, EstimatorBuilder, ObstacleDetector, RotationControllerBuilder,
-        SearchAgent, SearchOperator, TrackerBuilder, TrajectoryGeneratorBuilder,
-        TranslationControllerBuilder,
+        slalom_parameters_map, Commander, EstimatorBuilder, ObstacleDetector,
+        RotationControllerBuilder, SearchAgent, SearchOperator, TrackerBuilder,
+        TrajectoryGeneratorBuilder, TranslationControllerBuilder,
     },
+    maze::Maze,
     node::{Pattern, RunNode, SearchNode},
     node_converter::NodeConverter,
     pose_converter::PoseConverter,
     prelude::*,
-    simple_maze::Maze,
     utils::probability::Probability,
     wall_converter::WallConverter,
     wall_manager::WallManager,

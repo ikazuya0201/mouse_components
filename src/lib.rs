@@ -4,18 +4,16 @@ extern crate alloc;
 
 mod administrator;
 mod agent;
-pub mod commander;
+mod commander;
 mod controller;
 mod estimator;
-mod maze;
+pub mod maze;
 pub mod node;
 pub mod node_converter;
 mod obstacle_detector;
 mod operators;
 pub mod pose_converter;
 pub mod prelude;
-pub mod simple_maze;
-mod solver;
 mod tracker;
 mod trajectory_generator;
 pub mod utils;
@@ -31,8 +29,10 @@ pub mod traits {
         ObstacleDetector, RunTrajectoryGenerator, SearchTrajectoryGenerator, StateEstimator,
         Tracker,
     };
+    pub use commander::{
+        Graph, GraphConverter, NodeChecker, NodeConverter, ObstacleInterpreter, RouteNode,
+    };
     pub use operators::{RunAgent, RunCommander, SearchAgent, SearchCommander};
-    pub use solver::{Converter, ObstacleInterpreter};
     pub use tracker::{Logger, RotationController, TranslationController};
 }
 
@@ -49,11 +49,8 @@ pub mod data_types {
 
     pub use administrator::SelectMode;
     pub use agent::Pose;
-    pub use maze::Pattern;
-    pub use maze::{
-        AbsoluteDirection, NodeId, Position, RelativeDirection, SearchNodeId, WallDirection,
-        WallPosition,
-    };
+    pub use commander::{CannotCheckError, CommanderError, RunCommanderError};
+    pub use maze::{AbsoluteDirection, RelativeDirection};
     pub use obstacle_detector::Obstacle;
     pub use operators::FinishError;
     pub use tracker::{AngleState, LengthState, State};
@@ -67,15 +64,14 @@ pub mod impls {
 
     pub use administrator::Administrator;
     pub use agent::{RunAgent, SearchAgent};
+    pub use commander::Commander;
     pub use controller::{
         RotationController, RotationControllerBuilder, TranslationController,
         TranslationControllerBuilder,
     };
     pub use estimator::{Estimator, EstimatorBuilder};
-    pub use maze::{Maze, MazeBuilder};
     pub use obstacle_detector::ObstacleDetector;
     pub use operators::{RunOperator, SearchOperator};
-    pub use solver::Solver;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{
         slalom_parameters_map, ShiftTrajectory, TrajectoryGenerator, TrajectoryGeneratorBuilder,
@@ -146,45 +142,5 @@ pub mod defaults {
             data_types::RunKind,
         )>>::Trajectory,
         MaxPathLength,
-    >;
-
-    pub type Solver<MazeWidth, MaxPathLength, GoalSize, Math> = impls::Solver<
-        data_types::NodeId<MazeWidth>,
-        data_types::SearchNodeId<MazeWidth>,
-        MaxPathLength,
-        GoalSize,
-        impls::Maze<MazeWidth, Math>,
-    >;
-
-    pub type SearchOperator<
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensor,
-        DistanceSensorNum,
-        MazeWidth,
-        MaxPathLength,
-        GoalSize,
-        Mode,
-        Math,
-        Logger = impls::NullLogger,
-    > = impls::SearchOperator<
-        Mode,
-        data_types::Obstacle,
-        SearchAgent<
-            LeftEncoder,
-            RightEncoder,
-            Imu,
-            LeftMotor,
-            RightMotor,
-            DistanceSensor,
-            DistanceSensorNum,
-            Math,
-            MaxPathLength,
-            Logger,
-        >,
-        Solver<MazeWidth, MaxPathLength, GoalSize, Math>,
     >;
 }
