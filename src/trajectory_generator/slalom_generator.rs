@@ -28,8 +28,10 @@ pub enum SlalomDirection {
 pub enum SlalomKind {
     Search90,
     FastRun45,
+    FastRun45Rev,
     FastRun90,
     FastRun135,
+    FastRun135Rev,
     FastRun180,
     FastRunDiagonal90,
 }
@@ -233,8 +235,10 @@ pub fn slalom_parameters_map(kind: SlalomKind, dir: SlalomDirection) -> SlalomPa
     let params = match kind {
         Search90 => (5.000001, 5.0, 45.0, 40.0, 241.59, 90.0),
         FastRun45 => (2.57365, 21.2132, 75.0, 30.0, 411.636, 45.0),
+        FastRun45Rev => (21.2132, 2.57365, 93.63957, 29.99996, 411.636, 45.0),
         FastRun90 => (20.0, 20.0, 90.0, 70.0, 422.783, 90.0),
         FastRun135 => (21.8627, 14.1421, 55.0, 80.0, 353.609, 135.0),
+        FastRun135Rev => (14.1421, 21.8627, 47.27907, 80.00015, 353.609, 135.0),
         FastRun180 => (24.0, 24.0, 24.0, 90.0, 412.228, 180.0),
         FastRunDiagonal90 => (15.6396, 15.6396, 63.6396, 48.0, 289.908, 90.0),
     };

@@ -500,12 +500,12 @@ impl<N: Clone> RouteNode for RunNode<N> {
                 _ => return create_error(),
             },
             HorizontalBound | VerticalBound => match self.0.difference(&to.0, NorthEast) {
-                (2, 1, FrontRight) => Slalom(FastRun45, SRight),
+                (2, 1, FrontRight) => Slalom(FastRun45Rev, SRight),
                 (2, 0, Right) => Slalom(FastRunDiagonal90, SRight),
-                (2, -1, BackRight) => Slalom(FastRun135, SRight),
-                (1, 2, FrontLeft) => Slalom(FastRun45, SLeft),
+                (2, -1, BackRight) => Slalom(FastRun135Rev, SRight),
+                (1, 2, FrontLeft) => Slalom(FastRun45Rev, SLeft),
                 (0, 2, Left) => Slalom(FastRunDiagonal90, SLeft),
-                (-1, 2, BackLeft) => Slalom(FastRun135, SLeft),
+                (-1, 2, BackLeft) => Slalom(FastRun135Rev, SLeft),
                 (x, y, Front) if x == y && x > 0 => StraightDiagonal(x as u16),
                 _ => return create_error(),
             },
@@ -1481,7 +1481,7 @@ mod tests {
             (
                 (1, 0, NorthEast),
                 (0, 2, West),
-                Ok(Slalom(FastRun135, SLeft)),
+                Ok(Slalom(FastRun135Rev, SLeft)),
             ),
             ((0, 0, North), (0, 6, North), Ok(Straight(3))),
             (
@@ -1502,7 +1502,7 @@ mod tests {
             (
                 (1, 2, SouthWest),
                 (0, 0, South),
-                Ok(Slalom(FastRun45, SLeft)),
+                Ok(Slalom(FastRun45Rev, SLeft)),
             ),
         ];
 
