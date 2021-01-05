@@ -6,13 +6,13 @@ use core::ops::Mul;
 
 use components::{
     data_types::{Pose, State},
-    pose_converter::{ConversionError, PoseConverter},
+    errors::ConversionError,
+    impls::{PoseConverter, WallManager},
     prelude::*,
     sensors::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
     },
     utils::{array_length::ArrayLength, probability::Probability, sample::Sample},
-    wall_manager::WallManager,
 };
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 use uom::si::f32::{

@@ -5,7 +5,7 @@ use core::ops::Mul;
 use generic_array::{ArrayLength, GenericArray};
 use typenum::{consts::U2, PowerOfTwo, Unsigned};
 
-use crate::simple_maze::WallManager as IWallManager;
+use crate::maze::WallManager as IWallManager;
 use crate::utils::{itertools::repeat_n, probability::Probability};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

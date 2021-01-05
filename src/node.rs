@@ -6,7 +6,7 @@ use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use crate::commander::RouteNode;
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
-use crate::simple_maze::{BoundedNode, GraphNode, WallFinderNode, WallNode, WallSpaceNode};
+use crate::maze::{BoundedNode, GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generator::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
