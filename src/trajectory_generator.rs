@@ -87,7 +87,7 @@ pub struct TrajectoryGenerator<M, MaxLength> {
 
 impl<M, MaxLength> SearchTrajectoryGenerator<Pose, SearchKind> for TrajectoryGenerator<M, MaxLength>
 where
-    M: Math + Clone,
+    M: Math,
 {
     type Target = Target;
     type Trajectory = ShiftTrajectory<SearchTrajectory<M>, M>;
@@ -103,7 +103,7 @@ where
 //TODO: To deal with arbitrary initial commands
 impl<M, MaxLength> RunTrajectoryGenerator<(Pose, RunKind)> for TrajectoryGenerator<M, MaxLength>
 where
-    M: Math + Clone,
+    M: Math,
     MaxLength: ArrayLength<ShiftTrajectory<RunTrajectory<M>, M>>,
 {
     type Target = Target;
@@ -149,7 +149,7 @@ where
 
 impl<M, MaxLength> TrajectoryGenerator<M, MaxLength>
 where
-    M: Math + Clone,
+    M: Math,
 {
     fn generate_search_trajectory(
         &self,
@@ -204,7 +204,7 @@ where
         };
         let (trajectory, terminal_velocity) = match kind {
             RunKind::Straight(len) => {
-                let distance = *len as f32 * Length::new::<meter>(0.045);
+                let distance = *len as f32 * Length::new::<meter>(0.09);
                 generate_straight(distance)
             }
             RunKind::StraightDiagonal(len) => {
