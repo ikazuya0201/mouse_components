@@ -4,9 +4,9 @@ use core::ops::{Add, Mul};
 use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use crate::commander::RouteNode;
+use crate::commander::{BoundedNode, RouteNode};
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
-use crate::maze::{BoundedNode, GraphNode, WallFinderNode, WallNode, WallSpaceNode};
+use crate::maze::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generator::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
@@ -417,7 +417,7 @@ where
     N: Mul<N>,
     N::Output: Mul<U4>,
 {
-    type NodeNum = <N::Output as Mul<U4>>::Output;
+    type UpperBound = <N::Output as Mul<U4>>::Output;
 }
 
 impl<N> GraphNode for SearchNode<N>
@@ -517,6 +517,14 @@ impl<N: Clone> RouteNode for RunNode<N> {
 //TODO: Create new data type to reduce copy cost.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct RunNode<N>(Node<N>);
+
+impl<N> BoundedNode for RunNode<N>
+where
+    N: Mul<N>,
+    N::Output: Mul<U16>,
+{
+    type UpperBound = <N::Output as Mul<U16>>::Output;
+}
 
 impl<N> core::fmt::Debug for RunNode<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

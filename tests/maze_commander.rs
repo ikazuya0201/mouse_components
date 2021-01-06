@@ -57,11 +57,9 @@ fn cost(pattern: Pattern) -> u16 {
 
 #[test]
 fn test_compute_shortest_path_u4() {
-    use core::ops::Mul;
     use AbsoluteDirection::*;
 
     type Size = U4;
-    type MaxPathLength = <<Size as Mul<Size>>::Output as Mul<U16>>::Output;
 
     let new = |x, y, dir| RunNode::<Size>::new(x, y, dir, cost).unwrap();
     let new_wall = |x, y, z| Wall::<Size>::new(x, y, z).unwrap();
@@ -107,7 +105,7 @@ fn test_compute_shortest_path_u4() {
         let wall_converter = WallConverter::new(cost);
         let maze = Maze::<_, _, _, MathFake>::new(wall_manager, pose_converter, wall_converter);
         let node_converter = NodeConverter::default();
-        let commander = Commander::<_, _, _, MaxPathLength, _, _>::new(
+        let commander = Commander::new(
             start,
             goals.clone(),
             start_search_node.clone(),

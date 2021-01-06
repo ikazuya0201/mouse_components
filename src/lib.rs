@@ -30,7 +30,8 @@ pub mod traits {
         Tracker,
     };
     pub use commander::{
-        Graph, GraphConverter, NodeChecker, NodeConverter, ObstacleInterpreter, RouteNode,
+        BoundedNode, Graph, GraphConverter, NodeChecker, NodeConverter, ObstacleInterpreter,
+        RouteNode,
     };
     pub use operators::{RunAgent, RunCommander, SearchAgent, SearchCommander};
     pub use tracker::{Logger, RotationController, TranslationController};
@@ -157,11 +158,10 @@ pub mod defaults {
         MaxPathLength,
     >;
 
-    pub type Commander<Size, Goals, Math, MaxPathLength> = impls::Commander<
+    pub type Commander<Size, Goals, Math> = impls::Commander<
         data_types::RunNode<Size>,
         Goals,
         data_types::SearchNode<Size>,
-        MaxPathLength,
         impls::Maze<
             impls::WallManager<Size>,
             impls::PoseConverter<Size, Math>,
@@ -200,7 +200,7 @@ pub mod defaults {
             MaxPathLength,
             Logger,
         >,
-        Commander<Size, Goals, Math, MaxPathLength>,
+        Commander<Size, Goals, Math>,
     >;
 
     pub type RunOperator<
@@ -231,6 +231,6 @@ pub mod defaults {
             MaxPathLength,
             Logger,
         >,
-        Commander<Size, Goals, Math, MaxPathLength>,
+        Commander<Size, Goals, Math>,
     >;
 }
