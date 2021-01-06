@@ -4,7 +4,7 @@ use core::ops::{Add, Mul};
 use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use crate::commander::{BoundedNode, RouteNode};
+use crate::commander::{BoundedNode, BoundedPathNode, RouteNode};
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
 use crate::maze::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generator::{RunKind, SearchKind, SlalomDirection, SlalomKind};
@@ -524,6 +524,13 @@ where
     N::Output: Mul<U16>,
 {
     type UpperBound = <N::Output as Mul<U16>>::Output;
+}
+
+impl<N> BoundedPathNode for RunNode<N>
+where
+    N: Mul<N>,
+{
+    type PathUpperBound = N::Output;
 }
 
 impl<N> core::fmt::Debug for RunNode<N> {
