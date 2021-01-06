@@ -2,13 +2,13 @@ use core::cell::{Cell, RefCell};
 use core::cmp::Reverse;
 use core::convert::TryInto;
 use core::fmt::Debug;
-use core::marker::PhantomData;
 use core::ops::Deref;
 
 use generic_array::GenericArray;
 use heap::BinaryHeap;
 use heapless::{consts::*, Vec};
 use num::{Bounded, Saturating};
+use typenum::Unsigned;
 
 use crate::operators::{FinishError, RunCommander, SearchCommander};
 use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
@@ -63,6 +63,10 @@ pub trait RouteNode {
     fn route(&self, to: &Self) -> Result<Self::Route, Self::Error>;
 }
 
+pub trait BoundedNode {
+    type UpperBound;
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 enum State {
     Waiting,
@@ -71,7 +75,7 @@ enum State {
 
 type CandNum = U4;
 
-pub struct Commander<Node, Nodes, SearchNode, Max, Maze, ConverterType> {
+pub struct Commander<Node, Nodes, SearchNode, Maze, ConverterType> {
     start: Node,
     goals: Nodes,
     current: Cell<SearchNode>,
@@ -79,11 +83,10 @@ pub struct Commander<Node, Nodes, SearchNode, Max, Maze, ConverterType> {
     candidates: RefCell<Vec<SearchNode, CandNum>>,
     maze: Maze,
     converter: ConverterType,
-    _node_max: PhantomData<fn() -> Max>,
 }
 
-impl<Node, Nodes, SearchNode, Max, Maze, ConverterType>
-    Commander<Node, Nodes, SearchNode, Max, Maze, ConverterType>
+impl<Node, Nodes, SearchNode, Maze, ConverterType>
+    Commander<Node, Nodes, SearchNode, Maze, ConverterType>
 {
     pub fn new(
         start: Node,
@@ -100,13 +103,12 @@ impl<Node, Nodes, SearchNode, Max, Maze, ConverterType>
             candidates: RefCell::new(Vec::new()),
             maze,
             converter,
-            _node_max: PhantomData,
         }
     }
 }
 
-impl<Node, Nodes, SearchNode, Max, Maze, ConverterType> core::fmt::Debug
-    for Commander<Node, Nodes, SearchNode, Max, Maze, ConverterType>
+impl<Node, Nodes, SearchNode, Maze, ConverterType> core::fmt::Debug
+    for Commander<Node, Nodes, SearchNode, Maze, ConverterType>
 where
     Maze: core::fmt::Debug,
     SearchNode: core::fmt::Debug,
@@ -134,10 +136,10 @@ impl TryInto<FinishError> for CommanderError {
     }
 }
 
-impl<Node, Nodes, Cost, Max, Maze, ConverterType, Obstacle> SearchCommander<Obstacle>
-    for Commander<Node, Nodes, Maze::SearchNode, Max, Maze, ConverterType>
+impl<Node, Nodes, Cost, Maze, ConverterType, Obstacle> SearchCommander<Obstacle>
+    for Commander<Node, Nodes, Maze::SearchNode, Maze, ConverterType>
 where
-    Max: ArrayLength<Node>
+    Node::UpperBound: ArrayLength<Node>
         + ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Reverse<Cost>>
@@ -147,7 +149,7 @@ where
         + ArrayLength<Option<usize>>
         + typenum::Unsigned,
     Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize>,
+    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node, Cost = Cost>
@@ -222,10 +224,10 @@ where
 }
 
 //TODO: write test
-impl<Node, Nodes, Cost, Max, Maze, ConverterType>
-    Commander<Node, Nodes, Maze::SearchNode, Max, Maze, ConverterType>
+impl<Node, Nodes, Cost, Maze, ConverterType>
+    Commander<Node, Nodes, Maze::SearchNode, Maze, ConverterType>
 where
-    Max: ArrayLength<Node>
+    Node::UpperBound: ArrayLength<Node>
         + ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Reverse<Cost>>
@@ -233,9 +235,9 @@ where
         + ArrayLength<(Maze::SearchNode, Reverse<Cost>)>
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
-        + typenum::Unsigned,
+        + Unsigned,
     Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize>,
+    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node, Cost = Cost>
@@ -255,8 +257,9 @@ where
             .into_iter()
             .collect::<Vec<(Maze::SearchNode, Cost), U4>>();
 
-        let mut dists = repeat_n(Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
-        let mut heap = BinaryHeap::<Maze::SearchNode, Reverse<Cost>, Max>::new();
+        let mut dists = repeat_n(Cost::max_value(), <Node::UpperBound as Unsigned>::USIZE)
+            .collect::<GenericArray<_, Node::UpperBound>>();
+        let mut heap = BinaryHeap::<Maze::SearchNode, Reverse<Cost>, Node::UpperBound>::new();
         for node in checker_nodes {
             heap.push_or_update(node, Reverse(Cost::min_value()))
                 .unwrap();
@@ -300,10 +303,10 @@ pub enum RunCommanderError {
 ///NOTO: multiple implementations of Converter<_> can exist for different Target,
 ///but we assume there is only an implementation.
 //TODO: write test
-impl<Node, Nodes, SearchNode, Max, Maze, ConverterType> RunCommander
-    for Commander<Node, Nodes, SearchNode, Max, Maze, ConverterType>
+impl<Node, Nodes, SearchNode, Maze, ConverterType> RunCommander
+    for Commander<Node, Nodes, SearchNode, Maze, ConverterType>
 where
-    Max: ArrayLength<Node>
+    Node::UpperBound: ArrayLength<Node>
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + ArrayLength<Maze::Cost>
@@ -312,14 +315,14 @@ where
         + ArrayLength<(<ConverterType as NodeConverter<Node>>::Target, Node::Route)>
         + typenum::Unsigned,
     Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode,
+    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
     ConverterType: NodeConverter<Node>,
 {
     type Error = RunCommanderError;
     type Command = (<ConverterType as NodeConverter<Node>>::Target, Node::Route);
-    type Commands = Vec<Self::Command, Max>;
+    type Commands = Vec<Self::Command, Node::UpperBound>;
 
     fn compute_commands(&self) -> Result<Self::Commands, Self::Error> {
         let path = self
@@ -346,29 +349,33 @@ where
     }
 }
 
-impl<Node, Nodes, SearchNode, Max, Maze, ConverterType>
-    Commander<Node, Nodes, SearchNode, Max, Maze, ConverterType>
+impl<Node, Nodes, SearchNode, Maze, ConverterType>
+    Commander<Node, Nodes, SearchNode, Maze, ConverterType>
 where
-    Max: ArrayLength<Node>
+    Node::UpperBound: ArrayLength<Node>
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
         + ArrayLength<(Node, Reverse<Maze::Cost>)>
-        + typenum::Unsigned,
+        + Unsigned,
     Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize>,
+    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
 {
-    pub fn compute_shortest_path(&self) -> Option<Vec<Node, Max>> {
-        let mut dists =
-            repeat_n(Maze::Cost::max_value(), Max::USIZE).collect::<GenericArray<_, Max>>();
+    pub fn compute_shortest_path(&self) -> Option<Vec<Node, Node::UpperBound>> {
+        let mut dists = repeat_n(
+            Maze::Cost::max_value(),
+            <Node::UpperBound as Unsigned>::USIZE,
+        )
+        .collect::<GenericArray<_, Node::UpperBound>>();
         dists[self.start.into()] = Maze::Cost::min_value();
 
-        let mut prev = repeat_n(None, Max::USIZE).collect::<GenericArray<Option<Node>, Max>>();
+        let mut prev = repeat_n(None, <Node::UpperBound as Unsigned>::USIZE)
+            .collect::<GenericArray<Option<Node>, Node::UpperBound>>();
 
-        let mut heap = BinaryHeap::<Node, Reverse<Maze::Cost>, Max>::new();
+        let mut heap = BinaryHeap::<Node, Reverse<Maze::Cost>, Node::UpperBound>::new();
         heap.push(self.start, Reverse(Maze::Cost::min_value()))
             .unwrap();
 
@@ -410,9 +417,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec::Vec;
+
     use heapless::consts::*;
 
-    use super::{Commander, Graph};
+    use super::*;
 
     struct IGraph {
         n: usize,
@@ -474,7 +483,11 @@ mod tests {
 
         let graph = IGraph::new(n, &edges);
 
-        let solver = Commander::<usize, _, usize, U9, _, ()>::new(start, goals, start, graph, ());
+        impl BoundedNode for usize {
+            type UpperBound = U10;
+        }
+
+        let solver = Commander::<usize, _, usize, _, ()>::new(start, goals, start, graph, ());
 
         let path = solver.compute_shortest_path();
         let expected = [0, 1, 3, 5, 7, 8];

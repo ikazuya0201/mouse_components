@@ -236,7 +236,6 @@ fn test_run_operator() {
     let commander = {
         let pose_converter = PoseConverter::<Size, MathFake>::default();
         let wall_converter = WallConverter::new(cost);
-        type RunNodeNum = op!(Size * Size * U16);
         let maze = Maze::<_, _, _, MathFake>::new(wall_storage, pose_converter, wall_converter);
         let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
         let goals = vec![
@@ -245,7 +244,7 @@ fn test_run_operator() {
         ];
         let search_start = SearchNode::<Size>::new(0, 1, North, cost).unwrap();
         let node_converter = NodeConverter::default();
-        Rc::new(Commander::<_, _, _, RunNodeNum, _, _>::new(
+        Rc::new(Commander::new(
             start,
             goals,
             search_start,

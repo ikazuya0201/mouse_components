@@ -5,7 +5,9 @@ use core::marker::PhantomData;
 use heapless::{ArrayLength, Vec};
 use uom::si::f32::Length;
 
-use crate::commander::{CannotCheckError, Graph, GraphConverter, NodeChecker, ObstacleInterpreter};
+use crate::commander::{
+    BoundedNode, CannotCheckError, Graph, GraphConverter, NodeChecker, ObstacleInterpreter,
+};
 use crate::data_types::Pose;
 use crate::obstacle_detector::Obstacle;
 use crate::utils::{forced_vec::ForcedVec, math::Math, probability::Probability};
@@ -68,10 +70,6 @@ pub enum WallNode<Wall, Node> {
 
 pub trait WallSpaceNode {
     type Wall;
-}
-
-pub trait BoundedNode {
-    type NodeNum;
 }
 
 pub trait GraphNode: Sized + WallSpaceNode {
@@ -201,12 +199,12 @@ where
     WallConverterType: WallConverter<Node::Wall>,
     WallConverterType::SearchNode: BoundedNode,
     Manager: WallManager<Node::Wall>,
-    <WallConverterType::SearchNode as BoundedNode>::NodeNum:
+    <WallConverterType::SearchNode as BoundedNode>::UpperBound:
         ArrayLength<WallConverterType::SearchNode>,
 {
     type SearchNode = WallConverterType::SearchNode;
     type SearchNodes =
-        Vec<Self::SearchNode, <WallConverterType::SearchNode as BoundedNode>::NodeNum>;
+        Vec<Self::SearchNode, <WallConverterType::SearchNode as BoundedNode>::UpperBound>;
 
     fn convert_to_checker_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
         &self,
@@ -410,7 +408,7 @@ mod tests {
         }
 
         impl BoundedNode for SearchNode {
-            type NodeNum = U10;
+            type UpperBound = U10;
         }
 
         impl WallFinderNode for Node {
