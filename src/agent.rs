@@ -266,7 +266,10 @@ where
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct TrackFinishError;
+pub enum RunAgentError<T> {
+    TrackFinish,
+    TrackFailed(T),
+}
 
 impl<
         Command,
@@ -288,11 +291,10 @@ where
     ObstacleDetectorType: ObstacleDetector<StateEstimatorType::State>,
     StateEstimatorType: StateEstimator,
     TrackerType: Tracker<StateEstimatorType::State, TrajectoryGeneratorType::Target>,
-    TrackerType::Error: core::fmt::Debug,
     TrajectoryGeneratorType: RunTrajectoryGenerator<Command>,
     MaxLength: ArrayLength<TrajectoryGeneratorType::Trajectory>,
 {
-    type Error = TrackFinishError;
+    type Error = RunAgentError<TrackerType::Error>;
 
     fn set_commands<Commands: IntoIterator<Item = Command>>(&self, commands: Commands) {
         for trajectory in self.trajectory_generator.generate(commands) {
@@ -310,18 +312,16 @@ where
         loop {
             if trajectories.is_empty() {
                 self.tracker.borrow_mut().stop();
-                return Err(TrackFinishError);
+                return Err(RunAgentError::TrackFinish);
             }
             let trajectory = trajectories.iter_mut().next().unwrap();
             if let Some(target) = trajectory.next() {
                 self.state_estimator.borrow_mut().estimate();
                 let state = self.state_estimator.borrow().state();
-                self.tracker
-                    .borrow_mut()
-                    .track(&state, &target)
-                    .unwrap_or_else(|err| {
-                        unimplemented!("This error handling is unimplemented: {:?}", err)
-                    });
+                if let Err(err) = self.tracker.borrow_mut().track(&state, &target) {
+                    self.tracker.borrow_mut().stop();
+                    return Err(RunAgentError::TrackFailed(err));
+                }
                 return Ok(());
             }
             trajectories.dequeue();
