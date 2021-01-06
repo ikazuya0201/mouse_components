@@ -11,7 +11,7 @@ use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
 use crate::operators::{FinishError, RunCommander, SearchCommander};
-use crate::utils::{array_length::ArrayLength, itertools::repeat_n};
+use crate::utils::{array_length::ArrayLength, forced_vec::ForcedVec, itertools::repeat_n};
 
 pub trait GraphConverter<Node> {
     type SearchNode;
@@ -61,6 +61,10 @@ pub trait RouteNode {
     type Route;
 
     fn route(&self, to: &Self) -> Result<Self::Route, Self::Error>;
+}
+
+pub trait BoundedPathNode {
+    type PathUpperBound;
 }
 
 pub trait BoundedNode {
@@ -139,17 +143,17 @@ impl TryInto<FinishError> for CommanderError {
 impl<Node, Nodes, Cost, Maze, ConverterType, Obstacle> SearchCommander<Obstacle>
     for Commander<Node, Nodes, Maze::SearchNode, Maze, ConverterType>
 where
-    Node::UpperBound: ArrayLength<Node>
-        + ArrayLength<Maze::SearchNode>
+    Node::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Reverse<Cost>>
         + ArrayLength<(Node, Reverse<Cost>)>
         + ArrayLength<(Maze::SearchNode, Reverse<Cost>)>
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
-        + typenum::Unsigned,
+        + Unsigned,
+    Node::PathUpperBound: ArrayLength<Node>,
     Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
+    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node, Cost = Cost>
@@ -227,8 +231,7 @@ where
 impl<Node, Nodes, Cost, Maze, ConverterType>
     Commander<Node, Nodes, Maze::SearchNode, Maze, ConverterType>
 where
-    Node::UpperBound: ArrayLength<Node>
-        + ArrayLength<Maze::SearchNode>
+    Node::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Reverse<Cost>>
         + ArrayLength<(Node, Reverse<Cost>)>
@@ -236,8 +239,9 @@ where
         + ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + Unsigned,
+    Node::PathUpperBound: ArrayLength<Node>,
     Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
+    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node, Cost = Cost>
@@ -306,16 +310,16 @@ pub enum RunCommanderError {
 impl<Node, Nodes, SearchNode, Maze, ConverterType> RunCommander
     for Commander<Node, Nodes, SearchNode, Maze, ConverterType>
 where
-    Node::UpperBound: ArrayLength<Node>
-        + ArrayLength<Option<Node>>
+    Node::UpperBound: ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
         + ArrayLength<(Node, Reverse<Maze::Cost>)>
         + ArrayLength<(<ConverterType as NodeConverter<Node>>::Target, Node::Route)>
-        + typenum::Unsigned,
+        + Unsigned,
+    Node::PathUpperBound: ArrayLength<Node>,
     Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode,
+    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode + BoundedPathNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
     ConverterType: NodeConverter<Node>,
@@ -352,19 +356,19 @@ where
 impl<Node, Nodes, SearchNode, Maze, ConverterType>
     Commander<Node, Nodes, SearchNode, Maze, ConverterType>
 where
-    Node::UpperBound: ArrayLength<Node>
-        + ArrayLength<Option<Node>>
+    Node::UpperBound: ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
         + ArrayLength<(Node, Reverse<Maze::Cost>)>
         + Unsigned,
+    Node::PathUpperBound: ArrayLength<Node>,
     Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
+    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
 {
-    pub fn compute_shortest_path(&self) -> Option<Vec<Node, Node::UpperBound>> {
+    pub fn compute_shortest_path(&self) -> Option<Vec<Node, Node::PathUpperBound>> {
         let mut dists = repeat_n(
             Maze::Cost::max_value(),
             <Node::UpperBound as Unsigned>::USIZE,
@@ -381,11 +385,11 @@ where
 
         let construct_path = |goal: Node, prev: GenericArray<_, _>| {
             let mut current = prev[goal.into()]?;
-            let mut path = Vec::new();
-            path.push(goal).unwrap();
-            path.push(current).unwrap();
+            let mut path = ForcedVec::new();
+            path.push(goal);
+            path.push(current);
             while let Some(next) = prev[current.into()] {
-                path.push(next).unwrap();
+                path.push(next);
                 current = next;
             }
             let len = path.len();
@@ -393,7 +397,7 @@ where
             for i in 0..len / 2 {
                 path.swap(i, len - i - 1);
             }
-            Some(path)
+            Some(path.into())
         };
 
         while let Some((node, Reverse(cost))) = heap.pop() {
@@ -485,6 +489,10 @@ mod tests {
 
         impl BoundedNode for usize {
             type UpperBound = U10;
+        }
+
+        impl BoundedPathNode for usize {
+            type PathUpperBound = U10;
         }
 
         let solver = Commander::<usize, _, usize, _, ()>::new(start, goals, start, graph, ());
