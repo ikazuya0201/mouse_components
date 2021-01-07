@@ -147,6 +147,18 @@ where
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum SearchAgentError<T> {
+    TrackFailed(T),
+    QueueOverflowed,
+}
+
+impl<T> From<T> for SearchAgentError<T> {
+    fn from(value: T) -> Self {
+        SearchAgentError::TrackFailed(value)
+    }
+}
+
 impl<Pose, Kind, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
     ISearchAgent<(Pose, Kind)>
     for SearchAgent<
@@ -165,7 +177,7 @@ where
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
     ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Kind>,
 {
-    type Error = ITracker::Error;
+    type Error = SearchAgentError<ITracker::Error>;
     type Obstacle = IObstacleDetector::Obstacle;
     type Obstacles = IObstacleDetector::Obstacles;
 
@@ -178,12 +190,19 @@ where
         self.obstacle_detector.borrow_mut().detect(&state)
     }
 
-    fn set_command(&self, command: &(Pose, Kind)) {
+    fn set_command(&self, command: &(Pose, Kind)) -> Result<(), Self::Error> {
         let trajectory = self
             .trajectory_generator
             .generate_search(&command.0, &command.1);
         let mut trajectories = self.trajectories.lock();
-        trajectories.enqueue(trajectory).ok();
+        if trajectories.len() == 2 {
+            Err(SearchAgentError::QueueOverflowed)
+        } else {
+            trajectories
+                .enqueue(trajectory)
+                .unwrap_or_else(|_| unreachable!("This is bug"));
+            Ok(())
+        }
     }
 
     fn track_next(&self) -> Result<(), Self::Error> {
