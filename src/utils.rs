@@ -1,9 +1,9 @@
-pub mod array_length;
+pub(crate) mod array_length;
 pub(crate) mod forced_vec;
-pub mod itertools;
+pub(crate) mod itertools;
 pub mod math;
-pub mod mutex;
+pub(crate) mod mutex;
 pub mod probability;
 pub mod sample;
-pub mod total;
-pub mod vector;
+pub(crate) mod total;
+pub(crate) mod vector;
