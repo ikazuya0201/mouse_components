@@ -191,13 +191,13 @@ where
     }
 
     fn set_command(&self, command: &(Pose, Kind)) -> Result<(), Self::Error> {
-        let trajectory = self
-            .trajectory_generator
-            .generate_search(&command.0, &command.1);
         let mut trajectories = self.trajectories.lock();
         if trajectories.len() == 2 {
             Err(SearchAgentError::QueueOverflowed)
         } else {
+            let trajectory = self
+                .trajectory_generator
+                .generate_search(&command.0, &command.1);
             trajectories
                 .enqueue(trajectory)
                 .unwrap_or_else(|_| unreachable!("This is bug"));
