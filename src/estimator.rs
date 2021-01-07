@@ -32,7 +32,7 @@ pub struct Estimator<LE, RE, I, M> {
     trans_velocity: Velocity,
     angular_velocity: AngularVelocity,
     bias: AngularVelocity,
-    wheel_interval: Length,
+    wheel_interval: Option<Length>,
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
@@ -84,17 +84,21 @@ where
 
         let average_trans_velocity = (average_left_velocity + average_right_velocity) / 2.0;
 
-        let average_angular_velocity = AngularVelocity::from(
-            (average_right_velocity - average_left_velocity) / self.wheel_interval,
-        );
-
         let trans_acceleration = block!(self.imu.get_translational_acceleration()).unwrap();
         let imu_angular_velocity = block!(self.imu.get_angular_velocity()).unwrap();
 
-        self.bias = self.alpha * self.bias
-            + (1.0 - self.alpha) * (imu_angular_velocity - average_angular_velocity);
+        let angular_velocity = if let Some(wheel_interval) = self.wheel_interval {
+            let average_angular_velocity = AngularVelocity::from(
+                (average_right_velocity - average_left_velocity) / wheel_interval,
+            );
 
-        let angular_velocity = imu_angular_velocity - self.bias;
+            self.bias = self.alpha * self.bias
+                + (1.0 - self.alpha) * (imu_angular_velocity - average_angular_velocity);
+
+            imu_angular_velocity - self.bias
+        } else {
+            imu_angular_velocity
+        };
 
         //complementary filter
         let trans_velocity = self.alpha * (self.trans_velocity + trans_acceleration * self.period)
@@ -199,7 +203,7 @@ where
             right_encoder: self.right_encoder,
             imu: self.imu,
             bias: Default::default(),
-            wheel_interval: self.wheel_interval,
+            wheel_interval: Some(self.wheel_interval),
             initial_state: state.clone(),
             state,
             _phantom: PhantomData,
@@ -232,7 +236,73 @@ where
             right_encoder: self.right_encoder,
             imu: self.imu,
             bias: Default::default(),
-            wheel_interval: self.wheel_interval,
+            wheel_interval: Some(self.wheel_interval),
+            initial_state: state.clone(),
+            state,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, Angle, Length, Length, ()>
+where
+    LE: Encoder,
+    RE: Encoder,
+    I: IMU,
+{
+    pub fn build<M>(self) -> Estimator<LE, RE, I, M>
+    where
+        M: Math,
+    {
+        let alpha = 1.0
+            / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
+                + 1.0);
+
+        let state = Self::initial_state(self.initial_x, self.initial_y, self.initial_posture);
+
+        Estimator {
+            period: self.period,
+            alpha,
+            trans_velocity: Default::default(),
+            angular_velocity: Default::default(),
+            left_encoder: self.left_encoder,
+            right_encoder: self.right_encoder,
+            imu: self.imu,
+            bias: Default::default(),
+            wheel_interval: None,
+            initial_state: state.clone(),
+            state,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<LE, RE, I> EstimatorBuilder<LE, RE, I, Time, Frequency, (), (), (), ()>
+where
+    LE: Encoder,
+    RE: Encoder,
+    I: IMU,
+{
+    pub fn build<M>(self) -> Estimator<LE, RE, I, M>
+    where
+        M: Math,
+    {
+        let alpha = 1.0
+            / (2.0 * core::f32::consts::PI * (self.period * self.cut_off_frequency).get::<ratio>()
+                + 1.0);
+
+        let state = Self::initial_state(Default::default(), Default::default(), Default::default());
+
+        Estimator {
+            period: self.period,
+            alpha,
+            trans_velocity: Default::default(),
+            angular_velocity: Default::default(),
+            left_encoder: self.left_encoder,
+            right_encoder: self.right_encoder,
+            imu: self.imu,
+            bias: Default::default(),
+            wheel_interval: None,
             initial_state: state.clone(),
             state,
             _phantom: PhantomData,
