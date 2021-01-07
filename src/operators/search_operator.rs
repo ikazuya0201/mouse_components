@@ -1,4 +1,5 @@
 use alloc::rc::Rc;
+use core::cell::RefCell;
 use core::convert::TryInto;
 use core::marker::PhantomData;
 
@@ -11,7 +12,7 @@ pub trait SearchAgent<Command> {
 
     //update estimated state
     fn update_state(&self);
-    fn set_command(&self, command: &Command);
+    fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
     fn get_obstacles(&self) -> Self::Obstacles;
     //This method is called by interrupt.
     fn track_next(&self) -> Result<(), Self::Error>;
@@ -30,6 +31,7 @@ where
     Solver: SearchCommander<Obstacle>,
 {
     start_command: Solver::Command,
+    keeped_command: RefCell<Option<Solver::Command>>,
     next_mode: Mode,
     agent: Rc<Agent>,
     solver: Rc<Solver>,
@@ -48,6 +50,7 @@ where
     ) -> Self {
         Self {
             start_command,
+            keeped_command: RefCell::new(None),
             next_mode,
             agent,
             solver,
@@ -70,7 +73,9 @@ where
     type Mode = Mode;
 
     fn init(&self) {
-        self.agent.set_command(&self.start_command);
+        self.agent
+            .set_command(&self.start_command)
+            .unwrap_or_else(|_| unimplemented!("This error handling will be implemented"));
     }
 
     fn tick(&self) -> Result<(), Self::Error> {
@@ -81,12 +86,24 @@ where
     }
 
     fn run(&self) -> Result<Mode, NotFinishError> {
-        match self.solver.next_command() {
-            Ok(command) => self.agent.set_command(&command),
-            Err(err) => match err.try_into() {
-                Ok(_) => return Ok(self.next_mode),
-                Err(_) => (),
-            },
+        let mut keeped_command = self.keeped_command.borrow_mut();
+        if let Some(command) = keeped_command.as_ref() {
+            if self.agent.set_command(command).is_ok() {
+                keeped_command.take();
+            }
+        } else {
+            match self.solver.next_command() {
+                Ok(command) => {
+                    if self.agent.set_command(&command).is_err() {
+                        keeped_command.replace(command);
+                    }
+                }
+                Err(err) => {
+                    if err.try_into().is_ok() {
+                        return Ok(self.next_mode);
+                    }
+                }
+            }
         }
         Err(NotFinishError)
     }
