@@ -481,8 +481,8 @@ mod tests {
 
     struct AgentSimulatorInner<T> {
         trajectory: T,
-        current: Target,
-        prev: Target,
+        current: State,
+        prev: State,
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -494,25 +494,37 @@ mod tests {
     {
         fn step(&mut self) -> Result<State, FinishError> {
             if let Some(target) = self.trajectory.next() {
-                self.prev = self.current;
-                self.current = target;
-                Ok(State {
-                    x: LengthState {
-                        x: target.x.x,
-                        v: target.x.v,
-                        a: target.x.a,
+                let state = match target {
+                    Target::Moving(target) => State {
+                        x: LengthState {
+                            x: target.x.x,
+                            v: target.x.v,
+                            a: target.x.a,
+                        },
+                        y: LengthState {
+                            x: target.y.x,
+                            v: target.y.v,
+                            a: target.y.a,
+                        },
+                        theta: AngleState {
+                            x: target.theta.x,
+                            v: target.theta.v,
+                            a: target.theta.a,
+                        },
                     },
-                    y: LengthState {
-                        x: target.y.x,
-                        v: target.y.v,
-                        a: target.y.a,
+                    Target::Spin(target) => State {
+                        x: Default::default(),
+                        y: Default::default(),
+                        theta: AngleState {
+                            x: target.x,
+                            v: target.v,
+                            a: target.a,
+                        },
                     },
-                    theta: AngleState {
-                        x: target.theta.x,
-                        v: target.theta.v,
-                        a: target.theta.a,
-                    },
-                })
+                };
+                core::mem::swap(&mut self.prev, &mut self.current);
+                self.current = state.clone();
+                Ok(state)
             } else {
                 Err(FinishError)
             }
@@ -562,11 +574,9 @@ mod tests {
         }
 
         fn get_translational_acceleration(&mut self) -> nb::Result<Acceleration, Self::Error> {
-            let f = |target: Target| {
-                target.x.a * target.theta.x.get::<radian>().cos()
-                    + target.y.a * target.theta.x.get::<radian>().sin()
-            };
-            let cur_a = f(self.inner.borrow().current);
+            let target = self.inner.borrow().current.clone();
+            let cur_a = target.x.a * target.theta.x.get::<radian>().cos()
+                + target.y.a * target.theta.x.get::<radian>().sin();
             Ok(cur_a)
         }
     }

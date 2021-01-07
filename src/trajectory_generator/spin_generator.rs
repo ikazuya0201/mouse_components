@@ -70,10 +70,6 @@ impl Iterator for SpinTrajectory {
         }
         let t = self.t;
         self.t += self.period;
-        Some(Target {
-            x: Default::default(),
-            y: Default::default(),
-            theta: self.angle_calculator.calculate(t),
-        })
+        Some(Target::Spin(self.angle_calculator.calculate(t)))
     }
 }
