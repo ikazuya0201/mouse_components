@@ -12,8 +12,9 @@ use components::{
     sensors::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
     },
-    utils::{array_length::ArrayLength, probability::Probability, sample::Sample},
+    utils::{probability::Probability, sample::Sample},
 };
+use generic_array::ArrayLength;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 use uom::si::f32::{
     Acceleration, Angle, AngularAcceleration, AngularVelocity, ElectricPotential, Length, Time,
