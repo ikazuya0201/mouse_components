@@ -10,7 +10,7 @@ use uom::si::{
     time::second,
 };
 
-use super::trajectory::{AngleTarget, LengthTarget, Target};
+use super::trajectory::{AngleTarget, LengthTarget, MoveTarget, Target};
 use crate::traits::Math;
 
 macro_rules! impl_calculator_generator {
@@ -489,10 +489,10 @@ impl Iterator for StraightTrajectory {
             StraightTrajectoryCalculator::Accel(calculator) => calculator.calculate(t),
             StraightTrajectoryCalculator::Constant(calculator) => calculator.calculate(t),
         };
-        Some(Target {
+        Some(Target::Moving(MoveTarget {
             x: target,
             ..Default::default()
-        })
+        }))
     }
 }
 
@@ -637,8 +637,9 @@ mod tests {
                 Velocity::new::<meter_per_second>(v_end),
             );
 
-            let mut before = trajectory.next().unwrap();
+            let mut before = trajectory.next().unwrap().moving().unwrap();
             for target in trajectory {
+                let target = target.moving().unwrap();
                 let cos = target.theta.x.get::<radian>().cos();
                 let sin = target.theta.x.get::<radian>().sin();
 

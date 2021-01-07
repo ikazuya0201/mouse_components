@@ -55,7 +55,8 @@ pub mod data_types {
     pub use obstacle_detector::Obstacle;
     pub use tracker::{AngleState, LengthState, State};
     pub use trajectory_generator::{
-        AngleTarget, LengthTarget, RunKind, SearchKind, SlalomDirection, SlalomKind, Target,
+        AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection, SlalomKind,
+        Target,
     };
     pub use wall_manager::Wall;
 }

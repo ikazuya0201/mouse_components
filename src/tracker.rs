@@ -14,7 +14,7 @@ use uom::si::{
 use uom::{typenum::*, Kind};
 
 use super::agent::Tracker as ITracker;
-use super::trajectory_generator::Target;
+use super::trajectory_generator::{AngleTarget, MoveTarget, Target};
 use crate::traits::Math;
 pub use state::{AngleState, LengthState, State};
 
@@ -83,7 +83,7 @@ impl<LM, RM, M, TC, RC, L> core::fmt::Debug for Tracker<LM, RM, M, TC, RC, L> {
 #[derive(Clone, PartialEq, Debug)]
 pub struct FailSafeError {
     state: State,
-    target: Target,
+    target: MoveTarget,
 }
 
 impl<LM, RM, M, TC, RC, L> ITracker<State, Target> for Tracker<LM, RM, M, TC, RC, L>
@@ -113,7 +113,10 @@ where
 
     fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error> {
         self.logger.log(&state, &target);
-        let (left, right) = self.track_move(state, target)?;
+        let (left, right) = match target {
+            Target::Moving(target) => self.track_move(state, target)?,
+            Target::Spin(target) => self.track_spin(state, target),
+        };
         self.left_motor.apply(left);
         self.right_motor.apply(right);
         Ok(())
@@ -135,7 +138,7 @@ where
         xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
     }
 
-    fn fail_safe(&mut self, state: &State, target: &Target) -> Result<(), FailSafeError> {
+    fn fail_safe(&mut self, state: &State, target: &MoveTarget) -> Result<(), FailSafeError> {
         let x_diff = state.x.x - target.x.x;
         let y_diff = state.y.x - target.y.x;
 
@@ -153,7 +156,7 @@ where
     fn track_move(
         &mut self,
         state: &State,
-        target: &Target,
+        target: &MoveTarget,
     ) -> Result<(ElectricPotential, ElectricPotential), FailSafeError> {
         self.fail_safe(state, target)?;
 
@@ -210,6 +213,25 @@ where
             .rotation_controller
             .calculate(uw, duw, state.theta.v, state.theta.a);
         Ok((vol_v - vol_w, vol_v + vol_w))
+    }
+
+    fn track_spin(
+        &mut self,
+        state: &State,
+        target: &AngleTarget,
+    ) -> (ElectricPotential, ElectricPotential) {
+        let (sin_th, cos_th) = M::sincos(state.theta.x);
+        let vv = state.x.v * cos_th + state.y.v * sin_th;
+        let va = state.x.a * cos_th + state.y.a * sin_th;
+
+        let vol_v =
+            self.translation_controller
+                .calculate(Default::default(), Default::default(), vv, va);
+        let vol_w =
+            self.rotation_controller
+                .calculate(target.v, target.a, state.theta.v, state.theta.a);
+
+        (vol_v - vol_w, vol_v + vol_w)
     }
 }
 
@@ -994,7 +1016,7 @@ mod tests {
 
             let log = Rc::new(RefCell::new(String::new()));
             let state = State::default();
-            let target = Target::default();
+            let target = Target::Moving(MoveTarget::default());
             let mut tracker = build_tracker(ILogger::new(Rc::clone(&log)));
             tracker.track(&state, &target).unwrap();
             assert_eq!(log.borrow().as_ref(), format!("{:?},{:?}", state, target));

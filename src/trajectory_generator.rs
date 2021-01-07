@@ -16,7 +16,7 @@ pub use slalom_generator::{slalom_parameters_map, SlalomDirection, SlalomKind, S
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use spin_generator::{SpinGenerator, SpinTrajectory};
 use straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
-pub use trajectory::{AngleTarget, LengthTarget, ShiftTrajectory, Target};
+pub use trajectory::{AngleTarget, LengthTarget, MoveTarget, ShiftTrajectory, Target};
 use uom::si::{
     angle::degree,
     f32::{
@@ -673,13 +673,19 @@ mod tests {
 
                     let mut last = trajectory.next().unwrap();
                     for target in trajectory {
-                        let v = target.x.v * target.theta.x.get::<radian>().cos()
-                            + target.y.v * target.theta.x.get::<radian>().sin();
-                        assert!(
-                            v.get::<meter_per_second>() < search_velocity.get::<meter_per_second>() + EPSILON * 100.0,
-                        );
+                        match target {
+                            Target::Moving(target) => {
+                                let v = target.x.v * target.theta.x.get::<radian>().cos()
+                                    + target.y.v * target.theta.x.get::<radian>().sin();
+                                assert!(
+                                    v.get::<meter_per_second>() < search_velocity.get::<meter_per_second>() + EPSILON * 100.0,
+                                );
+                            },
+                            Target::Spin(_) => (),
+                        }
                         last = target;
                     }
+                    let last = last.moving().unwrap();
                     assert_relative_eq!(last.x.x.get::<meter>(), last_x, epsilon = EPSILON);
                     assert_relative_eq!(last.y.x.get::<meter>(), last_y, epsilon = EPSILON);
                     assert_relative_eq!(last.theta.x.get::<degree>(), last_theta, epsilon = EPSILON);
