@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use core::ops::{Add, Mul};
+use core::ops::Mul;
 
 use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
@@ -654,9 +654,8 @@ where
 
 impl<N> RunNode<N>
 where
-    N: Unsigned + PowerOfTwo + Mul<U2>,
-    N::Output: Add<U10>,
-    <N::Output as Add<U10>>::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
+    N: Unsigned + PowerOfTwo + Mul<U4>,
+    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
 {
     fn neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
         use AbsoluteDirection::*;
@@ -684,14 +683,11 @@ where
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, <N::Output as Add<U10>>::Output>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, N::Output>,
         i16,
         i16,
     ) -> Result<(), ()> {
-        move |list: &mut ForcedVec<
-            WallNode<Wall<N>, (RunNode<N>, u16)>,
-            <N::Output as Add<U10>>::Output,
-        >,
+        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, N::Output>,
               dx: i16,
               dy: i16| {
             let (dx, dy) = if is_succ { (dx, dy) } else { (-dx, -dy) };
@@ -707,16 +703,13 @@ where
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, <N::Output as Add<U10>>::Output>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, N::Output>,
         i16,
         i16,
         RelativeDirection,
         Pattern,
     ) -> Result<(), ()> {
-        move |list: &mut ForcedVec<
-            WallNode<Wall<N>, (RunNode<N>, u16)>,
-            <N::Output as Add<U10>>::Output,
-        >,
+        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, N::Output>,
               dx: i16,
               dy: i16,
               ddir: RelativeDirection,
@@ -872,13 +865,12 @@ impl<N> WallSpaceNode for RunNode<N> {
 //TODO: use iterator instead of vec
 impl<N> GraphNode for RunNode<N>
 where
-    N: Unsigned + PowerOfTwo + Mul<U2>,
-    N::Output: Add<U10>,
-    <N::Output as Add<U10>>::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
+    N: Unsigned + PowerOfTwo + Mul<U4>,
+    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
 {
-    type NeighborNum = <N::Output as Add<U10>>::Output;
+    type NeighborNum = N::Output;
     type Cost = u16;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Cost)>, <N::Output as Add<U10>>::Output>;
+    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Cost)>, N::Output>;
     type WallNodesList = Vec<Self::WallNodes, U3>;
 
     fn successors(&self) -> Self::WallNodesList {
