@@ -1,5 +1,6 @@
 mod direction;
 
+use core::fmt;
 use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
@@ -116,12 +117,28 @@ pub struct Maze<Manager, PoseConverterType, WallConverterType, MathType> {
     _math: PhantomData<fn() -> MathType>,
 }
 
-impl<Manager, PoseConverterType, WallConverterType, MathType> core::fmt::Debug
+impl<Manager, PoseConverterType, WallConverterType, MathType> fmt::Debug
     for Maze<Manager, PoseConverterType, WallConverterType, MathType>
 where
-    Manager: core::fmt::Debug,
+    Manager: fmt::Debug,
+    PoseConverterType: fmt::Debug,
+    WallConverterType: fmt::Debug,
 {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Maze")
+            .field("manager", &self.manager)
+            .field("pose_converter", &self.pose_converter)
+            .field("wall_converter", &self.wall_converter)
+            .finish()
+    }
+}
+
+impl<Manager, PoseConverterType, WallConverterType, MathType> fmt::Display
+    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
+where
+    Manager: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.manager.fmt(f)
     }
 }
