@@ -85,16 +85,16 @@ impl<N> Node<N> {
         }
     }
 
-    pub fn x(&self) -> u16 {
-        self.x as u16
+    pub fn x(&self) -> &i16 {
+        &self.x
     }
 
-    pub fn y(&self) -> u16 {
-        self.y as u16
+    pub fn y(&self) -> &i16 {
+        &self.y
     }
 
-    pub fn direction(&self) -> AbsoluteDirection {
-        self.direction
+    pub fn direction(&self) -> &AbsoluteDirection {
+        &self.direction
     }
 
     fn location(&self) -> Location {
@@ -313,15 +313,21 @@ where
                 unreachable!()
             }
         };
-        self.x() as usize
-            | ((self.y() as usize) << Self::y_offset())
+        *self.x() as usize
+            | ((*self.y() as usize) << Self::y_offset())
             | (direction << Self::direction_offset())
     }
 }
 
 impl<N> From<SearchNode<N>> for Wall<N> {
     fn from(value: SearchNode<N>) -> Self {
-        unsafe { Wall::new_unchecked(value.x() / 2, value.y() / 2, value.x() & 1 == 0) }
+        unsafe {
+            Wall::new_unchecked(
+                *value.x() as u16 / 2,
+                *value.y() as u16 / 2,
+                value.x() & 1 == 0,
+            )
+        }
     }
 }
 
