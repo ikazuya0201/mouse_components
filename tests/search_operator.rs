@@ -8,12 +8,11 @@ use core::f32::consts::PI;
 
 use components::{
     data_types::{
-        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RunNode, SearchKind, SearchNode,
-        State,
+        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RunNode, SearchKind, State,
     },
     defaults,
     impls::{
-        slalom_parameters_map, Commander, EstimatorBuilder, Maze, NodeConverter, ObstacleDetector,
+        slalom_parameters_map, EstimatorBuilder, Maze, NodeConverter, ObstacleDetector,
         PoseConverter, RotationControllerBuilder, SearchAgent, SearchOperator, TrackerBuilder,
         TrajectoryGeneratorBuilder, TranslationControllerBuilder, WallConverter, WallManager,
     },
@@ -240,12 +239,12 @@ macro_rules! search_operator_tests {
                     let wall_converter = WallConverter::new(cost);
                     let maze = Maze::<_, _, _, MathFake>::new(wall_storage, pose_converter, wall_converter);
                     let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
-                    let search_start = SearchNode::<Size>::new(0, 1, North, cost).unwrap();
                     let node_converter = NodeConverter::default();
-                    Rc::new(Commander::new(
+                    Rc::new(defaults::Commander::new(
                         start,
                         goals.clone(),
-                        search_start,
+                        SearchKind::Init,
+                        SearchKind::Final,
                         maze,
                         node_converter,
                     ))
@@ -254,14 +253,7 @@ macro_rules! search_operator_tests {
                 let commander = create_commander(WallManager::<Size>::new(existence_threshold));
                 let expected_commander = create_commander(wall_storage);
 
-                let start_pose = Pose {
-                    x: start_state.x.x,
-                    y: start_state.y.x,
-                    theta: start_state.theta.x,
-                };
-
                 let operator = SearchOperator::new(
-                    (start_pose, SearchKind::Init),
                     (),
                     Rc::clone(&agent),
                     Rc::clone(&commander),

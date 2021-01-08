@@ -30,7 +30,6 @@ pub struct SearchOperator<Mode, Obstacle, Agent, Solver>
 where
     Solver: SearchCommander<Obstacle>,
 {
-    start_command: Solver::Command,
     keeped_command: RefCell<Option<Solver::Command>>,
     next_mode: Mode,
     agent: Rc<Agent>,
@@ -42,14 +41,8 @@ impl<Mode, Obstacle, Agent, Solver> SearchOperator<Mode, Obstacle, Agent, Solver
 where
     Solver: SearchCommander<Obstacle>,
 {
-    pub fn new(
-        start_command: Solver::Command,
-        next_mode: Mode,
-        agent: Rc<Agent>,
-        solver: Rc<Solver>,
-    ) -> Self {
+    pub fn new(next_mode: Mode, agent: Rc<Agent>, solver: Rc<Solver>) -> Self {
         Self {
-            start_command,
             keeped_command: RefCell::new(None),
             next_mode,
             agent,
@@ -73,9 +66,13 @@ where
     type Mode = Mode;
 
     fn init(&self) {
+        let command = self
+            .solver
+            .next_command()
+            .unwrap_or_else(|_| unimplemented!("This error handling is not implemented."));
         self.agent
-            .set_command(&self.start_command)
-            .unwrap_or_else(|_| unimplemented!("This error handling will be implemented"));
+            .set_command(&command)
+            .unwrap_or_else(|_| unreachable!());
     }
 
     fn tick(&self) -> Result<(), Self::Error> {

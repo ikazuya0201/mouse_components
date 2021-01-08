@@ -3,8 +3,9 @@ extern crate components;
 use typenum::consts::*;
 
 use components::{
-    data_types::{AbsoluteDirection, Pattern, RunNode, SearchNode, Wall},
-    impls::{Commander, Maze, NodeConverter, PoseConverter, WallConverter, WallManager},
+    data_types::{AbsoluteDirection, Pattern, RunNode, SearchKind, Wall},
+    defaults::Commander,
+    impls::{Maze, NodeConverter, PoseConverter, WallConverter, WallManager},
     prelude::*,
     traits::Math,
     utils::probability::Probability,
@@ -66,7 +67,6 @@ fn test_compute_shortest_path_u4() {
 
     let start = new(0, 0, North);
     let goals = vec![new(2, 0, West), new(2, 0, South)];
-    let start_search_node = SearchNode::<Size>::new(0, 1, North, cost).unwrap();
 
     let test_data = vec![
         (vec![], vec![new(0, 0, North), new(2, 0, South)]),
@@ -108,7 +108,8 @@ fn test_compute_shortest_path_u4() {
         let commander = Commander::new(
             start,
             goals.clone(),
-            start_search_node.clone(),
+            SearchKind::Init,
+            SearchKind::Final,
             maze,
             node_converter,
         );

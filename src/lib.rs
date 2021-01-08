@@ -159,10 +159,11 @@ pub mod defaults {
         MaxPathLength,
     >;
 
-    pub type Commander<Size, Goals, Math> = impls::Commander<
+    pub type Commander<Size, Math> = impls::Commander<
+        data_types::Node<Size>,
         data_types::RunNode<Size>,
-        Goals,
         data_types::SearchNode<Size>,
+        data_types::SearchKind,
         impls::Maze<
             impls::WallManager<Size>,
             impls::PoseConverter<Size, Math>,
@@ -184,7 +185,6 @@ pub mod defaults {
         MaxPathLength,
         Mode,
         Size,
-        Goals,
         Logger = impls::NullLogger,
     > = impls::SearchOperator<
         Mode,
@@ -201,7 +201,7 @@ pub mod defaults {
             MaxPathLength,
             Logger,
         >,
-        Commander<Size, Goals, Math>,
+        Commander<Size, Math>,
     >;
 
     pub type RunOperator<
@@ -216,7 +216,6 @@ pub mod defaults {
         MaxPathLength,
         Mode,
         Size,
-        Goals,
         Logger = impls::NullLogger,
     > = impls::RunOperator<
         Mode,
@@ -232,6 +231,6 @@ pub mod defaults {
             MaxPathLength,
             Logger,
         >,
-        Commander<Size, Goals, Math>,
+        Commander<Size, Math>,
     >;
 }

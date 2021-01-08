@@ -29,6 +29,7 @@ use uom::si::{
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SearchKind {
     Init,
+    Final,
     Search(RelativeDirection),
 }
 
@@ -40,10 +41,8 @@ pub enum RunKind {
 }
 
 pub enum SearchTrajectory<M> {
-    Init(StraightTrajectory),
-    Right(SlalomTrajectory<M>),
-    Left(SlalomTrajectory<M>),
-    Front(StraightTrajectory),
+    Straight(StraightTrajectory),
+    Slalom(SlalomTrajectory<M>),
     Back(BackTrajectory<M>),
 }
 
@@ -54,10 +53,8 @@ impl<M: Math> Iterator for SearchTrajectory<M> {
         use SearchTrajectory::*;
 
         match self {
-            Init(inner) => inner.next(),
-            Right(inner) => inner.next(),
-            Left(inner) => inner.next(),
-            Front(inner) => inner.next(),
+            Straight(inner) => inner.next(),
+            Slalom(inner) => inner.next(),
             Back(inner) => inner.next(),
         }
     }
@@ -164,16 +161,24 @@ where
             match kind {
                 Init => {
                     let distance = Length::new::<meter>(0.045);
-                    SearchTrajectory::Init(self.straight_generator.generate(
+                    SearchTrajectory::Straight(self.straight_generator.generate(
                         distance,
                         Default::default(),
                         self.search_velocity,
                     ))
                 }
+                Final => {
+                    let distance = Length::new::<meter>(0.045);
+                    SearchTrajectory::Straight(self.straight_generator.generate(
+                        distance,
+                        self.search_velocity,
+                        Default::default(),
+                    ))
+                }
                 Search(direction) => match direction {
-                    Front => SearchTrajectory::Front(self.front_trajectory.clone()),
-                    Right => SearchTrajectory::Right(self.right_trajectory.clone()),
-                    Left => SearchTrajectory::Left(self.left_trajectory.clone()),
+                    Front => SearchTrajectory::Straight(self.front_trajectory.clone()),
+                    Right => SearchTrajectory::Slalom(self.right_trajectory.clone()),
+                    Left => SearchTrajectory::Slalom(self.left_trajectory.clone()),
                     Back => SearchTrajectory::Back(self.back_trajectory.clone()),
                     _ => unreachable!(),
                 },
