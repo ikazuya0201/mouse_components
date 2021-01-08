@@ -1,4 +1,5 @@
 use core::cell::RefCell;
+use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Mul;
 
@@ -88,13 +89,27 @@ where
     existence_threshold: Probability,
 }
 
-impl<N> core::fmt::Debug for WallManager<N>
+impl<N> fmt::Debug for WallManager<N>
+where
+    N: Mul<N>,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WallManager")
+            .field("walls", &self.walls)
+            .field("existence_threshold", &self.existence_threshold)
+            .finish()
+    }
+}
+
+impl<N> fmt::Display for WallManager<N>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
 {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let prob = |x: u16, y: u16, is_top: bool| -> Probability {
             let wall = Wall::<N>::new(x, y, is_top).unwrap();
             self.walls[wall.to_index()].borrow().clone()
