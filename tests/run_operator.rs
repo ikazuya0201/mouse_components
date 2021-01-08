@@ -12,7 +12,7 @@ use components::{
     },
     defaults,
     impls::{
-        slalom_parameters_map, EstimatorBuilder, Maze, NodeConverter, ObstacleDetector,
+        slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
         PoseConverter, RotationControllerBuilder, RunAgent, RunOperator, TrackerBuilder,
         TrajectoryGeneratorBuilder, TranslationControllerBuilder, WallConverter, WallManager,
     },
@@ -242,18 +242,21 @@ fn test_run_operator() {
             RunNode::<Size>::new(2, 0, South, cost).unwrap(),
             RunNode::<Size>::new(2, 0, West, cost).unwrap(),
         ];
-        let node_converter = NodeConverter::default();
         Rc::new(defaults::Commander::new(
             start,
             goals,
             SearchKind::Init,
             SearchKind::Final,
             maze,
-            node_converter,
         ))
     };
 
-    let operator = RunOperator::new((), Rc::clone(&agent), Rc::clone(&commander));
+    let operator = RunOperator::new(
+        (),
+        Rc::clone(&agent),
+        Rc::clone(&commander),
+        CommandConverter::default(),
+    );
     operator.init();
     while operator.run().is_err() {
         stepper.step();

@@ -12,7 +12,7 @@ use components::{
     },
     defaults,
     impls::{
-        slalom_parameters_map, EstimatorBuilder, Maze, NodeConverter, ObstacleDetector,
+        slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
         PoseConverter, RotationControllerBuilder, SearchAgent, SearchOperator, TrackerBuilder,
         TrajectoryGeneratorBuilder, TranslationControllerBuilder, WallConverter, WallManager,
     },
@@ -239,14 +239,12 @@ macro_rules! search_operator_tests {
                     let wall_converter = WallConverter::new(cost);
                     let maze = Maze::<_, _, _, MathFake>::new(wall_storage, pose_converter, wall_converter);
                     let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
-                    let node_converter = NodeConverter::default();
                     Rc::new(defaults::Commander::new(
                         start,
                         goals.clone(),
                         SearchKind::Init,
                         SearchKind::Final,
                         maze,
-                        node_converter,
                     ))
                 };
 
@@ -257,6 +255,7 @@ macro_rules! search_operator_tests {
                     (),
                     Rc::clone(&agent),
                     Rc::clone(&commander),
+                    CommandConverter::default(),
                 );
                 operator.init();
                 let mut count = 0usize;

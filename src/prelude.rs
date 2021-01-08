@@ -11,7 +11,6 @@ pub use crate::operators::SearchCommander as _components_operators_search_operat
 pub use crate::commander::Graph as _components_commander_Graph;
 pub use crate::commander::GraphConverter as _components_commander_GraphConverter;
 pub use crate::commander::NodeChecker as _components_commander_NodeChecker;
-pub use crate::commander::NodeConverter as _components_commander_NodeConverter;
 pub use crate::commander::ObstacleInterpreter as _components_commander_ObstacleInterpreter;
 
 pub use crate::agent::ObstacleDetector as _components_agent_ObstacleDetector;

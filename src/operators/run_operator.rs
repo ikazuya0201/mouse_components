@@ -1,6 +1,7 @@
 use alloc::rc::Rc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
+use super::search_operator::CommandConverter;
 use crate::administrator::{NotFinishError, Operator};
 
 pub trait RunCommander {
@@ -18,28 +19,36 @@ pub trait RunAgent<Command> {
     fn track_next(&self) -> Result<(), Self::Error>;
 }
 
-pub struct RunOperator<Mode, Agent, Commander> {
+pub struct RunOperator<Mode, Agent, Commander, Converter> {
     next_mode: Mode,
     is_completed: AtomicBool,
     agent: Rc<Agent>,
     commander: Rc<Commander>,
+    converter: Converter,
 }
 
-impl<Mode, Agent, Commander> RunOperator<Mode, Agent, Commander> {
-    pub fn new(next_mode: Mode, agent: Rc<Agent>, solver: Rc<Commander>) -> Self {
+impl<Mode, Agent, Commander, Converter> RunOperator<Mode, Agent, Commander, Converter> {
+    pub fn new(
+        next_mode: Mode,
+        agent: Rc<Agent>,
+        commander: Rc<Commander>,
+        converter: Converter,
+    ) -> Self {
         Self {
             next_mode,
             is_completed: AtomicBool::new(false),
             agent,
-            commander: solver,
+            commander,
+            converter,
         }
     }
 }
 
-impl<Mode, Agent, Commander> Operator for RunOperator<Mode, Agent, Commander>
+impl<Mode, Agent, Commander, Converter> Operator for RunOperator<Mode, Agent, Commander, Converter>
 where
     Mode: Copy,
-    Agent: RunAgent<Commander::Command>,
+    Agent: RunAgent<Converter::Output>,
+    Converter: CommandConverter<Commander::Command>,
     Commander: RunCommander,
     Commander::Error: core::fmt::Debug,
 {
@@ -52,7 +61,12 @@ where
             .commander
             .compute_commands()
             .unwrap_or_else(|err| todo!("Error handling is not implemented: {:?}", err));
-        self.agent.set_commands(commands);
+
+        self.agent.set_commands(
+            commands
+                .into_iter()
+                .map(|command| self.converter.convert(command)),
+        );
     }
 
     //TODO: correct agent position by sensor value and wall existence

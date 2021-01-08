@@ -4,12 +4,12 @@ extern crate alloc;
 
 mod administrator;
 mod agent;
+mod command_converter;
 mod commander;
 mod controller;
 mod estimator;
 mod maze;
 mod node;
-mod node_converter;
 mod obstacle_detector;
 mod operators;
 mod pose_converter;
@@ -30,10 +30,9 @@ pub mod traits {
         Tracker,
     };
     pub use commander::{
-        BoundedNode, Graph, GraphConverter, NodeChecker, NodeConverter, ObstacleInterpreter,
-        RouteNode,
+        BoundedNode, Graph, GraphConverter, NodeChecker, ObstacleInterpreter, RouteNode,
     };
-    pub use operators::{RunAgent, RunCommander, SearchAgent, SearchCommander};
+    pub use operators::{CommandConverter, RunAgent, RunCommander, SearchAgent, SearchCommander};
     pub use tracker::{Logger, RotationController, TranslationController};
 }
 
@@ -66,6 +65,7 @@ pub mod impls {
 
     pub use administrator::Administrator;
     pub use agent::{RunAgent, SearchAgent};
+    pub use command_converter::CommandConverter;
     pub use commander::Commander;
     pub use controller::{
         RotationController, RotationControllerBuilder, TranslationController,
@@ -73,7 +73,6 @@ pub mod impls {
     };
     pub use estimator::{Estimator, EstimatorBuilder};
     pub use maze::Maze;
-    pub use node_converter::NodeConverter;
     pub use obstacle_detector::ObstacleDetector;
     pub use operators::{RunOperator, SearchOperator};
     pub use pose_converter::PoseConverter;
@@ -170,7 +169,6 @@ pub mod defaults {
             impls::WallConverter,
             Math,
         >,
-        impls::NodeConverter,
     >;
 
     pub type SearchOperator<
@@ -189,6 +187,7 @@ pub mod defaults {
     > = impls::SearchOperator<
         Mode,
         data_types::Obstacle,
+        (data_types::Pose, data_types::SearchNode<Size>),
         SearchAgent<
             LeftEncoder,
             RightEncoder,
@@ -202,6 +201,7 @@ pub mod defaults {
             Logger,
         >,
         Commander<Size, Math>,
+        impls::CommandConverter,
     >;
 
     pub type RunOperator<
@@ -232,5 +232,6 @@ pub mod defaults {
             Logger,
         >,
         Commander<Size, Math>,
+        impls::CommandConverter,
     >;
 }
