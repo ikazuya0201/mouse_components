@@ -48,13 +48,6 @@ pub trait NodeChecker<Node> {
     fn is_available(&self, node: &Node) -> Result<bool, CannotCheckError>;
 }
 
-pub trait NodeConverter<Node> {
-    type Error;
-    type Target;
-
-    fn convert(&self, source: &Node) -> Result<Self::Target, Self::Error>;
-}
-
 pub trait RouteNode {
     type Error;
     type Route;
@@ -88,7 +81,7 @@ type CandidateSizeUpperBound = U4;
 type GoalSizeUpperBound = U8;
 
 //NOTE: The upper bounds of goal size and candidates size are fixed.
-pub struct Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType> {
+pub struct Commander<Node, RunNode, SearchNode, Route, Maze> {
     start: RunNode,
     goals: Vec<RunNode, GoalSizeUpperBound>,
     initial_route: Route,
@@ -97,11 +90,9 @@ pub struct Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType> {
     state: Cell<State>,
     candidates: RefCell<Vec<SearchNode, CandidateSizeUpperBound>>,
     maze: Maze,
-    converter: ConverterType,
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze, ConverterType>
-    Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType>
+impl<Node, RunNode, SearchNode, Route, Maze> Commander<Node, RunNode, SearchNode, Route, Maze>
 where
     Node: From<RunNode>,
     RunNode: Clone,
@@ -112,7 +103,6 @@ where
         initial_route: Route,
         final_route: Route,
         maze: Maze,
-        converter: ConverterType,
     ) -> Self {
         Self {
             start: start.clone(),
@@ -123,13 +113,12 @@ where
             state: Cell::new(State::Initial),
             candidates: RefCell::new(Vec::new()),
             maze,
-            converter,
         }
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze, ConverterType> core::fmt::Debug
-    for Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType>
+impl<Node, RunNode, SearchNode, Route, Maze> core::fmt::Debug
+    for Commander<Node, RunNode, SearchNode, Route, Maze>
 where
     Maze: core::fmt::Debug,
     SearchNode: core::fmt::Debug,
@@ -157,15 +146,8 @@ impl TryInto<FinishError> for CommanderError {
     }
 }
 
-impl<Node, RunNode, Cost, Maze, ConverterType, Obstacle> SearchCommander<Obstacle>
-    for Commander<
-        Node,
-        RunNode,
-        Maze::SearchNode,
-        <Maze::SearchNode as RouteNode>::Route,
-        Maze,
-        ConverterType,
-    >
+impl<Node, RunNode, Cost, Maze, Obstacle> SearchCommander<Obstacle>
+    for Commander<Node, RunNode, Maze::SearchNode, <Maze::SearchNode as RouteNode>::Route, Maze>
 where
     RunNode::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
@@ -186,15 +168,10 @@ where
         + NodeChecker<<Maze as GraphConverter<RunNode>>::SearchNode>,
     Node: From<Maze::SearchNode> + Clone + NextNode<<Maze::SearchNode as RouteNode>::Route>,
     <Maze::SearchNode as RouteNode>::Route: Clone,
-    ConverterType: NodeConverter<Node>,
-    ConverterType::Error: Debug,
     <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
 {
     type Error = CommanderError;
-    type Command = (
-        <ConverterType as NodeConverter<Node>>::Target,
-        <Maze::SearchNode as RouteNode>::Route,
-    );
+    type Command = (Node, <Maze::SearchNode as RouteNode>::Route);
 
     //TODO: write test
     fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
@@ -206,16 +183,15 @@ where
     fn next_command(&self) -> Result<Self::Command, Self::Error> {
         match self.state.get() {
             State::Initial => {
-                let mut current = self.current.borrow_mut();
-                let pose = self
-                    .converter
-                    .convert(&*current)
-                    .unwrap_or_else(|_| unimplemented!());
-                *current = current
-                    .next(&self.initial_route)
-                    .unwrap_or_else(|_| unreachable!());
+                let next = {
+                    self.current
+                        .borrow()
+                        .next(&self.initial_route)
+                        .unwrap_or_else(|_| unreachable!())
+                };
+                let current = self.current.replace(next);
                 self.state.set(State::Solving);
-                Ok((pose, self.initial_route.clone()))
+                Ok((current, self.initial_route.clone()))
             }
             State::Final => Err(CommanderError::SolveFinishError),
             State::Solving => {
@@ -253,24 +229,25 @@ where
                 }
                 self.candidates.replace(Vec::new());
                 self.state.set(State::Solving);
-                let mut current = self.current.borrow_mut();
-                let pose = self
-                    .converter
-                    .convert(&*current)
-                    .expect("Should never panic");
                 if let Some(next) = next {
-                    let kind = <Maze::SearchNode as TryFrom<Node>>::try_from(current.clone())
-                        .unwrap_or_else(|_| unimplemented!())
-                        .route(&next)
-                        .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err));
-                    *current = Node::from(next);
-                    Ok((pose, kind))
+                    let kind = {
+                        <Maze::SearchNode as TryFrom<Node>>::try_from(self.current.borrow().clone())
+                            .unwrap_or_else(|_| unimplemented!())
+                            .route(&next)
+                            .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
+                    };
+                    let current = self.current.replace(Node::from(next));
+                    Ok((current, kind))
                 } else {
-                    *current = current
-                        .next(&self.final_route)
-                        .unwrap_or_else(|_| unreachable!());
+                    let next = {
+                        self.current
+                            .borrow()
+                            .next(&self.final_route)
+                            .unwrap_or_else(|_| unreachable!())
+                    };
+                    let current = self.current.replace(next);
                     self.state.set(State::Final);
-                    Ok((pose, self.final_route.clone()))
+                    Ok((current, self.final_route.clone()))
                 }
             }
         }
@@ -278,8 +255,7 @@ where
 }
 
 //TODO: write test
-impl<Node, RunNode, Cost, Route, Maze, ConverterType>
-    Commander<Node, RunNode, Maze::SearchNode, Route, Maze, ConverterType>
+impl<Node, RunNode, Cost, Route, Maze> Commander<Node, RunNode, Maze::SearchNode, Route, Maze>
 where
     RunNode::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
@@ -356,29 +332,24 @@ pub enum RunCommanderError {
 ///NOTO: multiple implementations of Converter<_> can exist for different Target,
 ///but we assume there is only an implementation.
 //TODO: write test
-impl<Node, RunNode, SearchNode, Route, Maze, ConverterType> RunCommander
-    for Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType>
+impl<Node, RunNode, SearchNode, Route, Maze> RunCommander
+    for Commander<Node, RunNode, SearchNode, Route, Maze>
 where
     RunNode::UpperBound: ArrayLength<Option<RunNode>>
         + ArrayLength<Option<usize>>
         + ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
         + ArrayLength<(RunNode, Reverse<Maze::Cost>)>
-        + ArrayLength<(
-            <ConverterType as NodeConverter<RunNode>>::Target,
-            RunNode::Route,
-        )> + Unsigned,
+        + ArrayLength<(Node, RunNode::Route)>
+        + Unsigned,
     RunNode::PathUpperBound: ArrayLength<RunNode>,
     RunNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode + BoundedPathNode,
+    Node: From<RunNode>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode>,
-    ConverterType: NodeConverter<RunNode>,
 {
     type Error = RunCommanderError;
-    type Command = (
-        <ConverterType as NodeConverter<RunNode>>::Target,
-        RunNode::Route,
-    );
+    type Command = (Node, RunNode::Route);
     type Commands = Vec<Self::Command, RunNode::UpperBound>;
 
     fn compute_commands(&self) -> Result<Self::Commands, Self::Error> {
@@ -393,9 +364,7 @@ where
         for i in 0..path.len() - 1 {
             commands
                 .push((
-                    self.converter
-                        .convert(&path[i])
-                        .map_err(|_| RunCommanderError::ConversionError)?,
+                    Node::from(path[i]),
                     path[i]
                         .route(&path[i + 1])
                         .map_err(|_| RunCommanderError::ConversionError)?,
@@ -406,8 +375,7 @@ where
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze, ConverterType>
-    Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType>
+impl<Node, RunNode, SearchNode, Route, Maze> Commander<Node, RunNode, SearchNode, Route, Maze>
 where
     RunNode::UpperBound: ArrayLength<Option<RunNode>>
         + ArrayLength<Option<usize>>
@@ -576,8 +544,7 @@ mod tests {
             type PathUpperBound = U10;
         }
 
-        let solver =
-            Commander::<Node, RunNode, SearchNode, _, _, ()>::new(start, goals, (), (), graph, ());
+        let solver = Commander::<Node, RunNode, SearchNode, _, _>::new(start, goals, (), (), graph);
 
         let path = solver.compute_shortest_path();
         let expected = vec![0, 1, 3, 5, 7, 8]

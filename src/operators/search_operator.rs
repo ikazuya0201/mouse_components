@@ -26,27 +26,36 @@ pub trait SearchCommander<Obstacle> {
     fn next_command(&self) -> Result<Self::Command, Self::Error>;
 }
 
-pub struct SearchOperator<Mode, Obstacle, Agent, Solver>
-where
-    Solver: SearchCommander<Obstacle>,
-{
-    keeped_command: RefCell<Option<Solver::Command>>,
+pub trait CommandConverter<Command> {
+    type Output;
+
+    fn convert(&self, source: Command) -> Self::Output;
+}
+
+pub struct SearchOperator<Mode, Obstacle, Command, Agent, Solver, Converter> {
+    keeped_command: RefCell<Option<Command>>,
     next_mode: Mode,
     agent: Rc<Agent>,
     solver: Rc<Solver>,
+    converter: Converter,
     _obstacle: PhantomData<fn() -> Obstacle>,
 }
 
-impl<Mode, Obstacle, Agent, Solver> SearchOperator<Mode, Obstacle, Agent, Solver>
-where
-    Solver: SearchCommander<Obstacle>,
+impl<Mode, Obstacle, Command, Agent, Solver, Converter>
+    SearchOperator<Mode, Obstacle, Command, Agent, Solver, Converter>
 {
-    pub fn new(next_mode: Mode, agent: Rc<Agent>, solver: Rc<Solver>) -> Self {
+    pub fn new(
+        next_mode: Mode,
+        agent: Rc<Agent>,
+        solver: Rc<Solver>,
+        converter: Converter,
+    ) -> Self {
         Self {
             keeped_command: RefCell::new(None),
             next_mode,
             agent,
             solver,
+            converter,
             _obstacle: PhantomData,
         }
     }
@@ -55,10 +64,12 @@ where
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct FinishError;
 
-impl<Mode, Obstacle, Agent, Solver> Operator for SearchOperator<Mode, Obstacle, Agent, Solver>
+impl<Mode, Obstacle, Agent, Solver, Converter> Operator
+    for SearchOperator<Mode, Obstacle, Converter::Output, Agent, Solver, Converter>
 where
     Mode: Copy,
-    Agent: SearchAgent<Solver::Command, Obstacle = Obstacle>,
+    Agent: SearchAgent<Converter::Output, Obstacle = Obstacle>,
+    Converter: CommandConverter<Solver::Command>,
     Solver: SearchCommander<Obstacle>,
     Solver::Error: TryInto<FinishError>,
 {
@@ -66,10 +77,11 @@ where
     type Mode = Mode;
 
     fn init(&self) {
-        let command = self
-            .solver
-            .next_command()
-            .unwrap_or_else(|_| unimplemented!("This error handling is not implemented."));
+        let command = self.converter.convert(
+            self.solver
+                .next_command()
+                .unwrap_or_else(|_| unimplemented!("This error handling is not implemented.")),
+        );
         self.agent
             .set_command(&command)
             .unwrap_or_else(|_| unreachable!());
@@ -91,6 +103,7 @@ where
         } else {
             match self.solver.next_command() {
                 Ok(command) => {
+                    let command = self.converter.convert(command);
                     if self.agent.set_command(&command).is_err() {
                         keeped_command.replace(command);
                     }
