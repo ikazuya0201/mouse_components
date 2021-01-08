@@ -6,7 +6,7 @@ use uom::si::f32::{Angle, Length};
 
 use crate::commander::NodeConverter as INodeConverter;
 use crate::data_types::{AbsoluteDirection, Pose};
-use crate::node::{RunNode, SearchNode};
+use crate::node::{Node, RunNode, SearchNode};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct NodeConverter {
@@ -63,6 +63,16 @@ impl<N> INodeConverter<RunNode<N>> for NodeConverter {
     type Target = Pose;
 
     fn convert(&self, node: &RunNode<N>) -> Result<Self::Target, Self::Error> {
+        <Self as INodeConverter<Node<N>>>::convert(&self, &*node)
+    }
+}
+
+//TODO: Write test.
+impl<N> INodeConverter<Node<N>> for NodeConverter {
+    type Error = Infallible;
+    type Target = Pose;
+
+    fn convert(&self, node: &Node<N>) -> Result<Self::Target, Self::Error> {
         use AbsoluteDirection::*;
 
         Ok(Pose {

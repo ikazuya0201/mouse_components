@@ -1,8 +1,7 @@
 use core::cell::{Cell, RefCell};
 use core::cmp::Reverse;
-use core::convert::TryInto;
+use core::convert::{TryFrom, TryInto};
 use core::fmt::Debug;
-use core::ops::Deref;
 
 use generic_array::GenericArray;
 use heap::BinaryHeap;
@@ -19,7 +18,7 @@ pub trait GraphConverter<Node> {
 
     ///checker nodes are search nodes on which agent can check
     ///if walls on the given path exist.
-    fn convert_to_checker_nodes<Nodes: Deref<Target = [Node]>>(
+    fn convert_to_checker_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
         &self,
         path: Nodes,
     ) -> Self::SearchNodes;
@@ -71,39 +70,57 @@ pub trait BoundedNode {
     type UpperBound;
 }
 
+pub trait NextNode<Route>: Sized {
+    type Error;
+
+    fn next(&self, route: &Route) -> Result<Self, Self::Error>;
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 enum State {
     Waiting,
     Solving,
+    Initial,
+    Final,
 }
 
-type CandNum = U4;
+type CandidateSizeUpperBound = U4;
+type GoalSizeUpperBound = U8;
 
-pub struct Commander<Node, Nodes, SearchNode, Maze, ConverterType> {
-    start: Node,
-    goals: Nodes,
-    current: Cell<SearchNode>,
+//NOTE: The upper bounds of goal size and candidates size are fixed.
+pub struct Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType> {
+    start: RunNode,
+    goals: Vec<RunNode, GoalSizeUpperBound>,
+    initial_route: Route,
+    final_route: Route,
+    current: RefCell<Node>,
     state: Cell<State>,
-    candidates: RefCell<Vec<SearchNode, CandNum>>,
+    candidates: RefCell<Vec<SearchNode, CandidateSizeUpperBound>>,
     maze: Maze,
     converter: ConverterType,
 }
 
-impl<Node, Nodes, SearchNode, Maze, ConverterType>
-    Commander<Node, Nodes, SearchNode, Maze, ConverterType>
+impl<Node, RunNode, SearchNode, Route, Maze, ConverterType>
+    Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType>
+where
+    Node: From<RunNode>,
+    RunNode: Clone,
 {
-    pub fn new(
-        start: Node,
-        goals: Nodes,
-        search_start: SearchNode,
+    pub fn new<RunNodes: IntoIterator<Item = RunNode>>(
+        start: RunNode,
+        goals: RunNodes,
+        initial_route: Route,
+        final_route: Route,
         maze: Maze,
         converter: ConverterType,
     ) -> Self {
         Self {
-            start,
-            goals,
-            current: Cell::new(search_start),
-            state: Cell::new(State::Solving),
+            start: start.clone(),
+            goals: goals.into_iter().collect(),
+            initial_route,
+            final_route,
+            current: RefCell::new(start.into()),
+            state: Cell::new(State::Initial),
             candidates: RefCell::new(Vec::new()),
             maze,
             converter,
@@ -111,8 +128,8 @@ impl<Node, Nodes, SearchNode, Maze, ConverterType>
     }
 }
 
-impl<Node, Nodes, SearchNode, Maze, ConverterType> core::fmt::Debug
-    for Commander<Node, Nodes, SearchNode, Maze, ConverterType>
+impl<Node, RunNode, SearchNode, Route, Maze, ConverterType> core::fmt::Debug
+    for Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType>
 where
     Maze: core::fmt::Debug,
     SearchNode: core::fmt::Debug,
@@ -140,34 +157,42 @@ impl TryInto<FinishError> for CommanderError {
     }
 }
 
-impl<Node, Nodes, Cost, Maze, ConverterType, Obstacle> SearchCommander<Obstacle>
-    for Commander<Node, Nodes, Maze::SearchNode, Maze, ConverterType>
+impl<Node, RunNode, Cost, Maze, ConverterType, Obstacle> SearchCommander<Obstacle>
+    for Commander<
+        Node,
+        RunNode,
+        Maze::SearchNode,
+        <Maze::SearchNode as RouteNode>::Route,
+        Maze,
+        ConverterType,
+    >
 where
-    Node::UpperBound: ArrayLength<Maze::SearchNode>
+    RunNode::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Reverse<Cost>>
-        + ArrayLength<(Node, Reverse<Cost>)>
+        + ArrayLength<(RunNode, Reverse<Cost>)>
         + ArrayLength<(Maze::SearchNode, Reverse<Cost>)>
-        + ArrayLength<Option<Node>>
+        + ArrayLength<Option<RunNode>>
         + ArrayLength<Option<usize>>
         + Unsigned,
-    Node::PathUpperBound: ArrayLength<Node>,
-    Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
-    Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode,
+    RunNode::PathUpperBound: ArrayLength<RunNode>,
+    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
+    Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + TryFrom<Node>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-    Maze: Graph<Node, Cost = Cost>
-        + Graph<<Maze as GraphConverter<Node>>::SearchNode, Cost = Cost>
-        + GraphConverter<Node>
+    Maze: Graph<RunNode, Cost = Cost>
+        + Graph<<Maze as GraphConverter<RunNode>>::SearchNode, Cost = Cost>
+        + GraphConverter<RunNode>
         + ObstacleInterpreter<Obstacle>
-        + NodeChecker<<Maze as GraphConverter<Node>>::SearchNode>,
-    ConverterType: NodeConverter<Maze::SearchNode>,
-    ConverterType::Error: core::fmt::Debug,
+        + NodeChecker<<Maze as GraphConverter<RunNode>>::SearchNode>,
+    Node: From<Maze::SearchNode> + Clone + NextNode<<Maze::SearchNode as RouteNode>::Route>,
+    <Maze::SearchNode as RouteNode>::Route: Clone,
+    ConverterType: NodeConverter<Node>,
+    ConverterType::Error: Debug,
     <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
 {
     type Error = CommanderError;
     type Command = (
-        <ConverterType as NodeConverter<Maze::SearchNode>>::Target,
+        <ConverterType as NodeConverter<Node>>::Target,
         <Maze::SearchNode as RouteNode>::Route,
     );
 
@@ -180,9 +205,29 @@ where
     //TODO: write test
     fn next_command(&self) -> Result<Self::Command, Self::Error> {
         match self.state.get() {
+            State::Initial => {
+                let mut current = self.current.borrow_mut();
+                let pose = self
+                    .converter
+                    .convert(&*current)
+                    .unwrap_or_else(|_| unimplemented!());
+                *current = current
+                    .next(&self.initial_route)
+                    .unwrap_or_else(|_| unreachable!());
+                self.state.set(State::Solving);
+                Ok((pose, self.initial_route.clone()))
+            }
+            State::Final => Err(CommanderError::SolveFinishError),
             State::Solving => {
                 let candidates = self
-                    .next_node_candidates(&self.current.get())
+                    .next_node_candidates(
+                        &self
+                            .current
+                            .borrow()
+                            .clone()
+                            .try_into()
+                            .unwrap_or_else(|_| unimplemented!()),
+                    )
                     .ok_or(CommanderError::SolveFinishError)?;
                 self.candidates.replace(candidates);
                 self.state.set(State::Waiting);
@@ -208,19 +253,24 @@ where
                 }
                 self.candidates.replace(Vec::new());
                 self.state.set(State::Solving);
+                let mut current = self.current.borrow_mut();
+                let pose = self
+                    .converter
+                    .convert(&*current)
+                    .expect("Should never panic");
                 if let Some(next) = next {
-                    let current = self.current.get();
-                    let kind = current
+                    let kind = <Maze::SearchNode as TryFrom<Node>>::try_from(current.clone())
+                        .unwrap_or_else(|_| unimplemented!())
                         .route(&next)
                         .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err));
-                    let pose = self
-                        .converter
-                        .convert(&current)
-                        .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err));
-                    self.current.set(next);
+                    *current = Node::from(next);
                     Ok((pose, kind))
                 } else {
-                    Err(CommanderError::SolveFinishError)
+                    *current = current
+                        .next(&self.final_route)
+                        .unwrap_or_else(|_| unreachable!());
+                    self.state.set(State::Final);
+                    Ok((pose, self.final_route.clone()))
                 }
             }
         }
@@ -228,25 +278,24 @@ where
 }
 
 //TODO: write test
-impl<Node, Nodes, Cost, Maze, ConverterType>
-    Commander<Node, Nodes, Maze::SearchNode, Maze, ConverterType>
+impl<Node, RunNode, Cost, Route, Maze, ConverterType>
+    Commander<Node, RunNode, Maze::SearchNode, Route, Maze, ConverterType>
 where
-    Node::UpperBound: ArrayLength<Maze::SearchNode>
+    RunNode::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Reverse<Cost>>
-        + ArrayLength<(Node, Reverse<Cost>)>
+        + ArrayLength<(RunNode, Reverse<Cost>)>
         + ArrayLength<(Maze::SearchNode, Reverse<Cost>)>
-        + ArrayLength<Option<Node>>
+        + ArrayLength<Option<RunNode>>
         + ArrayLength<Option<usize>>
         + Unsigned,
-    Node::PathUpperBound: ArrayLength<Node>,
-    Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
+    RunNode::PathUpperBound: ArrayLength<RunNode>,
+    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-    Maze: Graph<Node, Cost = Cost>
-        + Graph<<Maze as GraphConverter<Node>>::SearchNode, Cost = Cost>
-        + GraphConverter<Node>,
+    Maze: Graph<RunNode, Cost = Cost>
+        + Graph<<Maze as GraphConverter<RunNode>>::SearchNode, Cost = Cost>
+        + GraphConverter<RunNode>,
 {
     fn next_node_candidates(
         &self,
@@ -261,9 +310,9 @@ where
             .into_iter()
             .collect::<Vec<(Maze::SearchNode, Cost), U4>>();
 
-        let mut dists = repeat_n(Cost::max_value(), <Node::UpperBound as Unsigned>::USIZE)
-            .collect::<GenericArray<_, Node::UpperBound>>();
-        let mut heap = BinaryHeap::<Maze::SearchNode, Reverse<Cost>, Node::UpperBound>::new();
+        let mut dists = repeat_n(Cost::max_value(), <RunNode::UpperBound as Unsigned>::USIZE)
+            .collect::<GenericArray<_, RunNode::UpperBound>>();
+        let mut heap = BinaryHeap::<Maze::SearchNode, Reverse<Cost>, RunNode::UpperBound>::new();
         for node in checker_nodes {
             heap.push_or_update(node, Reverse(Cost::min_value()))
                 .unwrap();
@@ -307,26 +356,30 @@ pub enum RunCommanderError {
 ///NOTO: multiple implementations of Converter<_> can exist for different Target,
 ///but we assume there is only an implementation.
 //TODO: write test
-impl<Node, Nodes, SearchNode, Maze, ConverterType> RunCommander
-    for Commander<Node, Nodes, SearchNode, Maze, ConverterType>
+impl<Node, RunNode, SearchNode, Route, Maze, ConverterType> RunCommander
+    for Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType>
 where
-    Node::UpperBound: ArrayLength<Option<Node>>
+    RunNode::UpperBound: ArrayLength<Option<RunNode>>
         + ArrayLength<Option<usize>>
         + ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
-        + ArrayLength<(Node, Reverse<Maze::Cost>)>
-        + ArrayLength<(<ConverterType as NodeConverter<Node>>::Target, Node::Route)>
-        + Unsigned,
-    Node::PathUpperBound: ArrayLength<Node>,
-    Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode + BoundedPathNode,
+        + ArrayLength<(RunNode, Reverse<Maze::Cost>)>
+        + ArrayLength<(
+            <ConverterType as NodeConverter<RunNode>>::Target,
+            RunNode::Route,
+        )> + Unsigned,
+    RunNode::PathUpperBound: ArrayLength<RunNode>,
+    RunNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode + BoundedPathNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-    Maze: Graph<Node>,
-    ConverterType: NodeConverter<Node>,
+    Maze: Graph<RunNode>,
+    ConverterType: NodeConverter<RunNode>,
 {
     type Error = RunCommanderError;
-    type Command = (<ConverterType as NodeConverter<Node>>::Target, Node::Route);
-    type Commands = Vec<Self::Command, Node::UpperBound>;
+    type Command = (
+        <ConverterType as NodeConverter<RunNode>>::Target,
+        RunNode::Route,
+    );
+    type Commands = Vec<Self::Command, RunNode::UpperBound>;
 
     fn compute_commands(&self) -> Result<Self::Commands, Self::Error> {
         let path = self
@@ -353,37 +406,36 @@ where
     }
 }
 
-impl<Node, Nodes, SearchNode, Maze, ConverterType>
-    Commander<Node, Nodes, SearchNode, Maze, ConverterType>
+impl<Node, RunNode, SearchNode, Route, Maze, ConverterType>
+    Commander<Node, RunNode, SearchNode, Route, Maze, ConverterType>
 where
-    Node::UpperBound: ArrayLength<Option<Node>>
+    RunNode::UpperBound: ArrayLength<Option<RunNode>>
         + ArrayLength<Option<usize>>
         + ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
-        + ArrayLength<(Node, Reverse<Maze::Cost>)>
+        + ArrayLength<(RunNode, Reverse<Maze::Cost>)>
         + Unsigned,
-    Node::PathUpperBound: ArrayLength<Node>,
-    Nodes: Deref<Target = [Node]>,
-    Node: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
+    RunNode::PathUpperBound: ArrayLength<RunNode>,
+    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-    Maze: Graph<Node>,
+    Maze: Graph<RunNode>,
 {
-    pub fn compute_shortest_path(&self) -> Option<Vec<Node, Node::PathUpperBound>> {
+    pub fn compute_shortest_path(&self) -> Option<Vec<RunNode, RunNode::PathUpperBound>> {
         let mut dists = repeat_n(
             Maze::Cost::max_value(),
-            <Node::UpperBound as Unsigned>::USIZE,
+            <RunNode::UpperBound as Unsigned>::USIZE,
         )
-        .collect::<GenericArray<_, Node::UpperBound>>();
+        .collect::<GenericArray<_, RunNode::UpperBound>>();
         dists[self.start.into()] = Maze::Cost::min_value();
 
-        let mut prev = repeat_n(None, <Node::UpperBound as Unsigned>::USIZE)
-            .collect::<GenericArray<Option<Node>, Node::UpperBound>>();
+        let mut prev = repeat_n(None, <RunNode::UpperBound as Unsigned>::USIZE)
+            .collect::<GenericArray<Option<RunNode>, RunNode::UpperBound>>();
 
-        let mut heap = BinaryHeap::<Node, Reverse<Maze::Cost>, Node::UpperBound>::new();
+        let mut heap = BinaryHeap::<RunNode, Reverse<Maze::Cost>, RunNode::UpperBound>::new();
         heap.push(self.start, Reverse(Maze::Cost::min_value()))
             .unwrap();
 
-        let construct_path = |goal: Node, prev: GenericArray<_, _>| {
+        let construct_path = |goal: RunNode, prev: GenericArray<_, _>| {
             let mut current = prev[goal.into()]?;
             let mut path = ForcedVec::new();
             path.push(goal);
@@ -427,48 +479,77 @@ mod tests {
 
     use super::*;
 
-    struct IGraph {
-        n: usize,
-        mat: Vec<Vec<Option<usize>>>,
-    }
-
-    impl IGraph {
-        fn new(n: usize, edges: &[(usize, usize, usize)]) -> Self {
-            let mut mat = vec![vec![None; n]; n];
-            for &(src, dst, cost) in edges {
-                mat[src][dst] = Some(cost);
-            }
-            Self { n, mat }
-        }
-    }
-
-    impl Graph<usize> for IGraph {
-        type Cost = usize;
-        type Edges = Vec<(usize, usize)>;
-
-        fn successors(&self, node: &usize) -> Self::Edges {
-            let mut result = Vec::new();
-            for i in 0..self.n {
-                if let Some(cost) = self.mat[*node][i] {
-                    result.push((i, cost));
-                }
-            }
-            result
-        }
-
-        fn predecessors(&self, node: &usize) -> Self::Edges {
-            let mut result = Vec::new();
-            for i in 0..self.n {
-                if let Some(cost) = self.mat[i][*node] {
-                    result.push((i, cost));
-                }
-            }
-            result
-        }
-    }
-
     #[test]
     fn test_compute_shortest_path() {
+        struct Node(usize);
+        #[derive(Clone, Copy, PartialEq, Debug)]
+        struct RunNode(usize);
+        struct SearchNode(usize);
+
+        impl From<usize> for RunNode {
+            fn from(value: usize) -> Self {
+                RunNode(value)
+            }
+        }
+
+        impl From<RunNode> for usize {
+            fn from(value: RunNode) -> Self {
+                value.0
+            }
+        }
+
+        impl From<RunNode> for Node {
+            fn from(value: RunNode) -> Self {
+                Node(value.0)
+            }
+        }
+
+        struct IGraph {
+            n: usize,
+            mat: Vec<Vec<Option<usize>>>,
+        }
+
+        impl IGraph {
+            fn new(n: usize, edges: &[(usize, usize, usize)]) -> Self {
+                let mut mat = vec![vec![None; n]; n];
+                for &(src, dst, cost) in edges {
+                    mat[src][dst] = Some(cost);
+                }
+                Self { n, mat }
+            }
+        }
+
+        impl<T> Graph<T> for IGraph
+        where
+            usize: From<T>,
+            T: Clone + From<usize>,
+        {
+            type Cost = usize;
+            type Edges = Vec<(T, usize)>;
+
+            fn successors(&self, node: &T) -> Self::Edges {
+                let node = usize::from(node.clone());
+                let mut result = Vec::new();
+                for i in 0..self.n {
+                    if let Some(cost) = self.mat[node][i] {
+                        result.push((T::from(i), cost));
+                    }
+                }
+                result
+            }
+
+            fn predecessors(&self, node: &T) -> Self::Edges {
+                let node = usize::from(node.clone());
+                let mut result = Vec::new();
+                for i in 0..self.n {
+                    if let Some(cost) = self.mat[i][node] {
+                        result.push((T::from(i), cost));
+                    }
+                }
+                result
+            }
+        }
+
         let edges = [
             (0, 1, 2),
             (0, 2, 1),
@@ -481,26 +562,30 @@ mod tests {
             (5, 7, 7),
             (7, 8, 1),
         ];
-        let start = 0;
-        let goals = vec![8usize];
+        let start = RunNode(0);
+        let goals = vec![RunNode(8usize)];
         let n = 9;
 
         let graph = IGraph::new(n, &edges);
 
-        impl BoundedNode for usize {
+        impl BoundedNode for RunNode {
             type UpperBound = U10;
         }
 
-        impl BoundedPathNode for usize {
+        impl BoundedPathNode for RunNode {
             type PathUpperBound = U10;
         }
 
-        let solver = Commander::<usize, _, usize, _, ()>::new(start, goals, start, graph, ());
+        let solver =
+            Commander::<Node, RunNode, SearchNode, _, _, ()>::new(start, goals, (), (), graph, ());
 
         let path = solver.compute_shortest_path();
-        let expected = [0, 1, 3, 5, 7, 8];
+        let expected = vec![0, 1, 3, 5, 7, 8]
+            .into_iter()
+            .map(|e| RunNode(e))
+            .collect::<Vec<_>>();
 
         assert!(path.is_some());
-        assert_eq!(path.unwrap().as_ref(), expected);
+        assert_eq!(path.unwrap(), expected.as_slice());
     }
 }

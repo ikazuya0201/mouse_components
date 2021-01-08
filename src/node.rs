@@ -4,7 +4,7 @@ use core::ops::Mul;
 use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use crate::commander::{BoundedNode, BoundedPathNode, RouteNode};
+use crate::commander::{BoundedNode, BoundedPathNode, NextNode, RouteNode};
 use crate::data_types::{AbsoluteDirection, RelativeDirection};
 use crate::maze::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generator::{RunKind, SearchKind, SlalomDirection, SlalomKind};
@@ -32,6 +32,30 @@ pub struct Node<N> {
     direction: AbsoluteDirection,
     cost: fn(Pattern) -> u16,
     _maze_width: PhantomData<fn() -> N>,
+}
+
+impl<N> NextNode<SearchKind> for Node<N>
+where
+    N: Unsigned,
+{
+    type Error = NodeCreationError;
+
+    fn next(&self, route: &SearchKind) -> Result<Self, Self::Error> {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+        use SearchKind::*;
+
+        match route {
+            Init | Final => self.relative(0, 1, Front, North),
+            Search(dir) => match dir {
+                Front => self.relative(0, 2, Front, North),
+                Right => self.relative(1, 1, Right, North),
+                Left => self.relative(-1, 1, Left, North),
+                Back => self.relative(0, 0, Back, North),
+                _ => unreachable!("This is bug"),
+            },
+        }
+    }
 }
 
 impl<N> core::fmt::Debug for Node<N> {
@@ -234,6 +258,12 @@ where
 //TODO: Remove Copy
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct SearchNode<N>(Node<N>);
+
+impl<N> From<SearchNode<N>> for Node<N> {
+    fn from(value: SearchNode<N>) -> Self {
+        value.0
+    }
+}
 
 impl<N> core::fmt::Debug for SearchNode<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -523,6 +553,12 @@ impl<N: Clone> RouteNode for RunNode<N> {
 //TODO: Create new data type to reduce copy cost.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct RunNode<N>(Node<N>);
+
+impl<N> From<RunNode<N>> for Node<N> {
+    fn from(value: RunNode<N>) -> Self {
+        value.0
+    }
+}
 
 impl<N> BoundedNode for RunNode<N>
 where

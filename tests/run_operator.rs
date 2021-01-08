@@ -8,11 +8,11 @@ use core::f32::consts::PI;
 
 use components::{
     data_types::{
-        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RunNode, SearchNode, State,
+        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RunNode, SearchKind, State,
     },
     defaults,
     impls::{
-        slalom_parameters_map, Commander, EstimatorBuilder, Maze, NodeConverter, ObstacleDetector,
+        slalom_parameters_map, EstimatorBuilder, Maze, NodeConverter, ObstacleDetector,
         PoseConverter, RotationControllerBuilder, RunAgent, RunOperator, TrackerBuilder,
         TrajectoryGeneratorBuilder, TranslationControllerBuilder, WallConverter, WallManager,
     },
@@ -242,12 +242,12 @@ fn test_run_operator() {
             RunNode::<Size>::new(2, 0, South, cost).unwrap(),
             RunNode::<Size>::new(2, 0, West, cost).unwrap(),
         ];
-        let search_start = SearchNode::<Size>::new(0, 1, North, cost).unwrap();
         let node_converter = NodeConverter::default();
-        Rc::new(Commander::new(
+        Rc::new(defaults::Commander::new(
             start,
             goals,
-            search_start,
+            SearchKind::Init,
+            SearchKind::Final,
             maze,
             node_converter,
         ))
