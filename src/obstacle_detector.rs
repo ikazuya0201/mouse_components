@@ -1,11 +1,10 @@
-use generic_array::GenericArray;
 use heapless::Vec;
 use uom::si::f32::Length;
 
 use crate::agent;
 use crate::data_types::Pose;
 use crate::tracker::State;
-use crate::utils::{array_length::ArrayLength, sample::Sample};
+use crate::utils::sample::Sample;
 
 pub trait DistanceSensor {
     type Error;
@@ -20,32 +19,26 @@ pub struct Obstacle {
     pub distance: Sample<Length>,
 }
 
-pub struct ObstacleDetector<D, N>
-where
-    D: DistanceSensor,
-    N: ArrayLength<D>,
-{
-    distance_sensors: GenericArray<D, N>,
+type SensorSizeUpperBound = typenum::consts::U6;
+
+//NOTE: the number of sensors is upper-bounded.
+pub struct ObstacleDetector<D> {
+    distance_sensors: Vec<D, SensorSizeUpperBound>,
 }
 
-impl<D, N> ObstacleDetector<D, N>
-where
-    D: DistanceSensor,
-    N: ArrayLength<D>,
-{
+impl<D> ObstacleDetector<D> {
     pub fn new<I: IntoIterator<Item = D>>(distance_sensors: I) -> Self {
         let distance_sensors = distance_sensors.into_iter().collect();
         Self { distance_sensors }
     }
 }
 
-impl<D, N> agent::ObstacleDetector<State> for ObstacleDetector<D, N>
+impl<D> agent::ObstacleDetector<State> for ObstacleDetector<D>
 where
     D: DistanceSensor,
-    N: ArrayLength<D> + ArrayLength<Obstacle>,
 {
     type Obstacle = Obstacle;
-    type Obstacles = Vec<Obstacle, N>;
+    type Obstacles = Vec<Obstacle, SensorSizeUpperBound>;
 
     fn detect(&mut self, state: &State) -> Self::Obstacles {
         let mut obstacles = Vec::new();
@@ -99,18 +92,15 @@ mod tests {
 
     #[test]
     fn test_detect() {
-        use generic_array::arr;
-
         let standard_deviation = Length::new::<meter>(0.001);
-        let sensors = arr![
-            IDistanceSensor;
+        let sensors = vec![
             IDistanceSensor::new(
                 Pose {
                     x: Length::new::<meter>(0.015),
                     y: Length::new::<meter>(0.015),
                     theta: Angle::new::<degree>(0.0),
                 },
-                Some(Sample{
+                Some(Sample {
                     mean: Length::new::<meter>(0.03),
                     standard_deviation,
                 }),
@@ -129,8 +119,8 @@ mod tests {
                     y: Length::new::<meter>(0.025),
                     theta: Angle::new::<degree>(90.0),
                 },
-                Some(Sample{
-                    mean:Length::new::<meter>(0.02),
+                Some(Sample {
+                    mean: Length::new::<meter>(0.02),
                     standard_deviation,
                 }),
             ),
@@ -150,7 +140,7 @@ mod tests {
 
         use crate::prelude::*;
 
-        let mut detector = ObstacleDetector::<_, typenum::consts::U3>::new(sensors);
+        let mut detector = ObstacleDetector::new(sensors);
         let obstacles = detector.detect(&Default::default());
         for (obstacle, expected) in obstacles.into_iter().zip(expected.into_iter()) {
             assert_relative_eq!(obstacle.source.x.get::<meter>(), expected.x.get::<meter>());

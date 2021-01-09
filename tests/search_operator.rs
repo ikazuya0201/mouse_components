@@ -139,8 +139,6 @@ macro_rules! search_operator_tests {
                     distance_sensors,
                 ) = simulator.split(wheel_interval);
 
-                type DistanceSensorNum = U5;
-
                 let agent: Rc<
                     defaults::SearchAgent<
                         Encoder,
@@ -149,7 +147,6 @@ macro_rules! search_operator_tests {
                         Motor,
                         Motor,
                         DistanceSensor<Size>,
-                        DistanceSensorNum,
                         MathFake,
                         MaxPathLength,
                         _,
@@ -222,7 +219,7 @@ macro_rules! search_operator_tests {
                         .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
                         .build::<MathFake, MaxPathLength>();
 
-                    let obstacle_detector = ObstacleDetector::<_, DistanceSensorNum>::new(distance_sensors);
+                    let obstacle_detector = ObstacleDetector::new(distance_sensors);
                     Rc::new(SearchAgent::new(
                         obstacle_detector,
                         estimator,

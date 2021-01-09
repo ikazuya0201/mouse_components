@@ -141,8 +141,6 @@ fn test_run_operator() {
         distance_sensors,
     ) = simulator.split(wheel_interval);
 
-    type DistanceSensorNum = U5;
-
     let agent: Rc<
         defaults::RunAgent<
             Encoder,
@@ -151,7 +149,6 @@ fn test_run_operator() {
             Motor,
             Motor,
             DistanceSensor<Size>,
-            DistanceSensorNum,
             MathFake,
             MaxPathLength,
             _,
@@ -224,7 +221,7 @@ fn test_run_operator() {
             .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
             .build::<MathFake, MaxPathLength>();
 
-        let obstacle_detector = ObstacleDetector::<_, DistanceSensorNum>::new(distance_sensors);
+        let obstacle_detector = ObstacleDetector::new(distance_sensors);
         let agent = RunAgent::new(obstacle_detector, estimator, tracker, trajectory_generator);
         Rc::new(agent)
     };
