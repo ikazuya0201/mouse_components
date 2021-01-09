@@ -24,13 +24,17 @@ pub mod traits {
     use super::*;
 
     pub use crate::utils::math::Math;
-    pub use administrator::{Atomic, Operator, OperatorStore, SelectMode, Selector};
+    pub use administrator::{Atomic, Operator, OperatorStore, Selector};
     pub use agent::{
         ObstacleDetector, RunTrajectoryGenerator, SearchTrajectoryGenerator, StateEstimator,
         Tracker,
     };
     pub use commander::{
-        BoundedNode, Graph, GraphConverter, NodeChecker, ObstacleInterpreter, RouteNode,
+        BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker,
+        ObstacleInterpreter, RouteNode,
+    };
+    pub use maze::{
+        GraphNode, PoseConverter, WallConverter, WallFinderNode, WallManager, WallSpaceNode,
     };
     pub use operators::{CommandConverter, RunAgent, RunCommander, SearchAgent, SearchCommander};
     pub use tracker::{Logger, RotationController, TranslationController};
@@ -50,7 +54,7 @@ pub mod data_types {
     pub use administrator::SelectMode;
     pub use agent::Pose;
     pub use maze::{AbsoluteDirection, RelativeDirection};
-    pub use node::{Node, Pattern, RunNode, SearchNode};
+    pub use node::Pattern;
     pub use obstacle_detector::Obstacle;
     pub use tracker::{AngleState, LengthState, State};
     pub use trajectory_generator::{
@@ -73,6 +77,7 @@ pub mod impls {
     };
     pub use estimator::{Estimator, EstimatorBuilder};
     pub use maze::Maze;
+    pub use node::{Node, RunNode, SearchNode};
     pub use obstacle_detector::ObstacleDetector;
     pub use operators::{RunOperator, SearchOperator};
     pub use pose_converter::PoseConverter;
@@ -159,9 +164,9 @@ pub mod defaults {
     >;
 
     pub type Commander<Size, Math> = impls::Commander<
-        data_types::Node<Size>,
-        data_types::RunNode<Size>,
-        data_types::SearchNode<Size>,
+        impls::Node<Size>,
+        impls::RunNode<Size>,
+        impls::SearchNode<Size>,
         data_types::SearchKind,
         impls::Maze<
             impls::WallManager<Size>,
@@ -187,7 +192,7 @@ pub mod defaults {
     > = impls::SearchOperator<
         Mode,
         data_types::Obstacle,
-        (data_types::Pose, data_types::SearchNode<Size>),
+        (data_types::Pose, impls::SearchNode<Size>),
         SearchAgent<
             LeftEncoder,
             RightEncoder,

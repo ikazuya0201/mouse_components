@@ -7,13 +7,11 @@ use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
-    data_types::{
-        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RunNode, SearchKind, State,
-    },
+    data_types::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, SearchKind, State},
     defaults,
     impls::{
         slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
-        PoseConverter, RotationControllerBuilder, RunAgent, RunOperator, TrackerBuilder,
+        PoseConverter, RotationControllerBuilder, RunAgent, RunNode, RunOperator, TrackerBuilder,
         TrajectoryGeneratorBuilder, TranslationControllerBuilder, WallConverter, WallManager,
     },
     prelude::*,
