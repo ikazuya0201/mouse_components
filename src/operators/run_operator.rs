@@ -19,23 +19,34 @@ pub trait RunAgent<Command> {
     fn track_next(&self) -> Result<(), Self::Error>;
 }
 
-pub struct RunOperator<Mode, Agent, Commander, Converter> {
-    next_mode: Mode,
+pub struct RunOperator<Agent, Commander, Converter> {
     is_completed: AtomicBool,
     agent: Rc<Agent>,
+    #[allow(unused)]
     commander: Rc<Commander>,
+    #[allow(unused)]
     converter: Converter,
 }
 
-impl<Mode, Agent, Commander, Converter> RunOperator<Mode, Agent, Commander, Converter> {
-    pub fn new(
-        next_mode: Mode,
-        agent: Rc<Agent>,
-        commander: Rc<Commander>,
-        converter: Converter,
-    ) -> Self {
+impl<Agent, Commander, Converter> RunOperator<Agent, Commander, Converter>
+where
+    Agent: RunAgent<Converter::Output>,
+    Converter: CommandConverter<Commander::Command>,
+    Commander: RunCommander,
+    Commander::Error: core::fmt::Debug,
+{
+    pub fn new(agent: Rc<Agent>, commander: Rc<Commander>, converter: Converter) -> Self {
+        let commands = commander
+            .compute_commands()
+            .unwrap_or_else(|err| todo!("Error handling is not implemented: {:?}", err));
+
+        agent.set_commands(
+            commands
+                .into_iter()
+                .map(|command| converter.convert(command)),
+        );
+
         Self {
-            next_mode,
             is_completed: AtomicBool::new(false),
             agent,
             commander,
@@ -44,30 +55,13 @@ impl<Mode, Agent, Commander, Converter> RunOperator<Mode, Agent, Commander, Conv
     }
 }
 
-impl<Mode, Agent, Commander, Converter> Operator for RunOperator<Mode, Agent, Commander, Converter>
+impl<Agent, Commander, Converter> Operator for RunOperator<Agent, Commander, Converter>
 where
-    Mode: Copy,
     Agent: RunAgent<Converter::Output>,
     Converter: CommandConverter<Commander::Command>,
     Commander: RunCommander,
-    Commander::Error: core::fmt::Debug,
 {
     type Error = core::convert::Infallible;
-    type Mode = Mode;
-
-    fn init(&self) {
-        //TODO: modify to return Result in init. remove this unwrap.
-        let commands = self
-            .commander
-            .compute_commands()
-            .unwrap_or_else(|err| todo!("Error handling is not implemented: {:?}", err));
-
-        self.agent.set_commands(
-            commands
-                .into_iter()
-                .map(|command| self.converter.convert(command)),
-        );
-    }
 
     //TODO: correct agent position by sensor value and wall existence
     fn tick(&self) -> Result<(), Self::Error> {
@@ -77,9 +71,9 @@ where
         Ok(())
     }
 
-    fn run(&self) -> Result<Mode, NotFinishError> {
+    fn run(&self) -> Result<(), NotFinishError> {
         if self.is_completed.load(Ordering::Relaxed) {
-            Ok(self.next_mode)
+            Ok(())
         } else {
             Err(NotFinishError)
         }

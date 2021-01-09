@@ -32,27 +32,33 @@ pub trait CommandConverter<Command> {
     fn convert(&self, source: Command) -> Self::Output;
 }
 
-pub struct SearchOperator<Mode, Obstacle, Command, Agent, Commander, Converter> {
+pub struct SearchOperator<Obstacle, Command, Agent, Commander, Converter> {
     keeped_command: RefCell<Option<Command>>,
-    next_mode: Mode,
     agent: Rc<Agent>,
     commander: Rc<Commander>,
     converter: Converter,
     _obstacle: PhantomData<fn() -> Obstacle>,
 }
 
-impl<Mode, Obstacle, Command, Agent, Commander, Converter>
-    SearchOperator<Mode, Obstacle, Command, Agent, Commander, Converter>
+impl<Obstacle, Command, Agent, Commander, Converter>
+    SearchOperator<Obstacle, Command, Agent, Commander, Converter>
+where
+    Agent: SearchAgent<Converter::Output, Obstacle = Obstacle>,
+    Converter: CommandConverter<Commander::Command>,
+    Commander: SearchCommander<Obstacle>,
 {
-    pub fn new(
-        next_mode: Mode,
-        agent: Rc<Agent>,
-        commander: Rc<Commander>,
-        converter: Converter,
-    ) -> Self {
+    pub fn new(agent: Rc<Agent>, commander: Rc<Commander>, converter: Converter) -> Self {
+        let command = converter.convert(
+            commander
+                .next_command()
+                .unwrap_or_else(|_| unimplemented!("This error handling is not implemented.")),
+        );
+        agent
+            .set_command(&command)
+            .unwrap_or_else(|_| unreachable!());
+
         Self {
             keeped_command: RefCell::new(None),
-            next_mode,
             agent,
             commander,
             converter,
@@ -64,28 +70,15 @@ impl<Mode, Obstacle, Command, Agent, Commander, Converter>
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct FinishError;
 
-impl<Mode, Obstacle, Agent, Commander, Converter> Operator
-    for SearchOperator<Mode, Obstacle, Converter::Output, Agent, Commander, Converter>
+impl<Obstacle, Agent, Commander, Converter> Operator
+    for SearchOperator<Obstacle, Converter::Output, Agent, Commander, Converter>
 where
-    Mode: Copy,
     Agent: SearchAgent<Converter::Output, Obstacle = Obstacle>,
     Converter: CommandConverter<Commander::Command>,
     Commander: SearchCommander<Obstacle>,
     Commander::Error: TryInto<FinishError>,
 {
     type Error = Agent::Error;
-    type Mode = Mode;
-
-    fn init(&self) {
-        let command = self.converter.convert(
-            self.commander
-                .next_command()
-                .unwrap_or_else(|_| unimplemented!("This error handling is not implemented.")),
-        );
-        self.agent
-            .set_command(&command)
-            .unwrap_or_else(|_| unreachable!());
-    }
 
     fn tick(&self) -> Result<(), Self::Error> {
         self.agent.update_state();
@@ -94,7 +87,7 @@ where
         self.agent.track_next()
     }
 
-    fn run(&self) -> Result<Mode, NotFinishError> {
+    fn run(&self) -> Result<(), NotFinishError> {
         let mut keeped_command = self.keeped_command.borrow_mut();
         if let Some(command) = keeped_command.as_ref() {
             if self.agent.set_command(command).is_ok() {
@@ -110,7 +103,7 @@ where
                 }
                 Err(err) => {
                     if err.try_into().is_ok() {
-                        return Ok(self.next_mode);
+                        return Ok(());
                     }
                 }
             }

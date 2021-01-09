@@ -251,20 +251,13 @@ macro_rules! search_operator_tests {
                 let expected_commander = create_commander(wall_storage);
 
                 let operator = SearchOperator::new(
-                    (),
                     Rc::clone(&agent),
                     Rc::clone(&commander),
                     CommandConverter::default(),
                 );
-                operator.init();
-                let mut count = 0usize;
                 while operator.run().is_err() {
                     stepper.step();
                     assert!(!operator.tick().is_err());
-                    count += 1;
-                    if count > 300000 {
-                        break;
-                    }
                 }
                 assert_eq!(
                     commander.compute_shortest_path(),

@@ -250,12 +250,10 @@ fn test_run_operator() {
     };
 
     let operator = RunOperator::new(
-        (),
         Rc::clone(&agent),
         Rc::clone(&commander),
         CommandConverter::default(),
     );
-    operator.init();
     while operator.run().is_err() {
         stepper.step();
         assert!(!operator.tick().is_err());
