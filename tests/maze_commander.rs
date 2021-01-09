@@ -3,9 +3,9 @@ extern crate components;
 use typenum::consts::*;
 
 use components::{
-    data_types::{AbsoluteDirection, Pattern, RunNode, SearchKind, Wall},
+    data_types::{AbsoluteDirection, Pattern, SearchKind, Wall},
     defaults::Commander,
-    impls::{Maze, PoseConverter, WallConverter, WallManager},
+    impls::{Maze, PoseConverter, RunNode, WallConverter, WallManager},
     prelude::*,
     traits::Math,
     utils::probability::Probability,
