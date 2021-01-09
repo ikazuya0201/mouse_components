@@ -16,6 +16,7 @@ pub use slalom_generator::{slalom_parameters_map, SlalomDirection, SlalomKind, S
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use spin_generator::{SpinGenerator, SpinTrajectory};
 use straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
+use trajectory::StopTrajectory;
 pub use trajectory::{AngleTarget, LengthTarget, MoveTarget, ShiftTrajectory, Target};
 use uom::si::{
     angle::degree,
@@ -60,8 +61,16 @@ impl<M: Math> Iterator for SearchTrajectory<M> {
     }
 }
 
-pub type BackTrajectory<M> =
-    Chain<Chain<StraightTrajectory, SpinTrajectory>, ShiftTrajectory<StraightTrajectory, M>>;
+pub type BackTrajectory<M> = Chain<
+    Chain<
+        Chain<
+            Chain<Chain<Chain<StraightTrajectory, StopTrajectory>, SpinTrajectory>, StopTrajectory>,
+            SpinTrajectory,
+        >,
+        StopTrajectory,
+    >,
+    ShiftTrajectory<StraightTrajectory, M>,
+>;
 
 pub struct TrajectoryGenerator<M, MaxLength> {
     straight_generator: StraightTrajectoryGenerator<M>,
@@ -325,11 +334,39 @@ impl
             let distance = Length::new::<meter>(0.09); //TODO: use configurable value
             straight_generator.generate(distance, self.search_velocity, self.search_velocity)
         };
+        use uom::si::time::millisecond;
         let back_trajectory = {
             let distance = Length::new::<meter>(0.045); //TODO: use configurable value
             straight_generator
                 .generate(distance, self.search_velocity, Default::default())
-                .chain(spin_generator.generate(pose.theta, Angle::new::<degree>(180.0)))
+                .chain(StopTrajectory::new(
+                    Pose {
+                        x: Length::new::<meter>(0.045),
+                        ..Default::default()
+                    },
+                    self.period,
+                    Time::new::<millisecond>(50.0),
+                ))
+                .chain(spin_generator.generate(pose.theta, Angle::new::<degree>(90.0)))
+                .chain(StopTrajectory::new(
+                    Pose {
+                        x: Length::new::<meter>(0.045),
+                        y: Default::default(),
+                        theta: Angle::new::<degree>(90.0),
+                    },
+                    self.period,
+                    Time::new::<millisecond>(50.0),
+                ))
+                .chain(spin_generator.generate(pose.theta, Angle::new::<degree>(90.0)))
+                .chain(StopTrajectory::new(
+                    Pose {
+                        x: Length::new::<meter>(0.045),
+                        y: Default::default(),
+                        theta: Angle::new::<degree>(180.0),
+                    },
+                    self.period,
+                    Time::new::<millisecond>(50.0),
+                ))
                 .chain(ShiftTrajectory::new(
                     Pose {
                         x: distance,

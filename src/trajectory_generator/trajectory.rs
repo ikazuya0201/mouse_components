@@ -126,6 +126,7 @@ where
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct StopTrajectory {
     t: Time,
     pose: Pose,
