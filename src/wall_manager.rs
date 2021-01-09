@@ -81,6 +81,7 @@ impl<N: Unsigned + PowerOfTwo> Wall<N> {
     }
 }
 
+#[derive(Clone)]
 pub struct WallManager<N>
 where
     N: Mul<N>,
