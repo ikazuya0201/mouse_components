@@ -3,7 +3,6 @@ extern crate alloc;
 #[macro_use]
 extern crate typenum;
 
-use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
@@ -141,18 +140,16 @@ fn test_run_operator() {
         distance_sensors,
     ) = simulator.split(wheel_interval);
 
-    let agent: Rc<
-        defaults::RunAgent<
-            Encoder,
-            Encoder,
-            IMU,
-            Motor,
-            Motor,
-            DistanceSensor<Size>,
-            MathFake,
-            MaxPathLength,
-            _,
-        >,
+    let agent: defaults::RunAgent<
+        Encoder,
+        Encoder,
+        IMU,
+        Motor,
+        Motor,
+        DistanceSensor<Size>,
+        MathFake,
+        MaxPathLength,
+        _,
     > = {
         let estimator = {
             EstimatorBuilder::new()
@@ -222,8 +219,7 @@ fn test_run_operator() {
             .build::<MathFake, MaxPathLength>();
 
         let obstacle_detector = ObstacleDetector::new(distance_sensors);
-        let agent = RunAgent::new(obstacle_detector, estimator, tracker, trajectory_generator);
-        Rc::new(agent)
+        RunAgent::new(obstacle_detector, estimator, tracker, trajectory_generator)
     };
 
     use AbsoluteDirection::*;
@@ -237,20 +233,10 @@ fn test_run_operator() {
             RunNode::<Size>::new(2, 0, South, cost).unwrap(),
             RunNode::<Size>::new(2, 0, West, cost).unwrap(),
         ];
-        Rc::new(defaults::Commander::new(
-            start,
-            goals,
-            SearchKind::Init,
-            SearchKind::Final,
-            maze,
-        ))
+        defaults::Commander::new(start, goals, SearchKind::Init, SearchKind::Final, maze)
     };
 
-    let operator = RunOperator::new(
-        Rc::clone(&agent),
-        Rc::clone(&commander),
-        CommandConverter::default(),
-    );
+    let operator = RunOperator::new(agent, commander, CommandConverter::default());
     while operator.run().is_err() {
         stepper.step();
         assert!(!operator.tick().is_err());

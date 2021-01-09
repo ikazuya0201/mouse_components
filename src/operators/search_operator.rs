@@ -1,4 +1,3 @@
-use alloc::rc::Rc;
 use core::cell::RefCell;
 use core::convert::TryInto;
 use core::marker::PhantomData;
@@ -34,10 +33,25 @@ pub trait CommandConverter<Command> {
 
 pub struct SearchOperator<Obstacle, Command, Agent, Commander, Converter> {
     keeped_command: RefCell<Option<Command>>,
-    agent: Rc<Agent>,
-    commander: Rc<Commander>,
+    agent: Agent,
+    commander: Commander,
     converter: Converter,
     _obstacle: PhantomData<fn() -> Obstacle>,
+}
+
+impl<Obstacle, Command, Agent, Commander, Converter>
+    SearchOperator<Obstacle, Command, Agent, Commander, Converter>
+{
+    pub fn consume(self) -> (Agent, Commander, Converter) {
+        let SearchOperator {
+            keeped_command: _,
+            agent,
+            commander,
+            converter,
+            _obstacle,
+        } = self;
+        (agent, commander, converter)
+    }
 }
 
 impl<Obstacle, Command, Agent, Commander, Converter>
@@ -47,7 +61,7 @@ where
     Converter: CommandConverter<Commander::Command>,
     Commander: SearchCommander<Obstacle>,
 {
-    pub fn new(agent: Rc<Agent>, commander: Rc<Commander>, converter: Converter) -> Self {
+    pub fn new(agent: Agent, commander: Commander, converter: Converter) -> Self {
         let command = converter.convert(
             commander
                 .next_command()
