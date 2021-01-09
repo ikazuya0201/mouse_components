@@ -1,4 +1,3 @@
-use core::cell::RefCell;
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Mul;
@@ -7,7 +6,11 @@ use generic_array::{ArrayLength, GenericArray};
 use typenum::{consts::U2, PowerOfTwo, Unsigned};
 
 use crate::maze::WallManager as IWallManager;
-use crate::utils::{itertools::repeat_n, probability::Probability};
+use crate::utils::{
+    itertools::repeat_n,
+    mutex::{Mutex, MutexError},
+    probability::Probability,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Wall<N> {
@@ -78,14 +81,13 @@ impl<N: Unsigned + PowerOfTwo> Wall<N> {
     }
 }
 
-#[derive(Clone)]
 pub struct WallManager<N>
 where
     N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
-    walls: GenericArray<RefCell<Probability>, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
+    walls: GenericArray<Mutex<Probability>, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
     existence_threshold: Probability,
 }
 
@@ -93,7 +95,7 @@ impl<N> fmt::Debug for WallManager<N>
 where
     N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WallManager")
@@ -107,12 +109,12 @@ impl<N> fmt::Display for WallManager<N>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let prob = |x: u16, y: u16, is_top: bool| -> Probability {
             let wall = Wall::<N>::new(x, y, is_top).unwrap();
-            self.walls[wall.to_index()].borrow().clone()
+            self.walls[wall.to_index()].lock().clone()
         };
         writeln!(f, "")?;
         for y in (0..N::U16).rev() {
@@ -153,11 +155,11 @@ impl<N> WallManager<N>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     fn _new(existence_threshold: Probability) -> Self {
         let walls = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .map(|p| RefCell::new(unsafe { Probability::new_unchecked(p) }))
+            .map(|p| Mutex::new(unsafe { Probability::new_unchecked(p) }))
             .collect();
         Self {
             walls,
@@ -198,7 +200,7 @@ where
         *self.walls[Wall::<N>::new(x, y, top)
             .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
             .to_index()]
-        .borrow_mut() = prob;
+        .lock() = prob;
     }
 
     ///NOTE: Input str of this method must be formatted like following.
@@ -276,38 +278,21 @@ where
     }
 }
 
-pub enum WallStorageError {
-    Borrow(core::cell::BorrowError),
-    BorrowMut(core::cell::BorrowMutError),
-}
-
-impl From<core::cell::BorrowError> for WallStorageError {
-    fn from(value: core::cell::BorrowError) -> Self {
-        WallStorageError::Borrow(value)
-    }
-}
-
-impl From<core::cell::BorrowMutError> for WallStorageError {
-    fn from(value: core::cell::BorrowMutError) -> Self {
-        WallStorageError::BorrowMut(value)
-    }
-}
-
 //TODO: Write test.
 impl<N> IWallManager<Wall<N>> for WallManager<N>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
-    type Error = WallStorageError;
+    type Error = MutexError;
 
     fn try_existence_probability(&self, wall: &Wall<N>) -> Result<Probability, Self::Error> {
-        Ok(self.walls[wall.to_index()].try_borrow()?.clone())
+        Ok(self.walls[wall.to_index()].try_lock()?.clone())
     }
 
     fn try_update(&self, wall: &Wall<N>, prob: &Probability) -> Result<(), Self::Error> {
-        *self.walls[wall.to_index()].try_borrow_mut()? = *prob;
+        *self.walls[wall.to_index()].try_lock()? = *prob;
         Ok(())
     }
 

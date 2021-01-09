@@ -12,7 +12,7 @@ use components::{
     sensors::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
     },
-    utils::{probability::Probability, sample::Sample},
+    utils::{mutex::Mutex, probability::Probability, sample::Sample},
 };
 use generic_array::ArrayLength;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
@@ -31,7 +31,7 @@ pub struct AgentSimulator<N>
 where
     N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     inner: Rc<RefCell<AgentSimulatorInner>>,
     wall_storage: Rc<WallManager<N>>,
@@ -42,7 +42,7 @@ impl<N> AgentSimulator<N>
 where
     N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     pub fn new(
         state: State,
@@ -313,7 +313,7 @@ pub struct DistanceSensor<N>
 where
     N: Mul<N>,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     inner: Rc<RefCell<AgentSimulatorInner>>,
     pose: Pose,
@@ -325,7 +325,7 @@ impl<N> IDistanceSensor for DistanceSensor<N>
 where
     N: Mul<N> + PowerOfTwo + Unsigned,
     <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<RefCell<Probability>>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     type Error = ConversionError;
 
