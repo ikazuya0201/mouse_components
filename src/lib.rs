@@ -24,7 +24,7 @@ pub mod traits {
     use super::*;
 
     pub use crate::utils::math::Math;
-    pub use administrator::{Atomic, Operator, OperatorStore, Selector};
+    pub use administrator::{Operator, OperatorStore, Selector};
     pub use agent::{
         ObstacleDetector, RunTrajectoryGenerator, SearchTrajectoryGenerator, StateEstimator,
         Tracker,
@@ -51,7 +51,6 @@ pub mod sensors {
 pub mod data_types {
     use super::*;
 
-    pub use administrator::SelectMode;
     pub use agent::Pose;
     pub use maze::{AbsoluteDirection, RelativeDirection};
     pub use node::Pattern;
@@ -186,11 +185,9 @@ pub mod defaults {
         DistanceSensorNum,
         Math,
         MaxPathLength,
-        Mode,
         Size,
         Logger = impls::NullLogger,
     > = impls::SearchOperator<
-        Mode,
         data_types::Obstacle,
         (data_types::Pose, impls::SearchNode<Size>),
         SearchAgent<
@@ -219,11 +216,9 @@ pub mod defaults {
         DistanceSensorNum,
         Math,
         MaxPathLength,
-        Mode,
         Size,
         Logger = impls::NullLogger,
     > = impls::RunOperator<
-        Mode,
         RunAgent<
             LeftEncoder,
             RightEncoder,

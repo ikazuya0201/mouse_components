@@ -1,35 +1,21 @@
-use alloc::rc::Rc;
 use core::marker::PhantomData;
-use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicBool, Ordering};
+
+use crate::utils::mutex::Mutex;
 
 #[derive(Debug, Clone, Copy)]
 pub struct NotFinishError;
 
+pub trait OperatorStore<Mode, Operator> {
+    fn exchange(&self, operator: Operator, mode: Mode) -> Operator;
+    fn next(&self, operator: Operator) -> Operator;
+}
+
 pub trait Operator {
-    type Mode;
     type Error;
 
-    fn init(&self);
     fn tick(&self) -> Result<(), Self::Error>;
-    fn run(&self) -> Result<Self::Mode, NotFinishError>;
-}
-
-//TODO: Remove this trait.
-pub trait OperatorStore<Mode> {
-    fn get_operator(
-        &self,
-        mode: Mode,
-    ) -> Rc<dyn Operator<Mode = Mode, Error = core::convert::Infallible>>;
-}
-
-pub trait Atomic<T> {
-    fn load(&self, order: Ordering) -> T;
-    fn store(&self, val: T, order: Ordering);
-}
-
-pub enum SelectMode<Mode> {
-    Select,
-    Other(Mode),
+    fn run(&self) -> Result<(), NotFinishError>;
 }
 
 pub trait Selector<Mode> {
@@ -38,23 +24,25 @@ pub trait Selector<Mode> {
     fn is_enabled(&self) -> bool;
 }
 
-pub struct Administrator<Mode, AtomicMode, ISelector, Store> {
-    mode: AtomicMode,
+pub struct Administrator<Mode, ISelector, Operator, Store> {
+    is_select: AtomicBool,
     selector: ISelector,
+    operator: Mutex<Option<Operator>>,
     store: Store,
     _mode: PhantomData<fn() -> Mode>,
 }
 
-impl<Mode, AtomicMode, ISelector, Store> Administrator<Mode, AtomicMode, ISelector, Store>
+impl<Mode, ISelector, IOperator, Store> Administrator<Mode, ISelector, IOperator, Store>
 where
-    AtomicMode: Atomic<SelectMode<Mode>>,
     ISelector: Selector<Mode>,
-    Store: OperatorStore<Mode>,
+    IOperator: Operator,
+    Store: OperatorStore<Mode, IOperator>,
 {
-    pub fn new(mode: AtomicMode, selector: ISelector, store: Store) -> Self {
+    pub fn new(selector: ISelector, operator: IOperator, store: Store) -> Self {
         Self {
-            mode,
+            is_select: AtomicBool::new(false),
             selector,
+            operator: Mutex::new(Some(operator)),
             store,
             _mode: PhantomData,
         }
@@ -62,27 +50,46 @@ where
 
     //called by periodic interrupt
     pub fn tick(&self) {
-        match self.mode.load(Ordering::Relaxed) {
-            SelectMode::Select => return,
-            SelectMode::Other(mode) => self.store.get_operator(mode).tick().unwrap(),
+        if self.is_select.load(Ordering::Relaxed) {
+            return;
+        } else if let Ok(operator) = self.operator.try_lock() {
+            operator
+                .as_ref()
+                .unwrap_or_else(|| todo!())
+                .tick()
+                .unwrap_or_else(|_| todo!());
         }
         if self.selector.is_enabled() {
-            self.mode.store(SelectMode::Select, Ordering::Relaxed);
+            self.is_select.store(true, Ordering::Relaxed);
         }
     }
 
     pub fn run(&self) {
         loop {
-            if let Ok(mode) = match self.mode.load(Ordering::Relaxed) {
-                SelectMode::Select => self.mode_select(),
-                SelectMode::Other(mode) => self.store.get_operator(mode).run(),
-            } {
-                self.mode.store(SelectMode::Other(mode), Ordering::Relaxed);
+            if self.is_select.load(Ordering::Relaxed) {
+                self.mode_select();
+            } else if self
+                .operator
+                .lock()
+                .as_ref()
+                .unwrap_or_else(|| todo!())
+                .run()
+                .is_ok()
+            {
+                let operator = self.operator.lock().take().expect("Should never be None");
+                let operator = self.store.next(operator);
+                *self.operator.lock() = Some(operator);
             }
         }
     }
 
-    fn mode_select(&self) -> Result<Mode, NotFinishError> {
+    fn exchange_operator(&self, mode: Mode) {
+        let operator = self.operator.lock().take().expect("Should never be None");
+        let operator = self.store.exchange(operator, mode);
+        *self.operator.lock() = Some(operator);
+    }
+
+    fn mode_select(&self) {
         //waiting for switch off
         while self.selector.is_enabled() {}
 
@@ -93,6 +100,9 @@ where
         //waiting for switch off
         while self.selector.is_enabled() {}
 
-        Ok(self.selector.mode())
+        let mode = self.selector.mode();
+        self.exchange_operator(mode);
+
+        self.is_select.store(false, Ordering::Relaxed);
     }
 }
