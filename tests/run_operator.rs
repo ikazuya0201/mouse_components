@@ -128,7 +128,7 @@ fn test_run_operator() {
         trans_model_time_constant,
         rot_model_gain,
         rot_model_time_constant,
-        WallManager::<Size>::with_str(existence_threshold, input_str),
+        wall_storage.clone(),
         distance_sensors_poses,
     );
 

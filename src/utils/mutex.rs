@@ -9,6 +9,12 @@ pub struct Mutex<T> {
     inner: UnsafeCell<T>,
 }
 
+impl<T: Clone> Clone for Mutex<T> {
+    fn clone(&self) -> Self {
+        Self::new(self.lock().clone())
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct MutexError;
 
