@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
 
 use uom::si::f32::{
-    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Velocity,
+    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
+    Velocity,
 };
 
 use crate::data_types::Pose;
@@ -121,6 +122,50 @@ where
         match self.inner.next()? {
             Target::Moving(target) => Some(Target::Moving(self.shift(target))),
             target => Some(target),
+        }
+    }
+}
+
+pub struct StopTrajectory {
+    t: Time,
+    pose: Pose,
+    period: Time,
+    t_end: Time,
+}
+
+impl StopTrajectory {
+    pub fn new(pose: Pose, period: Time, t_end: Time) -> Self {
+        Self {
+            t: Default::default(),
+            pose,
+            period,
+            t_end,
+        }
+    }
+}
+
+impl Iterator for StopTrajectory {
+    type Item = Target;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.t < self.t_end {
+            self.t += self.period;
+            Some(Target::Moving(MoveTarget {
+                x: LengthTarget {
+                    x: self.pose.x,
+                    ..Default::default()
+                },
+                y: LengthTarget {
+                    x: self.pose.y,
+                    ..Default::default()
+                },
+                theta: AngleTarget {
+                    x: self.pose.theta,
+                    ..Default::default()
+                },
+            }))
+        } else {
+            None
         }
     }
 }
