@@ -181,7 +181,6 @@ pub mod defaults {
         RightMotor,
         DistanceSensor,
         Math,
-        MaxPathLength,
         Size,
         Logger = impls::NullLogger,
     > = impls::SearchOperator<
@@ -195,7 +194,7 @@ pub mod defaults {
             RightMotor,
             DistanceSensor,
             Math,
-            MaxPathLength,
+            <impls::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
         Commander<Size, Math>,
@@ -210,7 +209,6 @@ pub mod defaults {
         RightMotor,
         DistanceSensor,
         Math,
-        MaxPathLength,
         Size,
         Logger = impls::NullLogger,
     > = impls::RunOperator<
@@ -222,7 +220,7 @@ pub mod defaults {
             RightMotor,
             DistanceSensor,
             Math,
-            MaxPathLength,
+            <impls::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
         Commander<Size, Math>,
