@@ -183,72 +183,61 @@ where
     fn next_command(&self) -> Result<Self::Command, Self::Error> {
         match self.state.get() {
             State::Initial => {
-                let next = {
-                    self.current
-                        .borrow()
-                        .next(&self.initial_route)
+                let current = self.current.replace_with(|node| {
+                    node.next(&self.initial_route)
                         .unwrap_or_else(|_| unreachable!())
-                };
-                let current = self.current.replace(next);
+                });
                 self.state.set(State::Solving);
                 Ok((current, self.initial_route.clone()))
             }
             State::Final => Err(CommanderError::SolveFinishError),
             State::Solving => {
-                let candidates = self
-                    .next_node_candidates(
-                        &self
-                            .current
-                            .borrow()
-                            .clone()
-                            .try_into()
-                            .unwrap_or_else(|_| unimplemented!()),
-                    )
-                    .ok_or(CommanderError::SolveFinishError)?;
-                self.candidates.replace(candidates);
-                self.state.set(State::Waiting);
-                Err(CommanderError::WaitingError)
+                let mut current = self.current.borrow_mut();
+                if let Some(candidates) = self.next_node_candidates(
+                    &current
+                        .clone()
+                        .try_into()
+                        .unwrap_or_else(|_| unimplemented!()),
+                ) {
+                    self.candidates.replace(candidates);
+                    self.state.set(State::Waiting);
+                    Err(CommanderError::WaitingError)
+                } else {
+                    let tmp = current.clone();
+                    *current = current
+                        .next(&self.final_route)
+                        .unwrap_or_else(|_| unreachable!());
+                    self.state.set(State::Final);
+                    Ok((tmp, self.final_route.clone()))
+                }
             }
             State::Waiting => {
                 let mut next = None;
-                {
-                    let candidates = self.candidates.borrow();
-                    if candidates.is_empty() {
-                        return Err(CommanderError::WaitingError);
-                    }
-                    for &node in candidates.iter() {
-                        let is_available = self
-                            .maze
-                            .is_available(&node)
-                            .map_err(|_| CommanderError::WaitingError)?;
-                        if is_available {
-                            next = Some(node);
-                            break;
-                        }
+                let mut candidates = self.candidates.borrow_mut();
+                if candidates.is_empty() {
+                    return Err(CommanderError::WaitingError);
+                }
+                for &node in candidates.iter() {
+                    let is_available = self
+                        .maze
+                        .is_available(&node)
+                        .map_err(|_| CommanderError::WaitingError)?;
+                    if is_available {
+                        next = Some(node);
+                        break;
                     }
                 }
-                self.candidates.replace(Vec::new());
+                candidates.clear();
+                let next = next.unwrap_or_else(|| unreachable!("This is bug."));
+                let kind = {
+                    <Maze::SearchNode as TryFrom<Node>>::try_from(self.current.borrow().clone())
+                        .unwrap_or_else(|_| unimplemented!())
+                        .route(&next)
+                        .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
+                };
+                let current = self.current.replace(Node::from(next));
                 self.state.set(State::Solving);
-                if let Some(next) = next {
-                    let kind = {
-                        <Maze::SearchNode as TryFrom<Node>>::try_from(self.current.borrow().clone())
-                            .unwrap_or_else(|_| unimplemented!())
-                            .route(&next)
-                            .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
-                    };
-                    let current = self.current.replace(Node::from(next));
-                    Ok((current, kind))
-                } else {
-                    let next = {
-                        self.current
-                            .borrow()
-                            .next(&self.final_route)
-                            .unwrap_or_else(|_| unreachable!())
-                    };
-                    let current = self.current.replace(next);
-                    self.state.set(State::Final);
-                    Ok((current, self.final_route.clone()))
-                }
+                Ok((current, kind))
             }
         }
     }
