@@ -3,7 +3,6 @@ extern crate alloc;
 #[macro_use]
 extern crate typenum;
 
-use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
@@ -139,7 +138,7 @@ macro_rules! search_operator_tests {
                     distance_sensors,
                 ) = simulator.split(wheel_interval);
 
-                let agent: Rc<
+                let agent:
                     defaults::SearchAgent<
                         Encoder,
                         Encoder,
@@ -150,8 +149,8 @@ macro_rules! search_operator_tests {
                         MathFake,
                         MaxPathLength,
                         _,
-                    >,
-                > = {
+                    >
+                 = {
                     let estimator = {
                         EstimatorBuilder::new()
                             .left_encoder(left_encoder)
@@ -220,12 +219,12 @@ macro_rules! search_operator_tests {
                         .build::<MathFake, MaxPathLength>();
 
                     let obstacle_detector = ObstacleDetector::new(distance_sensors);
-                    Rc::new(SearchAgent::new(
+                    SearchAgent::new(
                         obstacle_detector,
                         estimator,
                         tracker,
                         trajectory_generator,
-                    ))
+                    )
                 };
 
                 use AbsoluteDirection::*;
@@ -235,27 +234,28 @@ macro_rules! search_operator_tests {
                     let wall_converter = WallConverter::new(cost);
                     let maze = Maze::<_, _, _, MathFake>::new(wall_storage, pose_converter, wall_converter);
                     let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
-                    Rc::new(defaults::Commander::new(
+                    defaults::Commander::new(
                         start,
                         goals.clone(),
                         SearchKind::Init,
                         SearchKind::Final,
                         maze,
-                    ))
+                    )
                 };
 
                 let commander = create_commander(WallManager::<Size>::new(existence_threshold));
                 let expected_commander = create_commander(wall_storage);
 
                 let operator = SearchOperator::new(
-                    Rc::clone(&agent),
-                    Rc::clone(&commander),
+                    agent,
+                    commander,
                     CommandConverter::default(),
                 );
                 while operator.run().is_err() {
                     stepper.step();
                     assert!(!operator.tick().is_err());
                 }
+                let (_, commander, _) = operator.consume();
                 assert_eq!(
                     commander.compute_shortest_path(),
                     expected_commander.compute_shortest_path()

@@ -1,4 +1,3 @@
-use alloc::rc::Rc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use super::search_operator::CommandConverter;
@@ -21,9 +20,9 @@ pub trait RunAgent<Command> {
 
 pub struct RunOperator<Agent, Commander, Converter> {
     is_completed: AtomicBool,
-    agent: Rc<Agent>,
+    agent: Agent,
     #[allow(unused)]
-    commander: Rc<Commander>,
+    commander: Commander,
     #[allow(unused)]
     converter: Converter,
 }
@@ -35,7 +34,7 @@ where
     Commander: RunCommander,
     Commander::Error: core::fmt::Debug,
 {
-    pub fn new(agent: Rc<Agent>, commander: Rc<Commander>, converter: Converter) -> Self {
+    pub fn new(agent: Agent, commander: Commander, converter: Converter) -> Self {
         let commands = commander
             .compute_commands()
             .unwrap_or_else(|err| todo!("Error handling is not implemented: {:?}", err));
