@@ -4,7 +4,7 @@ use heapless::{spsc::Queue, ArrayLength};
 use typenum::consts::*;
 use uom::si::f32::{Angle, Length};
 
-use crate::operators::{RunAgent as IRunAgent, SearchAgent as ISearchAgent};
+use crate::operators::{EmptyTrajectoyError, RunAgent as IRunAgent, SearchAgent as ISearchAgent};
 use crate::utils::mutex::Mutex;
 
 pub trait ObstacleDetector<State> {
@@ -151,6 +151,18 @@ where
 pub enum SearchAgentError<T> {
     TrackFailed(T),
     QueueOverflowed,
+    EmptyTrajectory,
+}
+
+impl<T> core::convert::TryFrom<SearchAgentError<T>> for EmptyTrajectoyError {
+    type Error = SearchAgentError<T>;
+
+    fn try_from(value: SearchAgentError<T>) -> Result<Self, SearchAgentError<T>> {
+        match value {
+            SearchAgentError::EmptyTrajectory => Ok(EmptyTrajectoyError),
+            _ => Err(value),
+        }
+    }
 }
 
 impl<T> From<T> for SearchAgentError<T> {
@@ -207,27 +219,31 @@ where
 
     fn track_next(&self) -> Result<(), Self::Error> {
         let state = self.state_estimator.borrow().state();
-        let target = {
+        let (target, is_empty) = {
             if let Ok(mut trajectories) = self.trajectories.try_lock() {
                 loop {
                     if let Some(trajectory) = trajectories.iter_mut().next() {
                         if let Some(target) = trajectory.next() {
-                            break Some(target);
+                            break (Some(target), false);
                         }
                     } else {
-                        break self.last_target.get();
+                        break (self.last_target.get(), true);
                     }
                     trajectories.dequeue();
                 }
             } else {
-                self.last_target.get()
+                (self.last_target.get(), true)
             }
         };
         if let Some(target) = target {
             self.tracker.borrow_mut().track(&state, &target)?;
             self.last_target.set(Some(target));
         }
-        Ok(())
+        if is_empty {
+            Err(SearchAgentError::EmptyTrajectory)
+        } else {
+            Ok(())
+        }
     }
 }
 

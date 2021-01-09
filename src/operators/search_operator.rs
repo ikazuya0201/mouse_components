@@ -1,6 +1,7 @@
 use core::cell::RefCell;
-use core::convert::TryInto;
+use core::convert::{TryFrom, TryInto};
 use core::marker::PhantomData;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::administrator::{NotFinishError, Operator};
 
@@ -36,6 +37,7 @@ pub struct SearchOperator<Obstacle, Command, Agent, Commander, Converter> {
     agent: Agent,
     commander: Commander,
     converter: Converter,
+    trajectory_is_empty: AtomicBool,
     _obstacle: PhantomData<fn() -> Obstacle>,
 }
 
@@ -44,11 +46,10 @@ impl<Obstacle, Command, Agent, Commander, Converter>
 {
     pub fn consume(self) -> (Agent, Commander, Converter) {
         let SearchOperator {
-            keeped_command: _,
             agent,
             commander,
             converter,
-            _obstacle,
+            ..
         } = self;
         (agent, commander, converter)
     }
@@ -76,6 +77,7 @@ where
             agent,
             commander,
             converter,
+            trajectory_is_empty: AtomicBool::new(false),
             _obstacle: PhantomData,
         }
     }
@@ -84,6 +86,9 @@ where
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct FinishError;
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct EmptyTrajectoyError;
+
 impl<Obstacle, Agent, Commander, Converter> Operator
     for SearchOperator<Obstacle, Converter::Output, Agent, Commander, Converter>
 where
@@ -91,6 +96,8 @@ where
     Converter: CommandConverter<Commander::Command>,
     Commander: SearchCommander<Obstacle>,
     Commander::Error: TryInto<FinishError>,
+    EmptyTrajectoyError: TryFrom<Agent::Error>,
+    <EmptyTrajectoyError as TryFrom<Agent::Error>>::Error: Into<Agent::Error>,
 {
     type Error = Agent::Error;
 
@@ -98,7 +105,19 @@ where
         self.agent.update_state();
         let obstacles = self.agent.get_obstacles();
         self.commander.update_obstacles(obstacles);
-        self.agent.track_next()
+        match self.agent.track_next() {
+            Err(err) => match EmptyTrajectoyError::try_from(err) {
+                Ok(_) => {
+                    self.trajectory_is_empty.store(true, Ordering::Relaxed);
+                    Ok(())
+                }
+                Err(err) => Err(err.into()),
+            },
+            _ => {
+                self.trajectory_is_empty.store(false, Ordering::Relaxed);
+                Ok(())
+            }
+        }
     }
 
     fn run(&self) -> Result<(), NotFinishError> {
@@ -114,9 +133,14 @@ where
                     if self.agent.set_command(&command).is_err() {
                         keeped_command.replace(command);
                     }
+                    self.trajectory_is_empty.store(false, Ordering::Relaxed);
                 }
                 Err(err) => {
-                    if err.try_into().is_ok() {
+                    //success when error is finish error and trajectory is empty
+                    if err.try_into().is_ok()
+                        && self.trajectory_is_empty.load(Ordering::Relaxed)
+                        && keeped_command.is_none()
+                    {
                         return Ok(());
                     }
                 }
