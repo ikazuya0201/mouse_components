@@ -43,17 +43,13 @@ where
     fn next(&self, route: &SearchKind) -> Result<Self, Self::Error> {
         use AbsoluteDirection::*;
         use RelativeDirection::*;
-        use SearchKind::*;
 
         match route {
-            Init | Final => self.relative(0, 1, Front, North),
-            Search(dir) => match dir {
-                Front => self.relative(0, 2, Front, North),
-                Right => self.relative(1, 1, Right, North),
-                Left => self.relative(-1, 1, Left, North),
-                Back => self.relative(0, 0, Back, North),
-                _ => unreachable!("This is bug"),
-            },
+            SearchKind::Init | SearchKind::Final => self.relative(0, 1, Front, North),
+            SearchKind::Front => self.relative(0, 2, Front, North),
+            SearchKind::Right => self.relative(1, 1, Right, North),
+            SearchKind::Left => self.relative(-1, 1, Left, North),
+            SearchKind::Back => self.relative(0, 0, Back, North),
         }
     }
 }
@@ -486,13 +482,12 @@ impl<N: Clone> RouteNode for SearchNode<N> {
 
     fn route(&self, to: &Self) -> Result<Self::Route, Self::Error> {
         use RelativeDirection::*;
-        use SearchKind::*;
 
         Ok(match self.0.difference(&to.0, AbsoluteDirection::North) {
-            (1, 1, Right) => Search(Right),
-            (0, 2, Front) => Search(Front),
-            (-1, 1, Left) => Search(Left),
-            (0, 0, Back) => Search(Back),
+            (1, 1, Right) => SearchKind::Right,
+            (0, 2, Front) => SearchKind::Front,
+            (-1, 1, Left) => SearchKind::Left,
+            (0, 0, Back) => SearchKind::Back,
             _ => {
                 return Err(RouteError {
                     src: self.clone(),
@@ -1480,7 +1475,6 @@ mod tests {
     #[test]
     fn test_search_node_route() {
         use AbsoluteDirection::*;
-        use RelativeDirection::*;
         use SearchKind::*;
 
         fn cost(_pattern: Pattern) -> u16 {
@@ -1488,11 +1482,11 @@ mod tests {
         }
 
         let test_cases = vec![
-            ((0, 1, North), (1, 2, East), Ok(Search(Right))),
-            ((0, 1, North), (0, 3, North), Ok(Search(Front))),
+            ((0, 1, North), (1, 2, East), Ok(Right)),
+            ((0, 1, North), (0, 3, North), Ok(Front)),
             ((0, 1, North), (2, 1, North), Err(())),
-            ((2, 1, North), (1, 2, West), Ok(Search(Left))),
-            ((0, 1, North), (0, 1, South), Ok(Search(Back))),
+            ((2, 1, North), (1, 2, West), Ok(Left)),
+            ((0, 1, North), (0, 1, South), Ok(Back)),
         ];
 
         type Size = U4;
