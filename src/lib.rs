@@ -68,7 +68,7 @@ pub mod impls {
 
     pub use administrator::Administrator;
     pub use agent::{RunAgent, SearchAgent};
-    pub use command_converter::CommandConverter;
+    pub use command_converter::{CommandConverter, CommandConverter2};
     pub use commander::Commander;
     pub use controller::{
         RotationController, RotationControllerBuilder, TranslationController,

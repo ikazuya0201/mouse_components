@@ -60,3 +60,72 @@ impl<N, K> ICommandConverter<(Node<N>, K)> for CommandConverter {
         )
     }
 }
+
+//NOTE: This struct is intended to be used by SearchOperator
+#[derive(Clone, PartialEq, Debug)]
+pub struct CommandConverter2 {
+    square_width_half: Length,
+    front_offset: Length,
+}
+
+impl CommandConverter2 {
+    pub fn new(square_width: Length, front_offset: Length) -> Self {
+        Self {
+            square_width_half: square_width / 2.0,
+            front_offset,
+        }
+    }
+}
+
+impl CommandConverter2 {
+    const DEFAULT_SQUARE_WIDTH: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.09,
+    };
+}
+
+impl Default for CommandConverter2 {
+    fn default() -> Self {
+        Self::new(Self::DEFAULT_SQUARE_WIDTH, Default::default())
+    }
+}
+
+//TODO: Write test.
+impl<N, K> ICommandConverter<(Node<N>, K)> for CommandConverter2 {
+    type Output = (Pose, K);
+
+    fn convert(&self, (node, kind): (Node<N>, K)) -> Self::Output {
+        use AbsoluteDirection::*;
+
+        let (dx, dy, theta) = if (node.x() ^ node.y()) & 1 == 1 {
+            match node.direction() {
+                North => (Default::default(), self.front_offset, 90.0),
+                East => (self.front_offset, Default::default(), 0.0),
+                South => (Default::default(), -self.front_offset, -90.0),
+                West => (-self.front_offset, Default::default(), 180.0),
+                _ => unreachable!("This struct is intended to be used by SearchOperator"),
+            }
+        } else {
+            (
+                Default::default(),
+                Default::default(),
+                match node.direction() {
+                    North => 90.0,
+                    East => 0.0,
+                    South => -90.0,
+                    West => 180.0,
+                    _ => unreachable!("This struct is intended to be used by SearchOperator"),
+                },
+            )
+        };
+        (
+            Pose {
+                x: (node.x() + 1) as f32 * self.square_width_half + dx,
+                y: (node.y() + 1) as f32 * self.square_width_half + dy,
+                theta: Angle::new::<degree>(theta),
+            },
+            kind,
+        )
+    }
+}
