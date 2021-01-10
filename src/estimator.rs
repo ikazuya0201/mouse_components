@@ -487,7 +487,7 @@ impl<LE, RE, I, P, COF, POS, X, Y> EstimatorBuilder<LE, RE, I, P, COF, POS, X, Y
 mod tests {
     use super::*;
     use crate::{
-        data_types::{Pose, RelativeDirection, SearchKind, Target},
+        data_types::{Pose, SearchKind, Target},
         impls::{TrajectoryGenerator, TrajectoryGeneratorBuilder},
         prelude::*,
         trajectory_generator::slalom_parameters_map,
@@ -716,9 +716,7 @@ mod tests {
         )
     }
 
-    fn straight_and_search_trajectory(
-        direction: RelativeDirection,
-    ) -> impl Iterator<Item = Target> {
+    fn straight_and_search_trajectory(kind: SearchKind) -> impl Iterator<Item = Target> {
         let trajectory_generator = build_generator();
         trajectory_generator
             .generate_straight(
@@ -732,14 +730,14 @@ mod tests {
                     y: Default::default(),
                     theta: Default::default(),
                 },
-                &SearchKind::Search(direction),
+                &kind,
             ))
     }
 
     estimator_tests! {
         test_estimator_straight1: straight_trajectory(),
-        test_estimator_straight_right: straight_and_search_trajectory(RelativeDirection::Right),
-        test_estimator_straight_left: straight_and_search_trajectory(RelativeDirection::Left),
-        test_estimator_straight2: straight_and_search_trajectory(RelativeDirection::Front),
+        test_estimator_straight_right: straight_and_search_trajectory(SearchKind::Right),
+        test_estimator_straight_left: straight_and_search_trajectory(SearchKind::Left),
+        test_estimator_straight2: straight_and_search_trajectory(SearchKind::Front),
     }
 }

@@ -10,7 +10,6 @@ use heapless::{ArrayLength, Vec};
 
 use crate::agent::{RunTrajectoryGenerator, SearchTrajectoryGenerator};
 use crate::data_types::Pose;
-use crate::maze::RelativeDirection;
 use crate::traits::Math;
 pub use slalom_generator::{slalom_parameters_map, SlalomDirection, SlalomKind, SlalomParameters};
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
@@ -31,7 +30,10 @@ use uom::si::{
 pub enum SearchKind {
     Init,
     Final,
-    Search(RelativeDirection),
+    Front,
+    Right,
+    Left,
+    Back,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -162,7 +164,6 @@ where
         pose: &Pose,
         kind: &SearchKind,
     ) -> ShiftTrajectory<SearchTrajectory<M>, M> {
-        use RelativeDirection::*;
         use SearchKind::*;
 
         ShiftTrajectory::<_, M>::new(
@@ -184,13 +185,10 @@ where
                         Default::default(),
                     ))
                 }
-                Search(direction) => match direction {
-                    Front => SearchTrajectory::Straight(self.front_trajectory.clone()),
-                    Right => SearchTrajectory::Slalom(self.right_trajectory.clone()),
-                    Left => SearchTrajectory::Slalom(self.left_trajectory.clone()),
-                    Back => SearchTrajectory::Back(self.back_trajectory.clone()),
-                    _ => unreachable!(),
-                },
+                Front => SearchTrajectory::Straight(self.front_trajectory.clone()),
+                Right => SearchTrajectory::Slalom(self.right_trajectory.clone()),
+                Left => SearchTrajectory::Slalom(self.left_trajectory.clone()),
+                Back => SearchTrajectory::Back(self.back_trajectory.clone()),
             },
         )
     }
@@ -702,7 +700,7 @@ mod tests {
                         .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
                         .build::<MathFake, ()>();
 
-                    let (direction, last_x, last_y, last_theta) = $value;
+                    let (kind, last_x, last_y, last_theta) = $value;
 
                     let mut trajectory = generator.generate_search(
                         &Pose::new(
@@ -710,7 +708,7 @@ mod tests {
                             Length::new::<meter>(0.09),
                             Angle::new::<degree>(90.0),
                         ),
-                        &SearchKind::Search(direction),
+                        &kind,
                     );
 
                     let mut last = trajectory.next().unwrap();
@@ -737,9 +735,9 @@ mod tests {
     }
 
     search_trajectory_tests! {
-        test_search_trajectory_front: (RelativeDirection::Front, 0.045, 0.18, 90.0),
-        test_search_trajectory_right: (RelativeDirection::Right, 0.09, 0.135, 0.0),
-        test_search_trajectory_left: (RelativeDirection::Left, 0.0, 0.135, 180.0),
-        test_search_trajectory_back: (RelativeDirection::Back, 0.045, 0.09, 270.0),
+        test_search_trajectory_front: (SearchKind::Front, 0.045, 0.18, 90.0),
+        test_search_trajectory_right: (SearchKind::Right, 0.09, 0.135, 0.0),
+        test_search_trajectory_left: (SearchKind::Left, 0.0, 0.135, 180.0),
+        test_search_trajectory_back: (SearchKind::Back, 0.045, 0.09, 270.0),
     }
 }
