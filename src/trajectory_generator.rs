@@ -11,7 +11,9 @@ use heapless::{ArrayLength, Vec};
 use crate::agent::{RunTrajectoryGenerator, SearchTrajectoryGenerator};
 use crate::data_types::Pose;
 use crate::traits::Math;
-pub use slalom_generator::{slalom_parameters_map, SlalomDirection, SlalomKind, SlalomParameters};
+pub use slalom_generator::{
+    slalom_parameters_map, slalom_parameters_map2, SlalomDirection, SlalomKind, SlalomParameters,
+};
 use slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use spin_generator::{SpinGenerator, SpinTrajectory};
 use straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};

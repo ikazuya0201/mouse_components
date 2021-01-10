@@ -82,7 +82,8 @@ pub mod impls {
     pub use pose_converter::PoseConverter;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{
-        slalom_parameters_map, ShiftTrajectory, TrajectoryGenerator, TrajectoryGeneratorBuilder,
+        slalom_parameters_map, slalom_parameters_map2, ShiftTrajectory, TrajectoryGenerator,
+        TrajectoryGeneratorBuilder,
     };
     pub use wall_converter::WallConverter;
     pub use wall_manager::WallManager;
