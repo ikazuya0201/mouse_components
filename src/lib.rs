@@ -58,7 +58,7 @@ pub mod data_types {
     pub use tracker::{AngleState, LengthState, State};
     pub use trajectory_generator::{
         AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection, SlalomKind,
-        Target,
+        SlalomParameters, Target,
     };
     pub use wall_manager::Wall;
 }
@@ -186,7 +186,7 @@ pub mod defaults {
         Logger = impls::NullLogger,
     > = impls::SearchOperator<
         data_types::Obstacle,
-        (data_types::Pose, impls::SearchNode<Size>),
+        (data_types::Pose, data_types::SearchKind),
         SearchAgent<
             LeftEncoder,
             RightEncoder,
