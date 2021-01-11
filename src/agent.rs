@@ -27,6 +27,7 @@ pub trait SearchTrajectoryGenerator<Pose, Kind> {
     type Trajectory: Iterator<Item = Self::Target>;
 
     fn generate_search(&self, pose: &Pose, kind: &Kind) -> Self::Trajectory;
+    fn generate_emergency(&self, target: &Self::Target) -> Self::Trajectory;
 }
 
 pub trait Tracker<State, Target> {
@@ -76,7 +77,9 @@ pub struct SearchAgent<
     tracker: RefCell<ITracker>,
     trajectory_generator: ITrajectoryGenerator,
     trajectories: Mutex<Queue<Trajectory, U2>>,
-    last_target: Cell<Option<Target>>,
+    emergency_trajectory: RefCell<Option<Trajectory>>,
+    emergency_counter: Cell<usize>,
+    last_target: RefCell<Option<Target>>,
 }
 
 impl<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Trajectory, Target>
@@ -124,26 +127,10 @@ impl<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Traject
             tracker: RefCell::new(tracker),
             trajectory_generator,
             trajectories: Mutex::new(Queue::new()),
-            last_target: Cell::new(None),
+            emergency_trajectory: RefCell::new(None),
+            emergency_counter: Cell::new(0),
+            last_target: RefCell::new(None),
         }
-    }
-}
-
-impl<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Trajectory, Target>
-    SearchAgent<
-        IObstacleDetector,
-        IStateEstimator,
-        ITracker,
-        ITrajectoryGenerator,
-        Trajectory,
-        Target,
-    >
-where
-    ITracker: Tracker<IStateEstimator::State, Target>,
-    IStateEstimator: StateEstimator,
-{
-    pub fn stop(&self) {
-        self.tracker.borrow_mut().stop();
     }
 }
 
@@ -183,7 +170,6 @@ impl<Pose, Kind, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenera
     >
 where
     Pose: Copy,
-    ITrajectoryGenerator::Target: Copy,
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
@@ -218,30 +204,50 @@ where
     }
 
     fn track_next(&self) -> Result<(), Self::Error> {
+        let get_or_init_emergency = || {
+            let mut trajectory = self.emergency_trajectory.borrow_mut();
+            if trajectory.is_none() {
+                trajectory.replace(
+                    self.trajectory_generator.generate_emergency(
+                        &*self
+                            .last_target
+                            .borrow()
+                            .as_ref()
+                            .expect("Should never be None."),
+                    ),
+                );
+                self.emergency_counter.set(0);
+            }
+            self.emergency_counter.set(self.emergency_counter.get() + 1);
+            trajectory.as_mut().expect("Should never be None.").next()
+        };
+
         let state = self.state_estimator.borrow().state();
         let (target, is_empty) = {
             if let Ok(mut trajectories) = self.trajectories.try_lock() {
                 loop {
                     if let Some(trajectory) = trajectories.iter_mut().next() {
-                        if let Some(target) = trajectory.next() {
+                        if let Some(target) = trajectory.nth(self.emergency_counter.get()) {
                             break (Some(target), false);
                         }
                     } else {
-                        break (self.last_target.get(), true);
+                        break (get_or_init_emergency(), true);
                     }
                     trajectories.dequeue();
                 }
             } else {
-                (self.last_target.get(), true)
+                (get_or_init_emergency(), true)
             }
         };
-        if let Some(target) = target {
-            self.tracker.borrow_mut().track(&state, &target)?;
-            self.last_target.set(Some(target));
+        if let Some(target) = target.as_ref() {
+            self.tracker.borrow_mut().track(&state, target)?;
         }
         if is_empty {
             Err(SearchAgentError::EmptyTrajectory)
         } else {
+            self.last_target.replace(target);
+            self.emergency_trajectory.replace(None);
+            self.emergency_counter.set(0);
             Ok(())
         }
     }

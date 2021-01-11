@@ -63,6 +63,16 @@ impl<M: Math> Iterator for SearchTrajectory<M> {
             Back(inner) => inner.next(),
         }
     }
+
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        use SearchTrajectory::*;
+
+        match self {
+            Straight(inner) => inner.advance_by(n),
+            Slalom(inner) => inner.advance_by(n),
+            Back(inner) => inner.advance_by(n),
+        }
+    }
 }
 
 pub type BackTrajectory<M> = Chain<
@@ -226,6 +236,17 @@ where
 
     fn generate_search(&self, pose: &Pose, kind: &SearchKind) -> Self::Trajectory {
         self.generate_search_trajectory(pose, kind)
+    }
+
+    fn generate_emergency(&self, target: &Self::Target) -> Self::Trajectory {
+        //This method should never be called when spin.
+        let target = target.moving().expect("Should be Target::Moving.");
+        let pose = Pose {
+            x: target.x.x,
+            y: target.y.x,
+            theta: target.theta.x,
+        };
+        self.generate_search_trajectory(&pose, &SearchKind::Final)
     }
 }
 

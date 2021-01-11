@@ -494,6 +494,15 @@ impl Iterator for StraightTrajectory {
             ..Default::default()
         }))
     }
+
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        self.t += self.period * n as f32;
+        if self.t < self.t_end {
+            Ok(())
+        } else {
+            Err(n - ((self.t - self.t_end) / self.period).get::<uom::si::ratio::ratio>() as usize)
+        }
+    }
 }
 
 #[cfg(test)]
