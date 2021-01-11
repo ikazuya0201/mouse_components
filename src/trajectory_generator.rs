@@ -63,6 +63,16 @@ impl<M: Math> Iterator for SearchTrajectory<M> {
             Back(inner) => inner.next(),
         }
     }
+
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        use SearchTrajectory::*;
+
+        match self {
+            Straight(inner) => inner.advance_by(n),
+            Slalom(inner) => inner.advance_by(n),
+            Back(inner) => inner.advance_by(n),
+        }
+    }
 }
 
 pub type BackTrajectory<M> = Chain<
