@@ -49,6 +49,7 @@ pub enum SearchTrajectory<M> {
     Straight(StraightTrajectory),
     Slalom(SlalomTrajectory<M>),
     Back(BackTrajectory<M>),
+    SlowDown(SlowDownTrajectory),
 }
 
 impl<M: Math> Iterator for SearchTrajectory<M> {
@@ -61,6 +62,7 @@ impl<M: Math> Iterator for SearchTrajectory<M> {
             Straight(inner) => inner.next(),
             Slalom(inner) => inner.next(),
             Back(inner) => inner.next(),
+            SlowDown(inner) => inner.next(),
         }
     }
 
@@ -71,6 +73,7 @@ impl<M: Math> Iterator for SearchTrajectory<M> {
             Straight(inner) => inner.advance_by(n),
             Slalom(inner) => inner.advance_by(n),
             Back(inner) => inner.advance_by(n),
+            SlowDown(inner) => inner.advance_by(n),
         }
     }
 }
@@ -86,6 +89,8 @@ pub type BackTrajectory<M> = Chain<
     ShiftTrajectory<StraightTrajectory, M>,
 >;
 
+pub type SlowDownTrajectory = Chain<StraightTrajectory, StopTrajectory>;
+
 pub struct TrajectoryGenerator<M, MaxLength> {
     straight_generator: StraightTrajectoryGenerator<M>,
 
@@ -97,7 +102,7 @@ pub struct TrajectoryGenerator<M, MaxLength> {
     run_slalom_velocity: Velocity,
 
     initial_trajectory: StraightTrajectory,
-    final_trajectory: StraightTrajectory,
+    slow_down_trajectory: SlowDownTrajectory,
     front_trajectory: StraightTrajectory,
     right_trajectory: SlalomTrajectory<M>,
     left_trajectory: SlalomTrajectory<M>,
@@ -144,11 +149,20 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
             Default::default(),
             search_velocity,
         );
-        let final_trajectory = straight_generator.generate(
-            square_width_half - front_offset,
-            search_velocity,
-            Default::default(),
-        );
+        let slow_down_trajectory = straight_generator
+            .generate(
+                square_width_half - front_offset,
+                search_velocity,
+                Default::default(),
+            )
+            .chain(StopTrajectory::new(
+                Pose {
+                    x: square_width_half - front_offset,
+                    ..Default::default()
+                },
+                period,
+                Time::new::<second>(1.5),
+            ));
         let right_trajectory = slalom_generator.generate_slalom(
             SlalomKind::Search90,
             SlalomDirection::Right,
@@ -162,7 +176,7 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
         //TODO: use configurable value
         let front_trajectory =
             straight_generator.generate(square_width, search_velocity, search_velocity);
-        use uom::si::time::millisecond;
+        use uom::si::time::{millisecond, second};
         let back_trajectory = {
             let distance = square_width_half - front_offset; //TODO: use configurable value
             straight_generator
@@ -216,7 +230,7 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
             slalom_generator,
             spin_generator,
             initial_trajectory,
-            final_trajectory,
+            slow_down_trajectory,
             front_trajectory,
             right_trajectory,
             left_trajectory,
@@ -315,7 +329,7 @@ where
             *pose,
             match kind {
                 Init => SearchTrajectory::Straight(self.initial_trajectory.clone()),
-                Final => SearchTrajectory::Straight(self.final_trajectory.clone()),
+                Final => SearchTrajectory::SlowDown(self.slow_down_trajectory.clone()),
                 Front => SearchTrajectory::Straight(self.front_trajectory.clone()),
                 Right => SearchTrajectory::Slalom(self.right_trajectory.clone()),
                 Left => SearchTrajectory::Slalom(self.left_trajectory.clone()),
