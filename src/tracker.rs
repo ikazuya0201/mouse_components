@@ -5,8 +5,8 @@ use core::marker::PhantomData;
 use uom::si::{
     angle::radian,
     f32::{
-        Acceleration, AngularAcceleration, AngularVelocity, ElectricPotential, Frequency, Length,
-        Time, Velocity,
+        Acceleration, Angle, AngularAcceleration, AngularVelocity, ElectricPotential, Frequency,
+        Length, Time, Velocity,
     },
     frequency::hertz,
     Quantity, ISQ, SI,
@@ -186,7 +186,12 @@ where
             (uv, uw, duv, duw)
         } else {
             let (sin_th_r, cos_th_r) = M::sincos(target.theta.x);
-            let theta_d = target.theta.x - state.theta.x;
+            let theta_d = {
+                let theta_d = target.theta.x - state.theta.x;
+                Angle::new::<radian>(
+                    M::rem_euclidf(theta_d.value, core::f32::consts::TAU) - core::f32::consts::PI,
+                )
+            };
             let cos_th_d = M::cos(theta_d);
             let xd = target.x.x - state.x.x;
             let yd = target.y.x - state.y.x;
