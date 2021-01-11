@@ -74,7 +74,7 @@ pub struct SearchAgent<
 > {
     obstacle_detector: RefCell<IObstacleDetector>,
     state_estimator: RefCell<IStateEstimator>,
-    tracker: RefCell<ITracker>,
+    tracker: Mutex<ITracker>,
     trajectory_generator: ITrajectoryGenerator,
     trajectories: Mutex<Queue<Trajectory, U2>>,
     emergency_trajectory: RefCell<Option<Trajectory>>,
@@ -124,7 +124,7 @@ impl<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Traject
         Self {
             obstacle_detector: RefCell::new(obstacle_detector),
             state_estimator: RefCell::new(state_estimator),
-            tracker: RefCell::new(tracker),
+            tracker: Mutex::new(tracker),
             trajectory_generator,
             trajectories: Mutex::new(Queue::new()),
             emergency_trajectory: RefCell::new(None),
@@ -240,7 +240,7 @@ where
             }
         };
         if let Some(target) = target.as_ref() {
-            self.tracker.borrow_mut().track(&state, target)?;
+            self.tracker.lock().track(&state, target)?;
         }
         if is_empty {
             Err(SearchAgentError::EmptyTrajectory)
@@ -250,6 +250,10 @@ where
             self.emergency_counter.set(0);
             Ok(())
         }
+    }
+
+    fn stop(&self) {
+        self.tracker.lock().stop();
     }
 }
 
