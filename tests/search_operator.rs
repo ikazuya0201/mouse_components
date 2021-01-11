@@ -6,15 +6,16 @@ extern crate typenum;
 use core::f32::consts::PI;
 
 use components::{
-    data_types::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, SearchKind, State},
-    defaults,
-    impls::{
-        slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
-        PoseConverter, RotationControllerBuilder, RunNode, SearchAgent, SearchOperator,
-        TrackerBuilder, TrajectoryGeneratorBuilder, TranslationControllerBuilder, WallConverter,
-        WallManager,
+    data_types::{
+        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, SearchKind, SlalomDirection,
+        SlalomKind, SlalomParameters, State,
     },
-    prelude::*,
+    impls::{
+        slalom_parameters_map, slalom_parameters_map2, CommandConverter2, Commander,
+        EstimatorBuilder, Maze, ObstacleDetector, PoseConverter, RotationControllerBuilder,
+        RunNode, SearchAgent, SearchOperator, TrackerBuilder, TrajectoryGeneratorBuilder,
+        TranslationControllerBuilder, WallConverter, WallManager,
+    },
     utils::probability::Probability,
 };
 use typenum::consts::*;
@@ -35,7 +36,7 @@ use uom::si::{
     velocity::meter_per_second,
 };
 use utils::math::MathFake;
-use utils::sensors::{AgentSimulator, DistanceSensor, Encoder, Motor, IMU};
+use utils::sensors::AgentSimulator;
 
 fn cost(pattern: Pattern) -> u16 {
     use Pattern::*;
@@ -53,15 +54,25 @@ fn cost(pattern: Pattern) -> u16 {
     }
 }
 
-macro_rules! search_operator_tests {
-    ($($name: ident: ($size: ty, $input_str: expr, $goals: expr,),)*) => {
-        $(
-            #[ignore]
-            #[test]
-            fn $name() {
+macro_rules! impl_search_operator_test {
+    ($name: ident: $size: ty, $input_str: expr, $goals: expr,) => {
+        mod $name {
+            use super::*;
+
+            type Size = $size;
+
+            fn _test_search_operator(
+                slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+                front_offset: Length,
+                distance_sensors_poses: Vec<Pose>,
+            ) {
+                use components::prelude::*;
+
                 let input_str = $input_str;
-                type Size = $size;
-                let goals = $goals.into_iter().map(|goal| RunNode::<Size>::new(goal.0, goal.1, goal.2, cost).unwrap()).collect::<Vec<_>>();
+                let goals = $goals
+                    .into_iter()
+                    .map(|goal| RunNode::<Size>::new(goal.0, goal.1, goal.2, cost).unwrap())
+                    .collect::<Vec<_>>();
 
                 type MaxPathLength = op!(Size * Size);
 
@@ -84,33 +95,6 @@ macro_rules! search_operator_tests {
                 let trans_model_time_constant = Time::new::<second>(0.3694);
                 let rot_model_gain = 10.0;
                 let rot_model_time_constant = Time::new::<second>(0.1499);
-                let distance_sensors_poses = vec![
-                    Pose {
-                        x: Length::new::<millimeter>(0.0),
-                        y: Length::new::<millimeter>(23.0),
-                        theta: Angle::new::<degree>(0.0),
-                    },
-                    Pose {
-                        x: Length::new::<millimeter>(8.0),
-                        y: Length::new::<millimeter>(20.0),
-                        theta: Angle::new::<degree>(-45.0),
-                    },
-                    Pose {
-                        x: Length::new::<millimeter>(-8.0),
-                        y: Length::new::<millimeter>(20.0),
-                        theta: Angle::new::<degree>(45.0),
-                    },
-                    Pose {
-                        x: Length::new::<millimeter>(-11.5),
-                        y: Length::new::<millimeter>(13.0),
-                        theta: Angle::new::<degree>(90.0),
-                    },
-                    Pose {
-                        x: Length::new::<millimeter>(11.5),
-                        y: Length::new::<millimeter>(13.0),
-                        theta: Angle::new::<degree>(-90.0),
-                    },
-                ];
                 let existence_threshold = Probability::new(0.1).unwrap();
                 let wheel_interval = Length::new::<millimeter>(33.5);
 
@@ -138,19 +122,7 @@ macro_rules! search_operator_tests {
                     distance_sensors,
                 ) = simulator.split(wheel_interval);
 
-                let agent:
-                    defaults::SearchAgent<
-                        Encoder,
-                        Encoder,
-                        IMU,
-                        Motor,
-                        Motor,
-                        DistanceSensor<Size>,
-                        MathFake,
-                        MaxPathLength,
-                        _,
-                    >
-                 = {
+                let agent = {
                     let estimator = {
                         EstimatorBuilder::new()
                             .left_encoder(left_encoder)
@@ -211,20 +183,16 @@ macro_rules! search_operator_tests {
                         .search_velocity(search_velocity)
                         .slalom_parameters_map(slalom_parameters_map)
                         .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
-                        .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
-                            36.0 * PI,
-                        ))
+                        .angular_acceleration_ref(AngularAcceleration::new::<
+                            radian_per_second_squared,
+                        >(36.0 * PI))
                         .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
                         .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
+                        .front_offset(front_offset)
                         .build::<MathFake, MaxPathLength>();
 
                     let obstacle_detector = ObstacleDetector::new(distance_sensors);
-                    SearchAgent::new(
-                        obstacle_detector,
-                        estimator,
-                        tracker,
-                        trajectory_generator,
-                    )
+                    SearchAgent::new(obstacle_detector, estimator, tracker, trajectory_generator)
                 };
 
                 use AbsoluteDirection::*;
@@ -232,9 +200,13 @@ macro_rules! search_operator_tests {
                 let create_commander = |wall_storage| {
                     let pose_converter = PoseConverter::<Size, MathFake>::default();
                     let wall_converter = WallConverter::new(cost);
-                    let maze = Maze::<_, _, _, MathFake>::new(wall_storage, pose_converter, wall_converter);
+                    let maze = Maze::<_, _, _, MathFake>::new(
+                        wall_storage,
+                        pose_converter,
+                        wall_converter,
+                    );
                     let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
-                    defaults::Commander::new(
+                    Commander::new(
                         start,
                         goals.clone(),
                         SearchKind::Init,
@@ -249,11 +221,11 @@ macro_rules! search_operator_tests {
                 let operator = SearchOperator::new(
                     agent,
                     commander,
-                    CommandConverter::default(),
+                    CommandConverter2::new(Length::new::<millimeter>(90.0), front_offset),
                 );
                 while operator.run().is_err() {
                     stepper.step();
-                    assert!(!operator.tick().is_err());
+                    operator.tick().expect("Fail safe should never invoke");
                 }
                 let (_, commander, _) = operator.consume();
                 assert_eq!(
@@ -261,14 +233,75 @@ macro_rules! search_operator_tests {
                     expected_commander.compute_shortest_path()
                 );
             }
-        )*
-    }
+
+            #[ignore]
+            #[test]
+            fn test_search_operator() {
+                _test_search_operator(
+                    slalom_parameters_map,
+                    Default::default(),
+                    vec![
+                        Pose {
+                            x: Length::new::<millimeter>(0.0),
+                            y: Length::new::<millimeter>(23.0),
+                            theta: Angle::new::<degree>(0.0),
+                        },
+                        Pose {
+                            x: Length::new::<millimeter>(8.0),
+                            y: Length::new::<millimeter>(20.0),
+                            theta: Angle::new::<degree>(-45.0),
+                        },
+                        Pose {
+                            x: Length::new::<millimeter>(-8.0),
+                            y: Length::new::<millimeter>(20.0),
+                            theta: Angle::new::<degree>(45.0),
+                        },
+                        Pose {
+                            x: Length::new::<millimeter>(-11.5),
+                            y: Length::new::<millimeter>(13.0),
+                            theta: Angle::new::<degree>(90.0),
+                        },
+                        Pose {
+                            x: Length::new::<millimeter>(11.5),
+                            y: Length::new::<millimeter>(13.0),
+                            theta: Angle::new::<degree>(-90.0),
+                        },
+                    ],
+                );
+            }
+
+            #[ignore]
+            #[test]
+            fn test_search_operator_with_front_offset() {
+                _test_search_operator(
+                    slalom_parameters_map2,
+                    Length::new::<millimeter>(10.0),
+                    vec![
+                        Pose {
+                            x: Length::new::<millimeter>(0.0),
+                            y: Length::new::<millimeter>(23.0),
+                            theta: Angle::new::<degree>(0.0),
+                        },
+                        Pose {
+                            x: Length::new::<millimeter>(-11.5),
+                            y: Length::new::<millimeter>(13.0),
+                            theta: Angle::new::<degree>(90.0),
+                        },
+                        Pose {
+                            x: Length::new::<millimeter>(11.5),
+                            y: Length::new::<millimeter>(13.0),
+                            theta: Angle::new::<degree>(-90.0),
+                        },
+                    ],
+                );
+            }
+        }
+    };
 }
 
-search_operator_tests! {
-    test_search_operator1: (
-        U4,
-"+---+---+---+---+
+impl_search_operator_test!(
+    search_operator_tests1: U4,
+    "+---+---+---+---+
 |               |
 +   +---+---+   +
 |   |       |   |
@@ -277,11 +310,12 @@ search_operator_tests! {
 +   +   +---+   +
 |   |       |   |
 +---+---+---+---+",
-        vec![(2,0,South), (2,0,West)],
-    ),
-    test_search_operator2: (
-        U16,
-"+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+    vec![(2, 0, South), (2, 0, West)],
+);
+
+impl_search_operator_test!(
+    search_operator_tests2: U16,
+    "+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 |                           |   |   |                           |
 +   +---+---+---+   +---+   +---+---+   +---+   +---+---+---+   +
 |   |           |   |                       |   |           |   |
@@ -314,6 +348,10 @@ search_operator_tests! {
 +   +   +   +---+   +---+   +---+---+   +---+   +---+   +---+   +
 |   |   |                                       |   |           |
 +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+",
-        vec![(15,14,SouthWest),(15,14,SouthEast),(15,16,NorthWest),(15,16,NorthEast)],
-    ),
-}
+    vec![
+        (15, 14, SouthWest),
+        (15, 14, SouthEast),
+        (15, 16, NorthWest),
+        (15, 16, NorthEast)
+    ],
+);

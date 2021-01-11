@@ -58,7 +58,7 @@ pub mod data_types {
     pub use tracker::{AngleState, LengthState, State};
     pub use trajectory_generator::{
         AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection, SlalomKind,
-        Target,
+        SlalomParameters, Target,
     };
     pub use wall_manager::Wall;
 }
@@ -68,7 +68,7 @@ pub mod impls {
 
     pub use administrator::Administrator;
     pub use agent::{RunAgent, SearchAgent};
-    pub use command_converter::CommandConverter;
+    pub use command_converter::{CommandConverter, CommandConverter2};
     pub use commander::Commander;
     pub use controller::{
         RotationController, RotationControllerBuilder, TranslationController,
@@ -82,7 +82,8 @@ pub mod impls {
     pub use pose_converter::PoseConverter;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{
-        slalom_parameters_map, ShiftTrajectory, TrajectoryGenerator, TrajectoryGeneratorBuilder,
+        slalom_parameters_map, slalom_parameters_map2, ShiftTrajectory, TrajectoryGenerator,
+        TrajectoryGeneratorBuilder,
     };
     pub use wall_converter::WallConverter;
     pub use wall_manager::WallManager;
@@ -185,7 +186,7 @@ pub mod defaults {
         Logger = impls::NullLogger,
     > = impls::SearchOperator<
         data_types::Obstacle,
-        (data_types::Pose, impls::SearchNode<Size>),
+        (data_types::Pose, data_types::SearchKind),
         SearchAgent<
             LeftEncoder,
             RightEncoder,

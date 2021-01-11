@@ -241,32 +241,51 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
     }
 }
 
-pub fn slalom_parameters_map(kind: SlalomKind, dir: SlalomDirection) -> SlalomParameters {
+fn into_parameters(
+    l_start: f32,
+    l_end: f32,
+    x_curve_end: f32,
+    y_curve_end: f32,
+    v_ref: f32,
+    theta: f32,
+    dir: SlalomDirection,
+) -> SlalomParameters {
     use uom::si::{angle::degree, length::millimeter, velocity::millimeter_per_second};
     use SlalomDirection::*;
-    use SlalomKind::*;
 
-    let params = match kind {
-        Search90 => (5.000001, 5.0, 45.0, 40.0, 241.59, 90.0),
-        FastRun45 => (2.57365, 21.2132, 75.0, 30.0, 411.636, 45.0),
-        FastRun45Rev => (21.2132, 2.57365, 93.63957, 29.99996, 411.636, 45.0),
-        FastRun90 => (20.0, 20.0, 90.0, 70.0, 422.783, 90.0),
-        FastRun135 => (21.8627, 14.1421, 55.0, 80.0, 353.609, 135.0),
-        FastRun135Rev => (14.1421, 21.8627, 47.27907, 80.00015, 353.609, 135.0),
-        FastRun180 => (24.0, 24.0, 24.0, 90.0, 412.228, 180.0),
-        FastRunDiagonal90 => (15.6396, 15.6396, 63.6396, 48.0, 289.908, 90.0),
-    };
-    let params = match dir {
-        Left => params,
-        Right => (params.0, params.1, params.2, -params.3, params.4, -params.5),
+    let (y_curve_end, theta) = match dir {
+        Left => (y_curve_end, theta),
+        Right => (-y_curve_end, -theta),
     };
     SlalomParameters {
-        l_start: Length::new::<millimeter>(params.0),
-        l_end: Length::new::<millimeter>(params.1),
-        x_curve_end: Length::new::<millimeter>(params.2),
-        y_curve_end: Length::new::<millimeter>(params.3),
-        v_ref: Velocity::new::<millimeter_per_second>(params.4),
-        theta: Angle::new::<degree>(params.5),
+        l_start: Length::new::<millimeter>(l_start),
+        l_end: Length::new::<millimeter>(l_end),
+        x_curve_end: Length::new::<millimeter>(x_curve_end),
+        y_curve_end: Length::new::<millimeter>(y_curve_end),
+        v_ref: Velocity::new::<millimeter_per_second>(v_ref),
+        theta: Angle::new::<degree>(theta),
+    }
+}
+
+pub fn slalom_parameters_map(kind: SlalomKind, dir: SlalomDirection) -> SlalomParameters {
+    use SlalomKind::*;
+
+    match kind {
+        Search90 => into_parameters(5.000001, 5.0, 45.0, 40.0, 241.59, 90.0, dir),
+        FastRun45 => into_parameters(2.57365, 21.2132, 75.0, 30.0, 411.636, 45.0, dir),
+        FastRun45Rev => into_parameters(21.2132, 2.57365, 93.63957, 29.99996, 411.636, 45.0, dir),
+        FastRun90 => into_parameters(20.0, 20.0, 90.0, 70.0, 422.783, 90.0, dir),
+        FastRun135 => into_parameters(21.8627, 14.1421, 55.0, 80.0, 353.609, 135.0, dir),
+        FastRun135Rev => into_parameters(14.1421, 21.8627, 47.27907, 80.00015, 353.609, 135.0, dir),
+        FastRun180 => into_parameters(24.0, 24.0, 24.0, 90.0, 412.228, 180.0, dir),
+        FastRunDiagonal90 => into_parameters(15.6396, 15.6396, 63.6396, 48.0, 289.908, 90.0, dir),
+    }
+}
+
+pub fn slalom_parameters_map2(kind: SlalomKind, dir: SlalomDirection) -> SlalomParameters {
+    match kind {
+        SlalomKind::Search90 => into_parameters(0.0, 20.0, 35.0, 35.0, 211.39, 90.0, dir),
+        _ => slalom_parameters_map(kind, dir),
     }
 }
 
