@@ -109,6 +109,7 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
         search_velocity: Velocity,
         run_slalom_velocity: Velocity,
         front_offset: Length,
+        square_width: Length,
     ) -> Self {
         let straight_generator =
             StraightTrajectoryGenerator::new(max_velocity, max_acceleration, max_jerk, period);
@@ -126,13 +127,15 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
             period,
         );
 
+        let square_width_half = square_width / 2.0;
+
         let initial_trajectory = straight_generator.generate(
-            Length::new::<meter>(0.045) + front_offset,
+            square_width_half + front_offset,
             Default::default(),
             search_velocity,
         );
         let final_trajectory = straight_generator.generate(
-            Length::new::<meter>(0.045) - front_offset,
+            square_width_half - front_offset,
             search_velocity,
             Default::default(),
         );
@@ -147,14 +150,11 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
             search_velocity,
         );
         //TODO: use configurable value
-        let front_trajectory = straight_generator.generate(
-            Length::new::<meter>(0.09),
-            search_velocity,
-            search_velocity,
-        );
+        let front_trajectory =
+            straight_generator.generate(square_width, search_velocity, search_velocity);
         use uom::si::time::millisecond;
         let back_trajectory = {
-            let distance = Length::new::<meter>(0.045) - front_offset; //TODO: use configurable value
+            let distance = square_width_half - front_offset; //TODO: use configurable value
             straight_generator
                 .generate(distance, search_velocity, Default::default())
                 .chain(StopTrajectory::new(
@@ -362,7 +362,20 @@ where
     }
 }
 
-pub struct TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset> {
+pub struct TrajectoryGeneratorBuilder<
+    TV,
+    TA,
+    TJ,
+    SPM,
+    V,
+    A,
+    J,
+    T,
+    SV,
+    RunSlalomVelocity,
+    Offset,
+    SquareWidth,
+> {
     angular_velocity_ref: TV,
     angular_acceleration_ref: TA,
     angular_jerk_ref: TJ,
@@ -374,9 +387,39 @@ pub struct TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalom
     search_velocity: SV,
     run_slalom_velocity: RunSlalomVelocity,
     front_offset: Offset,
+    square_width: SquareWidth,
 }
 
-impl TrajectoryGeneratorBuilder<(), (), (), (), (), (), (), (), (), (), ()> {
+impl<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
+{
+    const DEFAULT_SQUARE_WIDTH: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.09,
+    };
+
+    const DEFAULT_FRONT_OFFSET: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.0,
+    };
+}
+
+impl TrajectoryGeneratorBuilder<(), (), (), (), (), (), (), (), (), (), (), ()> {
     pub fn new() -> Self {
         Self {
             angular_velocity_ref: (),
@@ -390,6 +433,7 @@ impl TrajectoryGeneratorBuilder<(), (), (), (), (), (), (), (), (), (), ()> {
             search_velocity: (),
             run_slalom_velocity: (),
             front_offset: (),
+            square_width: (),
         }
     }
 }
@@ -407,6 +451,7 @@ impl
         Velocity,
         Velocity,
         (),
+        (),
     >
 {
     pub fn build<M: Math, MaxLength>(self) -> TrajectoryGenerator<M, MaxLength> {
@@ -421,7 +466,42 @@ impl
             self.period,
             self.search_velocity,
             self.run_slalom_velocity,
-            Default::default(),
+            Self::DEFAULT_FRONT_OFFSET,
+            Self::DEFAULT_SQUARE_WIDTH,
+        )
+    }
+}
+
+impl
+    TrajectoryGeneratorBuilder<
+        AngularVelocity,
+        AngularAcceleration,
+        AngularJerk,
+        fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+        Velocity,
+        Acceleration,
+        Jerk,
+        Time,
+        Velocity,
+        Velocity,
+        (),
+        Length,
+    >
+{
+    pub fn build<M: Math, MaxLength>(self) -> TrajectoryGenerator<M, MaxLength> {
+        TrajectoryGenerator::new(
+            self.angular_velocity_ref,
+            self.angular_acceleration_ref,
+            self.angular_jerk_ref,
+            self.slalom_parameters_map,
+            self.max_velocity,
+            self.max_acceleration,
+            self.max_jerk,
+            self.period,
+            self.search_velocity,
+            self.run_slalom_velocity,
+            Self::DEFAULT_FRONT_OFFSET,
+            self.square_width,
         )
     }
 }
@@ -439,6 +519,7 @@ impl
         Velocity,
         Velocity,
         Length,
+        (),
     >
 {
     pub fn build<M: Math, MaxLength>(self) -> TrajectoryGenerator<M, MaxLength> {
@@ -454,12 +535,60 @@ impl
             self.search_velocity,
             self.run_slalom_velocity,
             self.front_offset,
+            Self::DEFAULT_SQUARE_WIDTH,
         )
     }
 }
 
-impl<TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
-    TrajectoryGeneratorBuilder<(), TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
+impl
+    TrajectoryGeneratorBuilder<
+        AngularVelocity,
+        AngularAcceleration,
+        AngularJerk,
+        fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+        Velocity,
+        Acceleration,
+        Jerk,
+        Time,
+        Velocity,
+        Velocity,
+        Length,
+        Length,
+    >
+{
+    pub fn build<M: Math, MaxLength>(self) -> TrajectoryGenerator<M, MaxLength> {
+        TrajectoryGenerator::new(
+            self.angular_velocity_ref,
+            self.angular_acceleration_ref,
+            self.angular_jerk_ref,
+            self.slalom_parameters_map,
+            self.max_velocity,
+            self.max_acceleration,
+            self.max_jerk,
+            self.period,
+            self.search_velocity,
+            self.run_slalom_velocity,
+            self.front_offset,
+            self.square_width,
+        )
+    }
+}
+
+impl<TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        (),
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
 {
     pub fn angular_velocity_ref(
         self,
@@ -476,6 +605,7 @@ impl<TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
         SV,
         RunSlalomVelocity,
         Offset,
+        SquareWidth,
     > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref,
@@ -489,12 +619,26 @@ impl<TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
             search_velocity: self.search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
-    TrajectoryGeneratorBuilder<TV, (), TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
+impl<TV, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        TV,
+        (),
+        TJ,
+        SPM,
+        V,
+        A,
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
 {
     pub fn angular_acceleration_ref(
         self,
@@ -511,6 +655,7 @@ impl<TV, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
         SV,
         RunSlalomVelocity,
         Offset,
+        SquareWidth,
     > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
@@ -524,12 +669,26 @@ impl<TV, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
             search_velocity: self.search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TA, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
-    TrajectoryGeneratorBuilder<TV, TA, (), SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
+impl<TV, TA, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        (),
+        SPM,
+        V,
+        A,
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
 {
     pub fn angular_jerk_ref(
         self,
@@ -546,6 +705,7 @@ impl<TV, TA, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
         SV,
         RunSlalomVelocity,
         Offset,
+        SquareWidth,
     > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
@@ -559,12 +719,26 @@ impl<TV, TA, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
             search_velocity: self.search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TA, TJ, V, A, J, T, SV, RunSlalomVelocity, Offset>
-    TrajectoryGeneratorBuilder<TV, TA, TJ, (), V, A, J, T, SV, RunSlalomVelocity, Offset>
+impl<TV, TA, TJ, V, A, J, T, SV, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        (),
+        V,
+        A,
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
 {
     pub fn slalom_parameters_map(
         self,
@@ -581,6 +755,7 @@ impl<TV, TA, TJ, V, A, J, T, SV, RunSlalomVelocity, Offset>
         SV,
         RunSlalomVelocity,
         Offset,
+        SquareWidth,
     > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
@@ -594,18 +769,44 @@ impl<TV, TA, TJ, V, A, J, T, SV, RunSlalomVelocity, Offset>
             search_velocity: self.search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TA, TJ, SPM, A, J, T, SV, RunSlalomVelocity, Offset>
-    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, (), A, J, T, SV, RunSlalomVelocity, Offset>
+impl<TV, TA, TJ, SPM, A, J, T, SV, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        (),
+        A,
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
 {
     pub fn max_velocity(
         self,
         max_velocity: Velocity,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, Velocity, A, J, T, SV, RunSlalomVelocity, Offset>
-    {
+    ) -> TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        Velocity,
+        A,
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -618,12 +819,26 @@ impl<TV, TA, TJ, SPM, A, J, T, SV, RunSlalomVelocity, Offset>
             search_velocity: self.search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TA, TJ, SPM, V, J, T, SV, RunSlalomVelocity, Offset>
-    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, (), J, T, SV, RunSlalomVelocity, Offset>
+impl<TV, TA, TJ, SPM, V, J, T, SV, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        (),
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
 {
     pub fn max_acceleration(
         self,
@@ -640,6 +855,7 @@ impl<TV, TA, TJ, SPM, V, J, T, SV, RunSlalomVelocity, Offset>
         SV,
         RunSlalomVelocity,
         Offset,
+        SquareWidth,
     > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
@@ -653,18 +869,44 @@ impl<TV, TA, TJ, SPM, V, J, T, SV, RunSlalomVelocity, Offset>
             search_velocity: self.search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TA, TJ, SPM, V, A, T, SV, RunSlalomVelocity, Offset>
-    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, (), T, SV, RunSlalomVelocity, Offset>
+impl<TV, TA, TJ, SPM, V, A, T, SV, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        (),
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
 {
     pub fn max_jerk(
         self,
         max_jerk: Jerk,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, Jerk, T, SV, RunSlalomVelocity, Offset>
-    {
+    ) -> TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        Jerk,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -677,18 +919,44 @@ impl<TV, TA, TJ, SPM, V, A, T, SV, RunSlalomVelocity, Offset>
             search_velocity: self.search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TA, TJ, SPM, V, A, J, SV, RunSlalomVelocity, Offset>
-    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, (), SV, RunSlalomVelocity, Offset>
+impl<TV, TA, TJ, SPM, V, A, J, SV, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        J,
+        (),
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
 {
     pub fn period(
         self,
         period: Time,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, Time, SV, RunSlalomVelocity, Offset>
-    {
+    ) -> TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        J,
+        Time,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -701,18 +969,44 @@ impl<TV, TA, TJ, SPM, V, A, J, SV, RunSlalomVelocity, Offset>
             search_velocity: self.search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TA, TJ, SPM, V, A, J, T, RunSlalomVelocity, Offset>
-    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, (), RunSlalomVelocity, Offset>
+impl<TV, TA, TJ, SPM, V, A, J, T, RunSlalomVelocity, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        J,
+        T,
+        (),
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    >
 {
     pub fn search_velocity(
         self,
         search_velocity: Velocity,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, Velocity, RunSlalomVelocity, Offset>
-    {
+    ) -> TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        J,
+        T,
+        Velocity,
+        RunSlalomVelocity,
+        Offset,
+        SquareWidth,
+    > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -725,17 +1019,19 @@ impl<TV, TA, TJ, SPM, V, A, J, T, RunSlalomVelocity, Offset>
             search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TA, TJ, SPM, V, A, J, T, SV, Offset>
-    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, (), Offset>
+impl<TV, TA, TJ, SPM, V, A, J, T, SV, Offset, SquareWidth>
+    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, (), Offset, SquareWidth>
 {
     pub fn run_slalom_velocity(
         self,
         run_slalom_velocity: Velocity,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, Velocity, Offset> {
+    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, Velocity, Offset, SquareWidth>
+    {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -748,18 +1044,31 @@ impl<TV, TA, TJ, SPM, V, A, J, T, SV, Offset>
             search_velocity: self.search_velocity,
             run_slalom_velocity,
             front_offset: self.front_offset,
+            square_width: self.square_width,
         }
     }
 }
 
-impl<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity>
-    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, ()>
+impl<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, SquareWidth>
+    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, (), SquareWidth>
 {
     pub fn front_offset(
         self,
         front_offset: Length,
-    ) -> TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Length>
-    {
+    ) -> TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Length,
+        SquareWidth,
+    > {
         TrajectoryGeneratorBuilder {
             angular_velocity_ref: self.angular_velocity_ref,
             angular_acceleration_ref: self.angular_acceleration_ref,
@@ -772,6 +1081,44 @@ impl<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity>
             search_velocity: self.search_velocity,
             run_slalom_velocity: self.run_slalom_velocity,
             front_offset,
+            square_width: self.square_width,
+        }
+    }
+}
+
+impl<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset>
+    TrajectoryGeneratorBuilder<TV, TA, TJ, SPM, V, A, J, T, SV, RunSlalomVelocity, Offset, ()>
+{
+    pub fn square_width(
+        self,
+        square_width: Length,
+    ) -> TrajectoryGeneratorBuilder<
+        TV,
+        TA,
+        TJ,
+        SPM,
+        V,
+        A,
+        J,
+        T,
+        SV,
+        RunSlalomVelocity,
+        Offset,
+        Length,
+    > {
+        TrajectoryGeneratorBuilder {
+            angular_velocity_ref: self.angular_velocity_ref,
+            angular_acceleration_ref: self.angular_acceleration_ref,
+            angular_jerk_ref: self.angular_jerk_ref,
+            slalom_parameters_map: self.slalom_parameters_map,
+            max_velocity: self.max_velocity,
+            max_acceleration: self.max_acceleration,
+            max_jerk: self.max_jerk,
+            period: self.period,
+            search_velocity: self.search_velocity,
+            run_slalom_velocity: self.run_slalom_velocity,
+            front_offset: self.front_offset,
+            square_width,
         }
     }
 }
