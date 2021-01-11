@@ -200,7 +200,7 @@ pub mod defaults {
             Logger,
         >,
         Commander<Size, Math>,
-        impls::CommandConverter,
+        impls::CommandConverter2,
     >;
 
     pub type RunOperator<
