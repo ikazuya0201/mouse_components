@@ -227,7 +227,7 @@ where
             if let Ok(mut trajectories) = self.trajectories.try_lock() {
                 loop {
                     if let Some(trajectory) = trajectories.iter_mut().next() {
-                        if let Some(target) = trajectory.nth(self.emergency_counter.get() + 1) {
+                        if let Some(target) = trajectory.nth(self.emergency_counter.get()) {
                             break (Some(target), false);
                         }
                     } else {
