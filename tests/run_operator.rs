@@ -24,9 +24,9 @@ use uom::si::f32::{
 use uom::si::{
     acceleration::meter_per_second_squared,
     angle::degree,
-    angular_acceleration::radian_per_second_squared,
-    angular_jerk::radian_per_second_cubed,
-    angular_velocity::radian_per_second,
+    angular_acceleration::{degree_per_second_squared, radian_per_second_squared},
+    angular_jerk::{degree_per_second_cubed, radian_per_second_cubed},
+    angular_velocity::{degree_per_second, radian_per_second},
     frequency::hertz,
     jerk::meter_per_second_cubed,
     length::{meter, millimeter},
@@ -216,6 +216,9 @@ fn test_run_operator() {
             ))
             .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
             .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
+            .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
+            .spin_angular_acceleration(AngularAcceleration::new::<degree_per_second_squared>(90.0))
+            .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
             .build::<MathFake, MaxPathLength>();
 
         let obstacle_detector = ObstacleDetector::new(distance_sensors);
