@@ -1,11 +1,11 @@
 use core::cell::{Cell, RefCell};
 
 use heapless::{spsc::Queue, ArrayLength};
+use spin::Mutex;
 use typenum::consts::*;
 use uom::si::f32::{Angle, Length};
 
 use crate::operators::{EmptyTrajectoyError, RunAgent as IRunAgent, SearchAgent as ISearchAgent};
-use crate::utils::mutex::Mutex;
 
 pub trait ObstacleDetector<State> {
     type Obstacle;
@@ -74,7 +74,7 @@ pub struct SearchAgent<
 > {
     obstacle_detector: RefCell<IObstacleDetector>,
     state_estimator: RefCell<IStateEstimator>,
-    tracker: RefCell<ITracker>,
+    tracker: Mutex<ITracker>,
     trajectory_generator: ITrajectoryGenerator,
     trajectories: Mutex<Queue<Trajectory, U2>>,
     emergency_trajectory: RefCell<Option<Trajectory>>,
@@ -124,7 +124,7 @@ impl<IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator, Traject
         Self {
             obstacle_detector: RefCell::new(obstacle_detector),
             state_estimator: RefCell::new(state_estimator),
-            tracker: RefCell::new(tracker),
+            tracker: Mutex::new(tracker),
             trajectory_generator,
             trajectories: Mutex::new(Queue::new()),
             emergency_trajectory: RefCell::new(None),
@@ -224,7 +224,7 @@ where
 
         let state = self.state_estimator.borrow().state();
         let (target, is_empty) = {
-            if let Ok(mut trajectories) = self.trajectories.try_lock() {
+            if let Some(mut trajectories) = self.trajectories.try_lock() {
                 loop {
                     if let Some(trajectory) = trajectories.iter_mut().next() {
                         if let Some(target) = trajectory.nth(self.emergency_counter.get()) {
@@ -240,7 +240,7 @@ where
             }
         };
         if let Some(target) = target.as_ref() {
-            self.tracker.borrow_mut().track(&state, target)?;
+            self.tracker.lock().track(&state, target)?;
         }
         if is_empty {
             Err(SearchAgentError::EmptyTrajectory)
@@ -250,6 +250,10 @@ where
             self.emergency_counter.set(0);
             Ok(())
         }
+    }
+
+    fn stop(&self) {
+        self.tracker.lock().stop();
     }
 }
 

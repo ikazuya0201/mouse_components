@@ -16,6 +16,9 @@ pub trait SearchAgent<Command> {
     fn get_obstacles(&self) -> Self::Obstacles;
     //This method is called by interrupt.
     fn track_next(&self) -> Result<(), Self::Error>;
+    //This method should be called in the end of search.
+    //This method can be blocking.
+    fn stop(&self);
 }
 
 pub trait SearchCommander<Obstacle> {
@@ -141,6 +144,7 @@ where
                         && self.trajectory_is_empty.load(Ordering::Relaxed)
                         && keeped_command.is_none()
                     {
+                        self.agent.stop();
                         return Ok(());
                     }
                 }

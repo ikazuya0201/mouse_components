@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::utils::mutex::Mutex;
+use spin::Mutex;
 
 #[derive(Debug, Clone, Copy)]
 pub struct NotFinishError;
@@ -52,7 +52,7 @@ where
     pub fn tick(&self) {
         if self.is_select.load(Ordering::Relaxed) {
             return;
-        } else if let Ok(operator) = self.operator.try_lock() {
+        } else if let Some(operator) = self.operator.try_lock() {
             operator
                 .as_ref()
                 .unwrap_or_else(|| todo!())
