@@ -244,14 +244,15 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
     }
 }
 
-impl<M, MaxLength> SearchTrajectoryGenerator<Pose, SearchKind> for TrajectoryGenerator<M, MaxLength>
+impl<M, MaxLength> SearchTrajectoryGenerator<(Pose, SearchKind)>
+    for TrajectoryGenerator<M, MaxLength>
 where
     M: Math,
 {
     type Target = Target;
     type Trajectory = ShiftTrajectory<SearchTrajectory<M>, M>;
 
-    fn generate_search(&self, pose: &Pose, kind: &SearchKind) -> Self::Trajectory {
+    fn generate_search(&self, (pose, kind): &(Pose, SearchKind)) -> Self::Trajectory {
         self.generate_search_trajectory(pose, kind)
     }
 
@@ -1848,14 +1849,14 @@ mod tests {
 
                 let (kind, last_x, last_y, last_theta) = $value;
 
-                let mut trajectory = generator.generate_search(
-                    &Pose::new(
+                let mut trajectory = generator.generate_search(&(
+                    Pose::new(
                         Length::new::<meter>(0.045),
                         Length::new::<meter>(0.09),
                         Angle::new::<degree>(90.0),
                     ),
-                    &kind,
-                );
+                    kind,
+                ));
 
                 let mut last = trajectory.next().unwrap();
                 for target in trajectory {

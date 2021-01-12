@@ -123,14 +123,14 @@ pub mod defaults {
             Logger,
         >,
         impls::TrajectoryGenerator<Math, MaxPathLength>,
-        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::SearchTrajectoryGenerator<
+        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::SearchTrajectoryGenerator<(
             data_types::Pose,
             data_types::SearchKind,
-        >>::Trajectory,
-        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::SearchTrajectoryGenerator<
+        )>>::Trajectory,
+        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::SearchTrajectoryGenerator<(
             data_types::Pose,
             data_types::SearchKind,
-        >>::Target,
+        )>>::Target,
     >;
 
     pub type RunAgent<

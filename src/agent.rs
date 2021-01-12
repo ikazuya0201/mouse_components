@@ -22,11 +22,11 @@ pub trait StateEstimator {
     fn state(&self) -> Self::State;
 }
 
-pub trait SearchTrajectoryGenerator<Pose, Kind> {
+pub trait SearchTrajectoryGenerator<Command> {
     type Target;
     type Trajectory: Iterator<Item = Self::Target>;
 
-    fn generate_search(&self, pose: &Pose, kind: &Kind) -> Self::Trajectory;
+    fn generate_search(&self, command: &Command) -> Self::Trajectory;
     fn generate_emergency(&self, target: &Self::Target) -> Self::Trajectory;
 }
 
@@ -158,8 +158,8 @@ impl<T> From<T> for SearchAgentError<T> {
     }
 }
 
-impl<Pose, Kind, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
-    ISearchAgent<(Pose, Kind)>
+impl<Command, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
+    ISearchAgent<Command>
     for SearchAgent<
         IObstacleDetector,
         IStateEstimator,
@@ -173,7 +173,7 @@ where
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
-    ITrajectoryGenerator: SearchTrajectoryGenerator<Pose, Kind>,
+    ITrajectoryGenerator: SearchTrajectoryGenerator<Command>,
 {
     type Error = SearchAgentError<ITracker::Error>;
     type Obstacle = IObstacleDetector::Obstacle;
@@ -188,14 +188,12 @@ where
         self.obstacle_detector.borrow_mut().detect(&state)
     }
 
-    fn set_command(&self, command: &(Pose, Kind)) -> Result<(), Self::Error> {
+    fn set_command(&self, command: &Command) -> Result<(), Self::Error> {
         let mut trajectories = self.trajectories.lock();
         if trajectories.len() == 2 {
             Err(SearchAgentError::QueueOverflowed)
         } else {
-            let trajectory = self
-                .trajectory_generator
-                .generate_search(&command.0, &command.1);
+            let trajectory = self.trajectory_generator.generate_search(&command);
             trajectories
                 .enqueue(trajectory)
                 .unwrap_or_else(|_| unreachable!("This is bug"));

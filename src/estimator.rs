@@ -725,14 +725,14 @@ mod tests {
                 Default::default(),
                 Velocity::new::<meter_per_second>(0.6),
             )
-            .chain(trajectory_generator.generate_search(
-                &Pose {
+            .chain(trajectory_generator.generate_search(&(
+                Pose {
                     x: Length::new::<meter>(0.09),
                     y: Default::default(),
                     theta: Default::default(),
                 },
-                &kind,
-            ))
+                kind,
+            )))
     }
 
     impl_estimator_test!(test_estimator_straight1: straight_trajectory());
