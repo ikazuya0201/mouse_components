@@ -178,7 +178,7 @@ macro_rules! impl_search_operator_test {
                     let trajectory_generator = TrajectoryGeneratorBuilder::new()
                         .period(period)
                         .max_velocity(Velocity::new::<meter_per_second>(2.0))
-                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
+                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.8))
                         .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
                         .search_velocity(search_velocity)
                         .slalom_parameters_map(slalom_parameters_map)
