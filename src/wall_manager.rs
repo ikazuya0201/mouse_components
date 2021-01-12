@@ -3,14 +3,11 @@ use core::marker::PhantomData;
 use core::ops::Mul;
 
 use generic_array::{ArrayLength, GenericArray};
+use spin::Mutex;
 use typenum::{consts::U2, PowerOfTwo, Unsigned};
 
 use crate::maze::WallManager as IWallManager;
-use crate::utils::{
-    itertools::repeat_n,
-    mutex::{Mutex, MutexError},
-    probability::Probability,
-};
+use crate::utils::{itertools::repeat_n, probability::Probability};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Wall<N> {
@@ -81,7 +78,6 @@ impl<N: Unsigned + PowerOfTwo> Wall<N> {
     }
 }
 
-#[derive(Clone)]
 pub struct WallManager<N>
 where
     N: Mul<N>,
@@ -279,6 +275,9 @@ where
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MutexError;
+
 //TODO: Write test.
 impl<N> IWallManager<Wall<N>> for WallManager<N>
 where
@@ -289,11 +288,14 @@ where
     type Error = MutexError;
 
     fn try_existence_probability(&self, wall: &Wall<N>) -> Result<Probability, Self::Error> {
-        Ok(self.walls[wall.to_index()].try_lock()?.clone())
+        Ok(self.walls[wall.to_index()]
+            .try_lock()
+            .ok_or(MutexError)?
+            .clone())
     }
 
     fn try_update(&self, wall: &Wall<N>, prob: &Probability) -> Result<(), Self::Error> {
-        *self.walls[wall.to_index()].try_lock()? = *prob;
+        *self.walls[wall.to_index()].try_lock().ok_or(MutexError)? = *prob;
         Ok(())
     }
 

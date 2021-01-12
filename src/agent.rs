@@ -1,11 +1,11 @@
 use core::cell::{Cell, RefCell};
 
 use heapless::{spsc::Queue, ArrayLength};
+use spin::Mutex;
 use typenum::consts::*;
 use uom::si::f32::{Angle, Length};
 
 use crate::operators::{EmptyTrajectoyError, RunAgent as IRunAgent, SearchAgent as ISearchAgent};
-use crate::utils::mutex::Mutex;
 
 pub trait ObstacleDetector<State> {
     type Obstacle;
@@ -224,7 +224,7 @@ where
 
         let state = self.state_estimator.borrow().state();
         let (target, is_empty) = {
-            if let Ok(mut trajectories) = self.trajectories.try_lock() {
+            if let Some(mut trajectories) = self.trajectories.try_lock() {
                 loop {
                     if let Some(trajectory) = trajectories.iter_mut().next() {
                         if let Some(target) = trajectory.nth(self.emergency_counter.get()) {
