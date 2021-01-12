@@ -5,4 +5,3 @@ pub mod math;
 pub mod probability;
 pub mod sample;
 pub(crate) mod total;
-pub(crate) mod vector;
