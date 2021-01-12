@@ -671,39 +671,40 @@ mod tests {
             .period(PERIOD)
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
             .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
+            .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
+            .spin_angular_acceleration(AngularAcceleration::new::<degree_per_second_squared>(90.0))
+            .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
             .build()
     }
 
-    macro_rules! estimator_tests {
-        ($($name: ident: $trajectory: expr,)*) => {
-            $(
-                #[test]
-                fn $name() {
-                    let wheel_interval = Length::new::<meter>(0.03);
+    macro_rules! impl_estimator_test {
+        ($name: ident: $trajectory: expr) => {
+            #[test]
+            fn $name() {
+                let wheel_interval = Length::new::<meter>(0.03);
 
-                    let trajectory = $trajectory;
+                let trajectory = $trajectory;
 
-                    let simulator = AgentSimulator::new(trajectory);
-                    let (right_encoder, left_encoder, imu) = simulator.split(wheel_interval);
-                    let mut estimator = EstimatorBuilder::new()
-                        .left_encoder(left_encoder)
-                        .right_encoder(right_encoder)
-                        .imu(imu)
-                        .period(PERIOD)
-                        .cut_off_frequency(Frequency::new::<hertz>(50.0))
-                        .initial_posture(Default::default())
-                        .initial_x(Default::default())
-                        .initial_y(Default::default())
-                        .wheel_interval(wheel_interval)
-                        .build::<MathFake>();
+                let simulator = AgentSimulator::new(trajectory);
+                let (right_encoder, left_encoder, imu) = simulator.split(wheel_interval);
+                let mut estimator = EstimatorBuilder::new()
+                    .left_encoder(left_encoder)
+                    .right_encoder(right_encoder)
+                    .imu(imu)
+                    .period(PERIOD)
+                    .cut_off_frequency(Frequency::new::<hertz>(50.0))
+                    .initial_posture(Default::default())
+                    .initial_x(Default::default())
+                    .initial_y(Default::default())
+                    .wheel_interval(wheel_interval)
+                    .build::<MathFake>();
 
-                    while let Ok(expected_state) = simulator.step() {
-                        estimator.estimate();
-                        let estimated_state = estimator.state();
-                        assert_abs_diff_eq!(expected_state, estimated_state, epsilon = EPSILON);
-                    }
+                while let Ok(expected_state) = simulator.step() {
+                    estimator.estimate();
+                    let estimated_state = estimator.state();
+                    assert_abs_diff_eq!(expected_state, estimated_state, epsilon = EPSILON);
                 }
-            )*
+            }
         };
     }
 
@@ -734,10 +735,14 @@ mod tests {
             ))
     }
 
-    estimator_tests! {
-        test_estimator_straight1: straight_trajectory(),
-        test_estimator_straight_right: straight_and_search_trajectory(SearchKind::Right),
-        test_estimator_straight_left: straight_and_search_trajectory(SearchKind::Left),
-        test_estimator_straight2: straight_and_search_trajectory(SearchKind::Front),
-    }
+    impl_estimator_test!(test_estimator_straight1: straight_trajectory());
+    impl_estimator_test!(
+        test_estimator_straight_right: straight_and_search_trajectory(SearchKind::Right)
+    );
+    impl_estimator_test!(
+        test_estimator_straight_left: straight_and_search_trajectory(SearchKind::Left)
+    );
+    impl_estimator_test!(
+        test_estimator_straight2: straight_and_search_trajectory(SearchKind::Front)
+    );
 }
