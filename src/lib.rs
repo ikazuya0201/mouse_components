@@ -1,8 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(iter_advance_by)]
 
-extern crate alloc;
-
 mod administrator;
 mod agent;
 mod command_converter;
