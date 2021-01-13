@@ -190,28 +190,26 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
         }
         let t = self.t;
         self.t += self.period;
-        let targets = [
-            self.angle_calculator.calculate(t),
-            self.angle_calculator.calculate(t + self.period / 2.0),
-            self.angle_calculator.calculate(t + self.period),
-        ];
 
-        let mut sin_theta = [0.0; 3];
-        let mut cos_theta = [0.0; 3];
-        for i in 0..3 {
-            let (sin, cos) = M::sincos(targets[i].x);
-            sin_theta[i] = sin;
-            cos_theta[i] = cos;
+        let cs = [0.21132487, 0.7886751];
+        let bs = [0.5, 0.5];
+        let mut delta_x = 0.0;
+        let mut delta_y = 0.0;
+        for i in 0..2 {
+            let (sin, cos) = M::sincos(self.angle_calculator.calculate(t + cs[i] * self.period).x);
+            delta_x += bs[i] * cos;
+            delta_y += bs[i] * sin;
         }
 
         let x = self.x;
         let y = self.y;
-        self.x += self.v * self.period * (cos_theta[0] + 4.0 * cos_theta[1] + cos_theta[2]) / 6.0;
-        self.y += self.v * self.period * (sin_theta[0] + 4.0 * sin_theta[1] + sin_theta[2]) / 6.0;
 
-        let target = targets[0].clone();
-        let cos_theta = cos_theta[0];
-        let sin_theta = sin_theta[0];
+        //gauss legendre (s=2)
+        self.x += self.v * self.period * delta_x;
+        self.y += self.v * self.period * delta_y;
+
+        let target = self.angle_calculator.calculate(t);
+        let (sin_theta, cos_theta) = M::sincos(target.x);
 
         let vx = self.v * cos_theta;
         let ax = -self.v * sin_theta * target.v;
