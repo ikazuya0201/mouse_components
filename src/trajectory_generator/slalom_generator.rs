@@ -190,28 +190,26 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
         }
         let t = self.t;
         self.t += self.period;
-        let targets = [
-            self.angle_calculator.calculate(t),
-            self.angle_calculator.calculate(t + self.period / 2.0),
-            self.angle_calculator.calculate(t + self.period),
-        ];
 
-        let mut sin_theta = [0.0; 3];
-        let mut cos_theta = [0.0; 3];
-        for i in 0..3 {
-            let (sin, cos) = M::sincos(targets[i].x);
-            sin_theta[i] = sin;
-            cos_theta[i] = cos;
+        let cs = [0.21132487, 0.7886751];
+        let bs = [0.5, 0.5];
+        let mut delta_x = 0.0;
+        let mut delta_y = 0.0;
+        for i in 0..2 {
+            let (sin, cos) = M::sincos(self.angle_calculator.calculate(t + cs[i] * self.period).x);
+            delta_x += bs[i] * cos;
+            delta_y += bs[i] * sin;
         }
 
         let x = self.x;
         let y = self.y;
-        self.x += self.v * self.period * (cos_theta[0] + 4.0 * cos_theta[1] + cos_theta[2]) / 6.0;
-        self.y += self.v * self.period * (sin_theta[0] + 4.0 * sin_theta[1] + sin_theta[2]) / 6.0;
 
-        let target = targets[0].clone();
-        let cos_theta = cos_theta[0];
-        let sin_theta = sin_theta[0];
+        //gauss legendre (s=2)
+        self.x += self.v * self.period * delta_x;
+        self.y += self.v * self.period * delta_y;
+
+        let target = self.angle_calculator.calculate(t);
+        let (sin_theta, cos_theta) = M::sincos(target.x);
 
         let vx = self.v * cos_theta;
         let ax = -self.v * sin_theta * target.v;
@@ -238,6 +236,34 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
             },
             theta: target,
         }))
+    }
+
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        let t = self.t;
+        self.t += self.period * n as f32;
+
+        let update_pos = |this: &mut Self, dt: Time| {
+            //gauss legendre (s=3)
+            let cs = [0.112701654, 0.5, 0.88729835];
+            let bs = [0.2777778, 0.44444445, 0.2777778];
+            let mut delta_x = 0.0;
+            let mut delta_y = 0.0;
+            for i in 0..3 {
+                let (sin, cos) = M::sincos(this.angle_calculator.calculate(t + cs[i] * dt).x);
+                delta_x += bs[i] * cos;
+                delta_y += bs[i] * sin;
+            }
+
+            this.x += this.v * dt * delta_x;
+            this.y += this.v * dt * delta_y;
+        };
+        if self.t >= self.t_end {
+            update_pos(self, self.t - self.t_end);
+            Err(n - ((self.t - self.t_end) / self.period).get::<uom::si::ratio::ratio>() as usize)
+        } else {
+            update_pos(self, self.period * n as f32);
+            Ok(())
+        }
     }
 }
 

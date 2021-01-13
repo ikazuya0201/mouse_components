@@ -189,11 +189,11 @@ macro_rules! impl_search_operator_test {
                         .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
                         .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
                         .front_offset(front_offset)
-                        .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
+                        .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(180.0))
                         .spin_angular_acceleration(AngularAcceleration::new::<
                             degree_per_second_squared,
-                        >(90.0))
-                        .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
+                        >(1800.0))
+                        .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
                         .build::<MathFake, MaxPathLength>();
 
                     let obstacle_detector = ObstacleDetector::new(distance_sensors);
