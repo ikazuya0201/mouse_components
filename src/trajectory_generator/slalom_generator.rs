@@ -237,6 +237,34 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
             theta: target,
         }))
     }
+
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        let t = self.t;
+        self.t += self.period * n as f32;
+
+        let update_pos = |this: &mut Self, dt: Time| {
+            //gauss legendre (s=3)
+            let cs = [0.112701654, 0.5, 0.88729835];
+            let bs = [0.2777778, 0.44444445, 0.2777778];
+            let mut delta_x = 0.0;
+            let mut delta_y = 0.0;
+            for i in 0..3 {
+                let (sin, cos) = M::sincos(this.angle_calculator.calculate(t + cs[i] * dt).x);
+                delta_x += bs[i] * cos;
+                delta_y += bs[i] * sin;
+            }
+
+            this.x += this.v * dt * delta_x;
+            this.y += this.v * dt * delta_y;
+        };
+        if self.t >= self.t_end {
+            update_pos(self, self.t - self.t_end);
+            Err(n - ((self.t - self.t_end) / self.period).get::<uom::si::ratio::ratio>() as usize)
+        } else {
+            update_pos(self, self.period * n as f32);
+            Ok(())
+        }
+    }
 }
 
 fn into_parameters(
