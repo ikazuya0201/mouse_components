@@ -34,30 +34,42 @@ impl Default for CommandConverter {
     }
 }
 
+fn _convert<N>(node: &Node<N>, square_width_half: Length) -> Pose {
+    use AbsoluteDirection::*;
+
+    Pose {
+        x: (node.x() + 1) as f32 * square_width_half,
+        y: (node.y() + 1) as f32 * square_width_half,
+        theta: Angle::new::<degree>(match node.direction() {
+            East => 0.0,
+            NorthEast => 45.0,
+            North => 90.0,
+            NorthWest => 135.0,
+            West => 180.0,
+            SouthWest => -135.0,
+            South => -90.0,
+            SouthEast => -45.0,
+        }),
+    }
+}
+
 //TODO: Write test.
 impl<N, K> ICommandConverter<(Node<N>, K)> for CommandConverter {
     type Output = (Pose, K);
 
     fn convert(&self, (node, kind): (Node<N>, K)) -> Self::Output {
-        use AbsoluteDirection::*;
+        (_convert(&node, self.square_width_half), kind)
+    }
+}
 
-        (
-            Pose {
-                x: (node.x() + 1) as f32 * self.square_width_half,
-                y: (node.y() + 1) as f32 * self.square_width_half,
-                theta: Angle::new::<degree>(match node.direction() {
-                    East => 0.0,
-                    NorthEast => 45.0,
-                    North => 90.0,
-                    NorthWest => 135.0,
-                    West => 180.0,
-                    SouthWest => -135.0,
-                    South => -90.0,
-                    SouthEast => -45.0,
-                }),
-            },
-            kind,
-        )
+impl<N, INode, K> ICommandConverter<(INode, K)> for CommandConverter
+where
+    INode: core::ops::Deref<Target = Node<N>>,
+{
+    type Output = (Pose, K);
+
+    fn convert(&self, (node, kind): (INode, K)) -> Self::Output {
+        (_convert(node.deref(), self.square_width_half), kind)
     }
 }
 

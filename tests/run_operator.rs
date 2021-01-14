@@ -6,7 +6,7 @@ extern crate typenum;
 use core::f32::consts::PI;
 
 use components::{
-    data_types::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, SearchKind, State},
+    data_types::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, State},
     defaults,
     impls::{
         slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
@@ -232,7 +232,7 @@ fn test_run_operator() {
             RunNode::<Size>::new(2, 0, South, cost).unwrap(),
             RunNode::<Size>::new(2, 0, West, cost).unwrap(),
         ];
-        defaults::Commander::new(start, goals, SearchKind::Init, SearchKind::Final, maze)
+        defaults::RunCommander::new(start, goals, maze)
     };
 
     let operator = RunOperator::new(agent, commander, CommandConverter::default());

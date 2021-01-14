@@ -68,7 +68,7 @@ pub mod impls {
     pub use administrator::Administrator;
     pub use agent::{RunAgent, SearchAgent};
     pub use command_converter::{CommandConverter, CommandConverter2};
-    pub use commander::Commander;
+    pub use commander::{RunCommander, SearchCommander};
     pub use controller::{
         RotationController, RotationControllerBuilder, TranslationController,
         TranslationControllerBuilder,
@@ -160,7 +160,7 @@ pub mod defaults {
         MaxPathLength,
     >;
 
-    pub type Commander<Size, Math> = impls::Commander<
+    pub type SearchCommander<Size, Math> = impls::SearchCommander<
         impls::Node<Size>,
         impls::RunNode<Size>,
         impls::SearchNode<Size>,
@@ -196,8 +196,18 @@ pub mod defaults {
             Math,
             Logger,
         >,
-        Commander<Size, Math>,
+        SearchCommander<Size, Math>,
         impls::CommandConverter2,
+    >;
+
+    pub type RunCommander<Size, Math> = impls::RunCommander<
+        impls::RunNode<Size>,
+        impls::Maze<
+            impls::WallManager<Size>,
+            impls::PoseConverter<Size, Math>,
+            impls::WallConverter,
+            Math,
+        >,
     >;
 
     pub type RunOperator<
@@ -222,7 +232,7 @@ pub mod defaults {
             <impls::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
-        Commander<Size, Math>,
+        RunCommander<Size, Math>,
         impls::CommandConverter,
     >;
 }

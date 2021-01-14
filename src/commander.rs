@@ -83,7 +83,7 @@ type CandidateSizeUpperBound = U4;
 type GoalSizeUpperBound = U8;
 
 //NOTE: The upper bounds of goal size and candidates size are fixed.
-pub struct Commander<Node, RunNode, SearchNode, Route, Maze> {
+pub struct SearchCommander<Node, RunNode, SearchNode, Route, Maze> {
     start: RunNode,
     goals: Vec<RunNode, GoalSizeUpperBound>,
     initial_route: Route,
@@ -94,7 +94,7 @@ pub struct Commander<Node, RunNode, SearchNode, Route, Maze> {
     maze: Maze,
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze> Commander<Node, RunNode, SearchNode, Route, Maze>
+impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, SearchNode, Route, Maze>
 where
     Node: From<RunNode>,
     RunNode: Clone,
@@ -120,7 +120,7 @@ where
 }
 
 impl<Node, RunNode, SearchNode, Route, Maze> core::fmt::Debug
-    for Commander<Node, RunNode, SearchNode, Route, Maze>
+    for SearchCommander<Node, RunNode, SearchNode, Route, Maze>
 where
     Maze: core::fmt::Debug,
     SearchNode: core::fmt::Debug,
@@ -149,7 +149,13 @@ impl TryInto<FinishError> for CommanderError {
 }
 
 impl<Node, RunNode, Cost, Maze, Obstacle> ISearchCommander<Obstacle>
-    for Commander<Node, RunNode, Maze::SearchNode, <Maze::SearchNode as RouteNode>::Route, Maze>
+    for SearchCommander<
+        Node,
+        RunNode,
+        Maze::SearchNode,
+        <Maze::SearchNode as RouteNode>::Route,
+        Maze,
+    >
 where
     RunNode::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
@@ -246,7 +252,7 @@ where
 }
 
 //TODO: write test
-impl<Node, RunNode, Cost, Route, Maze> Commander<Node, RunNode, Maze::SearchNode, Route, Maze>
+impl<Node, RunNode, Cost, Route, Maze> SearchCommander<Node, RunNode, Maze::SearchNode, Route, Maze>
 where
     RunNode::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
@@ -313,7 +319,22 @@ where
     }
 }
 
-//TODO: propagate each conversion errors
+pub struct RunCommander<Node, Maze> {
+    start: Node,
+    goals: Vec<Node, GoalSizeUpperBound>,
+    maze: Maze,
+}
+
+impl<Node, Maze> RunCommander<Node, Maze> {
+    pub fn new<Nodes: IntoIterator<Item = Node>>(start: Node, goals: Nodes, maze: Maze) -> Self {
+        Self {
+            start,
+            goals: goals.into_iter().collect(),
+            maze,
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RunCommanderError {
     UnreachableError,
@@ -323,25 +344,24 @@ pub enum RunCommanderError {
 ///NOTO: multiple implementations of Converter<_> can exist for different Target,
 ///but we assume there is only an implementation.
 //TODO: write test
-impl<Node, RunNode, SearchNode, Route, Maze> IRunCommander
-    for Commander<Node, RunNode, SearchNode, Route, Maze>
+impl<Node, Maze> IRunCommander for RunCommander<Node, Maze>
 where
-    RunNode::UpperBound: ArrayLength<Option<RunNode>>
+    Node::UpperBound: ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + ArrayLength<Maze::Cost>
         + ArrayLength<Reverse<Maze::Cost>>
-        + ArrayLength<(RunNode, Reverse<Maze::Cost>)>
-        + ArrayLength<(Node, RunNode::Route)>
+        + ArrayLength<(Node, Reverse<Maze::Cost>)>
+        + ArrayLength<(Node, Node::Route)>
         + Unsigned,
-    RunNode::PathUpperBound: ArrayLength<RunNode>,
-    RunNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode + BoundedPathNode,
-    Node: From<RunNode>,
+    Node::PathUpperBound: ArrayLength<Node>,
+    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode + BoundedPathNode,
+    Node: From<Node>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-    Maze: Graph<RunNode>,
+    Maze: Graph<Node>,
 {
     type Error = RunCommanderError;
-    type Command = (Node, RunNode::Route);
-    type Commands = Vec<Self::Command, RunNode::UpperBound>;
+    type Command = (Node, Node::Route);
+    type Commands = Vec<Self::Command, Node::UpperBound>;
 
     fn compute_commands(&self) -> Result<Self::Commands, Self::Error> {
         let path = compute_shortest_path(&self.start, &self.goals, &self.maze)
@@ -365,7 +385,7 @@ where
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze> Commander<Node, RunNode, SearchNode, Route, Maze>
+impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, SearchNode, Route, Maze>
 where
     RunNode: BoundedPathNode + BoundedNode + Clone + Into<usize> + PartialEq,
     RunNode::PathUpperBound: ArrayLength<RunNode>,
@@ -559,7 +579,8 @@ mod tests {
             type PathUpperBound = U10;
         }
 
-        let solver = Commander::<Node, RunNode, SearchNode, _, _>::new(start, goals, (), (), graph);
+        let solver =
+            SearchCommander::<Node, RunNode, SearchNode, _, _>::new(start, goals, (), (), graph);
 
         let path = solver.compute_shortest_path();
         let expected = vec![0, 1, 3, 5, 7, 8]
