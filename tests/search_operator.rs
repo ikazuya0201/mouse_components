@@ -1,8 +1,5 @@
 extern crate alloc;
 
-#[macro_use]
-extern crate typenum;
-
 use core::f32::consts::PI;
 
 use components::{
@@ -13,7 +10,7 @@ use components::{
     impls::{
         slalom_parameters_map, slalom_parameters_map2, CommandConverter2, Commander,
         EstimatorBuilder, Maze, ObstacleDetector, PoseConverter, RotationControllerBuilder,
-        RunNode, SearchAgent, SearchOperator, TrackerBuilder, TrajectoryGeneratorBuilder,
+        RunNode, SearchAgent, SearchOperator, SearchTrajectoryGeneratorBuilder, TrackerBuilder,
         TranslationControllerBuilder, WallConverter, WallManager,
     },
     utils::probability::Probability,
@@ -73,8 +70,6 @@ macro_rules! impl_search_operator_test {
                     .into_iter()
                     .map(|goal| RunNode::<Size>::new(goal.0, goal.1, goal.2, cost).unwrap())
                     .collect::<Vec<_>>();
-
-                type MaxPathLength = op!(Size * Size);
 
                 let start_state = State {
                     x: LengthState {
@@ -175,7 +170,7 @@ macro_rules! impl_search_operator_test {
 
                     let search_velocity = Velocity::new::<meter_per_second>(0.12);
 
-                    let trajectory_generator = TrajectoryGeneratorBuilder::new()
+                    let trajectory_generator = SearchTrajectoryGeneratorBuilder::new()
                         .period(period)
                         .max_velocity(Velocity::new::<meter_per_second>(2.0))
                         .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
@@ -187,14 +182,14 @@ macro_rules! impl_search_operator_test {
                             radian_per_second_squared,
                         >(36.0 * PI))
                         .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
-                        .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
                         .front_offset(front_offset)
                         .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(180.0))
                         .spin_angular_acceleration(AngularAcceleration::new::<
                             degree_per_second_squared,
                         >(1800.0))
                         .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
-                        .build::<MathFake, MaxPathLength>();
+                        .build::<MathFake>()
+                        .expect("Should never panic");
 
                     let obstacle_detector = ObstacleDetector::new(distance_sensors);
                     SearchAgent::new(obstacle_detector, estimator, tracker, trajectory_generator)
