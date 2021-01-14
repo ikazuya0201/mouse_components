@@ -81,8 +81,9 @@ pub mod impls {
     pub use pose_converter::PoseConverter;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{
-        slalom_parameters_map, slalom_parameters_map2, ShiftTrajectory, TrajectoryGenerator,
-        TrajectoryGeneratorBuilder,
+        slalom_parameters_map, slalom_parameters_map2, RunTrajectoryGenerator,
+        RunTrajectoryGeneratorBuilder, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
+        ShiftTrajectory,
     };
     pub use wall_converter::WallConverter;
     pub use wall_manager::WallManager;
@@ -107,7 +108,6 @@ pub mod defaults {
         RightMotor,
         DistanceSensor,
         Math,
-        MaxPathLength,
         Logger = impls::NullLogger,
     > = impls::SearchAgent<
         impls::ObstacleDetector<DistanceSensor>,
@@ -120,12 +120,12 @@ pub mod defaults {
             impls::RotationController,
             Logger,
         >,
-        impls::TrajectoryGenerator<Math, MaxPathLength>,
-        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::SearchTrajectoryGenerator<(
+        impls::SearchTrajectoryGenerator<Math>,
+        <impls::SearchTrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<(
             data_types::Pose,
             data_types::SearchKind,
         )>>::Trajectory,
-        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::SearchTrajectoryGenerator<(
+        <impls::SearchTrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<(
             data_types::Pose,
             data_types::SearchKind,
         )>>::Target,
@@ -152,8 +152,8 @@ pub mod defaults {
             impls::RotationController,
             Logger,
         >,
-        impls::TrajectoryGenerator<Math, MaxPathLength>,
-        <impls::TrajectoryGenerator<Math, MaxPathLength> as traits::RunTrajectoryGenerator<(
+        impls::RunTrajectoryGenerator<Math, MaxPathLength>,
+        <impls::RunTrajectoryGenerator<Math, MaxPathLength> as traits::RunTrajectoryGenerator<(
             data_types::Pose,
             data_types::RunKind,
         )>>::Trajectory,
@@ -194,7 +194,6 @@ pub mod defaults {
             RightMotor,
             DistanceSensor,
             Math,
-            <impls::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
         Commander<Size, Math>,

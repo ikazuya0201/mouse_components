@@ -8,7 +8,10 @@ use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
 
-use crate::agent::{RunTrajectoryGenerator, SearchTrajectoryGenerator};
+use crate::agent::{
+    RunTrajectoryGenerator as IRunTrajectoryGenerator,
+    SearchTrajectoryGenerator as ISearchTrajectoryGenerator,
+};
 use crate::data_types::Pose;
 use crate::traits::Math;
 pub use slalom_generator::{
@@ -91,27 +94,16 @@ pub type BackTrajectory<M> = Chain<
 
 pub type SlowDownTrajectory = Chain<StraightTrajectory, StopTrajectory>;
 
-pub struct TrajectoryGenerator<M, MaxLength> {
-    straight_generator: StraightTrajectoryGenerator<M>,
-
-    #[allow(unused)]
-    slalom_generator: SlalomGenerator<M>,
-    #[allow(unused)]
-    spin_generator: SpinGenerator<M>,
-
-    run_slalom_velocity: Velocity,
-
+pub struct SearchTrajectoryGenerator<M> {
     initial_trajectory: StraightTrajectory,
     slow_down_trajectory: SlowDownTrajectory,
     front_trajectory: StraightTrajectory,
     right_trajectory: SlalomTrajectory<M>,
     left_trajectory: SlalomTrajectory<M>,
     back_trajectory: BackTrajectory<M>,
-
-    _max_length: PhantomData<fn() -> MaxLength>,
 }
 
-impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
+impl<M: Math> SearchTrajectoryGenerator<M> {
     fn new(
         angular_velocity_ref: AngularVelocity,
         angular_acceleration_ref: AngularAcceleration,
@@ -122,7 +114,6 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
         max_jerk: Jerk,
         period: Time,
         search_velocity: Velocity,
-        run_slalom_velocity: Velocity,
         front_offset: Length,
         square_width: Length,
         spin_angular_velocity: AngularVelocity,
@@ -130,7 +121,7 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
         spin_angular_jerk: AngularJerk,
     ) -> Self {
         let straight_generator =
-            StraightTrajectoryGenerator::new(max_velocity, max_acceleration, max_jerk, period);
+            StraightTrajectoryGenerator::<M>::new(max_velocity, max_acceleration, max_jerk, period);
         let slalom_generator = SlalomGenerator::new(
             angular_velocity_ref,
             angular_acceleration_ref,
@@ -138,7 +129,7 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
             period,
             slalom_parameters_map,
         );
-        let spin_generator = SpinGenerator::new(
+        let spin_generator = SpinGenerator::<M>::new(
             spin_angular_velocity,
             spin_angular_acceleration,
             spin_angular_jerk,
@@ -229,23 +220,17 @@ impl<M: Math, MaxLength> TrajectoryGenerator<M, MaxLength> {
         };
 
         Self {
-            straight_generator,
-            slalom_generator,
-            spin_generator,
             initial_trajectory,
             slow_down_trajectory,
             front_trajectory,
             right_trajectory,
             left_trajectory,
             back_trajectory,
-            run_slalom_velocity,
-            _max_length: PhantomData,
         }
     }
 }
 
-impl<M, MaxLength> SearchTrajectoryGenerator<(Pose, SearchKind)>
-    for TrajectoryGenerator<M, MaxLength>
+impl<M> ISearchTrajectoryGenerator<(Pose, SearchKind)> for SearchTrajectoryGenerator<M>
 where
     M: Math,
 {
@@ -268,11 +253,48 @@ where
     }
 }
 
+pub struct RunTrajectoryGenerator<M, MaxLength> {
+    run_slalom_velocity: Velocity,
+    straight_generator: StraightTrajectoryGenerator<M>,
+    slalom_generator: SlalomGenerator<M>,
+    _max_length: PhantomData<fn() -> MaxLength>,
+}
+
+impl<M: Math, MaxLength> RunTrajectoryGenerator<M, MaxLength> {
+    fn new(
+        run_slalom_velocity: Velocity,
+        max_velocity: Velocity,
+        max_acceleration: Acceleration,
+        max_jerk: Jerk,
+        angular_velocity_ref: AngularVelocity,
+        angular_acceleration_ref: AngularAcceleration,
+        angular_jerk_ref: AngularJerk,
+        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+        period: Time,
+    ) -> Self {
+        let straight_generator =
+            StraightTrajectoryGenerator::<M>::new(max_velocity, max_acceleration, max_jerk, period);
+        let slalom_generator = SlalomGenerator::new(
+            angular_velocity_ref,
+            angular_acceleration_ref,
+            angular_jerk_ref,
+            period,
+            slalom_parameters_map,
+        );
+        Self {
+            run_slalom_velocity,
+            straight_generator,
+            slalom_generator,
+            _max_length: PhantomData,
+        }
+    }
+}
+
 //NOTO: this code doesn't work if the initial command is slalom
 //because trajectory does not accelerate in slalom.
 //Then, we assume that the initial command is straight.
 //TODO: To deal with arbitrary initial commands
-impl<M, MaxLength> RunTrajectoryGenerator<(Pose, RunKind)> for TrajectoryGenerator<M, MaxLength>
+impl<M, MaxLength> IRunTrajectoryGenerator<(Pose, RunKind)> for RunTrajectoryGenerator<M, MaxLength>
 where
     M: Math,
     MaxLength: ArrayLength<ShiftTrajectory<RunTrajectory<M>, M>>,
@@ -318,7 +340,7 @@ where
     }
 }
 
-impl<M, MaxLength> TrajectoryGenerator<M, MaxLength>
+impl<M> SearchTrajectoryGenerator<M>
 where
     M: Math,
 {
@@ -341,7 +363,12 @@ where
             },
         )
     }
+}
 
+impl<M, MaxLength> RunTrajectoryGenerator<M, MaxLength>
+where
+    M: Math,
+{
     fn generate_run_trajectory_and_terminal_velocity(
         &self,
         pose: &Pose,
@@ -382,1396 +409,266 @@ where
         };
         (ShiftTrajectory::new(*pose, trajectory), terminal_velocity)
     }
+}
 
-    pub fn generate_straight(
-        &self,
-        distance: Length,
-        v_start: Velocity,
-        v_end: Velocity,
-    ) -> impl Iterator<Item = Target> {
-        self.straight_generator.generate(distance, v_start, v_end)
-    }
+pub struct SearchTrajectoryGeneratorBuilder {
+    angular_velocity_ref: Option<AngularVelocity>,
+    angular_acceleration_ref: Option<AngularAcceleration>,
+    angular_jerk_ref: Option<AngularJerk>,
+    slalom_parameters_map: Option<fn(SlalomKind, SlalomDirection) -> SlalomParameters>,
+    max_velocity: Option<Velocity>,
+    max_acceleration: Option<Acceleration>,
+    max_jerk: Option<Jerk>,
+    period: Option<Time>,
+    search_velocity: Option<Velocity>,
+    front_offset: Option<Length>,
+    square_width: Option<Length>,
+    spin_angular_velocity: Option<AngularVelocity>,
+    spin_angular_acceleration: Option<AngularAcceleration>,
+    spin_angular_jerk: Option<AngularJerk>,
+}
 
-    pub fn generate_spin(
-        &self,
-        theta_start: Angle,
-        theta_distance: Angle,
-    ) -> impl Iterator<Item = Target> {
-        self.spin_generator.generate(theta_start, theta_distance)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RequiredFieldEmptyError {
+    field_name: &'static str,
+}
+
+impl core::fmt::Display for RequiredFieldEmptyError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(
+            f,
+            "Build failed: the field `{}` is required",
+            self.field_name
+        )
     }
 }
 
-pub struct TrajectoryGeneratorBuilder<
-    AngularVelocityRef,
-    AngularAccelerationRef,
-    AngularJerkRef,
-    SlalomParametersMap,
-    MaxVelocity,
-    MaxAcceleration,
-    MaxJerk,
-    Period,
-    SearchVelocity,
-    RunSlalomVelocity,
-    Offset,
-    SquareWidth,
-    SpinAngularVelocity,
-    SpinAngularAcceleration,
-    SpinAngularJerk,
-> {
-    angular_velocity_ref: AngularVelocityRef,
-    angular_acceleration_ref: AngularAccelerationRef,
-    angular_jerk_ref: AngularJerkRef,
-    slalom_parameters_map: SlalomParametersMap,
-    max_velocity: MaxVelocity,
-    max_acceleration: MaxAcceleration,
-    max_jerk: MaxJerk,
-    period: Period,
-    search_velocity: SearchVelocity,
-    run_slalom_velocity: RunSlalomVelocity,
-    front_offset: Offset,
-    square_width: SquareWidth,
-    spin_angular_velocity: SpinAngularVelocity,
-    spin_angular_acceleration: SpinAngularAcceleration,
-    spin_angular_jerk: SpinAngularJerk,
+fn ok_or<T>(value: Option<T>, field_name: &'static str) -> Result<T, RequiredFieldEmptyError> {
+    value.ok_or(RequiredFieldEmptyError { field_name })
 }
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
+impl SearchTrajectoryGeneratorBuilder {
+    const DEFAULT_FRONT_OFFSET: Length = Length {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: 0.0,
+    };
     const DEFAULT_SQUARE_WIDTH: Length = Length {
         dimension: PhantomData,
         units: PhantomData,
         value: 0.09,
     };
 
-    const DEFAULT_FRONT_OFFSET: Length = Length {
-        dimension: PhantomData,
-        units: PhantomData,
-        value: 0.0,
-    };
-}
-
-impl TrajectoryGeneratorBuilder<(), (), (), (), (), (), (), (), (), (), (), (), (), (), ()> {
     pub fn new() -> Self {
         Self {
-            angular_velocity_ref: (),
-            angular_acceleration_ref: (),
-            angular_jerk_ref: (),
-            slalom_parameters_map: (),
-            max_velocity: (),
-            max_acceleration: (),
-            max_jerk: (),
-            period: (),
-            search_velocity: (),
-            run_slalom_velocity: (),
-            front_offset: (),
-            square_width: (),
-            spin_angular_velocity: (),
-            spin_angular_acceleration: (),
-            spin_angular_jerk: (),
+            angular_velocity_ref: None,
+            angular_acceleration_ref: None,
+            angular_jerk_ref: None,
+            slalom_parameters_map: None,
+            max_velocity: None,
+            max_acceleration: None,
+            max_jerk: None,
+            period: None,
+            search_velocity: None,
+            front_offset: None,
+            square_width: None,
+            spin_angular_velocity: None,
+            spin_angular_acceleration: None,
+            spin_angular_jerk: None,
         }
     }
-}
 
-impl
-    TrajectoryGeneratorBuilder<
-        AngularVelocity,
-        AngularAcceleration,
-        AngularJerk,
-        fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-        Velocity,
-        Acceleration,
-        Jerk,
-        Time,
-        Velocity,
-        Velocity,
-        (),
-        (),
-        AngularVelocity,
-        AngularAcceleration,
-        AngularJerk,
-    >
-{
-    pub fn build<M: Math, MaxLength>(self) -> TrajectoryGenerator<M, MaxLength> {
-        TrajectoryGenerator::new(
-            self.angular_velocity_ref,
-            self.angular_acceleration_ref,
-            self.angular_jerk_ref,
-            self.slalom_parameters_map,
-            self.max_velocity,
-            self.max_acceleration,
-            self.max_jerk,
-            self.period,
-            self.search_velocity,
-            self.run_slalom_velocity,
-            Self::DEFAULT_FRONT_OFFSET,
-            Self::DEFAULT_SQUARE_WIDTH,
-            self.spin_angular_velocity,
-            self.spin_angular_acceleration,
-            self.spin_angular_jerk,
-        )
+    pub fn build<M: Math>(self) -> Result<SearchTrajectoryGenerator<M>, RequiredFieldEmptyError> {
+        Ok(SearchTrajectoryGenerator::<M>::new(
+            ok_or(self.angular_velocity_ref, "angular_velocity_ref")?,
+            ok_or(self.angular_acceleration_ref, "angular_acceleration_ref")?,
+            ok_or(self.angular_jerk_ref, "angular_jerk_ref")?,
+            ok_or(self.slalom_parameters_map, "slalom_parameters_map")?,
+            ok_or(self.max_velocity, "max_velocity")?,
+            ok_or(self.max_acceleration, "max_acceleration")?,
+            ok_or(self.max_jerk, "max_jerk")?,
+            ok_or(self.period, "period")?,
+            ok_or(self.search_velocity, "search_velocity")?,
+            self.front_offset.unwrap_or(Self::DEFAULT_FRONT_OFFSET),
+            self.square_width.unwrap_or(Self::DEFAULT_SQUARE_WIDTH),
+            ok_or(self.spin_angular_velocity, "spin_angular_velocity")?,
+            ok_or(self.spin_angular_acceleration, "spin_angular_acceleration")?,
+            ok_or(self.spin_angular_jerk, "spin_angular_jerk")?,
+        ))
     }
-}
 
-impl
-    TrajectoryGeneratorBuilder<
-        AngularVelocity,
-        AngularAcceleration,
-        AngularJerk,
-        fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-        Velocity,
-        Acceleration,
-        Jerk,
-        Time,
-        Velocity,
-        Velocity,
-        (),
-        Length,
-        AngularVelocity,
-        AngularAcceleration,
-        AngularJerk,
-    >
-{
-    pub fn build<M: Math, MaxLength>(self) -> TrajectoryGenerator<M, MaxLength> {
-        TrajectoryGenerator::new(
-            self.angular_velocity_ref,
-            self.angular_acceleration_ref,
-            self.angular_jerk_ref,
-            self.slalom_parameters_map,
-            self.max_velocity,
-            self.max_acceleration,
-            self.max_jerk,
-            self.period,
-            self.search_velocity,
-            self.run_slalom_velocity,
-            Self::DEFAULT_FRONT_OFFSET,
-            self.square_width,
-            self.spin_angular_velocity,
-            self.spin_angular_acceleration,
-            self.spin_angular_jerk,
-        )
+    pub fn angular_velocity_ref(mut self, angular_velocity_ref: AngularVelocity) -> Self {
+        self.angular_velocity_ref = Some(angular_velocity_ref);
+        self
     }
-}
 
-impl
-    TrajectoryGeneratorBuilder<
-        AngularVelocity,
-        AngularAcceleration,
-        AngularJerk,
-        fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-        Velocity,
-        Acceleration,
-        Jerk,
-        Time,
-        Velocity,
-        Velocity,
-        Length,
-        (),
-        AngularVelocity,
-        AngularAcceleration,
-        AngularJerk,
-    >
-{
-    pub fn build<M: Math, MaxLength>(self) -> TrajectoryGenerator<M, MaxLength> {
-        TrajectoryGenerator::new(
-            self.angular_velocity_ref,
-            self.angular_acceleration_ref,
-            self.angular_jerk_ref,
-            self.slalom_parameters_map,
-            self.max_velocity,
-            self.max_acceleration,
-            self.max_jerk,
-            self.period,
-            self.search_velocity,
-            self.run_slalom_velocity,
-            self.front_offset,
-            Self::DEFAULT_SQUARE_WIDTH,
-            self.spin_angular_velocity,
-            self.spin_angular_acceleration,
-            self.spin_angular_jerk,
-        )
-    }
-}
-
-impl
-    TrajectoryGeneratorBuilder<
-        AngularVelocity,
-        AngularAcceleration,
-        AngularJerk,
-        fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-        Velocity,
-        Acceleration,
-        Jerk,
-        Time,
-        Velocity,
-        Velocity,
-        Length,
-        Length,
-        AngularVelocity,
-        AngularAcceleration,
-        AngularJerk,
-    >
-{
-    pub fn build<M: Math, MaxLength>(self) -> TrajectoryGenerator<M, MaxLength> {
-        TrajectoryGenerator::new(
-            self.angular_velocity_ref,
-            self.angular_acceleration_ref,
-            self.angular_jerk_ref,
-            self.slalom_parameters_map,
-            self.max_velocity,
-            self.max_acceleration,
-            self.max_jerk,
-            self.period,
-            self.search_velocity,
-            self.run_slalom_velocity,
-            self.front_offset,
-            self.square_width,
-            self.spin_angular_velocity,
-            self.spin_angular_acceleration,
-            self.spin_angular_jerk,
-        )
-    }
-}
-
-impl<
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        (),
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn angular_velocity_ref(
-        self,
-        angular_velocity_ref: AngularVelocity,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocity,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
-    }
-}
-
-impl<
-        AngularVelocityRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        (),
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
     pub fn angular_acceleration_ref(
-        self,
+        mut self,
         angular_acceleration_ref: AngularAcceleration,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAcceleration,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    ) -> Self {
+        self.angular_acceleration_ref = Some(angular_acceleration_ref);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        (),
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn angular_jerk_ref(
-        self,
-        angular_jerk_ref: AngularJerk,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerk,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    pub fn angular_jerk_ref(mut self, angular_jerk_ref: AngularJerk) -> Self {
+        self.angular_jerk_ref = Some(angular_jerk_ref);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        (),
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
     pub fn slalom_parameters_map(
-        self,
+        mut self,
         slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    ) -> Self {
+        self.slalom_parameters_map = Some(slalom_parameters_map);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        (),
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn max_velocity(
-        self,
-        max_velocity: Velocity,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        Velocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    pub fn max_velocity(mut self, max_velocity: Velocity) -> Self {
+        self.max_velocity = Some(max_velocity);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        (),
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn max_acceleration(
-        self,
-        max_acceleration: Acceleration,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        Acceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    pub fn max_acceleration(mut self, max_acceleration: Acceleration) -> Self {
+        self.max_acceleration = Some(max_acceleration);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        (),
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn max_jerk(
-        self,
-        max_jerk: Jerk,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        Jerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    pub fn max_jerk(mut self, max_jerk: Jerk) -> Self {
+        self.max_jerk = Some(max_jerk);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        (),
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn period(
-        self,
-        period: Time,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Time,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    pub fn period(mut self, period: Time) -> Self {
+        self.period = Some(period);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        (),
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn search_velocity(
-        self,
-        search_velocity: Velocity,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        Velocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    pub fn search_velocity(mut self, search_velocity: Velocity) -> Self {
+        self.search_velocity = Some(search_velocity);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        (),
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn run_slalom_velocity(
-        self,
-        run_slalom_velocity: Velocity,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        Velocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    pub fn front_offset(mut self, front_offset: Length) -> Self {
+        self.front_offset = Some(front_offset);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        (),
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn front_offset(
-        self,
-        front_offset: Length,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Length,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    pub fn square_width(mut self, square_width: Length) -> Self {
+        self.square_width = Some(square_width);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        (),
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn square_width(
-        self,
-        square_width: Length,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        Length,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    pub fn spin_angular_velocity(mut self, spin_angular_velocity: AngularVelocity) -> Self {
+        self.spin_angular_velocity = Some(spin_angular_velocity);
+        self
     }
-}
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        (),
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    >
-{
-    pub fn spin_angular_velocity(
-        self,
-        spin_angular_velocity: AngularVelocity,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        AngularVelocity,
-        SpinAngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
-    }
-}
-
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularJerk,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        (),
-        SpinAngularJerk,
-    >
-{
     pub fn spin_angular_acceleration(
-        self,
+        mut self,
         spin_angular_acceleration: AngularAcceleration,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        AngularAcceleration,
-        SpinAngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration,
-            spin_angular_jerk: self.spin_angular_jerk,
-        }
+    ) -> Self {
+        self.spin_angular_acceleration = Some(spin_angular_acceleration);
+        self
+    }
+
+    pub fn spin_angular_jerk(mut self, spin_angular_jerk: AngularJerk) -> Self {
+        self.spin_angular_jerk = Some(spin_angular_jerk);
+        self
     }
 }
 
-impl<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-    >
-    TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        (),
-    >
-{
-    pub fn spin_angular_jerk(
-        self,
-        spin_angular_jerk: AngularJerk,
-    ) -> TrajectoryGeneratorBuilder<
-        AngularVelocityRef,
-        AngularAccelerationRef,
-        AngularJerkRef,
-        SlalomParametersMap,
-        MaxVelocity,
-        MaxAcceleration,
-        MaxJerk,
-        Period,
-        SearchVelocity,
-        RunSlalomVelocity,
-        Offset,
-        SquareWidth,
-        SpinAngularVelocity,
-        SpinAngularAcceleration,
-        AngularJerk,
-    > {
-        TrajectoryGeneratorBuilder {
-            angular_velocity_ref: self.angular_velocity_ref,
-            angular_acceleration_ref: self.angular_acceleration_ref,
-            angular_jerk_ref: self.angular_jerk_ref,
-            slalom_parameters_map: self.slalom_parameters_map,
-            max_velocity: self.max_velocity,
-            max_acceleration: self.max_acceleration,
-            max_jerk: self.max_jerk,
-            period: self.period,
-            search_velocity: self.search_velocity,
-            run_slalom_velocity: self.run_slalom_velocity,
-            front_offset: self.front_offset,
-            square_width: self.square_width,
-            spin_angular_velocity: self.spin_angular_velocity,
-            spin_angular_acceleration: self.spin_angular_acceleration,
-            spin_angular_jerk,
+pub struct RunTrajectoryGeneratorBuilder {
+    run_slalom_velocity: Option<Velocity>,
+    max_velocity: Option<Velocity>,
+    max_acceleration: Option<Acceleration>,
+    max_jerk: Option<Jerk>,
+    angular_velocity_ref: Option<AngularVelocity>,
+    angular_acceleration_ref: Option<AngularAcceleration>,
+    angular_jerk_ref: Option<AngularJerk>,
+    slalom_parameters_map: Option<fn(SlalomKind, SlalomDirection) -> SlalomParameters>,
+    period: Option<Time>,
+}
+
+impl RunTrajectoryGeneratorBuilder {
+    pub fn new() -> Self {
+        Self {
+            run_slalom_velocity: None,
+            max_velocity: None,
+            max_acceleration: None,
+            max_jerk: None,
+            angular_velocity_ref: None,
+            angular_acceleration_ref: None,
+            angular_jerk_ref: None,
+            slalom_parameters_map: None,
+            period: None,
         }
+    }
+
+    pub fn build<M: Math, MaxLength>(
+        self,
+    ) -> Result<RunTrajectoryGenerator<M, MaxLength>, RequiredFieldEmptyError> {
+        Ok(RunTrajectoryGenerator::<M, MaxLength>::new(
+            ok_or(self.run_slalom_velocity, "run_slalom_velocity")?,
+            ok_or(self.max_velocity, "max_velocity")?,
+            ok_or(self.max_acceleration, "max_acceleration")?,
+            ok_or(self.max_jerk, "max_jerk")?,
+            ok_or(self.angular_velocity_ref, "angular_velocity_ref")?,
+            ok_or(self.angular_acceleration_ref, "angular_acceleration_ref")?,
+            ok_or(self.angular_jerk_ref, "angular_jerk_ref")?,
+            ok_or(self.slalom_parameters_map, "slalom_parameters_map")?,
+            ok_or(self.period, "period")?,
+        ))
+    }
+
+    pub fn run_slalom_velocity(mut self, run_slalom_velocity: Velocity) -> Self {
+        self.run_slalom_velocity = Some(run_slalom_velocity);
+        self
+    }
+
+    pub fn max_velocity(mut self, max_velocity: Velocity) -> Self {
+        self.max_velocity = Some(max_velocity);
+        self
+    }
+
+    pub fn max_acceleration(mut self, max_acceleration: Acceleration) -> Self {
+        self.max_acceleration = Some(max_acceleration);
+        self
+    }
+
+    pub fn max_jerk(mut self, max_jerk: Jerk) -> Self {
+        self.max_jerk = Some(max_jerk);
+        self
+    }
+
+    pub fn period(mut self, period: Time) -> Self {
+        self.period = Some(period);
+        self
+    }
+
+    pub fn angular_velocity_ref(mut self, angular_velocity_ref: AngularVelocity) -> Self {
+        self.angular_velocity_ref = Some(angular_velocity_ref);
+        self
+    }
+
+    pub fn angular_acceleration_ref(
+        mut self,
+        angular_acceleration_ref: AngularAcceleration,
+    ) -> Self {
+        self.angular_acceleration_ref = Some(angular_acceleration_ref);
+        self
+    }
+
+    pub fn angular_jerk_ref(mut self, angular_jerk_ref: AngularJerk) -> Self {
+        self.angular_jerk_ref = Some(angular_jerk_ref);
+        self
+    }
+
+    pub fn slalom_parameters_map(
+        mut self,
+        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+    ) -> Self {
+        self.slalom_parameters_map = Some(slalom_parameters_map);
+        self
     }
 }
 
@@ -1791,8 +688,8 @@ mod tests {
         velocity::meter_per_second,
     };
 
-    fn build_generator() -> TrajectoryGenerator<MathFake, ()> {
-        TrajectoryGeneratorBuilder::new()
+    fn build_generator() -> SearchTrajectoryGenerator<MathFake> {
+        SearchTrajectoryGeneratorBuilder::new()
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
@@ -1804,11 +701,11 @@ mod tests {
             .slalom_parameters_map(slalom_parameters_map)
             .period(Time::new::<second>(0.001))
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
-            .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
             .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
             .spin_angular_acceleration(AngularAcceleration::new::<degree_per_second_squared>(90.0))
             .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
             .build()
+            .unwrap()
     }
 
     #[test]
@@ -1827,7 +724,7 @@ mod tests {
                 let period = Time::new::<second>(0.001);
                 let search_velocity = Velocity::new::<meter_per_second>(0.2);
 
-                let generator = TrajectoryGeneratorBuilder::new()
+                let generator = SearchTrajectoryGeneratorBuilder::new()
                     .period(period)
                     .max_velocity(Velocity::new::<meter_per_second>(2.0))
                     .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
@@ -1839,13 +736,13 @@ mod tests {
                         AngularAcceleration::new::<radian_per_second_squared>(36.0 * PI),
                     )
                     .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
-                    .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
                     .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
                     .spin_angular_acceleration(
                         AngularAcceleration::new::<degree_per_second_squared>(90.0),
                     )
                     .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
-                    .build::<MathFake, ()>();
+                    .build::<MathFake>()
+                    .unwrap();
 
                 let (kind, last_x, last_y, last_theta) = $value;
 

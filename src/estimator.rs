@@ -488,7 +488,7 @@ mod tests {
     use super::*;
     use crate::{
         data_types::{Pose, SearchKind, Target},
-        impls::{TrajectoryGenerator, TrajectoryGeneratorBuilder},
+        impls::{SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder},
         prelude::*,
         trajectory_generator::slalom_parameters_map,
         utils::math::MathFake,
@@ -657,8 +657,8 @@ mod tests {
         value: 0.001,
     };
 
-    fn build_generator() -> TrajectoryGenerator<MathFake, ()> {
-        TrajectoryGeneratorBuilder::new()
+    fn build_generator() -> SearchTrajectoryGenerator<MathFake> {
+        SearchTrajectoryGeneratorBuilder::new()
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
@@ -670,11 +670,11 @@ mod tests {
             .slalom_parameters_map(slalom_parameters_map)
             .period(PERIOD)
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
-            .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
             .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
             .spin_angular_acceleration(AngularAcceleration::new::<degree_per_second_squared>(90.0))
             .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
             .build()
+            .unwrap()
     }
 
     macro_rules! impl_estimator_test {
@@ -710,24 +710,16 @@ mod tests {
 
     fn straight_trajectory() -> impl Iterator<Item = Target> {
         let trajectory_generator = build_generator();
-        trajectory_generator.generate_straight(
-            Length::new::<meter>(3.0),
-            Default::default(),
-            Default::default(),
-        )
+        trajectory_generator.generate_search(&(Pose::default(), SearchKind::Init))
     }
 
     fn straight_and_search_trajectory(kind: SearchKind) -> impl Iterator<Item = Target> {
         let trajectory_generator = build_generator();
         trajectory_generator
-            .generate_straight(
-                Length::new::<meter>(0.09),
-                Default::default(),
-                Velocity::new::<meter_per_second>(0.6),
-            )
+            .generate_search(&(Pose::default(), SearchKind::Init))
             .chain(trajectory_generator.generate_search(&(
                 Pose {
-                    x: Length::new::<meter>(0.09),
+                    x: Length::new::<meter>(0.045),
                     y: Default::default(),
                     theta: Default::default(),
                 },

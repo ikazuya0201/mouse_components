@@ -10,8 +10,9 @@ use components::{
     defaults,
     impls::{
         slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
-        PoseConverter, RotationControllerBuilder, RunAgent, RunNode, RunOperator, TrackerBuilder,
-        TrajectoryGeneratorBuilder, TranslationControllerBuilder, WallConverter, WallManager,
+        PoseConverter, RotationControllerBuilder, RunAgent, RunNode, RunOperator,
+        RunTrajectoryGeneratorBuilder, TrackerBuilder, TranslationControllerBuilder, WallConverter,
+        WallManager,
     },
     prelude::*,
     utils::probability::Probability,
@@ -24,9 +25,9 @@ use uom::si::f32::{
 use uom::si::{
     acceleration::meter_per_second_squared,
     angle::degree,
-    angular_acceleration::{degree_per_second_squared, radian_per_second_squared},
-    angular_jerk::{degree_per_second_cubed, radian_per_second_cubed},
-    angular_velocity::{degree_per_second, radian_per_second},
+    angular_acceleration::radian_per_second_squared,
+    angular_jerk::radian_per_second_cubed,
+    angular_velocity::radian_per_second,
     frequency::hertz,
     jerk::meter_per_second_cubed,
     length::{meter, millimeter},
@@ -201,14 +202,11 @@ fn test_run_operator() {
                 .build::<MathFake>()
         };
 
-        let search_velocity = Velocity::new::<meter_per_second>(0.12);
-
-        let trajectory_generator = TrajectoryGeneratorBuilder::new()
+        let trajectory_generator = RunTrajectoryGeneratorBuilder::new()
             .period(period)
             .max_velocity(Velocity::new::<meter_per_second>(2.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
-            .search_velocity(search_velocity)
             .slalom_parameters_map(slalom_parameters_map)
             .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
             .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
@@ -216,10 +214,8 @@ fn test_run_operator() {
             ))
             .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
             .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
-            .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
-            .spin_angular_acceleration(AngularAcceleration::new::<degree_per_second_squared>(90.0))
-            .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
-            .build::<MathFake, MaxPathLength>();
+            .build::<MathFake, MaxPathLength>()
+            .expect("Should never panic");
 
         let obstacle_detector = ObstacleDetector::new(distance_sensors);
         RunAgent::new(obstacle_detector, estimator, tracker, trajectory_generator)
