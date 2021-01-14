@@ -4,7 +4,7 @@ use typenum::consts::*;
 
 use components::{
     data_types::{AbsoluteDirection, Pattern, SearchKind, Wall},
-    defaults::Commander,
+    defaults::SearchCommander,
     impls::{Maze, PoseConverter, RunNode, WallConverter, WallManager},
     prelude::*,
     traits::Math,
@@ -104,7 +104,7 @@ fn test_compute_shortest_path_u4() {
         let pose_converter = PoseConverter::<Size, MathFake>::default();
         let wall_converter = WallConverter::new(cost);
         let maze = Maze::<_, _, _, MathFake>::new(wall_manager, pose_converter, wall_converter);
-        let commander = Commander::new(
+        let commander = SearchCommander::new(
             start,
             goals.clone(),
             SearchKind::Init,

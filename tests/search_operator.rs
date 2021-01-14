@@ -7,10 +7,11 @@ use components::{
         AbsoluteDirection, AngleState, LengthState, Pattern, Pose, SearchKind, SlalomDirection,
         SlalomKind, SlalomParameters, State,
     },
+    defaults,
     impls::{
-        slalom_parameters_map, slalom_parameters_map2, CommandConverter2, Commander,
-        EstimatorBuilder, Maze, ObstacleDetector, PoseConverter, RotationControllerBuilder,
-        RunNode, SearchAgent, SearchOperator, SearchTrajectoryGeneratorBuilder, TrackerBuilder,
+        slalom_parameters_map, slalom_parameters_map2, CommandConverter2, EstimatorBuilder, Maze,
+        ObstacleDetector, PoseConverter, RotationControllerBuilder, RunNode, SearchAgent,
+        SearchOperator, SearchTrajectoryGeneratorBuilder, TrackerBuilder,
         TranslationControllerBuilder, WallConverter, WallManager,
     },
     utils::probability::Probability,
@@ -206,7 +207,7 @@ macro_rules! impl_search_operator_test {
                         wall_converter,
                     );
                     let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
-                    Commander::new(
+                    defaults::SearchCommander::new(
                         start,
                         goals.clone(),
                         SearchKind::Init,
