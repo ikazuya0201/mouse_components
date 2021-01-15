@@ -51,7 +51,7 @@ pub mod data_types {
     use super::*;
 
     pub use agent::Pose;
-    pub use maze::{AbsoluteDirection, RelativeDirection};
+    pub use maze::{AbsoluteDirection, CorrectInfo, RelativeDirection};
     pub use node::Pattern;
     pub use obstacle_detector::Obstacle;
     pub use tracker::{AngleState, LengthState, State};

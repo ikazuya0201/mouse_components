@@ -263,6 +263,14 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct CorrectInfo {
+    pub obstacle: Obstacle,
+    pub diff_from_expected: Length,
+}
+
+type ObstacleSizeUpperBound = typenum::consts::U6;
+
 //TODO: Write test
 impl<Manager, PoseConverterType, WallConverterType, MathType> ObstacleInterpreter<Obstacle>
     for Maze<Manager, PoseConverterType, WallConverterType, MathType>
@@ -271,18 +279,28 @@ where
     Manager: WallManager<PoseConverterType::Wall>,
     MathType: Math,
 {
-    type Error = core::cell::BorrowMutError;
+    type Diff = CorrectInfo;
+    type Diffs = Vec<CorrectInfo, ObstacleSizeUpperBound>;
 
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(
         &self,
         obstacles: Obstacles,
-    ) -> Result<(), Self::Error> {
+    ) -> Self::Diffs {
         use uom::si::ratio::ratio;
 
+        let mut diffs = ForcedVec::new();
         for obstacle in obstacles {
             if let Ok(wall_info) = self.pose_converter.convert(&obstacle.source) {
                 if let Ok(existence) = self.manager.try_existence_probability(&wall_info.wall) {
-                    if existence.is_zero() || existence.is_one() {
+                    if existence.is_zero() {
+                        continue;
+                    } else if existence.is_one() {
+                        let diff_from_expected =
+                            obstacle.distance.mean - wall_info.existing_distance;
+                        diffs.push(CorrectInfo {
+                            obstacle,
+                            diff_from_expected,
+                        });
                         continue;
                     }
 
@@ -324,7 +342,7 @@ where
                 }
             }
         }
-        Ok(())
+        diffs.into()
     }
 }
 

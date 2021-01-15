@@ -9,7 +9,7 @@ pub trait Math {
     fn sinf(val: f32) -> f32;
     fn cosf(val: f32) -> f32;
     fn expf(val: f32) -> f32;
-    fn atan2f(x: f32, y: f32) -> f32;
+    fn atan2f(y: f32, x: f32) -> f32;
     fn rem_euclidf(lhs: f32, rhs: f32) -> f32;
 
     fn sincosf(val: f32) -> (f32, f32) {
@@ -96,8 +96,8 @@ mod dummy {
             val.exp()
         }
 
-        fn atan2f(x: f32, y: f32) -> f32 {
-            x.atan2(y)
+        fn atan2f(y: f32, x: f32) -> f32 {
+            y.atan2(x)
         }
 
         fn rem_euclidf(lhs: f32, rhs: f32) -> f32 {

@@ -5,6 +5,7 @@ use spin::Mutex;
 use typenum::consts::*;
 use uom::si::f32::{Angle, Length};
 
+use crate::maze::CorrectInfo;
 use crate::operators::{EmptyTrajectoyError, RunAgent as IRunAgent, SearchAgent as ISearchAgent};
 
 pub trait ObstacleDetector<State> {
@@ -14,12 +15,13 @@ pub trait ObstacleDetector<State> {
     fn detect(&mut self, state: &State) -> Self::Obstacles;
 }
 
-pub trait StateEstimator {
+pub trait StateEstimator<Diff> {
     type State;
 
     fn init(&mut self);
     fn estimate(&mut self);
     fn state(&self) -> Self::State;
+    fn correct_state<Diffs: IntoIterator<Item = Diff>>(&mut self, diffs: Diffs);
 }
 
 pub trait SearchTrajectoryGenerator<Command> {
@@ -158,8 +160,8 @@ impl<T> From<T> for SearchAgentError<T> {
     }
 }
 
-impl<Command, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
-    ISearchAgent<Command>
+impl<Command, Diff, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator>
+    ISearchAgent<Command, Diff>
     for SearchAgent<
         IObstacleDetector,
         IStateEstimator,
@@ -171,7 +173,7 @@ impl<Command, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGenerator
 where
     Pose: Copy,
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
-    IStateEstimator: StateEstimator,
+    IStateEstimator: StateEstimator<Diff>,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
     ITrajectoryGenerator: SearchTrajectoryGenerator<Command>,
 {
@@ -253,6 +255,10 @@ where
     fn stop(&self) {
         self.tracker.lock().stop();
     }
+
+    fn correct_state<Diffs: IntoIterator<Item = Diff>>(&self, diffs: Diffs) {
+        self.state_estimator.borrow_mut().correct_state(diffs);
+    }
 }
 
 pub struct RunAgent<
@@ -332,7 +338,7 @@ impl<
     >
 where
     ObstacleDetectorType: ObstacleDetector<StateEstimatorType::State>,
-    StateEstimatorType: StateEstimator,
+    StateEstimatorType: StateEstimator<CorrectInfo>,
     TrackerType: Tracker<StateEstimatorType::State, TrajectoryGeneratorType::Target>,
     TrajectoryGeneratorType: RunTrajectoryGenerator<Command>,
     MaxLength: ArrayLength<TrajectoryGeneratorType::Trajectory>,
