@@ -20,8 +20,8 @@ impl Math for MathFake {
         val.exp()
     }
 
-    fn atan2f(x: f32, y: f32) -> f32 {
-        x.atan2(y)
+    fn atan2f(y: f32, x: f32) -> f32 {
+        y.atan2(x)
     }
 
     fn rem_euclidf(lhs: f32, rhs: f32) -> f32 {

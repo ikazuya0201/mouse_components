@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::administrator::{NotFinishError, Operator};
 
-pub trait SearchAgent<Command> {
+pub trait SearchAgent<Command, Diff> {
     type Error;
     type Obstacle;
     type Obstacles: IntoIterator<Item = Self::Obstacle>;
@@ -14,18 +14,28 @@ pub trait SearchAgent<Command> {
     fn update_state(&self);
     fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
     fn get_obstacles(&self) -> Self::Obstacles;
+
     //This method is called by interrupt.
     fn track_next(&self) -> Result<(), Self::Error>;
+
     //This method should be called in the end of search.
     //This method can be blocking.
     fn stop(&self);
+
+    //correct state by diffs
+    fn correct_state<Diffs: IntoIterator<Item = Diff>>(&self, diffs: Diffs);
 }
 
 pub trait SearchCommander<Obstacle> {
     type Error;
     type Command;
+    type Diff;
+    type Diffs: IntoIterator<Item = Self::Diff>;
 
-    fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles);
+    fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(
+        &self,
+        obstacles: Obstacles,
+    ) -> Self::Diffs;
     fn next_command(&self) -> Result<Self::Command, Self::Error>;
 }
 
@@ -61,7 +71,7 @@ impl<Obstacle, Command, Agent, Commander, Converter>
 impl<Obstacle, Command, Agent, Commander, Converter>
     SearchOperator<Obstacle, Command, Agent, Commander, Converter>
 where
-    Agent: SearchAgent<Converter::Output, Obstacle = Obstacle>,
+    Agent: SearchAgent<Converter::Output, Commander::Diff, Obstacle = Obstacle>,
     Converter: CommandConverter<Commander::Command>,
     Commander: SearchCommander<Obstacle>,
 {
@@ -95,7 +105,7 @@ pub struct EmptyTrajectoyError;
 impl<Obstacle, Agent, Commander, Converter> Operator
     for SearchOperator<Obstacle, Converter::Output, Agent, Commander, Converter>
 where
-    Agent: SearchAgent<Converter::Output, Obstacle = Obstacle>,
+    Agent: SearchAgent<Converter::Output, Commander::Diff, Obstacle = Obstacle>,
     Converter: CommandConverter<Commander::Command>,
     Commander: SearchCommander<Obstacle>,
     Commander::Error: TryInto<FinishError>,
@@ -107,7 +117,8 @@ where
     fn tick(&self) -> Result<(), Self::Error> {
         self.agent.update_state();
         let obstacles = self.agent.get_obstacles();
-        self.commander.update_obstacles(obstacles);
+        let diffs = self.commander.update_obstacles(obstacles);
+        self.agent.correct_state(diffs);
         match self.agent.track_next() {
             Err(err) => match EmptyTrajectoyError::try_from(err) {
                 Ok(_) => {

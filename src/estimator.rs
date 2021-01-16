@@ -10,6 +10,7 @@ use uom::si::{
 };
 
 use crate::agent::StateEstimator;
+use crate::maze::CorrectInfo;
 use crate::tracker::State;
 use crate::traits::Math;
 
@@ -38,6 +39,7 @@ pub struct Estimator<LE, RE, I, M> {
     imu: I,
     initial_state: State,
     state: State,
+    weight: f32,
     _phantom: PhantomData<fn() -> M>,
 }
 
@@ -51,7 +53,7 @@ impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
     }
 }
 
-impl<LE, RE, I, M> StateEstimator for Estimator<LE, RE, I, M>
+impl<LE, RE, I, M> StateEstimator<CorrectInfo> for Estimator<LE, RE, I, M>
 where
     LE: Encoder,
     RE: Encoder,
@@ -129,6 +131,18 @@ where
         self.trans_velocity = trans_velocity;
         self.angular_velocity = angular_velocity;
     }
+
+    fn correct_state<Infos: IntoIterator<Item = CorrectInfo>>(&mut self, infos: Infos) {
+        let mut sum_x = Length::default();
+        let mut sum_y = Length::default();
+        for info in infos {
+            let (sin, cos) = M::sincos(info.obstacle.source.theta);
+            sum_x += info.diff_from_expected * cos;
+            sum_y += info.diff_from_expected * sin;
+        }
+        self.state.x.x -= self.weight * sum_x;
+        self.state.y.x -= self.weight * sum_y;
+    }
 }
 
 pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
@@ -139,6 +153,7 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     cut_off_frequency: Option<Frequency>,
     initial_state: Option<State>,
     wheel_interval: Option<Length>,
+    correction_weight: Option<f32>,
 }
 
 impl<LeftEncoder: Encoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
@@ -172,6 +187,7 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
             cut_off_frequency: None,
             initial_state: None,
             wheel_interval: None,
+            correction_weight: None,
         }
     }
 
@@ -192,6 +208,11 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
 
     pub fn wheel_interval(mut self, wheel_interval: Length) -> Self {
         self.wheel_interval = Some(wheel_interval);
+        self
+    }
+
+    pub fn correction_weight(mut self, weight: f32) -> Self {
+        self.correction_weight = Some(weight);
         self
     }
 }
@@ -229,6 +250,7 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
             wheel_interval: self.wheel_interval,
             initial_state: initial_state.clone(),
             state: initial_state,
+            weight: self.correction_weight.unwrap_or(0.0),
             _phantom: PhantomData,
         })
     }

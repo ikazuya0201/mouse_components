@@ -180,6 +180,9 @@ where
             }))
         };
 
+        debug_assert!(!pose.x.value.is_nan());
+        debug_assert!(!pose.y.value.is_nan());
+
         let (x_rem, x_quo) = self.remquof_with_width(pose.x);
         let (y_rem, y_quo) = self.remquof_with_width(pose.y);
 

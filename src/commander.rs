@@ -35,12 +35,13 @@ pub trait Graph<Node> {
 }
 
 pub trait ObstacleInterpreter<Obstacle> {
-    type Error;
+    type Diff;
+    type Diffs: IntoIterator<Item = Self::Diff>;
 
     fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(
         &self,
         obstacles: Obstacles,
-    ) -> Result<(), Self::Error>;
+    ) -> Self::Diffs;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -180,10 +181,15 @@ where
 {
     type Error = CommanderError;
     type Command = (Node, <Maze::SearchNode as RouteNode>::Route);
+    type Diff = Maze::Diff;
+    type Diffs = Maze::Diffs;
 
     //TODO: write test
-    fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(&self, obstacles: Obstacles) {
-        let _ = self.maze.interpret_obstacles(obstacles);
+    fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(
+        &self,
+        obstacles: Obstacles,
+    ) -> Self::Diffs {
+        self.maze.interpret_obstacles(obstacles)
     }
 
     //must return the current pose and next kind
