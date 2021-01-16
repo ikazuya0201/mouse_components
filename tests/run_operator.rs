@@ -159,11 +159,10 @@ fn test_run_operator() {
                 .imu(imu)
                 .period(period)
                 .cut_off_frequency(Frequency::new::<hertz>(50.0))
-                .initial_posture(start_state.theta.x)
-                .initial_x(start_state.x.x)
-                .initial_y(start_state.y.x)
+                .initial_state(start_state)
                 .wheel_interval(wheel_interval)
                 .build::<MathFake>()
+                .unwrap()
         };
 
         let tracker = {
