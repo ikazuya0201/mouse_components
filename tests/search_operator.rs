@@ -356,3 +356,17 @@ impl_search_operator_test!(
         (15, 16, NorthEast)
     ],
 );
+
+impl_search_operator_test!(
+    search_operator_tests3: U4,
+    "+---+---+---+---+
+|               |
++   +---+---+   +
+|   |       |   |
++   +   +---+   +
+|       |       |
++   +---+---+   +
+|   |           |
++---+---+---+---+",
+    vec![(2, 0, South), (2, 0, West)],
+);
