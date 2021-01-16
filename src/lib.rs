@@ -110,7 +110,7 @@ pub mod defaults {
         Math,
         Logger = impls::NullLogger,
     > = impls::SearchAgent<
-        impls::ObstacleDetector<DistanceSensor>,
+        impls::ObstacleDetector<DistanceSensor, Math>,
         impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
         impls::Tracker<
             LeftMotor,
@@ -142,7 +142,7 @@ pub mod defaults {
         MaxPathLength,
         Logger = impls::NullLogger,
     > = impls::RunAgent<
-        impls::ObstacleDetector<DistanceSensor>,
+        impls::ObstacleDetector<DistanceSensor, Math>,
         impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
         impls::Tracker<
             LeftMotor,
