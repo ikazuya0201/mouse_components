@@ -336,9 +336,10 @@ where
 
     fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {
         let state = &self.inner.borrow().current;
+        let (sin_th, cos_th) = MathFake::sincos(state.theta.x);
         let pose = Pose {
-            x: state.x.x + self.pose.x,
-            y: state.y.x + self.pose.y,
+            x: state.x.x + self.pose.x * sin_th + self.pose.y * cos_th,
+            y: state.y.x + self.pose.y * sin_th - self.pose.x * cos_th,
             theta: state.theta.x + self.pose.theta,
         };
         let wall_info = self.pose_converter.convert(&pose)?;

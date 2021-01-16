@@ -192,7 +192,7 @@ macro_rules! impl_search_operator_test {
                         .build::<MathFake>()
                         .expect("Should never panic");
 
-                    let obstacle_detector = ObstacleDetector::new(distance_sensors);
+                    let obstacle_detector = ObstacleDetector::<_, MathFake>::new(distance_sensors);
                     SearchAgent::new(obstacle_detector, estimator, tracker, trajectory_generator)
                 };
 

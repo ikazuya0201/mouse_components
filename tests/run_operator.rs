@@ -217,7 +217,7 @@ fn test_run_operator() {
             .build::<MathFake, MaxPathLength>()
             .expect("Should never panic");
 
-        let obstacle_detector = ObstacleDetector::new(distance_sensors);
+        let obstacle_detector = ObstacleDetector::<_, MathFake>::new(distance_sensors);
         RunAgent::new(obstacle_detector, estimator, tracker, trajectory_generator)
     };
 
