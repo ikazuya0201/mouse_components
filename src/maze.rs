@@ -1,5 +1,6 @@
 mod direction;
 
+use alloc::rc::Rc;
 use core::fmt;
 use core::marker::PhantomData;
 
@@ -111,7 +112,7 @@ pub trait WallConverter<Wall> {
 }
 
 pub struct Maze<Manager, PoseConverterType, WallConverterType, MathType> {
-    manager: Manager,
+    manager: Rc<Manager>,
     pose_converter: PoseConverterType,
     wall_converter: WallConverterType,
     _math: PhantomData<fn() -> MathType>,
@@ -147,7 +148,7 @@ impl<Manager, PoseConverterType, WallConverterType, MathType>
     Maze<Manager, PoseConverterType, WallConverterType, MathType>
 {
     pub fn new(
-        manager: Manager,
+        manager: Rc<Manager>,
         obstacle_converter: PoseConverterType,
         wall_converter: WallConverterType,
     ) -> Self {
@@ -417,7 +418,7 @@ mod tests {
             }
         }
 
-        let manager = WallManagerType;
+        let manager = Rc::new(WallManagerType);
 
         let maze = Maze::<_, (), (), ()>::new(manager, (), ());
         let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
@@ -494,7 +495,7 @@ mod tests {
             }
         }
 
-        let maze = Maze::<_, (), _, ()>::new(WallManagerType, (), WallConverterType);
+        let maze = Maze::<_, (), _, ()>::new(Rc::new(WallManagerType), (), WallConverterType);
 
         let path = vec![0, 1, 1, 2, 3, 5, 8]
             .into_iter()
@@ -537,7 +538,7 @@ mod tests {
             }
         }
 
-        let maze = Maze::<_, (), (), ()>::new(WallManagerType, (), ());
+        let maze = Maze::<_, (), (), ()>::new(Rc::new(WallManagerType), (), ());
         let test_cases = vec![
             (0, Ok(false)),
             (1, Ok(true)),

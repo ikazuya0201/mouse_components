@@ -3,6 +3,7 @@ extern crate alloc;
 #[macro_use]
 extern crate typenum;
 
+use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
@@ -117,7 +118,10 @@ fn test_run_operator() {
 |   |       |   |
 +---+---+---+---+";
 
-    let wall_storage = WallManager::<Size>::with_str(existence_threshold, input_str);
+    let wall_storage = Rc::new(WallManager::<Size>::with_str(
+        existence_threshold,
+        input_str,
+    ));
 
     let simulator = AgentSimulator::new(
         start_state.clone(),

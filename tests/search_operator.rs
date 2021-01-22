@@ -1,5 +1,6 @@
 extern crate alloc;
 
+use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
@@ -216,8 +217,9 @@ macro_rules! impl_search_operator_test {
                     )
                 };
 
-                let commander = create_commander(WallManager::<Size>::new(existence_threshold));
-                let expected_commander = create_commander(wall_storage);
+                let commander =
+                    create_commander(Rc::new(WallManager::<Size>::new(existence_threshold)));
+                let expected_commander = create_commander(Rc::new(wall_storage));
 
                 let operator = SearchOperator::new(
                     agent,

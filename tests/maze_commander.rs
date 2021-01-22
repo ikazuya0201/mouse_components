@@ -1,6 +1,7 @@
+extern crate alloc;
 extern crate components;
 
-use typenum::consts::*;
+use alloc::rc::Rc;
 
 use components::{
     data_types::{AbsoluteDirection, Pattern, SearchKind, Wall},
@@ -9,6 +10,7 @@ use components::{
     prelude::*,
     utils::probability::Probability,
 };
+use typenum::consts::*;
 use utils::math::MathFake;
 
 fn cost(pattern: Pattern) -> u16 {
@@ -67,7 +69,7 @@ fn test_compute_shortest_path_u4() {
     ];
 
     for (walls, expected) in test_data {
-        let wall_manager = WallManager::new(Probability::new(0.1).unwrap());
+        let wall_manager = Rc::new(WallManager::new(Probability::new(0.1).unwrap()));
         for wall in walls {
             wall_manager.update(&wall, &Probability::one());
         }
