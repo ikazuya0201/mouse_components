@@ -1,6 +1,8 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(iter_advance_by)]
 
+extern crate alloc;
+
 mod administrator;
 mod agents;
 mod command_converter;
@@ -19,6 +21,7 @@ mod trajectory_generator;
 pub mod trajectory_manager;
 pub mod utils;
 mod wall_converter;
+pub mod wall_detector;
 mod wall_manager;
 
 pub use agents::simple_search_agent;
