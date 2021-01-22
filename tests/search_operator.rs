@@ -10,7 +10,7 @@ use components::{
     },
     defaults,
     impls::{
-        slalom_parameters_map, slalom_parameters_map2, CommandConverter2, EstimatorBuilder, Maze,
+        slalom_parameters_map, slalom_parameters_map2, CommandConverter, EstimatorBuilder, Maze,
         ObstacleDetector, PoseConverter, RotationControllerBuilder, RunNode,
         SearchTrajectoryGeneratorBuilder, TrackerBuilder, TranslationControllerBuilder,
         WallConverter, WallManager,
@@ -218,7 +218,7 @@ macro_rules! impl_search_operator_test {
 
                     let trajectory_manager = TrajectoryManager::new(
                         trajectory_generator,
-                        CommandConverter2::new(Length::new::<millimeter>(90.0), front_offset),
+                        CommandConverter::new(Length::new::<millimeter>(90.0), front_offset),
                     );
 
                     SearchAgent::new(trajectory_manager, robot)
