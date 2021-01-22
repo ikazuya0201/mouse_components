@@ -9,7 +9,7 @@ use uom::si::{
     ratio::ratio,
 };
 
-use crate::agent::StateEstimator;
+use crate::agents::StateEstimator;
 use crate::maze::CorrectInfo;
 use crate::tracker::State;
 use crate::traits::Math;

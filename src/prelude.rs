@@ -17,11 +17,11 @@ pub use crate::commander::NodeChecker as _components_commander_NodeChecker;
 pub use crate::commander::ObstacleInterpreter as _components_commander_ObstacleInterpreter;
 pub use crate::commander::RouteNode as _components_commander_RouteNode;
 
-pub use crate::agent::ObstacleDetector as _components_agent_ObstacleDetector;
-pub use crate::agent::RunTrajectoryGenerator as _components_agent_RunTrajectoryGenerator;
-pub use crate::agent::SearchTrajectoryGenerator as _components_agent_SearchTrajectoryGenerator;
-pub use crate::agent::StateEstimator as _components_agent_StateEstimator;
-pub use crate::agent::Tracker as _components_agent_Tracker;
+pub use crate::agents::ObstacleDetector as _components_agents_ObstacleDetector;
+pub use crate::agents::RunTrajectoryGenerator as _components_agents_RunTrajectoryGenerator;
+pub use crate::agents::SearchTrajectoryGenerator as _components_agents_SearchTrajectoryGenerator;
+pub use crate::agents::StateEstimator as _components_agents_StateEstimator;
+pub use crate::agents::Tracker as _components_agents_Tracker;
 
 pub use crate::tracker::RotationController as _components_tracker_RotationController;
 pub use crate::tracker::TranslationController as _components_tracker_TranslationController;

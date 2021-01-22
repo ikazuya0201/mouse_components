@@ -1,28 +1,11 @@
 use core::cell::{Cell, RefCell};
 
-use heapless::{spsc::Queue, ArrayLength};
+use heapless::spsc::Queue;
 use spin::Mutex;
 use typenum::consts::*;
-use uom::si::f32::{Angle, Length};
 
-use crate::maze::CorrectInfo;
-use crate::operators::{EmptyTrajectoyError, RunAgent as IRunAgent, SearchAgent as ISearchAgent};
-
-pub trait ObstacleDetector<State> {
-    type Obstacle;
-    type Obstacles: IntoIterator<Item = Self::Obstacle>;
-
-    fn detect(&mut self, state: &State) -> Self::Obstacles;
-}
-
-pub trait StateEstimator<Diff> {
-    type State;
-
-    fn init(&mut self);
-    fn estimate(&mut self);
-    fn state(&self) -> Self::State;
-    fn correct_state<Diffs: IntoIterator<Item = Diff>>(&mut self, diffs: Diffs);
-}
+use super::{ObstacleDetector, StateEstimator, Tracker};
+use crate::operators::{EmptyTrajectoyError, SearchAgent as ISearchAgent};
 
 pub trait SearchTrajectoryGenerator<Command> {
     type Target;
@@ -30,38 +13,6 @@ pub trait SearchTrajectoryGenerator<Command> {
 
     fn generate_search(&self, command: &Command) -> Self::Trajectory;
     fn generate_emergency(&self, target: &Self::Target) -> Self::Trajectory;
-}
-
-pub trait Tracker<State, Target> {
-    type Error;
-
-    fn init(&mut self);
-    fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error>;
-    fn stop(&mut self);
-}
-
-pub trait RunTrajectoryGenerator<Command> {
-    type Target;
-    type Trajectory: Iterator<Item = Self::Target>;
-    type Trajectories: IntoIterator<Item = Self::Trajectory>;
-
-    fn generate<Commands: IntoIterator<Item = Command>>(
-        &self,
-        commands: Commands,
-    ) -> Self::Trajectories;
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub struct Pose {
-    pub x: Length,
-    pub y: Length,
-    pub theta: Angle,
-}
-
-impl Pose {
-    pub fn new(x: Length, y: Length, theta: Angle) -> Self {
-        Self { x, y, theta }
-    }
 }
 
 //TODO: separate Agent to SearchAgent and RunAgent with AgentInner
@@ -171,7 +122,6 @@ impl<Command, Diff, IObstacleDetector, IStateEstimator, ITracker, ITrajectoryGen
         ITrajectoryGenerator::Target,
     >
 where
-    Pose: Copy,
     IObstacleDetector: ObstacleDetector<IStateEstimator::State>,
     IStateEstimator: StateEstimator<Diff>,
     ITracker: Tracker<IStateEstimator::State, ITrajectoryGenerator::Target>,
@@ -258,122 +208,5 @@ where
 
     fn correct_state<Diffs: IntoIterator<Item = Diff>>(&self, diffs: Diffs) {
         self.state_estimator.borrow_mut().correct_state(diffs);
-    }
-}
-
-pub struct RunAgent<
-    ObstacleDetectorType,
-    StateEstimatorType,
-    TrackerType,
-    TrajectoryGeneratorType,
-    Trajectory,
-    MaxLength,
-> where
-    MaxLength: ArrayLength<Trajectory>,
-{
-    #[allow(unused)]
-    obstacle_detector: ObstacleDetectorType,
-    state_estimator: RefCell<StateEstimatorType>,
-    tracker: RefCell<TrackerType>,
-    trajectory_generator: TrajectoryGeneratorType,
-    trajectories: RefCell<Queue<Trajectory, MaxLength>>,
-}
-
-impl<
-        ObstacleDetectorType,
-        StateEstimatorType,
-        TrackerType,
-        TrajectoryGeneratorType,
-        Trajectory,
-        MaxLength,
-    >
-    RunAgent<
-        ObstacleDetectorType,
-        StateEstimatorType,
-        TrackerType,
-        TrajectoryGeneratorType,
-        Trajectory,
-        MaxLength,
-    >
-where
-    MaxLength: ArrayLength<Trajectory>,
-{
-    pub fn new(
-        obstacle_detector: ObstacleDetectorType,
-        state_estimator: StateEstimatorType,
-        tracker: TrackerType,
-        trajectory_generator: TrajectoryGeneratorType,
-    ) -> Self {
-        Self {
-            obstacle_detector,
-            state_estimator: RefCell::new(state_estimator),
-            tracker: RefCell::new(tracker),
-            trajectory_generator,
-            trajectories: RefCell::new(Queue::new()),
-        }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum RunAgentError<T> {
-    TrackFinish,
-    TrackFailed(T),
-}
-
-impl<
-        Command,
-        ObstacleDetectorType,
-        StateEstimatorType,
-        TrackerType,
-        TrajectoryGeneratorType,
-        MaxLength,
-    > IRunAgent<Command>
-    for RunAgent<
-        ObstacleDetectorType,
-        StateEstimatorType,
-        TrackerType,
-        TrajectoryGeneratorType,
-        TrajectoryGeneratorType::Trajectory,
-        MaxLength,
-    >
-where
-    ObstacleDetectorType: ObstacleDetector<StateEstimatorType::State>,
-    StateEstimatorType: StateEstimator<CorrectInfo>,
-    TrackerType: Tracker<StateEstimatorType::State, TrajectoryGeneratorType::Target>,
-    TrajectoryGeneratorType: RunTrajectoryGenerator<Command>,
-    MaxLength: ArrayLength<TrajectoryGeneratorType::Trajectory>,
-{
-    type Error = RunAgentError<TrackerType::Error>;
-
-    fn set_commands<Commands: IntoIterator<Item = Command>>(&self, commands: Commands) {
-        for trajectory in self.trajectory_generator.generate(commands) {
-            self.trajectories
-                .borrow_mut()
-                .enqueue(trajectory)
-                .unwrap_or_else(|_| {
-                    unreachable!("The length of trajectory queue should never be exceeded.")
-                });
-        }
-    }
-
-    fn track_next(&self) -> Result<(), Self::Error> {
-        let mut trajectories = self.trajectories.borrow_mut();
-        loop {
-            if trajectories.is_empty() {
-                self.tracker.borrow_mut().stop();
-                return Err(RunAgentError::TrackFinish);
-            }
-            let trajectory = trajectories.iter_mut().next().unwrap();
-            if let Some(target) = trajectory.next() {
-                self.state_estimator.borrow_mut().estimate();
-                let state = self.state_estimator.borrow().state();
-                if let Err(err) = self.tracker.borrow_mut().track(&state, &target) {
-                    self.tracker.borrow_mut().stop();
-                    return Err(RunAgentError::TrackFailed(err));
-                }
-                return Ok(());
-            }
-            trajectories.dequeue();
-        }
     }
 }
