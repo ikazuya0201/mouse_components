@@ -10,6 +10,7 @@ use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
 use crate::operators::{
+    simple_search_operator::{SearchCommander as SimpleSearchCommander, SearchCommanderError},
     FinishError, RunCommander as IRunCommander, SearchCommander as ISearchCommander,
 };
 use crate::utils::{array_length::ArrayLength, forced_vec::ForcedVec, itertools::repeat_n};
@@ -145,6 +146,103 @@ impl TryInto<FinishError> for CommanderError {
         match self {
             Self::WaitingError => Err(()),
             Self::SolveFinishError => Ok(FinishError),
+        }
+    }
+}
+
+impl<Node, RunNode, Cost, Maze> SimpleSearchCommander
+    for SearchCommander<
+        Node,
+        RunNode,
+        Maze::SearchNode,
+        <Maze::SearchNode as RouteNode>::Route,
+        Maze,
+    >
+where
+    RunNode::UpperBound: ArrayLength<Maze::SearchNode>
+        + ArrayLength<Cost>
+        + ArrayLength<Reverse<Cost>>
+        + ArrayLength<(RunNode, Reverse<Cost>)>
+        + ArrayLength<(Maze::SearchNode, Reverse<Cost>)>
+        + ArrayLength<Option<RunNode>>
+        + ArrayLength<Option<usize>>
+        + Unsigned,
+    RunNode::PathUpperBound: ArrayLength<RunNode>,
+    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
+    Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + TryFrom<Node>,
+    Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Maze: Graph<RunNode, Cost = Cost>
+        + Graph<<Maze as GraphConverter<RunNode>>::SearchNode, Cost = Cost>
+        + GraphConverter<RunNode>
+        + NodeChecker<<Maze as GraphConverter<RunNode>>::SearchNode>,
+    Node: From<Maze::SearchNode> + Clone + NextNode<<Maze::SearchNode as RouteNode>::Route>,
+    <Maze::SearchNode as RouteNode>::Route: Clone,
+    <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
+{
+    type Error = CommanderError;
+    type Command = (Node, <Maze::SearchNode as RouteNode>::Route);
+
+    //must return the current pose and next kind
+    //TODO: write test
+    fn next_command(&self) -> Result<Self::Command, SearchCommanderError<Self::Error>> {
+        match self.state.get() {
+            State::Initial => {
+                let current = self.current.replace_with(|node| {
+                    node.next(&self.initial_route)
+                        .unwrap_or_else(|_| unreachable!())
+                });
+                self.state.set(State::Solving);
+                Ok((current, self.initial_route.clone()))
+            }
+            State::Final => Err(SearchCommanderError::SearchFinish),
+            State::Solving => {
+                let mut current = self.current.borrow_mut();
+                if let Some(candidates) = self.next_node_candidates(
+                    &current
+                        .clone()
+                        .try_into()
+                        .unwrap_or_else(|_| unimplemented!()),
+                ) {
+                    self.candidates.replace(candidates);
+                    self.state.set(State::Waiting);
+                    Err(SearchCommanderError::Waiting)
+                } else {
+                    let tmp = current.clone();
+                    *current = current
+                        .next(&self.final_route)
+                        .unwrap_or_else(|_| unreachable!());
+                    self.state.set(State::Final);
+                    Ok((tmp, self.final_route.clone()))
+                }
+            }
+            State::Waiting => {
+                let mut next = None;
+                let mut candidates = self.candidates.borrow_mut();
+                if candidates.is_empty() {
+                    return Err(SearchCommanderError::Waiting);
+                }
+                for &node in candidates.iter() {
+                    let is_available = self
+                        .maze
+                        .is_available(&node)
+                        .map_err(|_| SearchCommanderError::Waiting)?;
+                    if is_available {
+                        next = Some(node);
+                        break;
+                    }
+                }
+                candidates.clear();
+                let next = next.unwrap_or_else(|| unreachable!("This is bug."));
+                let kind = {
+                    <Maze::SearchNode as TryFrom<Node>>::try_from(self.current.borrow().clone())
+                        .unwrap_or_else(|_| unimplemented!())
+                        .route(&next)
+                        .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
+                };
+                let current = self.current.replace(Node::from(next));
+                self.state.set(State::Solving);
+                Ok((current, kind))
+            }
         }
     }
 }

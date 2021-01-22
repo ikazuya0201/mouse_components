@@ -8,13 +8,17 @@ pub trait SearchAgent<Command> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct SearchFinishError;
+pub enum SearchCommanderError<T> {
+    SearchFinish,
+    Waiting,
+    Other(T),
+}
 
 pub trait SearchCommander {
     type Error;
     type Command;
 
-    fn next_command(&self) -> Result<Self::Command, Result<SearchFinishError, Self::Error>>;
+    fn next_command(&self) -> Result<Self::Command, SearchCommanderError<Self::Error>>;
 }
 
 pub struct SearchOperator<Commander, Agent> {
@@ -48,14 +52,17 @@ where
     }
 
     fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>> {
+        use SearchCommanderError::*;
+
         match self.commander.next_command() {
             Ok(command) => match self.agent.set_command(&command) {
                 Ok(_) => Err(Ok(IncompletedError)),
                 Err(err) => Err(Err(SearchOperatorError::Agent(err))),
             },
             Err(err) => match err {
-                Ok(_) => Ok(()),
-                Err(err) => Err(Err(SearchOperatorError::Commander(err))),
+                SearchFinish => Ok(()),
+                Waiting => Err(Ok(IncompletedError)),
+                Other(err) => Err(Err(SearchOperatorError::Commander(err))),
             },
         }
     }
