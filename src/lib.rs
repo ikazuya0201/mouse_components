@@ -13,6 +13,7 @@ mod obstacle_detector;
 pub mod operators;
 mod pose_converter;
 pub mod prelude;
+pub mod robot;
 mod tracker;
 mod trajectory_generator;
 pub mod utils;
