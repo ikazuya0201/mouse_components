@@ -2,8 +2,7 @@ use core::cell::RefCell;
 
 use crate::operators::simple_search_operator::SearchAgent as ISearchAgent;
 
-//NOTE: Should be implemented as thread-safe.
-pub trait TrajectoryManager<Command>: Send + Sync {
+pub trait TrajectoryManager<Command> {
     type Error;
     type Target;
 
@@ -11,8 +10,8 @@ pub trait TrajectoryManager<Command>: Send + Sync {
 
     fn next(&self) -> Self::Target;
 
-    fn is_empty(&self) -> bool;
-    fn is_full(&self) -> bool;
+    fn is_empty(&self) -> Result<bool, Self::Error>;
+    fn is_full(&self) -> Result<bool, Self::Error>;
 }
 
 pub trait Robot<Target> {
@@ -62,11 +61,15 @@ where
             .map_err(|err| SearchAgentError::Manager(err))
     }
 
-    fn is_full(&self) -> bool {
-        self.manager.is_full()
+    fn is_full(&self) -> Result<bool, Self::Error> {
+        self.manager
+            .is_full()
+            .map_err(|err| SearchAgentError::Manager(err))
     }
 
-    fn is_empty(&self) -> bool {
-        self.manager.is_empty()
+    fn is_empty(&self) -> Result<bool, Self::Error> {
+        self.manager
+            .is_empty()
+            .map_err(|err| SearchAgentError::Manager(err))
     }
 }

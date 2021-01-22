@@ -5,8 +5,8 @@ pub trait SearchAgent<Command> {
 
     fn update(&self) -> Result<(), Self::Error>;
     fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
-    fn is_full(&self) -> bool;
-    fn is_empty(&self) -> bool;
+    fn is_full(&self) -> Result<bool, Self::Error>;
+    fn is_empty(&self) -> Result<bool, Self::Error>;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -56,7 +56,11 @@ where
     fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>> {
         use SearchCommanderError::*;
 
-        if self.agent.is_full() {
+        if let Ok(is_full) = self.agent.is_full() {
+            if is_full {
+                return Err(Ok(IncompletedError));
+            }
+        } else {
             return Err(Ok(IncompletedError));
         }
 
@@ -67,11 +71,12 @@ where
             },
             Err(err) => match err {
                 SearchFinish => {
-                    if self.agent.is_empty() {
-                        Ok(())
-                    } else {
-                        Err(Ok(IncompletedError))
+                    if let Ok(is_empty) = self.agent.is_empty() {
+                        if is_empty {
+                            return Ok(());
+                        }
                     }
+                    Err(Ok(IncompletedError))
                 }
                 Waiting => Err(Ok(IncompletedError)),
                 Other(err) => Err(Err(SearchOperatorError::Commander(err))),

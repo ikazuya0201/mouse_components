@@ -16,6 +16,7 @@ pub mod prelude;
 pub mod robot;
 mod tracker;
 mod trajectory_generator;
+pub mod trajectory_manager;
 pub mod utils;
 mod wall_converter;
 mod wall_manager;
