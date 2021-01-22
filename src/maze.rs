@@ -1,6 +1,5 @@
 mod direction;
 
-use alloc::rc::Rc;
 use core::fmt;
 
 use heapless::{ArrayLength, Vec};
@@ -92,12 +91,12 @@ pub trait WallConverter<Wall> {
     fn convert(&self, wall: &Wall) -> Result<Self::SearchNodes, Self::Error>;
 }
 
-pub struct Maze<Manager, WallConverterType> {
-    manager: Rc<Manager>,
+pub struct Maze<'a, Manager, WallConverterType> {
+    manager: &'a Manager,
     wall_converter: WallConverterType,
 }
 
-impl<Manager, WallConverterType> fmt::Debug for Maze<Manager, WallConverterType>
+impl<'a, Manager, WallConverterType> fmt::Debug for Maze<'a, Manager, WallConverterType>
 where
     Manager: fmt::Debug,
     WallConverterType: fmt::Debug,
@@ -110,7 +109,7 @@ where
     }
 }
 
-impl<Manager, WallConverterType> fmt::Display for Maze<Manager, WallConverterType>
+impl<'a, Manager, WallConverterType> fmt::Display for Maze<'a, Manager, WallConverterType>
 where
     Manager: fmt::Display,
 {
@@ -119,8 +118,8 @@ where
     }
 }
 
-impl<Manager, WallConverterType> Maze<Manager, WallConverterType> {
-    pub fn new(manager: Rc<Manager>, wall_converter: WallConverterType) -> Self {
+impl<'a, Manager, WallConverterType> Maze<'a, Manager, WallConverterType> {
+    pub fn new(manager: &'a Manager, wall_converter: WallConverterType) -> Self {
         Self {
             manager,
             wall_converter,
@@ -128,7 +127,7 @@ impl<Manager, WallConverterType> Maze<Manager, WallConverterType> {
     }
 }
 
-impl<Node, Manager, WallConverterType> Graph<Node> for Maze<Manager, WallConverterType>
+impl<'a, Node, Manager, WallConverterType> Graph<Node> for Maze<'a, Manager, WallConverterType>
 where
     Node: GraphNode,
     Manager: WallManager<Node::Wall>,
@@ -176,7 +175,8 @@ where
     }
 }
 
-impl<Node, Manager, WallConverterType> GraphConverter<Node> for Maze<Manager, WallConverterType>
+impl<'a, Node, Manager, WallConverterType> GraphConverter<Node>
+    for Maze<'a, Manager, WallConverterType>
 where
     Node: WallFinderNode,
     WallConverterType: WallConverter<Node::Wall>,
@@ -210,8 +210,8 @@ where
     }
 }
 
-impl<SearchNode, Manager, WallConverterType> NodeChecker<SearchNode>
-    for Maze<Manager, WallConverterType>
+impl<'a, SearchNode, Manager, WallConverterType> NodeChecker<SearchNode>
+    for Maze<'a, Manager, WallConverterType>
 where
     SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
     Manager: WallManager<SearchNode::Wall>,
@@ -300,9 +300,9 @@ mod tests {
             }
         }
 
-        let manager = Rc::new(WallManagerType);
+        let manager = WallManagerType;
 
-        let maze = Maze::<_, ()>::new(manager, ());
+        let maze = Maze::new(&manager, ());
         let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
         assert_eq!(maze.successors(&0), expected.as_slice());
         assert_eq!(maze.predecessors(&0), expected.as_slice());
@@ -377,7 +377,8 @@ mod tests {
             }
         }
 
-        let maze = Maze::new(Rc::new(WallManagerType), WallConverterType);
+        let manager = WallManagerType;
+        let maze = Maze::new(&manager, WallConverterType);
 
         let path = vec![0, 1, 1, 2, 3, 5, 8]
             .into_iter()
@@ -420,7 +421,9 @@ mod tests {
             }
         }
 
-        let maze = Maze::new(Rc::new(WallManagerType), ());
+        let manager = WallManagerType;
+
+        let maze = Maze::new(&manager, ());
         let test_cases = vec![
             (0, Ok(false)),
             (1, Ok(true)),

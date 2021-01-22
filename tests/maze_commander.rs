@@ -1,7 +1,4 @@
-extern crate alloc;
 extern crate components;
-
-use alloc::rc::Rc;
 
 use components::{
     data_types::{AbsoluteDirection, Pattern, SearchKind, Wall},
@@ -68,13 +65,13 @@ fn test_compute_shortest_path_u4() {
     ];
 
     for (walls, expected) in test_data {
-        let wall_manager = Rc::new(WallManager::new(Probability::new(0.1).unwrap()));
+        let wall_manager = WallManager::new(Probability::new(0.1).unwrap());
         for wall in walls {
             wall_manager.update(&wall, &Probability::one());
         }
 
         let wall_converter = WallConverter::new(cost);
-        let maze = Maze::new(wall_manager, wall_converter);
+        let maze = Maze::new(&wall_manager, wall_converter);
         let commander = SearchCommander::new(
             start,
             goals.clone(),

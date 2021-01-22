@@ -1,8 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(iter_advance_by)]
 
-extern crate alloc;
-
 mod administrator;
 mod agents;
 mod command_converter;
@@ -130,20 +128,21 @@ pub mod defaults {
         MaxPathLength,
     >;
 
-    pub type SearchCommander<Size> = impls::SearchCommander<
+    pub type SearchCommander<'a, Size> = impls::SearchCommander<
         impls::Node<Size>,
         impls::RunNode<Size>,
         impls::SearchNode<Size>,
         data_types::SearchKind,
-        impls::Maze<impls::WallManager<Size>, impls::WallConverter>,
+        impls::Maze<'a, impls::WallManager<Size>, impls::WallConverter>,
     >;
 
-    pub type RunCommander<Size> = impls::RunCommander<
+    pub type RunCommander<'a, Size> = impls::RunCommander<
         impls::RunNode<Size>,
-        impls::Maze<impls::WallManager<Size>, impls::WallConverter>,
+        impls::Maze<'a, impls::WallManager<Size>, impls::WallConverter>,
     >;
 
     pub type RunOperator<
+        'a,
         LeftEncoder,
         RightEncoder,
         Imu,
@@ -165,7 +164,7 @@ pub mod defaults {
             <impls::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
-        RunCommander<Size>,
+        RunCommander<'a, Size>,
         impls::CommandConverter,
     >;
 }

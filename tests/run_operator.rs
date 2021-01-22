@@ -3,7 +3,6 @@ extern crate alloc;
 #[macro_use]
 extern crate typenum;
 
-use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
@@ -117,10 +116,7 @@ fn test_run_operator() {
 |   |       |   |
 +---+---+---+---+";
 
-    let wall_storage = Rc::new(WallManager::<Size>::with_str(
-        existence_threshold,
-        input_str,
-    ));
+    let wall_storage = WallManager::<Size>::with_str(existence_threshold, input_str);
 
     let simulator = AgentSimulator::new(
         start_state.clone(),
@@ -227,7 +223,7 @@ fn test_run_operator() {
 
     let commander = {
         let wall_converter = WallConverter::new(cost);
-        let maze = Maze::new(wall_storage, wall_converter);
+        let maze = Maze::new(&wall_storage, wall_converter);
         let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
         let goals = vec![
             RunNode::<Size>::new(2, 0, South, cost).unwrap(),
