@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
 
-use crate::agent::{
+use crate::agents::{
     RunTrajectoryGenerator as IRunTrajectoryGenerator,
     SearchTrajectoryGenerator as ISearchTrajectoryGenerator,
 };

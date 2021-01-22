@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use heapless::Vec;
 use uom::si::f32::Length;
 
-use crate::agent;
+use crate::agents::ObstacleDetector as IObstacleDetector;
 use crate::data_types::Pose;
 use crate::tracker::State;
 use crate::utils::{math::Math, sample::Sample};
@@ -39,7 +39,7 @@ impl<D, M> ObstacleDetector<D, M> {
     }
 }
 
-impl<D, M> agent::ObstacleDetector<State> for ObstacleDetector<D, M>
+impl<D, M> IObstacleDetector<State> for ObstacleDetector<D, M>
 where
     M: Math,
     D: DistanceSensor,

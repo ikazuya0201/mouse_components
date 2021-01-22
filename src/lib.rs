@@ -2,7 +2,7 @@
 #![feature(iter_advance_by)]
 
 mod administrator;
-mod agent;
+mod agents;
 mod command_converter;
 mod commander;
 mod controller;
@@ -24,7 +24,7 @@ pub mod traits {
 
     pub use crate::utils::math::Math;
     pub use administrator::{Operator, OperatorStore, Selector};
-    pub use agent::{
+    pub use agents::{
         ObstacleDetector, RunTrajectoryGenerator, SearchTrajectoryGenerator, StateEstimator,
         Tracker,
     };
@@ -50,7 +50,7 @@ pub mod sensors {
 pub mod data_types {
     use super::*;
 
-    pub use agent::Pose;
+    pub use agents::Pose;
     pub use maze::{AbsoluteDirection, CorrectInfo, RelativeDirection};
     pub use node::Pattern;
     pub use obstacle_detector::Obstacle;
@@ -66,7 +66,7 @@ pub mod impls {
     use super::*;
 
     pub use administrator::Administrator;
-    pub use agent::{RunAgent, SearchAgent};
+    pub use agents::{RunAgent, SearchAgent};
     pub use command_converter::{CommandConverter, CommandConverter2};
     pub use commander::{RunCommander, SearchCommander};
     pub use controller::{
