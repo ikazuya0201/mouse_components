@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use super::search_operator::CommandConverter;
-use crate::administrator::{NotFinishError, Operator};
+use crate::administrator::{IncompletedError, Operator};
 
 pub trait RunCommander {
     type Error;
@@ -70,11 +70,11 @@ where
         Ok(())
     }
 
-    fn run(&self) -> Result<(), NotFinishError> {
+    fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>> {
         if self.is_completed.load(Ordering::Relaxed) {
             Ok(())
         } else {
-            Err(NotFinishError)
+            Err(Ok(IncompletedError))
         }
     }
 }

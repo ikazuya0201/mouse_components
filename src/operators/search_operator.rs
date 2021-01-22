@@ -3,7 +3,7 @@ use core::convert::{TryFrom, TryInto};
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::administrator::{NotFinishError, Operator};
+use crate::administrator::{IncompletedError, Operator};
 
 pub trait SearchAgent<Command, Diff> {
     type Error;
@@ -134,7 +134,7 @@ where
         }
     }
 
-    fn run(&self) -> Result<(), NotFinishError> {
+    fn run(&self) -> Result<(), Result<IncompletedError, Agent::Error>> {
         let mut keeped_command = self.keeped_command.borrow_mut();
         if let Some(command) = keeped_command.as_ref() {
             if self.agent.set_command(command).is_ok() {
@@ -161,6 +161,6 @@ where
                 }
             }
         }
-        Err(NotFinishError)
+        Err(Ok(IncompletedError))
     }
 }

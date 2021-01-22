@@ -10,7 +10,7 @@ mod estimator;
 mod maze;
 mod node;
 mod obstacle_detector;
-mod operators;
+pub mod operators;
 mod pose_converter;
 pub mod prelude;
 mod tracker;
