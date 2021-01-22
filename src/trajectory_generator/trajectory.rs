@@ -14,6 +14,12 @@ pub enum Target {
     Spin(AngleTarget),
 }
 
+impl Default for Target {
+    fn default() -> Self {
+        Target::Spin(AngleTarget::default())
+    }
+}
+
 impl Target {
     pub fn moving(self) -> Option<MoveTarget> {
         match self {

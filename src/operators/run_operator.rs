@@ -42,7 +42,7 @@ where
         agent.set_commands(
             commands
                 .into_iter()
-                .map(|command| converter.convert(command)),
+                .map(|command| converter.convert(&command)),
         );
 
         Self {

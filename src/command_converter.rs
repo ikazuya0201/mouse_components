@@ -54,22 +54,22 @@ fn _convert<N>(node: &Node<N>, square_width_half: Length) -> Pose {
 }
 
 //TODO: Write test.
-impl<N, K> ICommandConverter<(Node<N>, K)> for CommandConverter {
+impl<N, K: Clone> ICommandConverter<(Node<N>, K)> for CommandConverter {
     type Output = (Pose, K);
 
-    fn convert(&self, (node, kind): (Node<N>, K)) -> Self::Output {
-        (_convert(&node, self.square_width_half), kind)
+    fn convert(&self, (node, kind): &(Node<N>, K)) -> Self::Output {
+        (_convert(&node, self.square_width_half), kind.clone())
     }
 }
 
-impl<N, INode, K> ICommandConverter<(INode, K)> for CommandConverter
+impl<N, INode, K: Clone> ICommandConverter<(INode, K)> for CommandConverter
 where
     INode: core::ops::Deref<Target = Node<N>>,
 {
     type Output = (Pose, K);
 
-    fn convert(&self, (node, kind): (INode, K)) -> Self::Output {
-        (_convert(node.deref(), self.square_width_half), kind)
+    fn convert(&self, (node, kind): &(INode, K)) -> Self::Output {
+        (_convert(node.deref(), self.square_width_half), kind.clone())
     }
 }
 
@@ -104,10 +104,10 @@ impl Default for CommandConverter2 {
 }
 
 //TODO: Write test.
-impl<N, K> ICommandConverter<(Node<N>, K)> for CommandConverter2 {
+impl<N, K: Clone> ICommandConverter<(Node<N>, K)> for CommandConverter2 {
     type Output = (Pose, K);
 
-    fn convert(&self, (node, kind): (Node<N>, K)) -> Self::Output {
+    fn convert(&self, (node, kind): &(Node<N>, K)) -> Self::Output {
         use AbsoluteDirection::*;
 
         let (dx, dy, theta) = if (node.x() ^ node.y()) & 1 == 1 {
@@ -137,7 +137,7 @@ impl<N, K> ICommandConverter<(Node<N>, K)> for CommandConverter2 {
                 y: (node.y() + 1) as f32 * self.square_width_half + dy,
                 theta: Angle::new::<degree>(theta),
             },
-            kind,
+            kind.clone(),
         )
     }
 }

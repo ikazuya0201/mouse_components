@@ -2,10 +2,9 @@ use alloc::rc::Rc;
 use core::marker::PhantomData;
 
 use heapless::Vec;
-use uom::si::f32::Length;
 
 use crate::agents::ObstacleDetector;
-use crate::data_types::{Obstacle, Pose};
+use crate::data_types::{CorrectInfo, Obstacle, Pose};
 use crate::maze::PoseConverter;
 use crate::maze::WallManager;
 use crate::robot::WallDetector as IWallDetector;
@@ -27,12 +26,6 @@ impl<Manager, Detector, Converter, Math> WallDetector<Manager, Detector, Convert
             _math: PhantomData,
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct CorrectInfo {
-    pub obstacle: Obstacle,
-    pub diff_from_expected: Length,
 }
 
 type ObstacleSizeUpperBound = typenum::consts::U6;

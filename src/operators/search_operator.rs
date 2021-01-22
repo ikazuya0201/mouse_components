@@ -42,7 +42,7 @@ pub trait SearchCommander<Obstacle> {
 pub trait CommandConverter<Command> {
     type Output;
 
-    fn convert(&self, source: Command) -> Self::Output;
+    fn convert(&self, source: &Command) -> Self::Output;
 }
 
 pub struct SearchOperator<Obstacle, Command, Agent, Commander, Converter> {
@@ -77,7 +77,7 @@ where
 {
     pub fn new(agent: Agent, commander: Commander, converter: Converter) -> Self {
         let command = converter.convert(
-            commander
+            &commander
                 .next_command()
                 .unwrap_or_else(|_| unimplemented!("This error handling is not implemented.")),
         );
@@ -143,7 +143,7 @@ where
         } else {
             match self.commander.next_command() {
                 Ok(command) => {
-                    let command = self.converter.convert(command);
+                    let command = self.converter.convert(&command);
                     if self.agent.set_command(&command).is_err() {
                         keeped_command.replace(command);
                     }

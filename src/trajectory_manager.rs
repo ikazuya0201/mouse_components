@@ -5,24 +5,29 @@ use spin::Mutex;
 
 use crate::agents::simple_search_agent::TrajectoryManager as ITrajectoryManager;
 use crate::agents::SearchTrajectoryGenerator;
+use crate::operators::CommandConverter;
 
 type QueueLength = U3;
 
-pub struct TrajectoryManager<Generator, Target, Trajectory> {
+pub struct TrajectoryManager<Generator, Converter, Target, Trajectory> {
     generator: Generator,
+    converter: Converter,
     trajectories: Mutex<Queue<Trajectory, QueueLength>>,
     emergency_trajectory: RefCell<Option<Trajectory>>,
     emergency_counter: Cell<usize>,
     last_target: RefCell<Target>,
 }
 
-impl<Generator, Target, Trajectory> TrajectoryManager<Generator, Target, Trajectory> {
-    pub fn new(generator: Generator) -> Self
+impl<Generator, Converter, Target, Trajectory>
+    TrajectoryManager<Generator, Converter, Target, Trajectory>
+{
+    pub fn new(generator: Generator, converter: Converter) -> Self
     where
         Target: Default,
     {
         Self {
             generator,
+            converter,
             trajectories: Mutex::new(Queue::new()),
             emergency_trajectory: RefCell::new(None),
             emergency_counter: Cell::new(0),
@@ -37,11 +42,12 @@ pub enum TrajectoryManagerError {
     FullQueue,
 }
 
-impl<Generator, Command> ITrajectoryManager<Command>
-    for TrajectoryManager<Generator, Generator::Target, Generator::Trajectory>
+impl<Generator, Converter, Command> ITrajectoryManager<Command>
+    for TrajectoryManager<Generator, Converter, Generator::Target, Generator::Trajectory>
 where
-    Generator: SearchTrajectoryGenerator<Command>,
+    Generator: SearchTrajectoryGenerator<Converter::Output>,
     Generator::Target: Clone,
+    Converter: CommandConverter<Command>,
 {
     type Error = TrajectoryManagerError;
     type Target = Generator::Target;
@@ -55,7 +61,8 @@ where
         if trajectories.len() == QueueLength::USIZE {
             Err(TrajectoryManagerError::FullQueue)
         } else {
-            let trajectory = self.generator.generate_search(command);
+            let command = self.converter.convert(command);
+            let trajectory = self.generator.generate_search(&command);
             trajectories
                 .enqueue(trajectory)
                 .unwrap_or_else(|_| unreachable!("Should never exceed the length of queue."));
