@@ -1,6 +1,3 @@
-extern crate alloc;
-
-use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
@@ -100,11 +97,9 @@ macro_rules! impl_search_operator_test {
                 let existence_threshold = Probability::new(0.1).unwrap();
                 let wheel_interval = Length::new::<millimeter>(33.5);
 
-                let expected_wall_manager = Rc::new(WallManager::<Size>::with_str(
-                    existence_threshold,
-                    input_str,
-                ));
-                let wall_manager = Rc::new(WallManager::<Size>::new(existence_threshold));
+                let expected_wall_manager =
+                    WallManager::<Size>::with_str(existence_threshold, input_str);
+                let wall_manager = WallManager::<Size>::new(existence_threshold);
 
                 let simulator = AgentSimulator::new(
                     start_state.clone(),
@@ -185,7 +180,7 @@ macro_rules! impl_search_operator_test {
                                 ObstacleDetector::<_, MathFake>::new(distance_sensors);
                             let pose_converter = PoseConverter::<Size, MathFake>::default();
                             WallDetector::<_, _, _, MathFake>::new(
-                                Rc::clone(&wall_manager),
+                                &wall_manager,
                                 obstacle_detector,
                                 pose_converter,
                             )
@@ -239,15 +234,15 @@ macro_rules! impl_search_operator_test {
                     )
                 };
 
-                let commander = create_commander(Rc::clone(&wall_manager));
-                let expected_commander = create_commander(Rc::clone(&expected_wall_manager));
+                let commander = create_commander(&wall_manager);
+                let expected_commander = create_commander(&expected_wall_manager);
 
                 let operator = SearchOperator::new(commander, agent);
                 while operator.run().is_err() {
                     stepper.step();
                     operator.tick().expect("Fail safe should never invoke");
                 }
-                let commander = create_commander(Rc::clone(&wall_manager));
+                let commander = create_commander(&wall_manager);
                 assert_eq!(
                     commander.compute_shortest_path(),
                     expected_commander.compute_shortest_path()

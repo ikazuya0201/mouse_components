@@ -1,4 +1,3 @@
-use alloc::rc::Rc;
 use core::marker::PhantomData;
 
 use heapless::Vec;
@@ -35,15 +34,15 @@ pub trait ObstacleDetector<State> {
     fn detect(&mut self, state: &State) -> Self::Obstacles;
 }
 
-pub struct WallDetector<Manager, Detector, Converter, Math> {
-    manager: Rc<Manager>,
+pub struct WallDetector<'a, Manager, Detector, Converter, Math> {
+    manager: &'a Manager,
     detector: Detector,
     converter: Converter,
     _math: PhantomData<fn() -> Math>,
 }
 
-impl<Manager, Detector, Converter, Math> WallDetector<Manager, Detector, Converter, Math> {
-    pub fn new(manager: Rc<Manager>, detector: Detector, converter: Converter) -> Self {
+impl<'a, Manager, Detector, Converter, Math> WallDetector<'a, Manager, Detector, Converter, Math> {
+    pub fn new(manager: &'a Manager, detector: Detector, converter: Converter) -> Self {
         Self {
             manager,
             detector,
@@ -55,8 +54,8 @@ impl<Manager, Detector, Converter, Math> WallDetector<Manager, Detector, Convert
 
 type ObstacleSizeUpperBound = typenum::consts::U6;
 
-impl<Manager, Detector, Converter, Math, State> IWallDetector<State>
-    for WallDetector<Manager, Detector, Converter, Math>
+impl<'a, Manager, Detector, Converter, Math, State> IWallDetector<State>
+    for WallDetector<'a, Manager, Detector, Converter, Math>
 where
     Manager: WallManager<Converter::Wall>,
     Detector: ObstacleDetector<State, Obstacle = Obstacle>,
