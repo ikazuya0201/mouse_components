@@ -19,7 +19,7 @@ pub trait StateEstimator<Diff> {
 
     fn init(&mut self);
     fn estimate(&mut self);
-    fn state(&self) -> Self::State;
+    fn state(&self) -> &Self::State;
     fn correct_state<Diffs: IntoIterator<Item = Diff>>(&mut self, diffs: Diffs);
 }
 

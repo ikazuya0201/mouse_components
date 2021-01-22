@@ -72,8 +72,8 @@ where
         self.bias = Default::default();
     }
 
-    fn state(&self) -> State {
-        self.state.clone()
+    fn state(&self) -> &State {
+        &self.state
     }
 
     fn estimate(&mut self) {

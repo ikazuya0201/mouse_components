@@ -122,8 +122,11 @@ where
             let trajectory = trajectories.iter_mut().next().unwrap();
             if let Some(target) = trajectory.next() {
                 self.state_estimator.borrow_mut().estimate();
-                let state = self.state_estimator.borrow().state();
-                if let Err(err) = self.tracker.borrow_mut().track(&state, &target) {
+                if let Err(err) = self
+                    .tracker
+                    .borrow_mut()
+                    .track(self.state_estimator.borrow().state(), &target)
+                {
                     self.tracker.borrow_mut().stop();
                     return Err(RunAgentError::TrackFailed(err));
                 }

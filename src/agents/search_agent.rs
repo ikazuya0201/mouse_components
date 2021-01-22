@@ -136,8 +136,9 @@ where
     }
 
     fn get_obstacles(&self) -> Self::Obstacles {
-        let state = self.state_estimator.borrow().state();
-        self.obstacle_detector.borrow_mut().detect(&state)
+        self.obstacle_detector
+            .borrow_mut()
+            .detect(self.state_estimator.borrow().state())
     }
 
     fn set_command(&self, command: &Command) -> Result<(), Self::Error> {
@@ -172,7 +173,6 @@ where
             trajectory.as_mut().expect("Should never be None.").next()
         };
 
-        let state = self.state_estimator.borrow().state();
         let (target, is_empty) = {
             if let Some(mut trajectories) = self.trajectories.try_lock() {
                 loop {
@@ -190,7 +190,9 @@ where
             }
         };
         if let Some(target) = target.as_ref() {
-            self.tracker.lock().track(&state, target)?;
+            self.tracker
+                .lock()
+                .track(self.state_estimator.borrow().state(), target)?;
         }
         if is_empty {
             Err(SearchAgentError::EmptyTrajectory)
