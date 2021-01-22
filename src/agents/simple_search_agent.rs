@@ -1,16 +1,18 @@
 use core::cell::RefCell;
 
-use crate::operators::simple_search_operator::{SearchAgent as ISearchAgent, UpdateError};
+use crate::operators::simple_search_operator::SearchAgent as ISearchAgent;
 
 //NOTE: Should be implemented as thread-safe.
 pub trait TrajectoryManager<Command>: Send + Sync {
+    type Error;
     type Target;
 
-    fn set_command(&self, command: &Command);
+    fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
 
-    //Return the next target and a boolean.
-    //The boolean indicates whether the target is regular or not.
-    fn next(&self) -> (Self::Target, bool);
+    fn next(&self) -> Self::Target;
+
+    fn is_empty(&self) -> bool;
+    fn is_full(&self) -> bool;
 }
 
 pub trait Robot<Target> {
@@ -33,29 +35,38 @@ impl<Manager, Robot> SearchAgent<Manager, Robot> {
     }
 }
 
+#[derive(Debug)]
+pub enum SearchAgentError<T, U> {
+    Robot(T),
+    Manager(U),
+}
+
 impl<Manager, RobotType, Command> ISearchAgent<Command> for SearchAgent<Manager, RobotType>
 where
     RobotType: Robot<Manager::Target>,
     Manager: TrajectoryManager<Command>,
 {
-    type Error = RobotType::Error;
+    type Error = SearchAgentError<RobotType::Error, Manager::Error>;
 
-    fn update(&self) -> Result<(), UpdateError<Self::Error>> {
-        let (target, is_regular) = self.manager.next();
+    fn update(&self) -> Result<(), Self::Error> {
+        let target = self.manager.next();
         self.robot
             .borrow_mut()
             .track_and_update(&target)
-            .map_err(|err| UpdateError::Other(err))?;
-
-        if is_regular {
-            Ok(())
-        } else {
-            Err(UpdateError::EmptyTrajectory)
-        }
+            .map_err(|err| SearchAgentError::Robot(err))
     }
 
     fn set_command(&self, command: &Command) -> Result<(), Self::Error> {
-        self.manager.set_command(command);
-        Ok(())
+        self.manager
+            .set_command(command)
+            .map_err(|err| SearchAgentError::Manager(err))
+    }
+
+    fn is_full(&self) -> bool {
+        self.manager.is_full()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.manager.is_empty()
     }
 }

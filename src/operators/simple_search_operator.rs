@@ -1,18 +1,12 @@
-use core::sync::atomic::{AtomicBool, Ordering};
-
 use crate::administrator::{IncompletedError, Operator};
-
-#[derive(Debug)]
-pub enum UpdateError<T> {
-    EmptyTrajectory,
-    Other(T),
-}
 
 pub trait SearchAgent<Command> {
     type Error;
 
-    fn update(&self) -> Result<(), UpdateError<Self::Error>>;
+    fn update(&self) -> Result<(), Self::Error>;
     fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
+    fn is_full(&self) -> bool;
+    fn is_empty(&self) -> bool;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -32,16 +26,11 @@ pub trait SearchCommander {
 pub struct SearchOperator<Commander, Agent> {
     commander: Commander,
     agent: Agent,
-    trajectory_is_empty: AtomicBool,
 }
 
 impl<Commander, Agent> SearchOperator<Commander, Agent> {
     pub fn new(commander: Commander, agent: Agent) -> Self {
-        Self {
-            commander,
-            agent,
-            trajectory_is_empty: AtomicBool::new(false),
-        }
+        Self { commander, agent }
     }
 }
 
@@ -59,23 +48,17 @@ where
     type Error = SearchOperatorError<Agent::Error, Commander::Error>;
 
     fn tick(&self) -> Result<(), Self::Error> {
-        match self.agent.update() {
-            Ok(_) => {
-                self.trajectory_is_empty.store(false, Ordering::Release);
-                Ok(())
-            }
-            Err(err) => match err {
-                UpdateError::EmptyTrajectory => {
-                    self.trajectory_is_empty.store(true, Ordering::Release);
-                    Ok(())
-                }
-                UpdateError::Other(err) => Err(SearchOperatorError::Agent(err)),
-            },
-        }
+        self.agent
+            .update()
+            .map_err(|err| SearchOperatorError::Agent(err))
     }
 
     fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>> {
         use SearchCommanderError::*;
+
+        if self.agent.is_full() {
+            return Err(Ok(IncompletedError));
+        }
 
         match self.commander.next_command() {
             Ok(command) => match self.agent.set_command(&command) {
@@ -84,7 +67,7 @@ where
             },
             Err(err) => match err {
                 SearchFinish => {
-                    if self.trajectory_is_empty.load(Ordering::Acquire) {
+                    if self.agent.is_empty() {
                         Ok(())
                     } else {
                         Err(Ok(IncompletedError))
