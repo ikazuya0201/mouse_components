@@ -2,9 +2,9 @@ use core::cell::RefCell;
 
 use heapless::{spsc::Queue, ArrayLength};
 
-use super::{ObstacleDetector, StateEstimator, Tracker};
-use crate::maze::CorrectInfo;
+use super::{StateEstimator, Tracker};
 use crate::operators::RunAgent as IRunAgent;
+use crate::wall_detector::CorrectInfo;
 
 pub trait RunTrajectoryGenerator<Command> {
     type Target;
@@ -93,7 +93,6 @@ impl<
         MaxLength,
     >
 where
-    ObstacleDetectorType: ObstacleDetector<StateEstimatorType::State>,
     StateEstimatorType: StateEstimator<CorrectInfo>,
     TrackerType: Tracker<StateEstimatorType::State, TrajectoryGeneratorType::Target>,
     TrajectoryGeneratorType: RunTrajectoryGenerator<Command>,

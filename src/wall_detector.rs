@@ -2,13 +2,38 @@ use alloc::rc::Rc;
 use core::marker::PhantomData;
 
 use heapless::Vec;
+use uom::si::f32::Length;
 
-use crate::agents::ObstacleDetector;
-use crate::data_types::{CorrectInfo, Obstacle, Pose};
-use crate::maze::PoseConverter;
+use crate::data_types::{Obstacle, Pose};
 use crate::maze::WallManager;
 use crate::robot::WallDetector as IWallDetector;
 use crate::utils::{forced_vec::ForcedVec, math::Math as IMath, probability::Probability};
+
+#[derive(Debug, Clone)]
+pub struct CorrectInfo {
+    pub obstacle: Obstacle,
+    pub diff_from_expected: Length,
+}
+
+pub struct WallInfo<Wall> {
+    pub wall: Wall,
+    pub existing_distance: Length,
+    pub not_existing_distance: Length,
+}
+
+pub trait PoseConverter<Pose> {
+    type Error;
+    type Wall;
+
+    fn convert(&self, pose: &Pose) -> Result<WallInfo<Self::Wall>, Self::Error>;
+}
+
+pub trait ObstacleDetector<State> {
+    type Obstacle;
+    type Obstacles: IntoIterator<Item = Self::Obstacle>;
+
+    fn detect(&mut self, state: &State) -> Self::Obstacles;
+}
 
 pub struct WallDetector<Manager, Detector, Converter, Math> {
     manager: Rc<Manager>,

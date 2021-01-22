@@ -3,10 +3,10 @@ use core::marker::PhantomData;
 use heapless::Vec;
 use uom::si::f32::Length;
 
-use crate::agents::ObstacleDetector as IObstacleDetector;
 use crate::data_types::Pose;
 use crate::tracker::State;
 use crate::utils::{math::Math, sample::Sample};
+use crate::wall_detector::ObstacleDetector as IObstacleDetector;
 
 pub trait DistanceSensor {
     type Error;

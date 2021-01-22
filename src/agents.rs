@@ -5,13 +5,6 @@ use uom::si::f32::{Angle, Length};
 
 pub use run_agent::{RunAgent, RunAgentError, RunTrajectoryGenerator};
 
-pub trait ObstacleDetector<State> {
-    type Obstacle;
-    type Obstacles: IntoIterator<Item = Self::Obstacle>;
-
-    fn detect(&mut self, state: &State) -> Self::Obstacles;
-}
-
 pub trait StateEstimator<Diff> {
     type State;
 

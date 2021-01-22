@@ -227,13 +227,8 @@ macro_rules! impl_search_operator_test {
                 use AbsoluteDirection::*;
 
                 let create_commander = |wall_storage| {
-                    let pose_converter = PoseConverter::<Size, MathFake>::default();
                     let wall_converter = WallConverter::new(cost);
-                    let maze = Maze::<_, _, _, MathFake>::new(
-                        wall_storage,
-                        pose_converter,
-                        wall_converter,
-                    );
+                    let maze = Maze::new(wall_storage, wall_converter);
                     let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
                     defaults::SearchCommander::new(
                         start,

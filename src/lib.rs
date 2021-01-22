@@ -31,16 +31,14 @@ pub mod traits {
 
     pub use crate::utils::math::Math;
     pub use administrator::{Operator, OperatorStore, Selector};
-    pub use agents::{ObstacleDetector, RunTrajectoryGenerator, StateEstimator, Tracker};
+    pub use agents::{RunTrajectoryGenerator, StateEstimator, Tracker};
     pub use commander::{
-        BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker,
-        ObstacleInterpreter, RouteNode,
+        BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker, RouteNode,
     };
-    pub use maze::{
-        GraphNode, PoseConverter, WallConverter, WallFinderNode, WallManager, WallSpaceNode,
-    };
+    pub use maze::{GraphNode, WallConverter, WallFinderNode, WallManager, WallSpaceNode};
     pub use operators::{RunAgent, RunCommander};
     pub use tracker::{Logger, RotationController, TranslationController};
+    pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};
 }
 
 pub mod sensors {
@@ -55,7 +53,7 @@ pub mod data_types {
     use super::*;
 
     pub use agents::Pose;
-    pub use maze::{AbsoluteDirection, CorrectInfo, RelativeDirection};
+    pub use maze::{AbsoluteDirection, RelativeDirection};
     pub use node::Pattern;
     pub use obstacle_detector::Obstacle;
     pub use tracker::{AngleState, LengthState, State};
@@ -132,27 +130,17 @@ pub mod defaults {
         MaxPathLength,
     >;
 
-    pub type SearchCommander<Size, Math> = impls::SearchCommander<
+    pub type SearchCommander<Size> = impls::SearchCommander<
         impls::Node<Size>,
         impls::RunNode<Size>,
         impls::SearchNode<Size>,
         data_types::SearchKind,
-        impls::Maze<
-            impls::WallManager<Size>,
-            impls::PoseConverter<Size, Math>,
-            impls::WallConverter,
-            Math,
-        >,
+        impls::Maze<impls::WallManager<Size>, impls::WallConverter>,
     >;
 
-    pub type RunCommander<Size, Math> = impls::RunCommander<
+    pub type RunCommander<Size> = impls::RunCommander<
         impls::RunNode<Size>,
-        impls::Maze<
-            impls::WallManager<Size>,
-            impls::PoseConverter<Size, Math>,
-            impls::WallConverter,
-            Math,
-        >,
+        impls::Maze<impls::WallManager<Size>, impls::WallConverter>,
     >;
 
     pub type RunOperator<
@@ -177,7 +165,7 @@ pub mod defaults {
             <impls::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
-        RunCommander<Size, Math>,
+        RunCommander<Size>,
         impls::CommandConverter,
     >;
 }

@@ -35,16 +35,6 @@ pub trait Graph<Node> {
     fn predecessors(&self, node: &Node) -> Self::Edges;
 }
 
-pub trait ObstacleInterpreter<Obstacle> {
-    type Diff;
-    type Diffs: IntoIterator<Item = Self::Diff>;
-
-    fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(
-        &self,
-        obstacles: Obstacles,
-    ) -> Self::Diffs;
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct CannotCheckError;
 

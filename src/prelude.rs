@@ -13,10 +13,8 @@ pub use crate::commander::Graph as _components_commander_Graph;
 pub use crate::commander::GraphConverter as _components_commander_GraphConverter;
 pub use crate::commander::NextNode as _components_commander_NextNode;
 pub use crate::commander::NodeChecker as _components_commander_NodeChecker;
-pub use crate::commander::ObstacleInterpreter as _components_commander_ObstacleInterpreter;
 pub use crate::commander::RouteNode as _components_commander_RouteNode;
 
-pub use crate::agents::ObstacleDetector as _components_agents_ObstacleDetector;
 pub use crate::agents::RunTrajectoryGenerator as _components_agents_RunTrajectoryGenerator;
 pub use crate::agents::StateEstimator as _components_agents_StateEstimator;
 pub use crate::agents::Tracker as _components_agents_Tracker;
@@ -32,10 +30,12 @@ pub use crate::sensors::IMU as _components_sensors_IMU;
 pub use crate::utils::math::Math as _utils_math_Math;
 
 pub use crate::maze::GraphNode as _components_maze_GraphNode;
-pub use crate::maze::PoseConverter as _components_maze_PoseConverter;
 pub use crate::maze::WallFinderNode as _components_maze_WallFinderNode;
 pub use crate::maze::WallManager as _components_maze_WallManager;
 pub use crate::maze::WallSpaceNode as _components_maze_WallSpaceNode;
 
 pub use crate::trajectory_manager::CommandConverter as _components_trajectory_manager_CommandConverter;
 pub use crate::trajectory_manager::SearchTrajectoryGenerator as _components_trajectory_manager_SearchTrajectoryGenerator;
+
+pub use crate::wall_detector::ObstacleDetector as _components_wall_detector_ObstacleDetector;
+pub use crate::wall_detector::PoseConverter as _components_wall_detector_PoseConverter;

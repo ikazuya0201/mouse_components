@@ -2,17 +2,11 @@ mod direction;
 
 use alloc::rc::Rc;
 use core::fmt;
-use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
-use uom::si::f32::Length;
 
-use crate::commander::{
-    BoundedNode, CannotCheckError, Graph, GraphConverter, NodeChecker, ObstacleInterpreter,
-};
-use crate::data_types::Pose;
-use crate::obstacle_detector::Obstacle;
-use crate::utils::{forced_vec::ForcedVec, math::Math, probability::Probability};
+use crate::commander::{BoundedNode, CannotCheckError, Graph, GraphConverter, NodeChecker};
+use crate::utils::{forced_vec::ForcedVec, probability::Probability};
 pub use direction::{AbsoluteDirection, RelativeDirection};
 
 macro_rules! block {
@@ -90,19 +84,6 @@ pub trait WallFinderNode: WallSpaceNode {
     fn walls_between(&self, other: &Self) -> Self::Walls;
 }
 
-pub struct WallInfo<Wall> {
-    pub wall: Wall,
-    pub existing_distance: Length,
-    pub not_existing_distance: Length,
-}
-
-pub trait PoseConverter<Pose> {
-    type Error;
-    type Wall;
-
-    fn convert(&self, pose: &Pose) -> Result<WallInfo<Self::Wall>, Self::Error>;
-}
-
 pub trait WallConverter<Wall> {
     type Error;
     type SearchNode;
@@ -111,31 +92,25 @@ pub trait WallConverter<Wall> {
     fn convert(&self, wall: &Wall) -> Result<Self::SearchNodes, Self::Error>;
 }
 
-pub struct Maze<Manager, PoseConverterType, WallConverterType, MathType> {
+pub struct Maze<Manager, WallConverterType> {
     manager: Rc<Manager>,
-    pose_converter: PoseConverterType,
     wall_converter: WallConverterType,
-    _math: PhantomData<fn() -> MathType>,
 }
 
-impl<Manager, PoseConverterType, WallConverterType, MathType> fmt::Debug
-    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
+impl<Manager, WallConverterType> fmt::Debug for Maze<Manager, WallConverterType>
 where
     Manager: fmt::Debug,
-    PoseConverterType: fmt::Debug,
     WallConverterType: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Maze")
             .field("manager", &self.manager)
-            .field("pose_converter", &self.pose_converter)
             .field("wall_converter", &self.wall_converter)
             .finish()
     }
 }
 
-impl<Manager, PoseConverterType, WallConverterType, MathType> fmt::Display
-    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
+impl<Manager, WallConverterType> fmt::Display for Maze<Manager, WallConverterType>
 where
     Manager: fmt::Display,
 {
@@ -144,25 +119,16 @@ where
     }
 }
 
-impl<Manager, PoseConverterType, WallConverterType, MathType>
-    Maze<Manager, PoseConverterType, WallConverterType, MathType>
-{
-    pub fn new(
-        manager: Rc<Manager>,
-        obstacle_converter: PoseConverterType,
-        wall_converter: WallConverterType,
-    ) -> Self {
+impl<Manager, WallConverterType> Maze<Manager, WallConverterType> {
+    pub fn new(manager: Rc<Manager>, wall_converter: WallConverterType) -> Self {
         Self {
             manager,
-            pose_converter: obstacle_converter,
             wall_converter,
-            _math: PhantomData,
         }
     }
 }
 
-impl<Node, Manager, PoseConverterType, WallConverterType, MathType> Graph<Node>
-    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
+impl<Node, Manager, WallConverterType> Graph<Node> for Maze<Manager, WallConverterType>
 where
     Node: GraphNode,
     Manager: WallManager<Node::Wall>,
@@ -210,8 +176,7 @@ where
     }
 }
 
-impl<Node, Manager, PoseConverterType, WallConverterType, MathType> GraphConverter<Node>
-    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
+impl<Node, Manager, WallConverterType> GraphConverter<Node> for Maze<Manager, WallConverterType>
 where
     Node: WallFinderNode,
     WallConverterType: WallConverter<Node::Wall>,
@@ -245,8 +210,8 @@ where
     }
 }
 
-impl<SearchNode, Manager, PoseConverterType, WallConverterType, MathType> NodeChecker<SearchNode>
-    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
+impl<SearchNode, Manager, WallConverterType> NodeChecker<SearchNode>
+    for Maze<Manager, WallConverterType>
 where
     SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
     Manager: WallManager<SearchNode::Wall>,
@@ -261,89 +226,6 @@ where
             }
         }
         Err(CannotCheckError)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CorrectInfo {
-    pub obstacle: Obstacle,
-    pub diff_from_expected: Length,
-}
-
-type ObstacleSizeUpperBound = typenum::consts::U6;
-
-//TODO: Write test
-impl<Manager, PoseConverterType, WallConverterType, MathType> ObstacleInterpreter<Obstacle>
-    for Maze<Manager, PoseConverterType, WallConverterType, MathType>
-where
-    PoseConverterType: PoseConverter<Pose>,
-    Manager: WallManager<PoseConverterType::Wall>,
-    MathType: Math,
-{
-    type Diff = CorrectInfo;
-    type Diffs = Vec<CorrectInfo, ObstacleSizeUpperBound>;
-
-    fn interpret_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(
-        &self,
-        obstacles: Obstacles,
-    ) -> Self::Diffs {
-        use uom::si::ratio::ratio;
-
-        let mut diffs = ForcedVec::new();
-        for obstacle in obstacles {
-            if let Ok(wall_info) = self.pose_converter.convert(&obstacle.source) {
-                if let Ok(existence) = self.manager.try_existence_probability(&wall_info.wall) {
-                    if existence.is_zero() {
-                        continue;
-                    } else if existence.is_one() {
-                        let diff_from_expected =
-                            obstacle.distance.mean - wall_info.existing_distance;
-                        diffs.push(CorrectInfo {
-                            obstacle,
-                            diff_from_expected,
-                        });
-                        continue;
-                    }
-
-                    let exist_val = {
-                        let tmp = ((wall_info.existing_distance - obstacle.distance.mean)
-                            / obstacle.distance.standard_deviation)
-                            .get::<ratio>();
-                        -tmp * tmp / 2.0
-                    };
-                    let not_exist_val = {
-                        let tmp = ((wall_info.not_existing_distance - obstacle.distance.mean)
-                            / obstacle.distance.standard_deviation)
-                            .get::<ratio>();
-                        -tmp * tmp / 2.0
-                    };
-
-                    debug_assert!(!exist_val.is_nan());
-                    debug_assert!(!not_exist_val.is_nan());
-
-                    let min = if exist_val < not_exist_val {
-                        exist_val
-                    } else {
-                        not_exist_val
-                    };
-                    let exist_val = MathType::expf(exist_val - min) * existence;
-                    let not_exist_val = MathType::expf(not_exist_val - min) * existence.reverse();
-
-                    let existence = if exist_val.is_infinite() {
-                        Probability::one()
-                    } else if not_exist_val.is_infinite() {
-                        Probability::zero()
-                    } else {
-                        Probability::new(exist_val / (exist_val + not_exist_val)).unwrap_or_else(
-                            |err| unreachable!("Should never be out of bound: {:?}", err),
-                        )
-                    };
-                    let _ = self.manager.try_update(&wall_info.wall, &existence);
-                    //ignore if cannot update
-                }
-            }
-        }
-        diffs.into()
     }
 }
 
@@ -420,7 +302,7 @@ mod tests {
 
         let manager = Rc::new(WallManagerType);
 
-        let maze = Maze::<_, (), (), ()>::new(manager, (), ());
+        let maze = Maze::<_, ()>::new(manager, ());
         let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
         assert_eq!(maze.successors(&0), expected.as_slice());
         assert_eq!(maze.predecessors(&0), expected.as_slice());
@@ -495,7 +377,7 @@ mod tests {
             }
         }
 
-        let maze = Maze::<_, (), _, ()>::new(Rc::new(WallManagerType), (), WallConverterType);
+        let maze = Maze::new(Rc::new(WallManagerType), WallConverterType);
 
         let path = vec![0, 1, 1, 2, 3, 5, 8]
             .into_iter()
@@ -538,7 +420,7 @@ mod tests {
             }
         }
 
-        let maze = Maze::<_, (), (), ()>::new(Rc::new(WallManagerType), (), ());
+        let maze = Maze::new(Rc::new(WallManagerType), ());
         let test_cases = vec![
             (0, Ok(false)),
             (1, Ok(true)),

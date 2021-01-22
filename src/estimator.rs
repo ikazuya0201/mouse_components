@@ -10,9 +10,9 @@ use uom::si::{
 };
 
 use crate::agents::StateEstimator;
-use crate::maze::CorrectInfo;
 use crate::tracker::State;
 use crate::traits::Math;
+use crate::wall_detector::CorrectInfo;
 
 pub trait IMU {
     type Error;

@@ -11,9 +11,8 @@ use components::{
     defaults,
     impls::{
         slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
-        PoseConverter, RotationControllerBuilder, RunAgent, RunNode, RunOperator,
-        RunTrajectoryGeneratorBuilder, TrackerBuilder, TranslationControllerBuilder, WallConverter,
-        WallManager,
+        RotationControllerBuilder, RunAgent, RunNode, RunOperator, RunTrajectoryGeneratorBuilder,
+        TrackerBuilder, TranslationControllerBuilder, WallConverter, WallManager,
     },
     prelude::*,
     utils::probability::Probability,
@@ -227,9 +226,8 @@ fn test_run_operator() {
     use AbsoluteDirection::*;
 
     let commander = {
-        let pose_converter = PoseConverter::<Size, MathFake>::default();
         let wall_converter = WallConverter::new(cost);
-        let maze = Maze::<_, _, _, MathFake>::new(wall_storage, pose_converter, wall_converter);
+        let maze = Maze::new(wall_storage, wall_converter);
         let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
         let goals = vec![
             RunNode::<Size>::new(2, 0, South, cost).unwrap(),

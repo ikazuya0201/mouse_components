@@ -6,8 +6,8 @@ use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
 
 use crate::data_types::Pose;
-use crate::maze::{PoseConverter as IPoseConverter, WallInfo};
 use crate::utils::{math::Math, total::Total};
+use crate::wall_detector::{PoseConverter as IPoseConverter, WallInfo};
 use crate::wall_manager::Wall;
 
 #[derive(Clone, PartialEq, Debug)]
