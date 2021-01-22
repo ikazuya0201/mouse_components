@@ -128,12 +128,81 @@ pub mod defaults {
         MaxPathLength,
     >;
 
+    pub type SearchAgent<
+        'a,
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        Size,
+        Math,
+        Logger,
+    > = search_agent::SearchAgent<
+        trajectory_manager::TrajectoryManager<
+            impls::SearchTrajectoryGenerator<Math>,
+            impls::CommandConverter,
+            data_types::Target,
+            <impls::SearchTrajectoryGenerator<Math> as trajectory_manager::SearchTrajectoryGenerator<(
+                data_types::Pose,
+                data_types::SearchKind,
+            )>>::Trajectory,
+        >,
+        robot::Robot<
+            impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
+            impls::Tracker<
+                LeftMotor,
+                RightMotor,
+                Math,
+                impls::TranslationController,
+                impls::RotationController,
+                Logger,
+            >,
+            wall_detector::WallDetector<
+                'a,
+                impls::WallManager<Size>,
+                impls::ObstacleDetector<DistanceSensor, Math>,
+                impls::PoseConverter<Size, Math>,
+                Math,
+            >,
+            data_types::State,
+        >,
+    >;
+
     pub type SearchCommander<'a, Size> = impls::SearchCommander<
         impls::Node<Size>,
         impls::RunNode<Size>,
         impls::SearchNode<Size>,
         data_types::SearchKind,
         impls::Maze<'a, impls::WallManager<Size>, impls::WallConverter>,
+    >;
+
+    pub type SearchOperator<
+        'a,
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        Math,
+        Size,
+        Logger = impls::NullLogger,
+    > = operators::search_operator::SearchOperator<
+        SearchCommander<'a, Size>,
+        SearchAgent<
+            'a,
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            LeftMotor,
+            RightMotor,
+            DistanceSensor,
+            Size,
+            Math,
+            Logger,
+        >,
     >;
 
     pub type RunCommander<'a, Size> = impls::RunCommander<
