@@ -24,17 +24,14 @@ mod wall_converter;
 pub mod wall_detector;
 mod wall_manager;
 
-pub use agents::simple_search_agent;
+pub use agents::search_agent;
 
 pub mod traits {
     use super::*;
 
     pub use crate::utils::math::Math;
     pub use administrator::{Operator, OperatorStore, Selector};
-    pub use agents::{
-        ObstacleDetector, RunTrajectoryGenerator, SearchTrajectoryGenerator, StateEstimator,
-        Tracker,
-    };
+    pub use agents::{ObstacleDetector, RunTrajectoryGenerator, StateEstimator, Tracker};
     pub use commander::{
         BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker,
         ObstacleInterpreter, RouteNode,
@@ -42,7 +39,7 @@ pub mod traits {
     pub use maze::{
         GraphNode, PoseConverter, WallConverter, WallFinderNode, WallManager, WallSpaceNode,
     };
-    pub use operators::{CommandConverter, RunAgent, RunCommander, SearchAgent, SearchCommander};
+    pub use operators::{RunAgent, RunCommander};
     pub use tracker::{Logger, RotationController, TranslationController};
 }
 
@@ -73,7 +70,7 @@ pub mod impls {
     use super::*;
 
     pub use administrator::Administrator;
-    pub use agents::{RunAgent, SearchAgent};
+    pub use agents::RunAgent;
     pub use command_converter::{CommandConverter, CommandConverter2};
     pub use commander::{RunCommander, SearchCommander};
     pub use controller::{
@@ -84,7 +81,7 @@ pub mod impls {
     pub use maze::Maze;
     pub use node::{Node, RunNode, SearchNode};
     pub use obstacle_detector::ObstacleDetector;
-    pub use operators::{RunOperator, SearchOperator};
+    pub use operators::RunOperator;
     pub use pose_converter::PoseConverter;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{
@@ -99,44 +96,12 @@ pub mod impls {
 pub mod errors {
     use super::*;
 
-    pub use commander::{CannotCheckError, CommanderError, RunCommanderError};
-    pub use operators::FinishError;
+    pub use commander::{CannotCheckError, RunCommanderError};
     pub use pose_converter::ConversionError;
 }
 
 pub mod defaults {
     use super::*;
-
-    pub type SearchAgent<
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensor,
-        Math,
-        Logger = impls::NullLogger,
-    > = impls::SearchAgent<
-        impls::ObstacleDetector<DistanceSensor, Math>,
-        impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-        impls::Tracker<
-            LeftMotor,
-            RightMotor,
-            Math,
-            impls::TranslationController,
-            impls::RotationController,
-            Logger,
-        >,
-        impls::SearchTrajectoryGenerator<Math>,
-        <impls::SearchTrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<(
-            data_types::Pose,
-            data_types::SearchKind,
-        )>>::Trajectory,
-        <impls::SearchTrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<(
-            data_types::Pose,
-            data_types::SearchKind,
-        )>>::Target,
-    >;
 
     pub type RunAgent<
         LeftEncoder,
@@ -178,33 +143,6 @@ pub mod defaults {
             impls::WallConverter,
             Math,
         >,
-    >;
-
-    pub type SearchOperator<
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensor,
-        Math,
-        Size,
-        Logger = impls::NullLogger,
-    > = impls::SearchOperator<
-        data_types::Obstacle,
-        (data_types::Pose, data_types::SearchKind),
-        SearchAgent<
-            LeftEncoder,
-            RightEncoder,
-            Imu,
-            LeftMotor,
-            RightMotor,
-            DistanceSensor,
-            Math,
-            Logger,
-        >,
-        SearchCommander<Size, Math>,
-        impls::CommandConverter2,
     >;
 
     pub type RunCommander<Size, Math> = impls::RunCommander<

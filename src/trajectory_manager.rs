@@ -3,9 +3,21 @@ use core::cell::{Cell, RefCell};
 use heapless::{consts::*, spsc::Queue};
 use spin::Mutex;
 
-use crate::agents::simple_search_agent::TrajectoryManager as ITrajectoryManager;
-use crate::agents::SearchTrajectoryGenerator;
-use crate::operators::CommandConverter;
+use crate::agents::search_agent::TrajectoryManager as ITrajectoryManager;
+
+pub trait SearchTrajectoryGenerator<Command> {
+    type Target;
+    type Trajectory: Iterator<Item = Self::Target>;
+
+    fn generate_search(&self, command: &Command) -> Self::Trajectory;
+    fn generate_emergency(&self, target: &Self::Target) -> Self::Trajectory;
+}
+
+pub trait CommandConverter<Command> {
+    type Output;
+
+    fn convert(&self, source: &Command) -> Self::Output;
+}
 
 type QueueLength = U3;
 

@@ -1,6 +1,6 @@
 use core::cell::{Cell, RefCell};
 use core::cmp::Reverse;
-use core::convert::{TryFrom, TryInto};
+use core::convert::{Infallible, TryFrom, TryInto};
 use core::fmt::Debug;
 
 use generic_array::GenericArray;
@@ -10,8 +10,8 @@ use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
 use crate::operators::{
-    simple_search_operator::{SearchCommander as SimpleSearchCommander, SearchCommanderError},
-    FinishError, RunCommander as IRunCommander, SearchCommander as ISearchCommander,
+    search_operator::{SearchCommander as ISearchCommander, SearchCommanderError},
+    RunCommander as IRunCommander,
 };
 use crate::utils::{array_length::ArrayLength, forced_vec::ForcedVec, itertools::repeat_n};
 
@@ -133,24 +133,7 @@ where
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub enum CommanderError {
-    WaitingError,
-    SolveFinishError,
-}
-
-impl TryInto<FinishError> for CommanderError {
-    type Error = ();
-
-    fn try_into(self) -> Result<FinishError, Self::Error> {
-        match self {
-            Self::WaitingError => Err(()),
-            Self::SolveFinishError => Ok(FinishError),
-        }
-    }
-}
-
-impl<Node, RunNode, Cost, Maze> SimpleSearchCommander
+impl<Node, RunNode, Cost, Maze> ISearchCommander
     for SearchCommander<
         Node,
         RunNode,
@@ -179,7 +162,7 @@ where
     <Maze::SearchNode as RouteNode>::Route: Clone,
     <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
 {
-    type Error = CommanderError;
+    type Error = Infallible;
     type Command = (Node, <Maze::SearchNode as RouteNode>::Route);
 
     //must return the current pose and next kind
@@ -226,114 +209,6 @@ where
                         .maze
                         .is_available(&node)
                         .map_err(|_| SearchCommanderError::Waiting)?;
-                    if is_available {
-                        next = Some(node);
-                        break;
-                    }
-                }
-                candidates.clear();
-                let next = next.unwrap_or_else(|| unreachable!("This is bug."));
-                let kind = {
-                    <Maze::SearchNode as TryFrom<Node>>::try_from(self.current.borrow().clone())
-                        .unwrap_or_else(|_| unimplemented!())
-                        .route(&next)
-                        .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
-                };
-                let current = self.current.replace(Node::from(next));
-                self.state.set(State::Solving);
-                Ok((current, kind))
-            }
-        }
-    }
-}
-
-impl<Node, RunNode, Cost, Maze, Obstacle> ISearchCommander<Obstacle>
-    for SearchCommander<
-        Node,
-        RunNode,
-        Maze::SearchNode,
-        <Maze::SearchNode as RouteNode>::Route,
-        Maze,
-    >
-where
-    RunNode::UpperBound: ArrayLength<Maze::SearchNode>
-        + ArrayLength<Cost>
-        + ArrayLength<Reverse<Cost>>
-        + ArrayLength<(RunNode, Reverse<Cost>)>
-        + ArrayLength<(Maze::SearchNode, Reverse<Cost>)>
-        + ArrayLength<Option<RunNode>>
-        + ArrayLength<Option<usize>>
-        + Unsigned,
-    RunNode::PathUpperBound: ArrayLength<RunNode>,
-    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
-    Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + TryFrom<Node>,
-    Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
-    Maze: Graph<RunNode, Cost = Cost>
-        + Graph<<Maze as GraphConverter<RunNode>>::SearchNode, Cost = Cost>
-        + GraphConverter<RunNode>
-        + ObstacleInterpreter<Obstacle>
-        + NodeChecker<<Maze as GraphConverter<RunNode>>::SearchNode>,
-    Node: From<Maze::SearchNode> + Clone + NextNode<<Maze::SearchNode as RouteNode>::Route>,
-    <Maze::SearchNode as RouteNode>::Route: Clone,
-    <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
-{
-    type Error = CommanderError;
-    type Command = (Node, <Maze::SearchNode as RouteNode>::Route);
-    type Diff = Maze::Diff;
-    type Diffs = Maze::Diffs;
-
-    //TODO: write test
-    fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(
-        &self,
-        obstacles: Obstacles,
-    ) -> Self::Diffs {
-        self.maze.interpret_obstacles(obstacles)
-    }
-
-    //must return the current pose and next kind
-    //TODO: write test
-    fn next_command(&self) -> Result<Self::Command, Self::Error> {
-        match self.state.get() {
-            State::Initial => {
-                let current = self.current.replace_with(|node| {
-                    node.next(&self.initial_route)
-                        .unwrap_or_else(|_| unreachable!())
-                });
-                self.state.set(State::Solving);
-                Ok((current, self.initial_route.clone()))
-            }
-            State::Final => Err(CommanderError::SolveFinishError),
-            State::Solving => {
-                let mut current = self.current.borrow_mut();
-                if let Some(candidates) = self.next_node_candidates(
-                    &current
-                        .clone()
-                        .try_into()
-                        .unwrap_or_else(|_| unimplemented!()),
-                ) {
-                    self.candidates.replace(candidates);
-                    self.state.set(State::Waiting);
-                    Err(CommanderError::WaitingError)
-                } else {
-                    let tmp = current.clone();
-                    *current = current
-                        .next(&self.final_route)
-                        .unwrap_or_else(|_| unreachable!());
-                    self.state.set(State::Final);
-                    Ok((tmp, self.final_route.clone()))
-                }
-            }
-            State::Waiting => {
-                let mut next = None;
-                let mut candidates = self.candidates.borrow_mut();
-                if candidates.is_empty() {
-                    return Err(CommanderError::WaitingError);
-                }
-                for &node in candidates.iter() {
-                    let is_available = self
-                        .maze
-                        .is_available(&node)
-                        .map_err(|_| CommanderError::WaitingError)?;
                     if is_available {
                         next = Some(node);
                         break;

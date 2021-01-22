@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use super::search_operator::CommandConverter;
 use crate::administrator::{IncompletedError, Operator};
+use crate::trajectory_manager::CommandConverter;
 
 pub trait RunCommander {
     type Error;

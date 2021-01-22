@@ -8,12 +8,10 @@ use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
 
-use crate::agents::{
-    RunTrajectoryGenerator as IRunTrajectoryGenerator,
-    SearchTrajectoryGenerator as ISearchTrajectoryGenerator,
-};
+use crate::agents::RunTrajectoryGenerator as IRunTrajectoryGenerator;
 use crate::data_types::Pose;
 use crate::traits::Math;
+use crate::trajectory_manager::SearchTrajectoryGenerator as ISearchTrajectoryGenerator;
 pub use slalom_generator::{
     slalom_parameters_map, slalom_parameters_map2, SlalomDirection, SlalomKind, SlalomParameters,
 };

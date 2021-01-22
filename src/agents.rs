@@ -1,11 +1,9 @@
 mod run_agent;
-mod search_agent;
-pub mod simple_search_agent;
+pub mod search_agent;
 
 use uom::si::f32::{Angle, Length};
 
 pub use run_agent::{RunAgent, RunAgentError, RunTrajectoryGenerator};
-pub use search_agent::{SearchAgent, SearchAgentError, SearchTrajectoryGenerator};
 
 pub trait ObstacleDetector<State> {
     type Obstacle;

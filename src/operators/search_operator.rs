@@ -1,166 +1,86 @@
-use core::cell::RefCell;
-use core::convert::{TryFrom, TryInto};
-use core::marker::PhantomData;
-use core::sync::atomic::{AtomicBool, Ordering};
-
 use crate::administrator::{IncompletedError, Operator};
 
-pub trait SearchAgent<Command, Diff> {
+pub trait SearchAgent<Command> {
     type Error;
-    type Obstacle;
-    type Obstacles: IntoIterator<Item = Self::Obstacle>;
 
-    //update estimated state
-    fn update_state(&self);
+    fn update(&self) -> Result<(), Self::Error>;
     fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
-    fn get_obstacles(&self) -> Self::Obstacles;
-
-    //This method is called by interrupt.
-    fn track_next(&self) -> Result<(), Self::Error>;
-
-    //This method should be called in the end of search.
-    //This method can be blocking.
-    fn stop(&self);
-
-    //correct state by diffs
-    fn correct_state<Diffs: IntoIterator<Item = Diff>>(&self, diffs: Diffs);
+    fn is_full(&self) -> Result<bool, Self::Error>;
+    fn is_empty(&self) -> Result<bool, Self::Error>;
 }
 
-pub trait SearchCommander<Obstacle> {
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SearchCommanderError<T> {
+    SearchFinish,
+    Waiting,
+    Other(T),
+}
+
+pub trait SearchCommander {
     type Error;
     type Command;
-    type Diff;
-    type Diffs: IntoIterator<Item = Self::Diff>;
 
-    fn update_obstacles<Obstacles: IntoIterator<Item = Obstacle>>(
-        &self,
-        obstacles: Obstacles,
-    ) -> Self::Diffs;
-    fn next_command(&self) -> Result<Self::Command, Self::Error>;
+    fn next_command(&self) -> Result<Self::Command, SearchCommanderError<Self::Error>>;
 }
 
-pub trait CommandConverter<Command> {
-    type Output;
-
-    fn convert(&self, source: &Command) -> Self::Output;
-}
-
-pub struct SearchOperator<Obstacle, Command, Agent, Commander, Converter> {
-    keeped_command: RefCell<Option<Command>>,
-    agent: Agent,
+pub struct SearchOperator<Commander, Agent> {
     commander: Commander,
-    converter: Converter,
-    trajectory_is_empty: AtomicBool,
-    _obstacle: PhantomData<fn() -> Obstacle>,
+    agent: Agent,
 }
 
-impl<Obstacle, Command, Agent, Commander, Converter>
-    SearchOperator<Obstacle, Command, Agent, Commander, Converter>
-{
-    pub fn consume(self) -> (Agent, Commander, Converter) {
-        let SearchOperator {
-            agent,
-            commander,
-            converter,
-            ..
-        } = self;
-        (agent, commander, converter)
+impl<Commander, Agent> SearchOperator<Commander, Agent> {
+    pub fn new(commander: Commander, agent: Agent) -> Self {
+        Self { commander, agent }
     }
 }
 
-impl<Obstacle, Command, Agent, Commander, Converter>
-    SearchOperator<Obstacle, Command, Agent, Commander, Converter>
-where
-    Agent: SearchAgent<Converter::Output, Commander::Diff, Obstacle = Obstacle>,
-    Converter: CommandConverter<Commander::Command>,
-    Commander: SearchCommander<Obstacle>,
-{
-    pub fn new(agent: Agent, commander: Commander, converter: Converter) -> Self {
-        let command = converter.convert(
-            &commander
-                .next_command()
-                .unwrap_or_else(|_| unimplemented!("This error handling is not implemented.")),
-        );
-        agent
-            .set_command(&command)
-            .unwrap_or_else(|_| unreachable!());
-
-        Self {
-            keeped_command: RefCell::new(None),
-            agent,
-            commander,
-            converter,
-            trajectory_is_empty: AtomicBool::new(false),
-            _obstacle: PhantomData,
-        }
-    }
+#[derive(Debug)]
+pub enum SearchOperatorError<T, U> {
+    Agent(T),
+    Commander(U),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct FinishError;
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct EmptyTrajectoyError;
-
-impl<Obstacle, Agent, Commander, Converter> Operator
-    for SearchOperator<Obstacle, Converter::Output, Agent, Commander, Converter>
+impl<Commander, Agent> Operator for SearchOperator<Commander, Agent>
 where
-    Agent: SearchAgent<Converter::Output, Commander::Diff, Obstacle = Obstacle>,
-    Converter: CommandConverter<Commander::Command>,
-    Commander: SearchCommander<Obstacle>,
-    Commander::Error: TryInto<FinishError>,
-    EmptyTrajectoyError: TryFrom<Agent::Error>,
-    <EmptyTrajectoyError as TryFrom<Agent::Error>>::Error: Into<Agent::Error>,
+    Commander: SearchCommander,
+    Agent: SearchAgent<Commander::Command>,
 {
-    type Error = Agent::Error;
+    type Error = SearchOperatorError<Agent::Error, Commander::Error>;
 
     fn tick(&self) -> Result<(), Self::Error> {
-        self.agent.update_state();
-        let obstacles = self.agent.get_obstacles();
-        let diffs = self.commander.update_obstacles(obstacles);
-        self.agent.correct_state(diffs);
-        match self.agent.track_next() {
-            Err(err) => match EmptyTrajectoyError::try_from(err) {
-                Ok(_) => {
-                    self.trajectory_is_empty.store(true, Ordering::Relaxed);
-                    Ok(())
-                }
-                Err(err) => Err(err.into()),
-            },
-            _ => {
-                self.trajectory_is_empty.store(false, Ordering::Relaxed);
-                Ok(())
-            }
-        }
+        self.agent
+            .update()
+            .map_err(|err| SearchOperatorError::Agent(err))
     }
 
-    fn run(&self) -> Result<(), Result<IncompletedError, Agent::Error>> {
-        let mut keeped_command = self.keeped_command.borrow_mut();
-        if let Some(command) = keeped_command.as_ref() {
-            if self.agent.set_command(command).is_ok() {
-                keeped_command.take();
+    fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>> {
+        use SearchCommanderError::*;
+
+        if let Ok(is_full) = self.agent.is_full() {
+            if is_full {
+                return Err(Ok(IncompletedError));
             }
         } else {
-            match self.commander.next_command() {
-                Ok(command) => {
-                    let command = self.converter.convert(&command);
-                    if self.agent.set_command(&command).is_err() {
-                        keeped_command.replace(command);
-                    }
-                    self.trajectory_is_empty.store(false, Ordering::Relaxed);
-                }
-                Err(err) => {
-                    //success when error is finish error and trajectory is empty
-                    if err.try_into().is_ok()
-                        && self.trajectory_is_empty.load(Ordering::Relaxed)
-                        && keeped_command.is_none()
-                    {
-                        self.agent.stop();
-                        return Ok(());
-                    }
-                }
-            }
+            return Err(Ok(IncompletedError));
         }
-        Err(Ok(IncompletedError))
+
+        match self.commander.next_command() {
+            Ok(command) => match self.agent.set_command(&command) {
+                Ok(_) => Err(Ok(IncompletedError)),
+                Err(err) => Err(Err(SearchOperatorError::Agent(err))),
+            },
+            Err(err) => match err {
+                SearchFinish => {
+                    if let Ok(is_empty) = self.agent.is_empty() {
+                        if is_empty {
+                            return Ok(());
+                        }
+                    }
+                    Err(Ok(IncompletedError))
+                }
+                Waiting => Err(Ok(IncompletedError)),
+                Other(err) => Err(Err(SearchOperatorError::Commander(err))),
+            },
+        }
     }
 }
