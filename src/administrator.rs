@@ -4,7 +4,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use spin::Mutex;
 
 #[derive(Debug, Clone, Copy)]
-pub struct NotFinishError;
+pub struct IncompletedError;
 
 pub trait OperatorStore<Mode, Operator> {
     fn exchange(&self, operator: Operator, mode: Mode) -> Operator;
@@ -15,7 +15,7 @@ pub trait Operator {
     type Error;
 
     fn tick(&self) -> Result<(), Self::Error>;
-    fn run(&self) -> Result<(), NotFinishError>;
+    fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>>;
 }
 
 pub trait Selector<Mode> {

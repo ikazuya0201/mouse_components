@@ -1,5 +1,6 @@
 extern crate alloc;
 
+use alloc::rc::Rc;
 use core::f32::consts::PI;
 
 use components::{
@@ -9,12 +10,17 @@ use components::{
     },
     defaults,
     impls::{
-        slalom_parameters_map, slalom_parameters_map2, CommandConverter2, EstimatorBuilder, Maze,
-        ObstacleDetector, PoseConverter, RotationControllerBuilder, RunNode, SearchAgent,
-        SearchOperator, SearchTrajectoryGeneratorBuilder, TrackerBuilder,
-        TranslationControllerBuilder, WallConverter, WallManager,
+        slalom_parameters_map, slalom_parameters_map2, CommandConverter, EstimatorBuilder, Maze,
+        ObstacleDetector, PoseConverter, RotationControllerBuilder, RunNode,
+        SearchTrajectoryGeneratorBuilder, TrackerBuilder, TranslationControllerBuilder,
+        WallConverter, WallManager,
     },
+    operators::search_operator::SearchOperator,
+    robot::Robot,
+    search_agent::SearchAgent,
+    trajectory_manager::TrajectoryManager,
     utils::probability::Probability,
+    wall_detector::WallDetector,
 };
 use typenum::consts::*;
 use uom::si::f32::{
@@ -94,7 +100,11 @@ macro_rules! impl_search_operator_test {
                 let existence_threshold = Probability::new(0.1).unwrap();
                 let wheel_interval = Length::new::<millimeter>(33.5);
 
-                let wall_storage = WallManager::<Size>::with_str(existence_threshold, input_str);
+                let expected_wall_manager = Rc::new(WallManager::<Size>::with_str(
+                    existence_threshold,
+                    input_str,
+                ));
+                let wall_manager = Rc::new(WallManager::<Size>::new(existence_threshold));
 
                 let simulator = AgentSimulator::new(
                     start_state.clone(),
@@ -119,54 +129,68 @@ macro_rules! impl_search_operator_test {
                 ) = simulator.split(wheel_interval);
 
                 let agent = {
-                    let estimator = {
-                        EstimatorBuilder::new()
-                            .left_encoder(left_encoder)
-                            .right_encoder(right_encoder)
-                            .imu(imu)
-                            .period(period)
-                            .cut_off_frequency(Frequency::new::<hertz>(50.0))
-                            .initial_state(start_state)
-                            .wheel_interval(wheel_interval)
-                            .correction_weight(0.1)
-                            .build::<MathFake>()
-                            .unwrap()
-                    };
+                    let robot = {
+                        let estimator = {
+                            EstimatorBuilder::new()
+                                .left_encoder(left_encoder)
+                                .right_encoder(right_encoder)
+                                .imu(imu)
+                                .period(period)
+                                .cut_off_frequency(Frequency::new::<hertz>(50.0))
+                                .initial_state(start_state)
+                                .wheel_interval(wheel_interval)
+                                .correction_weight(0.1)
+                                .build::<MathFake>()
+                                .unwrap()
+                        };
 
-                    let tracker = {
-                        let trans_controller = TranslationControllerBuilder::new()
-                            .kp(0.9)
-                            .ki(0.05)
-                            .kd(0.01)
-                            .period(period)
-                            .model_gain(trans_model_gain)
-                            .model_time_constant(trans_model_time_constant)
-                            .build();
+                        let tracker = {
+                            let trans_controller = TranslationControllerBuilder::new()
+                                .kp(0.9)
+                                .ki(0.05)
+                                .kd(0.01)
+                                .period(period)
+                                .model_gain(trans_model_gain)
+                                .model_time_constant(trans_model_time_constant)
+                                .build();
 
-                        let rot_controller = RotationControllerBuilder::new()
-                            .kp(0.2)
-                            .ki(0.2)
-                            .kd(0.0)
-                            .period(period)
-                            .model_gain(rot_model_gain)
-                            .model_time_constant(rot_model_time_constant)
-                            .build();
+                            let rot_controller = RotationControllerBuilder::new()
+                                .kp(0.2)
+                                .ki(0.2)
+                                .kd(0.0)
+                                .period(period)
+                                .model_gain(rot_model_gain)
+                                .model_time_constant(rot_model_time_constant)
+                                .build();
 
-                        TrackerBuilder::new()
-                            .right_motor(right_motor)
-                            .left_motor(left_motor)
-                            .period(period)
-                            .kx(15.0)
-                            .kdx(4.0)
-                            .ky(15.0)
-                            .kdy(4.0)
-                            .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
-                            .translation_controller(trans_controller)
-                            .rotation_controller(rot_controller)
-                            .low_zeta(1.0)
-                            .low_b(1e-3)
-                            .fail_safe_distance(Length::new::<meter>(0.05))
-                            .build::<MathFake>()
+                            TrackerBuilder::new()
+                                .right_motor(right_motor)
+                                .left_motor(left_motor)
+                                .period(period)
+                                .kx(15.0)
+                                .kdx(4.0)
+                                .ky(15.0)
+                                .kdy(4.0)
+                                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
+                                .translation_controller(trans_controller)
+                                .rotation_controller(rot_controller)
+                                .low_zeta(1.0)
+                                .low_b(1e-3)
+                                .fail_safe_distance(Length::new::<meter>(0.05))
+                                .build::<MathFake>()
+                        };
+
+                        let wall_detector = {
+                            let obstacle_detector =
+                                ObstacleDetector::<_, MathFake>::new(distance_sensors);
+                            let pose_converter = PoseConverter::<Size, MathFake>::default();
+                            WallDetector::<_, _, _, MathFake>::new(
+                                Rc::clone(&wall_manager),
+                                obstacle_detector,
+                                pose_converter,
+                            )
+                        };
+                        Robot::new(estimator, tracker, wall_detector)
                     };
 
                     let search_velocity = Velocity::new::<meter_per_second>(0.12);
@@ -192,20 +216,19 @@ macro_rules! impl_search_operator_test {
                         .build::<MathFake>()
                         .expect("Should never panic");
 
-                    let obstacle_detector = ObstacleDetector::<_, MathFake>::new(distance_sensors);
-                    SearchAgent::new(obstacle_detector, estimator, tracker, trajectory_generator)
+                    let trajectory_manager = TrajectoryManager::new(
+                        trajectory_generator,
+                        CommandConverter::new(Length::new::<millimeter>(90.0), front_offset),
+                    );
+
+                    SearchAgent::new(trajectory_manager, robot)
                 };
 
                 use AbsoluteDirection::*;
 
                 let create_commander = |wall_storage| {
-                    let pose_converter = PoseConverter::<Size, MathFake>::default();
                     let wall_converter = WallConverter::new(cost);
-                    let maze = Maze::<_, _, _, MathFake>::new(
-                        wall_storage,
-                        pose_converter,
-                        wall_converter,
-                    );
+                    let maze = Maze::new(wall_storage, wall_converter);
                     let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
                     defaults::SearchCommander::new(
                         start,
@@ -216,19 +239,15 @@ macro_rules! impl_search_operator_test {
                     )
                 };
 
-                let commander = create_commander(WallManager::<Size>::new(existence_threshold));
-                let expected_commander = create_commander(wall_storage);
+                let commander = create_commander(Rc::clone(&wall_manager));
+                let expected_commander = create_commander(Rc::clone(&expected_wall_manager));
 
-                let operator = SearchOperator::new(
-                    agent,
-                    commander,
-                    CommandConverter2::new(Length::new::<millimeter>(90.0), front_offset),
-                );
+                let operator = SearchOperator::new(commander, agent);
                 while operator.run().is_err() {
                     stepper.step();
                     operator.tick().expect("Fail safe should never invoke");
                 }
-                let (_, commander, _) = operator.consume();
+                let commander = create_commander(Rc::clone(&wall_manager));
                 assert_eq!(
                     commander.compute_shortest_path(),
                     expected_commander.compute_shortest_path()

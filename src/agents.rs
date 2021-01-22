@@ -1,24 +1,16 @@
 mod run_agent;
-mod search_agent;
+pub mod search_agent;
 
 use uom::si::f32::{Angle, Length};
 
 pub use run_agent::{RunAgent, RunAgentError, RunTrajectoryGenerator};
-pub use search_agent::{SearchAgent, SearchAgentError, SearchTrajectoryGenerator};
-
-pub trait ObstacleDetector<State> {
-    type Obstacle;
-    type Obstacles: IntoIterator<Item = Self::Obstacle>;
-
-    fn detect(&mut self, state: &State) -> Self::Obstacles;
-}
 
 pub trait StateEstimator<Diff> {
     type State;
 
     fn init(&mut self);
     fn estimate(&mut self);
-    fn state(&self) -> Self::State;
+    fn state(&self) -> &Self::State;
     fn correct_state<Diffs: IntoIterator<Item = Diff>>(&mut self, diffs: Diffs);
 }
 

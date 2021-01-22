@@ -10,9 +10,9 @@ use uom::si::{
 };
 
 use crate::agents::StateEstimator;
-use crate::maze::CorrectInfo;
 use crate::tracker::State;
 use crate::traits::Math;
+use crate::wall_detector::CorrectInfo;
 
 pub trait IMU {
     type Error;
@@ -72,8 +72,8 @@ where
         self.bias = Default::default();
     }
 
-    fn state(&self) -> State {
-        self.state.clone()
+    fn state(&self) -> &State {
+        &self.state
     }
 
     fn estimate(&mut self) {

@@ -1,6 +1,8 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(iter_advance_by)]
 
+extern crate alloc;
+
 mod administrator;
 mod agents;
 mod command_converter;
@@ -10,33 +12,33 @@ mod estimator;
 mod maze;
 mod node;
 mod obstacle_detector;
-mod operators;
+pub mod operators;
 mod pose_converter;
 pub mod prelude;
+pub mod robot;
 mod tracker;
 mod trajectory_generator;
+pub mod trajectory_manager;
 pub mod utils;
 mod wall_converter;
+pub mod wall_detector;
 mod wall_manager;
+
+pub use agents::search_agent;
 
 pub mod traits {
     use super::*;
 
     pub use crate::utils::math::Math;
     pub use administrator::{Operator, OperatorStore, Selector};
-    pub use agents::{
-        ObstacleDetector, RunTrajectoryGenerator, SearchTrajectoryGenerator, StateEstimator,
-        Tracker,
-    };
+    pub use agents::{RunTrajectoryGenerator, StateEstimator, Tracker};
     pub use commander::{
-        BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker,
-        ObstacleInterpreter, RouteNode,
+        BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker, RouteNode,
     };
-    pub use maze::{
-        GraphNode, PoseConverter, WallConverter, WallFinderNode, WallManager, WallSpaceNode,
-    };
-    pub use operators::{CommandConverter, RunAgent, RunCommander, SearchAgent, SearchCommander};
+    pub use maze::{GraphNode, WallConverter, WallFinderNode, WallManager, WallSpaceNode};
+    pub use operators::{RunAgent, RunCommander};
     pub use tracker::{Logger, RotationController, TranslationController};
+    pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};
 }
 
 pub mod sensors {
@@ -51,7 +53,7 @@ pub mod data_types {
     use super::*;
 
     pub use agents::Pose;
-    pub use maze::{AbsoluteDirection, CorrectInfo, RelativeDirection};
+    pub use maze::{AbsoluteDirection, RelativeDirection};
     pub use node::Pattern;
     pub use obstacle_detector::Obstacle;
     pub use tracker::{AngleState, LengthState, State};
@@ -66,8 +68,8 @@ pub mod impls {
     use super::*;
 
     pub use administrator::Administrator;
-    pub use agents::{RunAgent, SearchAgent};
-    pub use command_converter::{CommandConverter, CommandConverter2};
+    pub use agents::RunAgent;
+    pub use command_converter::CommandConverter;
     pub use commander::{RunCommander, SearchCommander};
     pub use controller::{
         RotationController, RotationControllerBuilder, TranslationController,
@@ -77,7 +79,7 @@ pub mod impls {
     pub use maze::Maze;
     pub use node::{Node, RunNode, SearchNode};
     pub use obstacle_detector::ObstacleDetector;
-    pub use operators::{RunOperator, SearchOperator};
+    pub use operators::RunOperator;
     pub use pose_converter::PoseConverter;
     pub use tracker::{NullLogger, Tracker, TrackerBuilder};
     pub use trajectory_generator::{
@@ -92,44 +94,12 @@ pub mod impls {
 pub mod errors {
     use super::*;
 
-    pub use commander::{CannotCheckError, CommanderError, RunCommanderError};
-    pub use operators::FinishError;
+    pub use commander::{CannotCheckError, RunCommanderError};
     pub use pose_converter::ConversionError;
 }
 
 pub mod defaults {
     use super::*;
-
-    pub type SearchAgent<
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensor,
-        Math,
-        Logger = impls::NullLogger,
-    > = impls::SearchAgent<
-        impls::ObstacleDetector<DistanceSensor, Math>,
-        impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-        impls::Tracker<
-            LeftMotor,
-            RightMotor,
-            Math,
-            impls::TranslationController,
-            impls::RotationController,
-            Logger,
-        >,
-        impls::SearchTrajectoryGenerator<Math>,
-        <impls::SearchTrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<(
-            data_types::Pose,
-            data_types::SearchKind,
-        )>>::Trajectory,
-        <impls::SearchTrajectoryGenerator<Math> as traits::SearchTrajectoryGenerator<(
-            data_types::Pose,
-            data_types::SearchKind,
-        )>>::Target,
-    >;
 
     pub type RunAgent<
         LeftEncoder,
@@ -160,54 +130,17 @@ pub mod defaults {
         MaxPathLength,
     >;
 
-    pub type SearchCommander<Size, Math> = impls::SearchCommander<
+    pub type SearchCommander<Size> = impls::SearchCommander<
         impls::Node<Size>,
         impls::RunNode<Size>,
         impls::SearchNode<Size>,
         data_types::SearchKind,
-        impls::Maze<
-            impls::WallManager<Size>,
-            impls::PoseConverter<Size, Math>,
-            impls::WallConverter,
-            Math,
-        >,
+        impls::Maze<impls::WallManager<Size>, impls::WallConverter>,
     >;
 
-    pub type SearchOperator<
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensor,
-        Math,
-        Size,
-        Logger = impls::NullLogger,
-    > = impls::SearchOperator<
-        data_types::Obstacle,
-        (data_types::Pose, data_types::SearchKind),
-        SearchAgent<
-            LeftEncoder,
-            RightEncoder,
-            Imu,
-            LeftMotor,
-            RightMotor,
-            DistanceSensor,
-            Math,
-            Logger,
-        >,
-        SearchCommander<Size, Math>,
-        impls::CommandConverter2,
-    >;
-
-    pub type RunCommander<Size, Math> = impls::RunCommander<
+    pub type RunCommander<Size> = impls::RunCommander<
         impls::RunNode<Size>,
-        impls::Maze<
-            impls::WallManager<Size>,
-            impls::PoseConverter<Size, Math>,
-            impls::WallConverter,
-            Math,
-        >,
+        impls::Maze<impls::WallManager<Size>, impls::WallConverter>,
     >;
 
     pub type RunOperator<
@@ -232,7 +165,7 @@ pub mod defaults {
             <impls::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
-        RunCommander<Size, Math>,
+        RunCommander<Size>,
         impls::CommandConverter,
     >;
 }

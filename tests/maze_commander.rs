@@ -1,15 +1,16 @@
+extern crate alloc;
 extern crate components;
 
-use typenum::consts::*;
+use alloc::rc::Rc;
 
 use components::{
     data_types::{AbsoluteDirection, Pattern, SearchKind, Wall},
     defaults::SearchCommander,
-    impls::{Maze, PoseConverter, RunNode, WallConverter, WallManager},
+    impls::{Maze, RunNode, WallConverter, WallManager},
     prelude::*,
     utils::probability::Probability,
 };
-use utils::math::MathFake;
+use typenum::consts::*;
 
 fn cost(pattern: Pattern) -> u16 {
     use Pattern::*;
@@ -67,14 +68,13 @@ fn test_compute_shortest_path_u4() {
     ];
 
     for (walls, expected) in test_data {
-        let wall_manager = WallManager::new(Probability::new(0.1).unwrap());
+        let wall_manager = Rc::new(WallManager::new(Probability::new(0.1).unwrap()));
         for wall in walls {
             wall_manager.update(&wall, &Probability::one());
         }
 
-        let pose_converter = PoseConverter::<Size, MathFake>::default();
         let wall_converter = WallConverter::new(cost);
-        let maze = Maze::<_, _, _, MathFake>::new(wall_manager, pose_converter, wall_converter);
+        let maze = Maze::new(wall_manager, wall_converter);
         let commander = SearchCommander::new(
             start,
             goals.clone(),
