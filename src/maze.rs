@@ -25,7 +25,7 @@ macro_rules! block {
 }
 
 ///This trait should be implemented as thread safe.
-pub trait WallManager<Wall> {
+pub trait WallManager<Wall>: Send + Sync {
     type Error;
 
     fn try_existence_probability(&self, wall: &Wall) -> Result<Probability, Self::Error>;
