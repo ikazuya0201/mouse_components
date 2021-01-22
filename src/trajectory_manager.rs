@@ -96,26 +96,30 @@ where
             trajectory.as_mut().expect("Should never be None.").next()
         };
 
-        let target = {
+        let (target, is_emergency) = {
             if let Some(mut trajectories) = self.trajectories.try_lock() {
                 loop {
                     if let Some(trajectory) = trajectories.iter_mut().next() {
                         if let Some(target) = trajectory.nth(self.emergency_counter.get()) {
-                            break Some(target);
+                            break (Some(target), false);
                         }
                     } else {
-                        break get_or_init_emergency();
+                        break (get_or_init_emergency(), true);
                     }
                     trajectories.dequeue();
                 }
             } else {
-                get_or_init_emergency()
+                (get_or_init_emergency(), true)
             }
         };
-        if let Some(target) = target {
-            self.last_target.replace(target.clone());
+
+        if !is_emergency {
             self.emergency_trajectory.replace(None);
             self.emergency_counter.set(0);
+        }
+
+        if let Some(target) = target {
+            self.last_target.replace(target.clone());
             target
         } else {
             self.last_target.borrow().clone()
