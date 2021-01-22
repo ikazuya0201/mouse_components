@@ -19,6 +19,8 @@ pub mod utils;
 mod wall_converter;
 mod wall_manager;
 
+pub use agents::simple_search_agent;
+
 pub mod traits {
     use super::*;
 

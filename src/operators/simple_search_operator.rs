@@ -1,9 +1,17 @@
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use crate::administrator::{IncompletedError, Operator};
+
+#[derive(Debug)]
+pub enum UpdateError<T> {
+    EmptyTrajectory,
+    Other(T),
+}
 
 pub trait SearchAgent<Command> {
     type Error;
 
-    fn update(&self) -> Result<(), Self::Error>;
+    fn update(&self) -> Result<(), UpdateError<Self::Error>>;
     fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
 }
 
@@ -24,11 +32,16 @@ pub trait SearchCommander {
 pub struct SearchOperator<Commander, Agent> {
     commander: Commander,
     agent: Agent,
+    trajectory_is_empty: AtomicBool,
 }
 
 impl<Commander, Agent> SearchOperator<Commander, Agent> {
     pub fn new(commander: Commander, agent: Agent) -> Self {
-        Self { commander, agent }
+        Self {
+            commander,
+            agent,
+            trajectory_is_empty: AtomicBool::new(false),
+        }
     }
 }
 
@@ -46,9 +59,19 @@ where
     type Error = SearchOperatorError<Agent::Error, Commander::Error>;
 
     fn tick(&self) -> Result<(), Self::Error> {
-        self.agent
-            .update()
-            .map_err(|err| SearchOperatorError::Agent(err))
+        match self.agent.update() {
+            Ok(_) => {
+                self.trajectory_is_empty.store(false, Ordering::Release);
+                Ok(())
+            }
+            Err(err) => match err {
+                UpdateError::EmptyTrajectory => {
+                    self.trajectory_is_empty.store(true, Ordering::Release);
+                    Ok(())
+                }
+                UpdateError::Other(err) => Err(SearchOperatorError::Agent(err)),
+            },
+        }
     }
 
     fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>> {
@@ -60,7 +83,13 @@ where
                 Err(err) => Err(Err(SearchOperatorError::Agent(err))),
             },
             Err(err) => match err {
-                SearchFinish => Ok(()),
+                SearchFinish => {
+                    if self.trajectory_is_empty.load(Ordering::Acquire) {
+                        Ok(())
+                    } else {
+                        Err(Ok(IncompletedError))
+                    }
+                }
                 Waiting => Err(Ok(IncompletedError)),
                 Other(err) => Err(Err(SearchOperatorError::Commander(err))),
             },

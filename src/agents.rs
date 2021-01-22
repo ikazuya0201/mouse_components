@@ -1,5 +1,6 @@
 mod run_agent;
 mod search_agent;
+pub mod simple_search_agent;
 
 use uom::si::f32::{Angle, Length};
 
