@@ -28,8 +28,16 @@ pub struct SearchOperator<Commander, Agent> {
     agent: Agent,
 }
 
-impl<Commander, Agent> SearchOperator<Commander, Agent> {
+impl<Commander, Agent> SearchOperator<Commander, Agent>
+where
+    Commander: SearchCommander,
+    Agent: SearchAgent<Commander::Command>,
+{
     pub fn new(commander: Commander, agent: Agent) -> Self {
+        let command = commander.next_command().unwrap_or_else(|_| unreachable!());
+        agent
+            .set_command(&command)
+            .unwrap_or_else(|_| unreachable!());
         Self { commander, agent }
     }
 }
