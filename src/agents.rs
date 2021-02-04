@@ -22,6 +22,12 @@ pub trait Tracker<State, Target> {
     fn stop(&mut self);
 }
 
+pub trait Robot<Target> {
+    type Error;
+
+    fn track_and_update(&mut self, target: &Target) -> Result<(), Self::Error>;
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Pose {
     pub x: Length,

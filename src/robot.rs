@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::agents::search_agent::Robot as IRobot;
+use crate::agents::Robot as IRobot;
 use crate::agents::{StateEstimator as IEstimator, Tracker as ITracker};
 
 pub trait WallDetector<State> {
