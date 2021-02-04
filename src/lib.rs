@@ -33,7 +33,7 @@ pub mod traits {
     pub use commander::{
         BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker, RouteNode,
     };
-    pub use maze::{GraphNode, WallConverter, WallFinderNode, WallManager, WallSpaceNode};
+    pub use maze::{GraphNode, WallChecker, WallConverter, WallFinderNode, WallSpaceNode};
     pub use operators::{RunAgent, RunCommander};
     pub use tracker::{Logger, RotationController, TranslationController};
     pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};

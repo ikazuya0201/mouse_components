@@ -4,7 +4,6 @@ use heapless::Vec;
 use uom::si::f32::Length;
 
 use crate::data_types::{Obstacle, Pose};
-use crate::maze::WallManager;
 use crate::robot::WallDetector as IWallDetector;
 use crate::utils::{forced_vec::ForcedVec, math::Math as IMath, probability::Probability};
 
@@ -34,6 +33,13 @@ pub trait ObstacleDetector<State> {
     fn detect(&mut self, state: &State) -> Self::Obstacles;
 }
 
+pub trait WallProbabilityManager<Wall>: Send + Sync {
+    type Error;
+
+    fn try_existence_probability(&self, wall: &Wall) -> Result<Probability, Self::Error>;
+    fn try_update(&self, wall: &Wall, probablity: &Probability) -> Result<(), Self::Error>;
+}
+
 pub struct WallDetector<'a, Manager, Detector, Converter, Math> {
     manager: &'a Manager,
     detector: Detector,
@@ -57,7 +63,7 @@ type ObstacleSizeUpperBound = typenum::consts::U6;
 impl<'a, Manager, Detector, Converter, Math, State> IWallDetector<State>
     for WallDetector<'a, Manager, Detector, Converter, Math>
 where
-    Manager: WallManager<Converter::Wall>,
+    Manager: WallProbabilityManager<Converter::Wall>,
     Detector: ObstacleDetector<State, Obstacle = Obstacle>,
     Converter: PoseConverter<Pose>,
     Math: IMath,

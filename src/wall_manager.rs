@@ -6,8 +6,9 @@ use generic_array::{ArrayLength, GenericArray};
 use spin::Mutex;
 use typenum::{consts::U2, PowerOfTwo, Unsigned};
 
-use crate::maze::WallManager as IWallManager;
+use crate::maze::WallChecker;
 use crate::utils::{itertools::repeat_n, probability::Probability};
+use crate::wall_detector::WallProbabilityManager;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Wall<N> {
@@ -181,19 +182,19 @@ where
 
         for i in 0..max + 1 {
             //Walls on the top of maze exist.
-            self.update(i, max, true, Probability::one());
+            self._update(i, max, true, Probability::one());
 
             //Walls on the right of maze exist.
-            self.update(max, i, false, Probability::one());
+            self._update(max, i, false, Probability::one());
         }
         //A wall on the just right of start exists.
-        self.update(0, 0, false, Probability::one());
+        self._update(0, 0, false, Probability::one());
 
         //A wall on the just top of start does not exist.
-        self.update(0, 0, true, Probability::zero());
+        self._update(0, 0, true, Probability::zero());
     }
 
-    fn update(&self, x: u16, y: u16, top: bool, prob: Probability) {
+    fn _update(&self, x: u16, y: u16, top: bool, prob: Probability) {
         *self.walls[Wall::<N>::new(x, y, top)
             .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
             .to_index()]
@@ -254,9 +255,9 @@ where
                         }
                         let x = x / 4;
                         if c == '-' {
-                            self.update(x, N::U16 - y / 2 - 1, true, Probability::one());
+                            self._update(x, N::U16 - y / 2 - 1, true, Probability::one());
                         } else {
-                            self.update(x, N::U16 - y / 2 - 1, true, Probability::zero());
+                            self._update(x, N::U16 - y / 2 - 1, true, Probability::zero());
                         }
                     } else {
                         //check right walls
@@ -265,13 +266,17 @@ where
                         }
                         let x = x / 4;
                         if c == '|' {
-                            self.update(x - 1, N::U16 - y / 2 - 1, false, Probability::one());
+                            self._update(x - 1, N::U16 - y / 2 - 1, false, Probability::one());
                         } else {
-                            self.update(x - 1, N::U16 - y / 2 - 1, false, Probability::zero());
+                            self._update(x - 1, N::U16 - y / 2 - 1, false, Probability::zero());
                         }
                     }
                 });
             });
+    }
+
+    pub fn update(&self, wall: &Wall<N>, prob: &Probability) {
+        while self.try_update(wall, prob).is_err() {}
     }
 }
 
@@ -279,7 +284,7 @@ where
 pub struct MutexError;
 
 //TODO: Write test.
-impl<N> IWallManager<Wall<N>> for WallManager<N>
+impl<N> WallProbabilityManager<Wall<N>> for WallManager<N>
 where
     N: Mul<N> + Unsigned + PowerOfTwo,
     <N as Mul<N>>::Output: Mul<U2>,
@@ -298,10 +303,24 @@ where
         *self.walls[wall.to_index()].try_lock().ok_or(MutexError)? = *prob;
         Ok(())
     }
+}
 
-    #[inline]
-    fn existence_threshold(&self) -> Probability {
-        self.existence_threshold
+impl<N> WallChecker<Wall<N>> for WallManager<N>
+where
+    N: Mul<N> + Unsigned + PowerOfTwo,
+    <N as Mul<N>>::Output: Mul<U2>,
+    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
+{
+    type Error = MutexError;
+
+    fn try_is_checked(&self, wall: &Wall<N>) -> Result<bool, Self::Error> {
+        let prob = self.try_existence_probability(wall)?;
+        Ok(prob < self.existence_threshold || prob > self.existence_threshold.reverse())
+    }
+
+    fn try_exists(&self, wall: &Wall<N>) -> Result<bool, Self::Error> {
+        let prob = self.try_existence_probability(wall)?;
+        Ok(prob > self.existence_threshold.reverse())
     }
 }
 
