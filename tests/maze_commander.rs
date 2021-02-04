@@ -4,7 +4,6 @@ use components::{
     data_types::{AbsoluteDirection, Pattern, SearchKind, Wall},
     defaults::SearchCommander,
     impls::{Maze, RunNode, WallConverter, WallManager},
-    prelude::*,
     utils::probability::Probability,
 };
 use typenum::consts::*;
