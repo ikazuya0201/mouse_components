@@ -53,6 +53,15 @@ impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
     }
 }
 
+impl<LE, RE, I, M> Estimator<LE, RE, I, M> {
+    pub fn init(&mut self) {
+        self.state = self.initial_state.clone();
+        self.trans_velocity = Default::default();
+        self.angular_velocity = Default::default();
+        self.bias = Default::default();
+    }
+}
+
 impl<LE, RE, I, M> StateEstimator<CorrectInfo> for Estimator<LE, RE, I, M>
 where
     LE: Encoder,
@@ -64,13 +73,6 @@ where
     M: Math,
 {
     type State = State;
-
-    fn init(&mut self) {
-        self.state = self.initial_state.clone();
-        self.trans_velocity = Default::default();
-        self.angular_velocity = Default::default();
-        self.bias = Default::default();
-    }
 
     fn state(&self) -> &State {
         &self.state
