@@ -2,7 +2,7 @@ use core::cmp::Reverse;
 use core::convert::{Infallible, TryFrom, TryInto};
 use core::fmt::Debug;
 
-use generic_array::GenericArray;
+use generic_array::{ArrayLength, GenericArray};
 use heap::BinaryHeap;
 use heapless::{consts::*, Vec};
 use num::{Bounded, Saturating};
@@ -12,7 +12,7 @@ use typenum::Unsigned;
 use crate::operators::{
     RunCommander as IRunCommander, SearchCommander as ISearchCommander, SearchCommanderError,
 };
-use crate::utils::{array_length::ArrayLength, forced_vec::ForcedVec, itertools::repeat_n};
+use crate::utils::{forced_vec::ForcedVec, itertools::repeat_n};
 
 pub trait GraphConverter<Node> {
     type SearchNode;
