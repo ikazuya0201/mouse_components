@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, Length};
 
-use crate::data_types::{AbsoluteDirection, Pose};
+use crate::types::data::{AbsoluteDirection, Pose};
 use crate::node::Node;
 use crate::trajectory_managers::CommandConverter as ICommandConverter;
 

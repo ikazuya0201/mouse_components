@@ -10,8 +10,7 @@ use spin::Mutex;
 use typenum::Unsigned;
 
 use crate::operators::{
-    search_operator::{SearchCommander as ISearchCommander, SearchCommanderError},
-    RunCommander as IRunCommander,
+    RunCommander as IRunCommander, SearchCommander as ISearchCommander, SearchCommanderError,
 };
 use crate::utils::{array_length::ArrayLength, forced_vec::ForcedVec, itertools::repeat_n};
 

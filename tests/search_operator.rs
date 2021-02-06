@@ -2,22 +2,29 @@ use core::f32::consts::PI;
 
 use components::{
     agents::SearchAgent,
-    data_types::{
+    command_converter::CommandConverter,
+    controllers::{RotationControllerBuilder, TranslationControllerBuilder},
+    defaults,
+    estimator::EstimatorBuilder,
+    maze::Maze,
+    node::RunNode,
+    obstacle_detector::ObstacleDetector,
+    operators::SearchOperator,
+    pose_converter::PoseConverter,
+    robot::Robot,
+    tracker::TrackerBuilder,
+    trajectory_generators::{
+        slalom_parameters_map, slalom_parameters_map2, SearchTrajectoryGeneratorBuilder,
+    },
+    trajectory_managers::SearchTrajectoryManager,
+    types::data::{
         AbsoluteDirection, AngleState, LengthState, Pattern, Pose, SearchKind, SlalomDirection,
         SlalomKind, SlalomParameters, State,
     },
-    defaults,
-    impls::{
-        slalom_parameters_map, slalom_parameters_map2, CommandConverter, EstimatorBuilder, Maze,
-        ObstacleDetector, PoseConverter, RotationControllerBuilder, RunNode,
-        SearchTrajectoryGeneratorBuilder, TrackerBuilder, TranslationControllerBuilder,
-        WallConverter, WallManager,
-    },
-    operators::search_operator::SearchOperator,
-    robot::Robot,
-    trajectory_managers::SearchTrajectoryManager,
     utils::probability::Probability,
+    wall_converter::WallConverter,
     wall_detector::WallDetector,
+    wall_manager::WallManager,
 };
 use typenum::consts::*;
 use uom::si::f32::{

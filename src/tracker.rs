@@ -14,7 +14,7 @@ use uom::si::{
 use uom::{typenum::*, Kind};
 
 use super::robot::Tracker as ITracker;
-use super::trajectory_generator::{AngleTarget, MoveTarget, Target};
+use super::trajectory_generators::{AngleTarget, MoveTarget, Target};
 use crate::traits::Math;
 pub use state::{AngleState, LengthState, State};
 
@@ -51,8 +51,8 @@ pub struct Tracker<
     LM,
     RM,
     M,
-    TC = crate::impls::TranslationController,
-    RC = crate::impls::RotationController,
+    TC = crate::controllers::TranslationController,
+    RC = crate::controllers::RotationController,
     L = NullLogger,
 > {
     kx: GainType,

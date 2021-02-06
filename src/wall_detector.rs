@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use heapless::Vec;
 use uom::si::f32::Length;
 
-use crate::data_types::{Obstacle, Pose};
+use crate::types::data::{Obstacle, Pose};
 use crate::robot::WallDetector as IWallDetector;
 use crate::utils::{forced_vec::ForcedVec, math::Math as IMath, probability::Probability};
 

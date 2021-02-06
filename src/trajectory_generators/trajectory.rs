@@ -5,8 +5,8 @@ use uom::si::f32::{
     Velocity,
 };
 
-use crate::data_types::Pose;
 use crate::traits::Math;
+use crate::types::data::Pose;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Target {

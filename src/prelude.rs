@@ -2,18 +2,18 @@ pub use crate::administrator::Operator as _components_administrator_Operator;
 pub use crate::administrator::OperatorStore as _components_administrator_OperatorStore;
 pub use crate::administrator::Selector as _components_administrator_Selector;
 
-pub use crate::operators::search_operator::SearchAgent as _components_operators_search_operator_SearchAgent;
-pub use crate::operators::search_operator::SearchCommander as _components_operators_search_operator_SearchCommander;
 pub use crate::operators::RunAgent as _components_operators_run_operator_RunAgent;
 pub use crate::operators::RunCommander as _components_operators_run_operator_RunCommander;
+pub use crate::operators::SearchAgent as _components_operators_SearchAgent;
+pub use crate::operators::SearchCommander as _components_operators_SearchCommander;
 
-pub use crate::commander::BoundedNode as _components_commander_BoundedNode;
-pub use crate::commander::BoundedPathNode as _components_commander_BoundedPathNode;
-pub use crate::commander::Graph as _components_commander_Graph;
-pub use crate::commander::GraphConverter as _components_commander_GraphConverter;
-pub use crate::commander::NextNode as _components_commander_NextNode;
-pub use crate::commander::NodeChecker as _components_commander_NodeChecker;
-pub use crate::commander::RouteNode as _components_commander_RouteNode;
+pub use crate::commanders::BoundedNode as _components_commander_BoundedNode;
+pub use crate::commanders::BoundedPathNode as _components_commander_BoundedPathNode;
+pub use crate::commanders::Graph as _components_commander_Graph;
+pub use crate::commanders::GraphConverter as _components_commander_GraphConverter;
+pub use crate::commanders::NextNode as _components_commander_NextNode;
+pub use crate::commanders::NodeChecker as _components_commander_NodeChecker;
+pub use crate::commanders::RouteNode as _components_commander_RouteNode;
 
 pub use crate::robot::StateEstimator as _components_robot_StateEstimator;
 pub use crate::robot::Tracker as _components_robot_Tracker;

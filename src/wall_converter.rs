@@ -1,7 +1,7 @@
 use heapless::Vec;
 use typenum::{consts::*, Unsigned};
 
-use crate::data_types::AbsoluteDirection;
+use crate::types::data::AbsoluteDirection;
 use crate::maze::WallConverter as IWallConverter;
 use crate::node::{NodeCreationError, Pattern, SearchNode};
 use crate::utils::forced_vec::ForcedVec;

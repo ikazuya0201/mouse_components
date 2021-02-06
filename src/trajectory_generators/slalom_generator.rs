@@ -13,8 +13,8 @@ use super::straight_generator::{
     StraightTrajectoryGenerator,
 };
 use super::trajectory::{LengthTarget, MoveTarget, ShiftTrajectory, Target};
-use crate::data_types::Pose;
 use crate::traits::Math;
+use crate::types::data::Pose;
 
 #[cfg_attr(test, derive(Arbitrary))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
