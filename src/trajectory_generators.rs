@@ -8,7 +8,6 @@ use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
 
-use crate::types::data::Pose;
 use crate::traits::Math;
 use crate::trajectory_managers::{
     RunTrajectoryGenerator as IRunTrajectoryGenerator,
@@ -30,6 +29,19 @@ use uom::si::{
     },
     length::meter,
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct Pose {
+    pub x: Length,
+    pub y: Length,
+    pub theta: Angle,
+}
+
+impl Pose {
+    pub fn new(x: Length, y: Length, theta: Angle) -> Self {
+        Self { x, y, theta }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SearchKind {
