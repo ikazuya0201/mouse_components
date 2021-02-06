@@ -196,7 +196,7 @@ pub mod defaults {
         Math,
         Size,
         Logger = impls::NullLogger,
-    > = operators::search_operator::SearchOperator<
+    > = operators::SearchOperator<
         SearchCommander<'a, Size>,
         SearchAgent<
             'a,

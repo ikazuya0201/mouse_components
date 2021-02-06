@@ -2,10 +2,10 @@ pub use crate::administrator::Operator as _components_administrator_Operator;
 pub use crate::administrator::OperatorStore as _components_administrator_OperatorStore;
 pub use crate::administrator::Selector as _components_administrator_Selector;
 
-pub use crate::operators::search_operator::SearchAgent as _components_operators_search_operator_SearchAgent;
-pub use crate::operators::search_operator::SearchCommander as _components_operators_search_operator_SearchCommander;
 pub use crate::operators::RunAgent as _components_operators_run_operator_RunAgent;
 pub use crate::operators::RunCommander as _components_operators_run_operator_RunCommander;
+pub use crate::operators::SearchAgent as _components_operators_SearchAgent;
+pub use crate::operators::SearchCommander as _components_operators_SearchCommander;
 
 pub use crate::commander::BoundedNode as _components_commander_BoundedNode;
 pub use crate::commander::BoundedPathNode as _components_commander_BoundedPathNode;

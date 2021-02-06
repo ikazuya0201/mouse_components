@@ -13,7 +13,7 @@ use components::{
         SearchTrajectoryGeneratorBuilder, TrackerBuilder, TranslationControllerBuilder,
         WallConverter, WallManager,
     },
-    operators::search_operator::SearchOperator,
+    operators::SearchOperator,
     robot::Robot,
     trajectory_managers::SearchTrajectoryManager,
     utils::probability::Probability,

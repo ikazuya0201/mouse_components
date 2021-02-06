@@ -1,7 +1,7 @@
 use spin::Mutex;
 
 use crate::agents::Robot;
-use crate::operators::search_operator::SearchAgent as ISearchAgent;
+use crate::operators::SearchAgent as ISearchAgent;
 
 pub trait TrajectoryManager<Command> {
     type Error;
