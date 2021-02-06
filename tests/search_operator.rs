@@ -3,7 +3,7 @@ use core::f32::consts::PI;
 use components::{
     agents::SearchAgent,
     command_converter::CommandConverter,
-    controller::{RotationControllerBuilder, TranslationControllerBuilder},
+    controllers::{RotationControllerBuilder, TranslationControllerBuilder},
     defaults,
     estimator::EstimatorBuilder,
     maze::Maze,

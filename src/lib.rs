@@ -5,7 +5,7 @@ pub mod administrator;
 pub mod agents;
 pub mod command_converter;
 pub mod commander;
-pub mod controller;
+pub mod controllers;
 pub mod estimator;
 pub mod maze;
 pub mod node;
@@ -89,8 +89,8 @@ pub mod defaults {
                 LeftMotor,
                 RightMotor,
                 Math,
-                controller::TranslationController,
-                controller::RotationController,
+                controllers::TranslationController,
+                controllers::RotationController,
                 Logger,
             >,
             wall_detector::WallDetector<
@@ -131,8 +131,8 @@ pub mod defaults {
                 LeftMotor,
                 RightMotor,
                 Math,
-                controller::TranslationController,
-                controller::RotationController,
+                controllers::TranslationController,
+                controllers::RotationController,
                 Logger,
             >,
             wall_detector::WallDetector<
