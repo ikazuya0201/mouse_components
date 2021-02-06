@@ -97,20 +97,6 @@ where
 {
     type Error = FailSafeError;
 
-    fn stop(&mut self)
-    where
-        LM: Motor,
-        RM: Motor,
-    {
-        self.left_motor.apply(Default::default());
-        self.right_motor.apply(Default::default());
-    }
-
-    fn init(&mut self) {
-        self.translation_controller.init();
-        self.rotation_controller.init();
-    }
-
     fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error> {
         self.logger.log(&state, &target);
         let (left, right) = match target {
@@ -132,6 +118,20 @@ where
     L: Logger,
     M: Math,
 {
+    pub fn stop(&mut self)
+    where
+        LM: Motor,
+        RM: Motor,
+    {
+        self.left_motor.apply(Default::default());
+        self.right_motor.apply(Default::default());
+    }
+
+    pub fn init(&mut self) {
+        self.translation_controller.init();
+        self.rotation_controller.init();
+    }
+
     fn sinc(x: f32) -> f32 {
         let xx = x * x;
         let xxxx = xx * xx;
