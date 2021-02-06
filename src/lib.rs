@@ -4,7 +4,7 @@
 pub mod administrator;
 pub mod agents;
 pub mod command_converter;
-pub mod commander;
+pub mod commanders;
 pub mod controllers;
 pub mod estimator;
 pub mod maze;
@@ -27,7 +27,7 @@ pub mod traits {
 
     pub use crate::utils::math::Math;
     pub use administrator::{Operator, OperatorStore, Selector};
-    pub use commander::{
+    pub use commanders::{
         BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker, RouteNode,
     };
     pub use maze::{GraphNode, WallChecker, WallConverter, WallFinderNode, WallSpaceNode};
@@ -146,7 +146,7 @@ pub mod defaults {
         >,
     >;
 
-    pub type SearchCommander<'a, Size> = commander::SearchCommander<
+    pub type SearchCommander<'a, Size> = commanders::SearchCommander<
         node::Node<Size>,
         node::RunNode<Size>,
         node::SearchNode<Size>,
@@ -181,7 +181,7 @@ pub mod defaults {
         >,
     >;
 
-    pub type RunCommander<'a, Size> = commander::RunCommander<
+    pub type RunCommander<'a, Size> = commanders::RunCommander<
         node::RunNode<Size>,
         maze::Maze<'a, wall_manager::WallManager<Size>, wall_converter::WallConverter>,
     >;

@@ -4,7 +4,7 @@ use core::fmt;
 
 use heapless::{ArrayLength, Vec};
 
-use crate::commander::{BoundedNode, CannotCheckError, Graph, GraphConverter, NodeChecker};
+use crate::commanders::{BoundedNode, CannotCheckError, Graph, GraphConverter, NodeChecker};
 use crate::utils::forced_vec::ForcedVec;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 
