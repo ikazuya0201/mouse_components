@@ -1,5 +1,6 @@
 use core::cell::RefCell;
 
+use crate::agents::Robot;
 use crate::operators::search_operator::SearchAgent as ISearchAgent;
 
 pub trait TrajectoryManager<Command> {
@@ -12,12 +13,6 @@ pub trait TrajectoryManager<Command> {
 
     fn is_empty(&self) -> Result<bool, Self::Error>;
     fn is_full(&self) -> Result<bool, Self::Error>;
-}
-
-pub trait Robot<Target> {
-    type Error;
-
-    fn track_and_update(&mut self, target: &Target) -> Result<(), Self::Error>;
 }
 
 pub struct SearchAgent<Manager, Robot> {

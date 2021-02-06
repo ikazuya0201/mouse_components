@@ -8,10 +8,12 @@ use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
 
-use crate::agents::RunTrajectoryGenerator as IRunTrajectoryGenerator;
 use crate::data_types::Pose;
 use crate::traits::Math;
-use crate::trajectory_manager::SearchTrajectoryGenerator as ISearchTrajectoryGenerator;
+use crate::trajectory_managers::{
+    RunTrajectoryGenerator as IRunTrajectoryGenerator,
+    SearchTrajectoryGenerator as ISearchTrajectoryGenerator,
+};
 pub use slalom_generator::{
     slalom_parameters_map, slalom_parameters_map2, SlalomDirection, SlalomKind, SlalomParameters,
 };
@@ -297,6 +299,7 @@ where
     M: Math,
     MaxLength: ArrayLength<ShiftTrajectory<RunTrajectory<M>, M>>,
 {
+    type MaxLength = MaxLength;
     type Target = Target;
     type Trajectory = ShiftTrajectory<RunTrajectory<M>, M>;
     type Trajectories = Vec<Self::Trajectory, MaxLength>;

@@ -1,25 +1,15 @@
 mod run_agent;
-pub mod search_agent;
+mod search_agent;
 
 use uom::si::f32::{Angle, Length};
 
-pub use run_agent::{RunAgent, RunAgentError, RunTrajectoryGenerator};
+pub use run_agent::{RunAgent, TrajectoryManager as RunTrajectoryManager};
+pub use search_agent::{SearchAgent, TrajectoryManager as SearchTrajectoryManager};
 
-pub trait StateEstimator<Diff> {
-    type State;
-
-    fn init(&mut self);
-    fn estimate(&mut self);
-    fn state(&self) -> &Self::State;
-    fn correct_state<Diffs: IntoIterator<Item = Diff>>(&mut self, diffs: Diffs);
-}
-
-pub trait Tracker<State, Target> {
+pub trait Robot<Target> {
     type Error;
 
-    fn init(&mut self);
-    fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error>;
-    fn stop(&mut self);
+    fn track_and_update(&mut self, target: &Target) -> Result<(), Self::Error>;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]

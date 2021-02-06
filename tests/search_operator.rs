@@ -1,6 +1,7 @@
 use core::f32::consts::PI;
 
 use components::{
+    agents::SearchAgent,
     data_types::{
         AbsoluteDirection, AngleState, LengthState, Pattern, Pose, SearchKind, SlalomDirection,
         SlalomKind, SlalomParameters, State,
@@ -14,8 +15,7 @@ use components::{
     },
     operators::search_operator::SearchOperator,
     robot::Robot,
-    search_agent::SearchAgent,
-    trajectory_manager::TrajectoryManager,
+    trajectory_managers::SearchTrajectoryManager,
     utils::probability::Probability,
     wall_detector::WallDetector,
 };
@@ -211,7 +211,7 @@ macro_rules! impl_search_operator_test {
                         .build::<MathFake>()
                         .expect("Should never panic");
 
-                    let trajectory_manager = TrajectoryManager::new(
+                    let trajectory_manager = SearchTrajectoryManager::new(
                         trajectory_generator,
                         CommandConverter::new(Length::new::<millimeter>(90.0), front_offset),
                     );

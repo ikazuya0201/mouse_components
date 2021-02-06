@@ -1,137 +1,51 @@
 use core::cell::RefCell;
 
-use heapless::{spsc::Queue, ArrayLength};
-
-use super::{StateEstimator, Tracker};
+use crate::agents::Robot;
 use crate::operators::RunAgent as IRunAgent;
-use crate::wall_detector::CorrectInfo;
 
-pub trait RunTrajectoryGenerator<Command> {
+pub trait TrajectoryManager<Command> {
     type Target;
-    type Trajectory: Iterator<Item = Self::Target>;
-    type Trajectories: IntoIterator<Item = Self::Trajectory>;
 
-    fn generate<Commands: IntoIterator<Item = Command>>(
-        &self,
-        commands: Commands,
-    ) -> Self::Trajectories;
+    fn set_commands<Commands: IntoIterator<Item = Command>>(&self, commands: Commands);
+    fn next(&self) -> Option<Self::Target>;
 }
 
-pub struct RunAgent<
-    ObstacleDetectorType,
-    StateEstimatorType,
-    TrackerType,
-    TrajectoryGeneratorType,
-    Trajectory,
-    MaxLength,
-> where
-    MaxLength: ArrayLength<Trajectory>,
-{
-    #[allow(unused)]
-    obstacle_detector: ObstacleDetectorType,
-    state_estimator: RefCell<StateEstimatorType>,
-    tracker: RefCell<TrackerType>,
-    trajectory_generator: TrajectoryGeneratorType,
-    trajectories: RefCell<Queue<Trajectory, MaxLength>>,
+pub struct RunAgent<Manager, Robot> {
+    manager: Manager,
+    robot: RefCell<Robot>,
 }
 
-impl<
-        ObstacleDetectorType,
-        StateEstimatorType,
-        TrackerType,
-        TrajectoryGeneratorType,
-        Trajectory,
-        MaxLength,
-    >
-    RunAgent<
-        ObstacleDetectorType,
-        StateEstimatorType,
-        TrackerType,
-        TrajectoryGeneratorType,
-        Trajectory,
-        MaxLength,
-    >
-where
-    MaxLength: ArrayLength<Trajectory>,
-{
-    pub fn new(
-        obstacle_detector: ObstacleDetectorType,
-        state_estimator: StateEstimatorType,
-        tracker: TrackerType,
-        trajectory_generator: TrajectoryGeneratorType,
-    ) -> Self {
+impl<Manager, Robot> RunAgent<Manager, Robot> {
+    pub fn new(manager: Manager, robot: Robot) -> Self {
         Self {
-            obstacle_detector,
-            state_estimator: RefCell::new(state_estimator),
-            tracker: RefCell::new(tracker),
-            trajectory_generator,
-            trajectories: RefCell::new(Queue::new()),
+            manager,
+            robot: RefCell::new(robot),
         }
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunAgentError<T> {
-    TrackFinish,
-    TrackFailed(T),
+    Manager,
+    Robot(T),
 }
 
-impl<
-        Command,
-        ObstacleDetectorType,
-        StateEstimatorType,
-        TrackerType,
-        TrajectoryGeneratorType,
-        MaxLength,
-    > IRunAgent<Command>
-    for RunAgent<
-        ObstacleDetectorType,
-        StateEstimatorType,
-        TrackerType,
-        TrajectoryGeneratorType,
-        TrajectoryGeneratorType::Trajectory,
-        MaxLength,
-    >
+impl<Command, Manager, RobotType> IRunAgent<Command> for RunAgent<Manager, RobotType>
 where
-    StateEstimatorType: StateEstimator<CorrectInfo>,
-    TrackerType: Tracker<StateEstimatorType::State, TrajectoryGeneratorType::Target>,
-    TrajectoryGeneratorType: RunTrajectoryGenerator<Command>,
-    MaxLength: ArrayLength<TrajectoryGeneratorType::Trajectory>,
+    Manager: TrajectoryManager<Command>,
+    RobotType: Robot<Manager::Target>,
 {
-    type Error = RunAgentError<TrackerType::Error>;
+    type Error = RunAgentError<RobotType::Error>;
 
     fn set_commands<Commands: IntoIterator<Item = Command>>(&self, commands: Commands) {
-        for trajectory in self.trajectory_generator.generate(commands) {
-            self.trajectories
-                .borrow_mut()
-                .enqueue(trajectory)
-                .unwrap_or_else(|_| {
-                    unreachable!("The length of trajectory queue should never be exceeded.")
-                });
-        }
+        self.manager.set_commands(commands);
     }
 
     fn track_next(&self) -> Result<(), Self::Error> {
-        let mut trajectories = self.trajectories.borrow_mut();
-        loop {
-            if trajectories.is_empty() {
-                self.tracker.borrow_mut().stop();
-                return Err(RunAgentError::TrackFinish);
-            }
-            let trajectory = trajectories.iter_mut().next().unwrap();
-            if let Some(target) = trajectory.next() {
-                self.state_estimator.borrow_mut().estimate();
-                if let Err(err) = self
-                    .tracker
-                    .borrow_mut()
-                    .track(self.state_estimator.borrow().state(), &target)
-                {
-                    self.tracker.borrow_mut().stop();
-                    return Err(RunAgentError::TrackFailed(err));
-                }
-                return Ok(());
-            }
-            trajectories.dequeue();
-        }
+        let target = self.manager.next().ok_or(RunAgentError::Manager)?;
+        self.robot
+            .borrow_mut()
+            .track_and_update(&target)
+            .map_err(|err| RunAgentError::Robot(err))
     }
 }

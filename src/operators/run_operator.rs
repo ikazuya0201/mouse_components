@@ -1,7 +1,6 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::administrator::{IncompletedError, Operator};
-use crate::trajectory_manager::CommandConverter;
 
 pub trait RunCommander {
     type Error;
@@ -18,46 +17,37 @@ pub trait RunAgent<Command> {
     fn track_next(&self) -> Result<(), Self::Error>;
 }
 
-pub struct RunOperator<Agent, Commander, Converter> {
+pub struct RunOperator<Agent, Commander> {
     is_completed: AtomicBool,
     agent: Agent,
     #[allow(unused)]
     commander: Commander,
-    #[allow(unused)]
-    converter: Converter,
 }
 
-impl<Agent, Commander, Converter> RunOperator<Agent, Commander, Converter>
+impl<Agent, Commander> RunOperator<Agent, Commander>
 where
-    Agent: RunAgent<Converter::Output>,
-    Converter: CommandConverter<Commander::Command>,
+    Agent: RunAgent<Commander::Command>,
     Commander: RunCommander,
     Commander::Error: core::fmt::Debug,
 {
-    pub fn new(agent: Agent, commander: Commander, converter: Converter) -> Self {
+    pub fn new(agent: Agent, commander: Commander) -> Self {
         let commands = commander
             .compute_commands()
             .unwrap_or_else(|err| todo!("Error handling is not implemented: {:?}", err));
 
-        agent.set_commands(
-            commands
-                .into_iter()
-                .map(|command| converter.convert(&command)),
-        );
+        agent.set_commands(commands);
 
         Self {
             is_completed: AtomicBool::new(false),
             agent,
             commander,
-            converter,
         }
     }
 }
 
-impl<Agent, Commander, Converter> Operator for RunOperator<Agent, Commander, Converter>
+impl<Agent, Commander> Operator for RunOperator<Agent, Commander>
 where
-    Agent: RunAgent<Converter::Output>,
-    Converter: CommandConverter<Commander::Command>,
+    Agent: RunAgent<Commander::Command>,
     Commander: RunCommander,
 {
     type Error = core::convert::Infallible;
