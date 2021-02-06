@@ -5,7 +5,7 @@ use uom::si::f32::{Angle, Length};
 
 use crate::data_types::{AbsoluteDirection, Pose};
 use crate::node::Node;
-use crate::trajectory_manager::CommandConverter as ICommandConverter;
+use crate::trajectory_managers::CommandConverter as ICommandConverter;
 
 //NOTE: This struct is intended to be used by SearchOperator
 #[derive(Clone, PartialEq, Debug)]

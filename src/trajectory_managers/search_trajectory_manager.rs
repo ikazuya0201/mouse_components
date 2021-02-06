@@ -3,7 +3,8 @@ use core::cell::{Cell, RefCell};
 use heapless::{consts::*, spsc::Queue};
 use spin::Mutex;
 
-use crate::agents::search_agent::TrajectoryManager as ITrajectoryManager;
+use crate::agents::SearchTrajectoryManager;
+use crate::trajectory_managers::CommandConverter;
 
 pub trait SearchTrajectoryGenerator<Command> {
     type Target;
@@ -11,12 +12,6 @@ pub trait SearchTrajectoryGenerator<Command> {
 
     fn generate_search(&self, command: &Command) -> Self::Trajectory;
     fn generate_emergency(&self, target: &Self::Target) -> Self::Trajectory;
-}
-
-pub trait CommandConverter<Command> {
-    type Output;
-
-    fn convert(&self, source: &Command) -> Self::Output;
 }
 
 type QueueLength = U3;
@@ -54,7 +49,7 @@ pub enum TrajectoryManagerError {
     FullQueue,
 }
 
-impl<Generator, Converter, Command> ITrajectoryManager<Command>
+impl<Generator, Converter, Command> SearchTrajectoryManager<Command>
     for TrajectoryManager<Generator, Converter, Generator::Target, Generator::Trajectory>
 where
     Generator: SearchTrajectoryGenerator<Converter::Output>,

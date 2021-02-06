@@ -4,4 +4,3 @@ where
 {
     core::iter::repeat(val).take(count)
 }
-

@@ -2,7 +2,7 @@
 #![feature(iter_advance_by)]
 
 mod administrator;
-mod agents;
+pub mod agents;
 mod command_converter;
 mod commander;
 mod controller;
@@ -16,20 +16,17 @@ pub mod prelude;
 pub mod robot;
 mod tracker;
 mod trajectory_generator;
-pub mod trajectory_manager;
+pub mod trajectory_managers;
 pub mod utils;
 mod wall_converter;
 pub mod wall_detector;
 mod wall_manager;
-
-pub use agents::search_agent;
 
 pub mod traits {
     use super::*;
 
     pub use crate::utils::math::Math;
     pub use administrator::{Operator, OperatorStore, Selector};
-    pub use agents::{RunTrajectoryGenerator, StateEstimator, Tracker};
     pub use commander::{
         BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker, RouteNode,
     };
@@ -100,32 +97,42 @@ pub mod defaults {
     use super::*;
 
     pub type RunAgent<
+        'a,
         LeftEncoder,
         RightEncoder,
         Imu,
         LeftMotor,
         RightMotor,
         DistanceSensor,
+        Size,
         Math,
         MaxPathLength,
         Logger = impls::NullLogger,
     > = impls::RunAgent<
-        impls::ObstacleDetector<DistanceSensor, Math>,
-        impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-        impls::Tracker<
-            LeftMotor,
-            RightMotor,
-            Math,
-            impls::TranslationController,
-            impls::RotationController,
-            Logger,
+        trajectory_managers::RunTrajectoryManager<
+            (impls::RunNode<Size>, data_types::RunKind),
+            impls::RunTrajectoryGenerator<Math, MaxPathLength>,
+            impls::CommandConverter,
         >,
-        impls::RunTrajectoryGenerator<Math, MaxPathLength>,
-        <impls::RunTrajectoryGenerator<Math, MaxPathLength> as traits::RunTrajectoryGenerator<(
-            data_types::Pose,
-            data_types::RunKind,
-        )>>::Trajectory,
-        MaxPathLength,
+        robot::Robot<
+            impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
+            impls::Tracker<
+                LeftMotor,
+                RightMotor,
+                Math,
+                impls::TranslationController,
+                impls::RotationController,
+                Logger,
+            >,
+            wall_detector::WallDetector<
+                'a,
+                impls::WallManager<Size>,
+                impls::ObstacleDetector<DistanceSensor, Math>,
+                impls::PoseConverter<Size, Math>,
+                Math,
+            >,
+            data_types::State,
+        >,
     >;
 
     pub type SearchAgent<
@@ -139,12 +146,12 @@ pub mod defaults {
         Size,
         Math,
         Logger,
-    > = search_agent::SearchAgent<
-        trajectory_manager::TrajectoryManager<
+    > = agents::SearchAgent<
+        trajectory_managers::SearchTrajectoryManager<
             impls::SearchTrajectoryGenerator<Math>,
             impls::CommandConverter,
             data_types::Target,
-            <impls::SearchTrajectoryGenerator<Math> as trajectory_manager::SearchTrajectoryGenerator<(
+            <impls::SearchTrajectoryGenerator<Math> as trajectory_managers::SearchTrajectoryGenerator<(
                 data_types::Pose,
                 data_types::SearchKind,
             )>>::Trajectory,
@@ -223,17 +230,18 @@ pub mod defaults {
         Logger = impls::NullLogger,
     > = impls::RunOperator<
         RunAgent<
+            'a,
             LeftEncoder,
             RightEncoder,
             Imu,
             LeftMotor,
             RightMotor,
             DistanceSensor,
+            Size,
             Math,
             <impls::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
         RunCommander<'a, Size>,
-        impls::CommandConverter,
     >;
 }

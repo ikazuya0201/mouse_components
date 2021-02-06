@@ -13,7 +13,7 @@ use uom::si::{
 };
 use uom::{typenum::*, Kind};
 
-use super::agents::Tracker as ITracker;
+use super::robot::Tracker as ITracker;
 use super::trajectory_generator::{AngleTarget, MoveTarget, Target};
 use crate::traits::Math;
 pub use state::{AngleState, LengthState, State};

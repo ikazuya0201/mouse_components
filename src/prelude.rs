@@ -15,9 +15,8 @@ pub use crate::commander::NextNode as _components_commander_NextNode;
 pub use crate::commander::NodeChecker as _components_commander_NodeChecker;
 pub use crate::commander::RouteNode as _components_commander_RouteNode;
 
-pub use crate::agents::RunTrajectoryGenerator as _components_agents_RunTrajectoryGenerator;
-pub use crate::agents::StateEstimator as _components_agents_StateEstimator;
-pub use crate::agents::Tracker as _components_agents_Tracker;
+pub use crate::robot::StateEstimator as _components_robot_StateEstimator;
+pub use crate::robot::Tracker as _components_robot_Tracker;
 
 pub use crate::tracker::RotationController as _components_tracker_RotationController;
 pub use crate::tracker::TranslationController as _components_tracker_TranslationController;
@@ -34,8 +33,9 @@ pub use crate::maze::WallChecker as _components_maze_WallManager;
 pub use crate::maze::WallFinderNode as _components_maze_WallFinderNode;
 pub use crate::maze::WallSpaceNode as _components_maze_WallSpaceNode;
 
-pub use crate::trajectory_manager::CommandConverter as _components_trajectory_manager_CommandConverter;
-pub use crate::trajectory_manager::SearchTrajectoryGenerator as _components_trajectory_manager_SearchTrajectoryGenerator;
+pub use crate::trajectory_managers::CommandConverter as _components_trajectory_managers_CommandConverter;
+pub use crate::trajectory_managers::RunTrajectoryGenerator as _components_trajectory_managers_RunTrajectoryGenerator;
+pub use crate::trajectory_managers::SearchTrajectoryGenerator as _components_trajectory_managers_SearchTrajectoryGenerator;
 
 pub use crate::wall_detector::ObstacleDetector as _components_wall_detector_ObstacleDetector;
 pub use crate::wall_detector::PoseConverter as _components_wall_detector_PoseConverter;

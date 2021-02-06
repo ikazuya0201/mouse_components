@@ -10,11 +10,15 @@ use components::{
     defaults,
     impls::{
         slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
-        RotationControllerBuilder, RunAgent, RunNode, RunOperator, RunTrajectoryGeneratorBuilder,
-        TrackerBuilder, TranslationControllerBuilder, WallConverter, WallManager,
+        PoseConverter, RotationControllerBuilder, RunAgent, RunNode, RunOperator,
+        RunTrajectoryGeneratorBuilder, TrackerBuilder, TranslationControllerBuilder, WallConverter,
+        WallManager,
     },
     prelude::*,
+    robot::Robot,
+    trajectory_managers::RunTrajectoryManager,
     utils::probability::Probability,
+    wall_detector::WallDetector,
 };
 use typenum::consts::*;
 use uom::si::f32::{
@@ -34,7 +38,7 @@ use uom::si::{
     velocity::meter_per_second,
 };
 use utils::math::MathFake;
-use utils::sensors::{AgentSimulator, DistanceSensor, Encoder, Motor, IMU};
+use utils::sensors::AgentSimulator;
 
 fn cost(pattern: Pattern) -> u16 {
     use Pattern::*;
@@ -140,83 +144,86 @@ fn test_run_operator() {
         distance_sensors,
     ) = simulator.split(wheel_interval);
 
-    let agent: defaults::RunAgent<
-        Encoder,
-        Encoder,
-        IMU,
-        Motor,
-        Motor,
-        DistanceSensor<Size>,
-        MathFake,
-        MaxPathLength,
-        _,
-    > = {
-        let estimator = {
-            EstimatorBuilder::new()
-                .left_encoder(left_encoder)
-                .right_encoder(right_encoder)
-                .imu(imu)
-                .period(period)
-                .cut_off_frequency(Frequency::new::<hertz>(50.0))
-                .initial_state(start_state)
-                .wheel_interval(wheel_interval)
-                .build::<MathFake>()
-                .unwrap()
+    let agent = {
+        let robot = {
+            let estimator = {
+                EstimatorBuilder::new()
+                    .left_encoder(left_encoder)
+                    .right_encoder(right_encoder)
+                    .imu(imu)
+                    .period(period)
+                    .cut_off_frequency(Frequency::new::<hertz>(50.0))
+                    .initial_state(start_state)
+                    .wheel_interval(wheel_interval)
+                    .build::<MathFake>()
+                    .unwrap()
+            };
+
+            let tracker = {
+                let trans_controller = TranslationControllerBuilder::new()
+                    .kp(0.9)
+                    .ki(0.05)
+                    .kd(0.01)
+                    .period(period)
+                    .model_gain(trans_model_gain)
+                    .model_time_constant(trans_model_time_constant)
+                    .build();
+
+                let rot_controller = RotationControllerBuilder::new()
+                    .kp(0.2)
+                    .ki(0.2)
+                    .kd(0.0)
+                    .period(period)
+                    .model_gain(rot_model_gain)
+                    .model_time_constant(rot_model_time_constant)
+                    .build();
+
+                TrackerBuilder::new()
+                    .right_motor(right_motor)
+                    .left_motor(left_motor)
+                    .period(period)
+                    .kx(40.0)
+                    .kdx(4.0)
+                    .ky(40.0)
+                    .kdy(4.0)
+                    .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
+                    .translation_controller(trans_controller)
+                    .rotation_controller(rot_controller)
+                    .low_zeta(1.0)
+                    .low_b(1e-3)
+                    .fail_safe_distance(Length::new::<meter>(0.05))
+                    .build::<MathFake>()
+            };
+
+            let wall_detector = {
+                let obstacle_detector = ObstacleDetector::<_, MathFake>::new(distance_sensors);
+                let pose_converter = PoseConverter::<Size, MathFake>::default();
+                WallDetector::<_, _, _, MathFake>::new(
+                    &wall_storage,
+                    obstacle_detector,
+                    pose_converter,
+                )
+            };
+            Robot::new(estimator, tracker, wall_detector)
         };
-
-        let tracker = {
-            let trans_controller = TranslationControllerBuilder::new()
-                .kp(0.9)
-                .ki(0.05)
-                .kd(0.01)
+        let trajectory_manager = {
+            let trajectory_generator = RunTrajectoryGeneratorBuilder::new()
                 .period(period)
-                .model_gain(trans_model_gain)
-                .model_time_constant(trans_model_time_constant)
-                .build();
-
-            let rot_controller = RotationControllerBuilder::new()
-                .kp(0.2)
-                .ki(0.2)
-                .kd(0.0)
-                .period(period)
-                .model_gain(rot_model_gain)
-                .model_time_constant(rot_model_time_constant)
-                .build();
-
-            TrackerBuilder::new()
-                .right_motor(right_motor)
-                .left_motor(left_motor)
-                .period(period)
-                .kx(40.0)
-                .kdx(4.0)
-                .ky(40.0)
-                .kdy(4.0)
-                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
-                .translation_controller(trans_controller)
-                .rotation_controller(rot_controller)
-                .low_zeta(1.0)
-                .low_b(1e-3)
-                .fail_safe_distance(Length::new::<meter>(0.05))
-                .build::<MathFake>()
+                .max_velocity(Velocity::new::<meter_per_second>(2.0))
+                .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
+                .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
+                .slalom_parameters_map(slalom_parameters_map)
+                .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
+                .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
+                    36.0 * PI,
+                ))
+                .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
+                .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
+                .build::<MathFake, MaxPathLength>()
+                .expect("Should never panic");
+            RunTrajectoryManager::new(trajectory_generator, CommandConverter::default())
         };
-
-        let trajectory_generator = RunTrajectoryGeneratorBuilder::new()
-            .period(period)
-            .max_velocity(Velocity::new::<meter_per_second>(2.0))
-            .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
-            .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
-            .slalom_parameters_map(slalom_parameters_map)
-            .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
-            .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
-                36.0 * PI,
-            ))
-            .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
-            .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
-            .build::<MathFake, MaxPathLength>()
-            .expect("Should never panic");
-
-        let obstacle_detector = ObstacleDetector::<_, MathFake>::new(distance_sensors);
-        RunAgent::new(obstacle_detector, estimator, tracker, trajectory_generator)
+        RunAgent::new(trajectory_manager, robot)
     };
 
     use AbsoluteDirection::*;
@@ -232,7 +239,7 @@ fn test_run_operator() {
         defaults::RunCommander::new(start, goals, maze)
     };
 
-    let operator = RunOperator::new(agent, commander, CommandConverter::default());
+    let operator = RunOperator::new(agent, commander);
     while operator.run().is_err() {
         stepper.step();
         assert!(!operator.tick().is_err());
