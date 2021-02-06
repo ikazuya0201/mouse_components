@@ -1,3 +1,5 @@
+//! Components for implementing a code of [Micromouse contest](https://www.ntf.or.jp/mouse/).
+
 #![cfg_attr(not(test), no_std)]
 #![feature(iter_advance_by)]
 

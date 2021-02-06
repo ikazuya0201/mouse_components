@@ -1,3 +1,5 @@
+//! Definition of [Maze](crate::maze::Maze) and its dependent traits.
+
 mod direction;
 
 use core::fmt;
@@ -18,7 +20,7 @@ macro_rules! block {
     };
 }
 
-///This trait should be implemented as thread safe.
+/// A trait that checks states of walls.
 pub trait WallChecker<Wall>: Send + Sync {
     type Error;
 
@@ -34,16 +36,19 @@ pub trait WallChecker<Wall>: Send + Sync {
     }
 }
 
+/// An enum that represents a wall or node.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum WallNode<Wall, Node> {
     Wall(Wall),
     Node(Node),
 }
 
+/// A trait that specified the corresponding wall of a node.
 pub trait WallSpaceNode {
     type Wall;
 }
 
+/// A trait that enumerates wall-node successors and predecessors of a node.
 pub trait GraphNode: Sized + WallSpaceNode {
     type NeighborNum;
     type Cost;
@@ -54,12 +59,14 @@ pub trait GraphNode: Sized + WallSpaceNode {
     fn predecessors(&self) -> Self::WallNodesList;
 }
 
+/// A trait that enumerates walls between two nodes.
 pub trait WallFinderNode: WallSpaceNode {
     type Walls: IntoIterator<Item = Self::Wall>;
 
     fn walls_between(&self, other: &Self) -> Self::Walls;
 }
 
+/// A trait that converts a wall to corresponding SearchNodes.
 pub trait WallConverter<Wall> {
     type Error;
     type SearchNode;
@@ -68,6 +75,10 @@ pub trait WallConverter<Wall> {
     fn convert(&self, wall: &Wall) -> Result<Self::SearchNodes, Self::Error>;
 }
 
+/// An implementation of [Graph](crate::commanders::Graph),
+/// [GraphConverter](crate::commanders::GraphConverter) and
+/// [NodeChecker](crate::commanders::NodeChecker) required by
+/// [SearchCommander](crate::commanders::SearchCommander).
 pub struct Maze<'a, Manager, WallConverterType> {
     manager: &'a Manager,
     wall_converter: WallConverterType,
