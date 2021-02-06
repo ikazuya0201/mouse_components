@@ -5,7 +5,7 @@ use typenum::{consts::*, PowerOfTwo, Unsigned};
 use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
 
-use crate::data_types::Pose;
+use crate::types::data::Pose;
 use crate::utils::{math::Math, total::Total};
 use crate::wall_detector::{PoseConverter as IPoseConverter, WallInfo};
 use crate::wall_manager::Wall;
@@ -296,7 +296,7 @@ mod tests {
     use uom::si::f32::Angle;
 
     use super::*;
-    use crate::data_types::Pose;
+    use crate::types::data::Pose;
     use crate::utils::math::MathFake;
 
     macro_rules! convert_ok_tests {

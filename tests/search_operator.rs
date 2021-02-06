@@ -2,7 +2,7 @@ use core::f32::consts::PI;
 
 use components::{
     agents::SearchAgent,
-    data_types::{
+    types::data::{
         AbsoluteDirection, AngleState, LengthState, Pattern, Pose, SearchKind, SlalomDirection,
         SlalomKind, SlalomParameters, State,
     },

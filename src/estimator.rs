@@ -262,7 +262,7 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
 mod tests {
     use super::*;
     use crate::{
-        data_types::{AngleState, LengthState, Pose, SearchKind, Target},
+        types::data::{AngleState, LengthState, Pose, SearchKind, Target},
         impls::{SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder},
         prelude::*,
         trajectory_generator::slalom_parameters_map,

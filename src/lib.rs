@@ -36,27 +36,30 @@ pub mod traits {
     pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};
 }
 
+pub mod types {
+    use super::*;
+    pub mod data {
+        use super::*;
+
+        pub use agents::Pose;
+        pub use maze::{AbsoluteDirection, RelativeDirection};
+        pub use node::Pattern;
+        pub use obstacle_detector::Obstacle;
+        pub use tracker::{AngleState, LengthState, State};
+        pub use trajectory_generator::{
+            AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection,
+            SlalomKind, SlalomParameters, Target,
+        };
+        pub use wall_manager::Wall;
+    }
+}
+
 pub mod sensors {
     use super::*;
 
     pub use estimator::{Encoder, IMU};
     pub use obstacle_detector::DistanceSensor;
     pub use tracker::Motor;
-}
-
-pub mod data_types {
-    use super::*;
-
-    pub use agents::Pose;
-    pub use maze::{AbsoluteDirection, RelativeDirection};
-    pub use node::Pattern;
-    pub use obstacle_detector::Obstacle;
-    pub use tracker::{AngleState, LengthState, State};
-    pub use trajectory_generator::{
-        AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection, SlalomKind,
-        SlalomParameters, Target,
-    };
-    pub use wall_manager::Wall;
 }
 
 pub mod impls {
@@ -110,7 +113,7 @@ pub mod defaults {
         Logger = impls::NullLogger,
     > = impls::RunAgent<
         trajectory_managers::RunTrajectoryManager<
-            (impls::RunNode<Size>, data_types::RunKind),
+            (impls::RunNode<Size>, types::data::RunKind),
             impls::RunTrajectoryGenerator<Math, MaxPathLength>,
             impls::CommandConverter,
         >,
@@ -131,7 +134,7 @@ pub mod defaults {
                 impls::PoseConverter<Size, Math>,
                 Math,
             >,
-            data_types::State,
+            types::data::State,
         >,
     >;
 
@@ -150,10 +153,10 @@ pub mod defaults {
         trajectory_managers::SearchTrajectoryManager<
             impls::SearchTrajectoryGenerator<Math>,
             impls::CommandConverter,
-            data_types::Target,
+            types::data::Target,
             <impls::SearchTrajectoryGenerator<Math> as trajectory_managers::SearchTrajectoryGenerator<(
-                data_types::Pose,
-                data_types::SearchKind,
+                types::data::Pose,
+                types::data::SearchKind,
             )>>::Trajectory,
         >,
         robot::Robot<
@@ -173,7 +176,7 @@ pub mod defaults {
                 impls::PoseConverter<Size, Math>,
                 Math,
             >,
-            data_types::State,
+            types::data::State,
         >,
     >;
 
@@ -181,7 +184,7 @@ pub mod defaults {
         impls::Node<Size>,
         impls::RunNode<Size>,
         impls::SearchNode<Size>,
-        data_types::SearchKind,
+        types::data::SearchKind,
         impls::Maze<'a, impls::WallManager<Size>, impls::WallConverter>,
     >;
 

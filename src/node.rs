@@ -5,7 +5,7 @@ use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use crate::commander::{BoundedNode, BoundedPathNode, NextNode, RouteNode};
-use crate::data_types::{AbsoluteDirection, RelativeDirection};
+use crate::types::data::{AbsoluteDirection, RelativeDirection};
 use crate::maze::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generator::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;

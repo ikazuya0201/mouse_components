@@ -5,13 +5,13 @@ use core::convert::Infallible;
 use core::ops::Mul;
 
 use components::{
-    data_types::{Pose, State},
     errors::ConversionError,
     impls::{PoseConverter, WallManager},
     prelude::*,
     sensors::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
     },
+    types::data::{Pose, State},
     utils::{probability::Probability, sample::Sample},
 };
 use generic_array::ArrayLength;

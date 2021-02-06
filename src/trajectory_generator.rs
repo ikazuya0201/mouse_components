@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
 
-use crate::data_types::Pose;
+use crate::types::data::Pose;
 use crate::traits::Math;
 use crate::trajectory_managers::{
     RunTrajectoryGenerator as IRunTrajectoryGenerator,

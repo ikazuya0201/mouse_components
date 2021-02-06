@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use heapless::Vec;
 use uom::si::f32::Length;
 
-use crate::data_types::Pose;
+use crate::types::data::Pose;
 use crate::tracker::State;
 use crate::utils::{math::Math, sample::Sample};
 use crate::wall_detector::ObstacleDetector as IObstacleDetector;
@@ -73,7 +73,7 @@ mod tests {
     use uom::si::{angle::degree, f32::Angle, length::meter};
 
     use super::*;
-    use crate::data_types::Pose;
+    use crate::types::data::Pose;
     use crate::utils::math::MathFake;
 
     struct IDistanceSensor {

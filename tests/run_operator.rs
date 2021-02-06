@@ -6,7 +6,7 @@ extern crate typenum;
 use core::f32::consts::PI;
 
 use components::{
-    data_types::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, State},
+    types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, State},
     defaults,
     impls::{
         slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
