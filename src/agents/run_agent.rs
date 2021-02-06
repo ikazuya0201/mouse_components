@@ -1,4 +1,4 @@
-use core::cell::RefCell;
+use spin::Mutex;
 
 use crate::agents::Robot;
 use crate::operators::RunAgent as IRunAgent;
@@ -12,14 +12,14 @@ pub trait TrajectoryManager<Command> {
 
 pub struct RunAgent<Manager, Robot> {
     manager: Manager,
-    robot: RefCell<Robot>,
+    robot: Mutex<Robot>,
 }
 
 impl<Manager, Robot> RunAgent<Manager, Robot> {
     pub fn new(manager: Manager, robot: Robot) -> Self {
         Self {
             manager,
-            robot: RefCell::new(robot),
+            robot: Mutex::new(robot),
         }
     }
 }
@@ -44,7 +44,7 @@ where
     fn track_next(&self) -> Result<(), Self::Error> {
         let target = self.manager.next().ok_or(RunAgentError::Manager)?;
         self.robot
-            .borrow_mut()
+            .lock()
             .track_and_update(&target)
             .map_err(|err| RunAgentError::Robot(err))
     }
