@@ -27,6 +27,9 @@ pub trait Encoder {
     fn get_relative_distance(&mut self) -> nb::Result<Length, Self::Error>;
 }
 
+/// An implementation of [StateEstimator](crate::robot::StateEstimator).
+///
+/// This should be created by [EstimatorBuilder](EstimatorBuilder).
 pub struct Estimator<LE, RE, I, M> {
     period: Time,
     alpha: f32,
@@ -147,6 +150,27 @@ where
     }
 }
 
+//TODO: Use a testable example.
+/// A builder for [Estimator](Estimator).
+///
+/// # Example
+///
+/// ```text
+/// use components::estimator::EstimatorBuilder;
+/// use uom::si::f32::{Length, Frequency, Time};
+/// use uom::si::{length::meter, frequency::hertz, time::second};
+///
+/// let mut estimator = EstimatorBuilder::new()
+///     .left_encoder(left_encoder)
+///     .right_encoder(right_encoder)
+///     .imu(imu)
+///     .period(Time::new::<second>(0.001))
+///     .cut_off_frequency(Frequency::new::<hertz>(50.0))
+///     .wheel_interval(Length::new::<meter>(0.035))
+///     .correction_weight(0.1)
+///     .build::<Math>()
+///     .unwrap();
+/// ```
 pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     left_encoder: Option<LeftEncoder>,
     right_encoder: Option<RightEncoder>,
