@@ -28,6 +28,7 @@ pub trait WallDetector<State> {
 }
 
 /// An implementation of [Robot](crate::agents::Robot).
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Robot<Estimator, Tracker, Detector, State> {
     estimator: Estimator,
     tracker: Tracker,
