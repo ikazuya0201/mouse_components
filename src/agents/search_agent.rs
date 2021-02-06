@@ -1,4 +1,4 @@
-use core::cell::RefCell;
+use spin::Mutex;
 
 use crate::agents::Robot;
 use crate::operators::search_operator::SearchAgent as ISearchAgent;
@@ -17,14 +17,14 @@ pub trait TrajectoryManager<Command> {
 
 pub struct SearchAgent<Manager, Robot> {
     manager: Manager,
-    robot: RefCell<Robot>,
+    robot: Mutex<Robot>,
 }
 
 impl<Manager, Robot> SearchAgent<Manager, Robot> {
     pub fn new(manager: Manager, robot: Robot) -> Self {
         Self {
             manager,
-            robot: RefCell::new(robot),
+            robot: Mutex::new(robot),
         }
     }
 }
@@ -45,7 +45,7 @@ where
     fn update(&self) -> Result<(), Self::Error> {
         let target = self.manager.next();
         self.robot
-            .borrow_mut()
+            .lock()
             .track_and_update(&target)
             .map_err(|err| SearchAgentError::Robot(err))
     }
