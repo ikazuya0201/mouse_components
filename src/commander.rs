@@ -1,4 +1,3 @@
-use core::cell::{Cell, RefCell};
 use core::cmp::Reverse;
 use core::convert::{Infallible, TryFrom, TryInto};
 use core::fmt::Debug;
@@ -7,6 +6,7 @@ use generic_array::GenericArray;
 use heap::BinaryHeap;
 use heapless::{consts::*, Vec};
 use num::{Bounded, Saturating};
+use spin::Mutex;
 use typenum::Unsigned;
 
 use crate::operators::{
@@ -80,9 +80,9 @@ pub struct SearchCommander<Node, RunNode, SearchNode, Route, Maze> {
     goals: Vec<RunNode, GoalSizeUpperBound>,
     initial_route: Route,
     final_route: Route,
-    current: RefCell<Node>,
-    state: Cell<State>,
-    candidates: RefCell<Vec<SearchNode, CandidateSizeUpperBound>>,
+    current: Mutex<Node>,
+    state: Mutex<State>,
+    candidates: Mutex<Vec<SearchNode, CandidateSizeUpperBound>>,
     maze: Maze,
 }
 
@@ -103,9 +103,9 @@ where
             goals: goals.into_iter().collect(),
             initial_route,
             final_route,
-            current: RefCell::new(start.into()),
-            state: Cell::new(State::Initial),
-            candidates: RefCell::new(Vec::new()),
+            current: Mutex::new(start.into()),
+            state: Mutex::new(State::Initial),
+            candidates: Mutex::new(Vec::new()),
             maze,
         }
     }
@@ -118,7 +118,7 @@ where
     SearchNode: core::fmt::Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        writeln!(f, "candidates: {:?}", self.candidates.borrow())?;
+        writeln!(f, "candidates: {:?}", self.candidates.lock())?;
         writeln!(f, "maze: {:?}", &self.maze)
     }
 }
@@ -158,39 +158,41 @@ where
     //must return the current pose and next kind
     //TODO: write test
     fn next_command(&self) -> Result<Self::Command, SearchCommanderError<Self::Error>> {
-        match self.state.get() {
+        let mut state = self.state.lock();
+        match *state {
             State::Initial => {
-                let current = self.current.replace_with(|node| {
-                    node.next(&self.initial_route)
-                        .unwrap_or_else(|_| unreachable!())
-                });
-                self.state.set(State::Solving);
-                Ok((current, self.initial_route.clone()))
+                let mut current = self.current.lock();
+                let mut next = current
+                    .next(&self.initial_route)
+                    .unwrap_or_else(|_| unreachable!());
+                core::mem::swap(&mut *current, &mut next);
+                *state = State::Solving;
+                Ok((next, self.initial_route.clone()))
             }
             State::Final => Err(SearchCommanderError::SearchFinish),
             State::Solving => {
-                let mut current = self.current.borrow_mut();
+                let mut current = self.current.lock();
                 if let Some(candidates) = self.next_node_candidates(
                     &current
                         .clone()
                         .try_into()
                         .unwrap_or_else(|_| unimplemented!()),
                 ) {
-                    self.candidates.replace(candidates);
-                    self.state.set(State::Waiting);
+                    *self.candidates.lock() = candidates;
+                    *state = State::Waiting;
                     Err(SearchCommanderError::Waiting)
                 } else {
                     let tmp = current.clone();
                     *current = current
                         .next(&self.final_route)
                         .unwrap_or_else(|_| unreachable!());
-                    self.state.set(State::Final);
+                    *state = State::Final;
                     Ok((tmp, self.final_route.clone()))
                 }
             }
             State::Waiting => {
                 let mut next = None;
-                let mut candidates = self.candidates.borrow_mut();
+                let mut candidates = self.candidates.lock();
                 if candidates.is_empty() {
                     return Err(SearchCommanderError::Waiting);
                 }
@@ -207,14 +209,16 @@ where
                 candidates.clear();
                 let next = next.unwrap_or_else(|| unreachable!("This is bug."));
                 let kind = {
-                    <Maze::SearchNode as TryFrom<Node>>::try_from(self.current.borrow().clone())
+                    <Maze::SearchNode as TryFrom<Node>>::try_from(self.current.lock().clone())
                         .unwrap_or_else(|_| unimplemented!())
                         .route(&next)
                         .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
                 };
-                let current = self.current.replace(Node::from(next));
-                self.state.set(State::Solving);
-                Ok((current, kind))
+                let mut next = Node::from(next);
+                let mut current = self.current.lock();
+                core::mem::swap(&mut next, &mut current);
+                *state = State::Solving;
+                Ok((next, kind))
             }
         }
     }
