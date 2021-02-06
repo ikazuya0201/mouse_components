@@ -41,11 +41,11 @@ pub mod types {
     pub mod data {
         use super::*;
 
-        pub use agents::Pose;
         pub use maze::{AbsoluteDirection, RelativeDirection};
         pub use node::Pattern;
         pub use obstacle_detector::Obstacle;
         pub use tracker::{AngleState, LengthState, State};
+        pub use trajectory_generators::Pose;
         pub use trajectory_generators::{
             AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection,
             SlalomKind, SlalomParameters, Target,
