@@ -16,6 +16,9 @@ pub trait SearchTrajectoryGenerator<Command> {
 
 type QueueLength = U3;
 
+/// An implementation of [SearchTrajectoryManager](crate::agents::SearchTrajectoryManager) required
+/// by [SearchAgent](crate::agents::SearchAgent).
+#[derive(Debug)]
 pub struct TrajectoryManager<Generator, Converter, Target, Trajectory> {
     generator: Generator,
     converter: Converter,
@@ -43,7 +46,7 @@ impl<Generator, Converter, Target, Trajectory>
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TrajectoryManagerError {
     MutexLocked,
     FullQueue,
