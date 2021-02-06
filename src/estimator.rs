@@ -262,10 +262,11 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
 mod tests {
     use super::*;
     use crate::{
-        types::data::{AngleState, LengthState, Pose, SearchKind, Target},
-        impls::{SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder},
         prelude::*,
-        trajectory_generator::slalom_parameters_map,
+        trajectory_generator::{
+            slalom_parameters_map, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
+        },
+        types::data::{AngleState, LengthState, Pose, SearchKind, Target},
         utils::math::MathFake,
     };
     use approx::assert_abs_diff_eq;

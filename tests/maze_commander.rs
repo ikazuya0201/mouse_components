@@ -1,10 +1,13 @@
 extern crate components;
 
 use components::{
-    types::data::{AbsoluteDirection, Pattern, SearchKind, Wall},
     defaults::SearchCommander,
-    impls::{Maze, RunNode, WallConverter, WallManager},
+    maze::Maze,
+    node::RunNode,
+    types::data::{AbsoluteDirection, Pattern, SearchKind, Wall},
     utils::probability::Probability,
+    wall_converter::WallConverter,
+    wall_manager::WallManager,
 };
 use typenum::consts::*;
 

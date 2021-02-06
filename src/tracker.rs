@@ -51,8 +51,8 @@ pub struct Tracker<
     LM,
     RM,
     M,
-    TC = crate::impls::TranslationController,
-    RC = crate::impls::RotationController,
+    TC = crate::controller::TranslationController,
+    RC = crate::controller::RotationController,
     L = NullLogger,
 > {
     kx: GainType,

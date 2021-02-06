@@ -5,14 +5,14 @@ use core::convert::Infallible;
 use core::ops::Mul;
 
 use components::{
-    errors::ConversionError,
-    impls::{PoseConverter, WallManager},
+    pose_converter::{ConversionError, PoseConverter},
     prelude::*,
     sensors::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
     },
     types::data::{Pose, State},
     utils::{probability::Probability, sample::Sample},
+    wall_manager::WallManager,
 };
 use generic_array::ArrayLength;
 use spin::Mutex;

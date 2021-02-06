@@ -1,26 +1,26 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(iter_advance_by)]
 
-mod administrator;
+pub mod administrator;
 pub mod agents;
-mod command_converter;
-mod commander;
-mod controller;
-mod estimator;
-mod maze;
-mod node;
-mod obstacle_detector;
+pub mod command_converter;
+pub mod commander;
+pub mod controller;
+pub mod estimator;
+pub mod maze;
+pub mod node;
+pub mod obstacle_detector;
 pub mod operators;
-mod pose_converter;
+pub mod pose_converter;
 pub mod prelude;
 pub mod robot;
-mod tracker;
-mod trajectory_generator;
+pub mod tracker;
+pub mod trajectory_generator;
 pub mod trajectory_managers;
 pub mod utils;
-mod wall_converter;
+pub mod wall_converter;
 pub mod wall_detector;
-mod wall_manager;
+pub mod wall_manager;
 
 pub mod traits {
     use super::*;
@@ -62,40 +62,6 @@ pub mod sensors {
     pub use tracker::Motor;
 }
 
-pub mod impls {
-    use super::*;
-
-    pub use administrator::Administrator;
-    pub use agents::RunAgent;
-    pub use command_converter::CommandConverter;
-    pub use commander::{RunCommander, SearchCommander};
-    pub use controller::{
-        RotationController, RotationControllerBuilder, TranslationController,
-        TranslationControllerBuilder,
-    };
-    pub use estimator::{Estimator, EstimatorBuilder};
-    pub use maze::Maze;
-    pub use node::{Node, RunNode, SearchNode};
-    pub use obstacle_detector::ObstacleDetector;
-    pub use operators::RunOperator;
-    pub use pose_converter::PoseConverter;
-    pub use tracker::{NullLogger, Tracker, TrackerBuilder};
-    pub use trajectory_generator::{
-        slalom_parameters_map, slalom_parameters_map2, RunTrajectoryGenerator,
-        RunTrajectoryGeneratorBuilder, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
-        ShiftTrajectory,
-    };
-    pub use wall_converter::WallConverter;
-    pub use wall_manager::WallManager;
-}
-
-pub mod errors {
-    use super::*;
-
-    pub use commander::{CannotCheckError, RunCommanderError};
-    pub use pose_converter::ConversionError;
-}
-
 pub mod defaults {
     use super::*;
 
@@ -110,28 +76,28 @@ pub mod defaults {
         Size,
         Math,
         MaxPathLength,
-        Logger = impls::NullLogger,
-    > = impls::RunAgent<
+        Logger = tracker::NullLogger,
+    > = agents::RunAgent<
         trajectory_managers::RunTrajectoryManager<
-            (impls::RunNode<Size>, types::data::RunKind),
-            impls::RunTrajectoryGenerator<Math, MaxPathLength>,
-            impls::CommandConverter,
+            (node::RunNode<Size>, types::data::RunKind),
+            trajectory_generator::RunTrajectoryGenerator<Math, MaxPathLength>,
+            command_converter::CommandConverter,
         >,
         robot::Robot<
-            impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-            impls::Tracker<
+            estimator::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
+            tracker::Tracker<
                 LeftMotor,
                 RightMotor,
                 Math,
-                impls::TranslationController,
-                impls::RotationController,
+                controller::TranslationController,
+                controller::RotationController,
                 Logger,
             >,
             wall_detector::WallDetector<
                 'a,
-                impls::WallManager<Size>,
-                impls::ObstacleDetector<DistanceSensor, Math>,
-                impls::PoseConverter<Size, Math>,
+                wall_manager::WallManager<Size>,
+                obstacle_detector::ObstacleDetector<DistanceSensor, Math>,
+                pose_converter::PoseConverter<Size, Math>,
                 Math,
             >,
             types::data::State,
@@ -151,41 +117,41 @@ pub mod defaults {
         Logger,
     > = agents::SearchAgent<
         trajectory_managers::SearchTrajectoryManager<
-            impls::SearchTrajectoryGenerator<Math>,
-            impls::CommandConverter,
+            trajectory_generator::SearchTrajectoryGenerator<Math>,
+            command_converter::CommandConverter,
             types::data::Target,
-            <impls::SearchTrajectoryGenerator<Math> as trajectory_managers::SearchTrajectoryGenerator<(
+            <trajectory_generator::SearchTrajectoryGenerator<Math> as trajectory_managers::SearchTrajectoryGenerator<(
                 types::data::Pose,
                 types::data::SearchKind,
             )>>::Trajectory,
         >,
         robot::Robot<
-            impls::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-            impls::Tracker<
+            estimator::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
+            tracker::Tracker<
                 LeftMotor,
                 RightMotor,
                 Math,
-                impls::TranslationController,
-                impls::RotationController,
+                controller::TranslationController,
+                controller::RotationController,
                 Logger,
             >,
             wall_detector::WallDetector<
                 'a,
-                impls::WallManager<Size>,
-                impls::ObstacleDetector<DistanceSensor, Math>,
-                impls::PoseConverter<Size, Math>,
+                wall_manager::WallManager<Size>,
+                obstacle_detector::ObstacleDetector<DistanceSensor, Math>,
+                pose_converter::PoseConverter<Size, Math>,
                 Math,
             >,
             types::data::State,
         >,
     >;
 
-    pub type SearchCommander<'a, Size> = impls::SearchCommander<
-        impls::Node<Size>,
-        impls::RunNode<Size>,
-        impls::SearchNode<Size>,
+    pub type SearchCommander<'a, Size> = commander::SearchCommander<
+        node::Node<Size>,
+        node::RunNode<Size>,
+        node::SearchNode<Size>,
         types::data::SearchKind,
-        impls::Maze<'a, impls::WallManager<Size>, impls::WallConverter>,
+        maze::Maze<'a, wall_manager::WallManager<Size>, wall_converter::WallConverter>,
     >;
 
     pub type SearchOperator<
@@ -198,7 +164,7 @@ pub mod defaults {
         DistanceSensor,
         Math,
         Size,
-        Logger = impls::NullLogger,
+        Logger = tracker::NullLogger,
     > = operators::SearchOperator<
         SearchCommander<'a, Size>,
         SearchAgent<
@@ -215,9 +181,9 @@ pub mod defaults {
         >,
     >;
 
-    pub type RunCommander<'a, Size> = impls::RunCommander<
-        impls::RunNode<Size>,
-        impls::Maze<'a, impls::WallManager<Size>, impls::WallConverter>,
+    pub type RunCommander<'a, Size> = commander::RunCommander<
+        node::RunNode<Size>,
+        maze::Maze<'a, wall_manager::WallManager<Size>, wall_converter::WallConverter>,
     >;
 
     pub type RunOperator<
@@ -230,8 +196,8 @@ pub mod defaults {
         DistanceSensor,
         Math,
         Size,
-        Logger = impls::NullLogger,
-    > = impls::RunOperator<
+        Logger = tracker::NullLogger,
+    > = operators::RunOperator<
         RunAgent<
             'a,
             LeftEncoder,
@@ -242,7 +208,7 @@ pub mod defaults {
             DistanceSensor,
             Size,
             Math,
-            <impls::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
+            <node::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
         RunCommander<'a, Size>,

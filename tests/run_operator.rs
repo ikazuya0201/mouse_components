@@ -6,19 +6,26 @@ extern crate typenum;
 use core::f32::consts::PI;
 
 use components::{
-    types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, State},
+    agents::RunAgent,
+    command_converter::CommandConverter,
+    controller::{RotationControllerBuilder, TranslationControllerBuilder},
     defaults,
-    impls::{
-        slalom_parameters_map, CommandConverter, EstimatorBuilder, Maze, ObstacleDetector,
-        PoseConverter, RotationControllerBuilder, RunAgent, RunNode, RunOperator,
-        RunTrajectoryGeneratorBuilder, TrackerBuilder, TranslationControllerBuilder, WallConverter,
-        WallManager,
-    },
+    estimator::EstimatorBuilder,
+    maze::Maze,
+    node::RunNode,
+    obstacle_detector::ObstacleDetector,
+    operators::RunOperator,
+    pose_converter::PoseConverter,
     prelude::*,
     robot::Robot,
+    tracker::TrackerBuilder,
+    trajectory_generator::{slalom_parameters_map, RunTrajectoryGeneratorBuilder},
     trajectory_managers::RunTrajectoryManager,
+    types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, State},
     utils::probability::Probability,
+    wall_converter::WallConverter,
     wall_detector::WallDetector,
+    wall_manager::WallManager,
 };
 use typenum::consts::*;
 use uom::si::f32::{
