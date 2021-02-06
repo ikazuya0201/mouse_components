@@ -15,7 +15,7 @@ pub mod pose_converter;
 pub mod prelude;
 pub mod robot;
 pub mod tracker;
-pub mod trajectory_generator;
+pub mod trajectory_generators;
 pub mod trajectory_managers;
 pub mod utils;
 pub mod wall_converter;
@@ -46,7 +46,7 @@ pub mod types {
         pub use node::Pattern;
         pub use obstacle_detector::Obstacle;
         pub use tracker::{AngleState, LengthState, State};
-        pub use trajectory_generator::{
+        pub use trajectory_generators::{
             AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection,
             SlalomKind, SlalomParameters, Target,
         };
@@ -80,7 +80,7 @@ pub mod defaults {
     > = agents::RunAgent<
         trajectory_managers::RunTrajectoryManager<
             (node::RunNode<Size>, types::data::RunKind),
-            trajectory_generator::RunTrajectoryGenerator<Math, MaxPathLength>,
+            trajectory_generators::RunTrajectoryGenerator<Math, MaxPathLength>,
             command_converter::CommandConverter,
         >,
         robot::Robot<
@@ -117,10 +117,10 @@ pub mod defaults {
         Logger,
     > = agents::SearchAgent<
         trajectory_managers::SearchTrajectoryManager<
-            trajectory_generator::SearchTrajectoryGenerator<Math>,
+            trajectory_generators::SearchTrajectoryGenerator<Math>,
             command_converter::CommandConverter,
             types::data::Target,
-            <trajectory_generator::SearchTrajectoryGenerator<Math> as trajectory_managers::SearchTrajectoryGenerator<(
+            <trajectory_generators::SearchTrajectoryGenerator<Math> as trajectory_managers::SearchTrajectoryGenerator<(
                 types::data::Pose,
                 types::data::SearchKind,
             )>>::Trajectory,

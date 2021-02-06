@@ -263,7 +263,7 @@ mod tests {
     use super::*;
     use crate::{
         prelude::*,
-        trajectory_generator::{
+        trajectory_generators::{
             slalom_parameters_map, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
         },
         types::data::{AngleState, LengthState, Pose, SearchKind, Target},

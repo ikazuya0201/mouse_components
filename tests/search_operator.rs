@@ -13,7 +13,7 @@ use components::{
     pose_converter::PoseConverter,
     robot::Robot,
     tracker::TrackerBuilder,
-    trajectory_generator::{
+    trajectory_generators::{
         slalom_parameters_map, slalom_parameters_map2, SearchTrajectoryGeneratorBuilder,
     },
     trajectory_managers::SearchTrajectoryManager,

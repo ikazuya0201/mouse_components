@@ -19,7 +19,7 @@ use components::{
     prelude::*,
     robot::Robot,
     tracker::TrackerBuilder,
-    trajectory_generator::{slalom_parameters_map, RunTrajectoryGeneratorBuilder},
+    trajectory_generators::{slalom_parameters_map, RunTrajectoryGeneratorBuilder},
     trajectory_managers::RunTrajectoryManager,
     types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, State},
     utils::probability::Probability,
