@@ -3,6 +3,7 @@ use spin::Mutex;
 use crate::agents::Robot;
 use crate::operators::SearchAgent as ISearchAgent;
 
+/// A trait that manages trajectories.
 pub trait TrajectoryManager<Command> {
     type Error;
     type Target;
@@ -11,10 +12,12 @@ pub trait TrajectoryManager<Command> {
 
     fn next(&self) -> Self::Target;
 
-    fn is_empty(&self) -> Result<bool, Self::Error>;
-    fn is_full(&self) -> Result<bool, Self::Error>;
+    fn is_empty(&self) -> Option<bool>;
+    fn is_full(&self) -> Option<bool>;
 }
 
+/// An implementation of [SearchAgent](crate::operators::SearchAgent) required by
+/// [SearchOperator](crate::operators::SearchOperator).
 pub struct SearchAgent<Manager, Robot> {
     manager: Manager,
     robot: Mutex<Robot>,
@@ -56,15 +59,11 @@ where
             .map_err(|err| SearchAgentError::Manager(err))
     }
 
-    fn is_full(&self) -> Result<bool, Self::Error> {
-        self.manager
-            .is_full()
-            .map_err(|err| SearchAgentError::Manager(err))
+    fn is_full(&self) -> Option<bool> {
+        self.manager.is_full()
     }
 
-    fn is_empty(&self) -> Result<bool, Self::Error> {
-        self.manager
-            .is_empty()
-            .map_err(|err| SearchAgentError::Manager(err))
+    fn is_empty(&self) -> Option<bool> {
+        self.manager.is_empty()
     }
 }

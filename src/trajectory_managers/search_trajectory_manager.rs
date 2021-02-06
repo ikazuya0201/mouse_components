@@ -48,7 +48,6 @@ impl<Generator, Converter, Target, Trajectory>
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TrajectoryManagerError {
-    MutexLocked,
     FullQueue,
 }
 
@@ -123,22 +122,13 @@ where
         }
     }
 
-    fn is_empty(&self) -> Result<bool, Self::Error> {
-        Ok(self
-            .trajectories
-            .try_lock()
-            .ok_or(TrajectoryManagerError::MutexLocked)?
-            .is_empty())
+    fn is_empty(&self) -> Option<bool> {
+        Some(self.trajectories.try_lock()?.is_empty())
     }
 
-    fn is_full(&self) -> Result<bool, Self::Error> {
+    fn is_full(&self) -> Option<bool> {
         use typenum::Unsigned;
 
-        Ok(self
-            .trajectories
-            .try_lock()
-            .ok_or(TrajectoryManagerError::MutexLocked)?
-            .len()
-            == QueueLength::USIZE)
+        Some(self.trajectories.try_lock()?.len() == QueueLength::USIZE)
     }
 }

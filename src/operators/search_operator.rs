@@ -1,14 +1,21 @@
 use crate::administrator::{IncompletedError, Operator};
 
+/// A trait that processes command and moves the machine.
+///
+/// Physical quantities should be maanged only in this trait.
 pub trait SearchAgent<Command> {
     type Error;
 
     fn update(&self) -> Result<(), Self::Error>;
     fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
-    fn is_full(&self) -> Result<bool, Self::Error>;
-    fn is_empty(&self) -> Result<bool, Self::Error>;
+    fn is_full(&self) -> Option<bool>;
+    fn is_empty(&self) -> Option<bool>;
 }
 
+/// Error on [SearchCommander](SearchCommander)
+///
+/// - SearchFinish indicates the search process has completed.
+/// - Waiting indicates the calculation process of next command is being blocked now.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SearchCommanderError<T> {
     SearchFinish,
@@ -16,6 +23,7 @@ pub enum SearchCommanderError<T> {
     Other(T),
 }
 
+/// A trait that calculates and instructs commands for agent.
 pub trait SearchCommander {
     type Error;
     type Command;
@@ -23,6 +31,10 @@ pub trait SearchCommander {
     fn next_command(&self) -> Result<Self::Command, SearchCommanderError<Self::Error>>;
 }
 
+/// An implementation of [Operator](crate::administrator::Operator) required by
+/// [Administrator](crate::administrator::Administrator).
+///
+/// This processes a search of a maze.
 pub struct SearchOperator<Commander, Agent> {
     commander: Commander,
     agent: Agent,
@@ -64,7 +76,7 @@ where
     fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>> {
         use SearchCommanderError::*;
 
-        if let Ok(is_full) = self.agent.is_full() {
+        if let Some(is_full) = self.agent.is_full() {
             if is_full {
                 return Err(Ok(IncompletedError));
             }
@@ -79,7 +91,7 @@ where
             },
             Err(err) => match err {
                 SearchFinish => {
-                    if let Ok(is_empty) = self.agent.is_empty() {
+                    if let Some(is_empty) = self.agent.is_empty() {
                         if is_empty {
                             return Ok(());
                         }
