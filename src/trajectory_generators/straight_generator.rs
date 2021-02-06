@@ -520,8 +520,8 @@ mod tests {
 
     use proptest::prelude::*;
 
-    macro_rules! straight_calculator_tests {
-        ($(
+    macro_rules! define_straight_calculator_test {
+        (
             $test_name: ident,
             $generator_name: ident: (
                 $t: ty,
@@ -533,96 +533,98 @@ mod tests {
                 $ddtunit: ty,
                 $dddtunit: ty,
             ),
-        )*) => {
-            $(
-                proptest!{
-                    #[ignore]
-                    #[test]
-                    fn $test_name(
-                        a_max in 0.5f32..1.00f32,
-                        j_max in 0.5f32..10.0f32,
-                        x_start in 0.0f32..2.88f32,
-                        distance in 0.01f32..2.88f32,
-                        period in 0.001f32..0.01f32,
-                        (v_max, v_start, v_end) in (0.5f32..1.0f32)
-                            .prop_flat_map(|v_max| (Just(v_max), 0.0..v_max, 0.0..v_max)),
-                    ) {
-                        let v_max = <$dt>::new::<$dtunit>(v_max);
-                        let a_max = <$ddt>::new::<$ddtunit>(a_max);
-                        let j_max = <$dddt>::new::<$dddtunit>(j_max);
-                        let period = Time::new::<second>(period);
-                        let generator = $generator_name::<MathFake>::new(v_max, a_max, j_max);
-                        let (trajectory_calculator, t_end) = generator.generate(
-                            <$t>::new::<$tunit>(x_start),
-                            <$t>::new::<$tunit>(distance),
-                            <$dt>::new::<$dtunit>(v_start),
-                            <$dt>::new::<$dtunit>(v_end),
+        ) => {
+            proptest! {
+                #[ignore]
+                #[test]
+                fn $test_name(
+                    a_max in 0.5f32..1.00f32,
+                    j_max in 0.5f32..10.0f32,
+                    x_start in 0.0f32..2.88f32,
+                    distance in 0.01f32..2.88f32,
+                    period in 0.001f32..0.01f32,
+                    (v_max, v_start, v_end) in (0.5f32..1.0f32)
+                        .prop_flat_map(|v_max| (Just(v_max), 0.0..v_max, 0.0..v_max)),
+                ) {
+                    let v_max = <$dt>::new::<$dtunit>(v_max);
+                    let a_max = <$ddt>::new::<$ddtunit>(a_max);
+                    let j_max = <$dddt>::new::<$dddtunit>(j_max);
+                    let period = Time::new::<second>(period);
+                    let generator = $generator_name::<MathFake>::new(v_max, a_max, j_max);
+                    let (trajectory_calculator, t_end) = generator.generate(
+                        <$t>::new::<$tunit>(x_start),
+                        <$t>::new::<$tunit>(distance),
+                        <$dt>::new::<$dtunit>(v_start),
+                        <$dt>::new::<$dtunit>(v_end),
+                    );
+                    let mut current = Time::new::<second>(0.0);
+                    let mut before = trajectory_calculator.calculate(current);
+
+                    let epst = <$t>::new::<$tunit>(EPSILON);
+                    let epsdt = <$dt>::new::<$dtunit>(EPSILON);
+                    let epsddt = <$ddt>::new::<$ddtunit>(EPSILON);
+
+                    while current <= t_end {
+                        let target = trajectory_calculator.calculate(current);
+
+                        let xd = (target.x - before.x).abs();
+                        let vd = (target.v - before.v).abs();
+                        let ad = (target.a - before.a).abs();
+
+                        let dx_max = <$t>::from(v_max * period) + epst;
+                        let dv_max = <$dt>::from(a_max * period) + epsdt;
+                        let da_max = <$ddt>::from(j_max * period) + epsddt;
+
+                        prop_assert!(
+                            xd <= dx_max,
+                            "left:{:?}, right:{:?}", xd, dx_max,
                         );
-                        let mut current = Time::new::<second>(0.0);
-                        let mut before = trajectory_calculator.calculate(current);
+                        prop_assert!(
+                            vd <= dv_max,
+                            "left:{:?}, right:{:?}", vd, dv_max,
+                        );
+                        prop_assert!(
+                            ad <= da_max,
+                            "left:{:?}, right:{:?}", ad, da_max,
+                        );
 
-                        let epst = <$t>::new::<$tunit>(EPSILON);
-                        let epsdt = <$dt>::new::<$dtunit>(EPSILON);
-                        let epsddt = <$ddt>::new::<$ddtunit>(EPSILON);
-
-                        while current <= t_end {
-                            let target = trajectory_calculator.calculate(current);
-
-                            let xd = (target.x - before.x).abs();
-                            let vd = (target.v - before.v).abs();
-                            let ad = (target.a - before.a).abs();
-
-                            let dx_max = <$t>::from(v_max * period) + epst;
-                            let dv_max = <$dt>::from(a_max * period) + epsdt;
-                            let da_max = <$ddt>::from(j_max * period) + epsddt;
-
-                            prop_assert!(
-                                xd <= dx_max,
-                                "left:{:?}, right:{:?}", xd, dx_max,
-                            );
-                            prop_assert!(
-                                vd <= dv_max,
-                                "left:{:?}, right:{:?}", vd, dv_max,
-                            );
-                            prop_assert!(
-                                ad <= da_max,
-                                "left:{:?}, right:{:?}", ad, da_max,
-                            );
-
-                            before = target;
-                            current += period;
-                        }
-                        prop_assert!((before.x.get::<$tunit>() - x_start).abs() <= distance + EPSILON);
+                        before = target;
+                        current += period;
                     }
+                    prop_assert!((before.x.get::<$tunit>() - x_start).abs() <= distance + EPSILON);
                 }
-            )*
-        }
+            }
+        };
     }
 
-    straight_calculator_tests! {
+    define_straight_calculator_test!(
         test_length_straight_calculator,
-        LengthStraightCalculatorGenerator: (
-            Length,
-            Velocity,
-            Acceleration,
-            Jerk,
-            meter,
-            meter_per_second,
-            meter_per_second_squared,
-            meter_per_second_cubed,
-        ),
+        LengthStraightCalculatorGenerator:
+            (
+                Length,
+                Velocity,
+                Acceleration,
+                Jerk,
+                meter,
+                meter_per_second,
+                meter_per_second_squared,
+                meter_per_second_cubed,
+            ),
+    );
+    define_straight_calculator_test!(
         test_angle_straight_calculator,
-        AngleStraightCalculatorGenerator: (
-            Angle,
-            AngularVelocity,
-            AngularAcceleration,
-            AngularJerk,
-            radian,
-            radian_per_second,
-            radian_per_second_squared,
-            radian_per_second_cubed,
-        ),
-    }
+        AngleStraightCalculatorGenerator:
+            (
+                Angle,
+                AngularVelocity,
+                AngularAcceleration,
+                AngularJerk,
+                radian,
+                radian_per_second,
+                radian_per_second_squared,
+                radian_per_second_cubed,
+            ),
+    );
 
     proptest! {
         #[ignore]

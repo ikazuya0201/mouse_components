@@ -299,101 +299,100 @@ mod tests {
     use crate::types::data::Pose;
     use crate::utils::math::MathFake;
 
-    macro_rules! convert_ok_tests {
-        ($($name:ident: ($size:ty, $value: expr),)*) => {
-            $(
-                #[test]
-                fn $name() {
-                    let (input, expected) = $value;
-                    let input = Pose{
-                        x: Length::new::<meter>(input.0),
-                        y: Length::new::<meter>(input.1),
-                        theta: Angle::new::<degree>(input.2),
-                    };
-                    let expected = WallInfo{
-                        wall: Wall::<$size>::new(expected.0, expected.1, expected.2).unwrap(),
-                        existing_distance: Length::new::<meter>(expected.3),
-                        not_existing_distance: Length::new::<meter>(expected.4),
-                    };
+    macro_rules! define_convert_ok_test {
+        ($name:ident: ($size:ty, $value: expr)) => {
+            #[test]
+            fn $name() {
+                let (input, expected) = $value;
+                let input = Pose {
+                    x: Length::new::<meter>(input.0),
+                    y: Length::new::<meter>(input.1),
+                    theta: Angle::new::<degree>(input.2),
+                };
+                let expected = WallInfo {
+                    wall: Wall::<$size>::new(expected.0, expected.1, expected.2).unwrap(),
+                    existing_distance: Length::new::<meter>(expected.3),
+                    not_existing_distance: Length::new::<meter>(expected.4),
+                };
 
-                    let converter = PoseConverter::<$size, MathFake>::new(
-                        Length::new::<meter>(0.09),
-                        Length::new::<meter>(0.006),
-                        Length::new::<meter>(0.01),
-                    );
-                    let info = converter.convert(&input).unwrap();
-                    assert_eq!(info.wall, expected.wall);
-                    assert_relative_eq!(
-                        info.existing_distance.get::<meter>(),
-                        expected.existing_distance.get::<meter>(),
-                    );
-                    assert_relative_eq!(
-                        info.not_existing_distance.get::<meter>(),
-                        expected.not_existing_distance.get::<meter>(),
-                    );
-                }
-            )*
-        }
+                let converter = PoseConverter::<$size, MathFake>::new(
+                    Length::new::<meter>(0.09),
+                    Length::new::<meter>(0.006),
+                    Length::new::<meter>(0.01),
+                );
+                let info = converter.convert(&input).unwrap();
+                assert_eq!(info.wall, expected.wall);
+                assert_relative_eq!(
+                    info.existing_distance.get::<meter>(),
+                    expected.existing_distance.get::<meter>(),
+                );
+                assert_relative_eq!(
+                    info.not_existing_distance.get::<meter>(),
+                    expected.not_existing_distance.get::<meter>(),
+                );
+            }
+        };
     }
 
-    macro_rules! convert_err_tests {
-        ($($name:ident: ($size:ty, $value: expr),)*) => {
-            $(
-                #[test]
-                fn $name() {
-                    let input = $value;
-                    let input = Pose{
-                            x: Length::new::<meter>(input.0),
-                            y: Length::new::<meter>(input.1),
-                            theta: Angle::new::<degree>(input.2),
-                    };
+    macro_rules! define_convert_err_test {
+        ($name:ident: ($size:ty, $value: expr)) => {
+            #[test]
+            fn $name() {
+                let input = $value;
+                let input = Pose {
+                    x: Length::new::<meter>(input.0),
+                    y: Length::new::<meter>(input.1),
+                    theta: Angle::new::<degree>(input.2),
+                };
 
-                    let converter = PoseConverter::<$size, MathFake>::new(
-                        Length::new::<meter>(0.09),
-                        Length::new::<meter>(0.006),
-                        Length::new::<meter>(0.01),
-                    );
-                    assert!(converter.convert(&input).is_err());
-                }
-            )*
-        }
+                let converter = PoseConverter::<$size, MathFake>::new(
+                    Length::new::<meter>(0.09),
+                    Length::new::<meter>(0.006),
+                    Length::new::<meter>(0.01),
+                );
+                assert!(converter.convert(&input).is_err());
+            }
+        };
     }
 
-    convert_ok_tests! {
-        convert_ok_test1: (U4, (
-            (0.045, 0.045, 0.0),
-            (0, 0, false, 0.042, 0.132),
-        )),
-        convert_ok_test2: (U4, (
-            (0.077, 0.045, 45.0),
-            (0, 0, false, 2.0f32.sqrt() * 0.01, 2.0f32.sqrt() * 0.042),
-        )),
-        convert_ok_test3: (U4, (
-            (0.135, 0.045, 180.0),
-            (0, 0, false, 0.042, 0.132),
-        )),
-        convert_ok_test4: (U4, (
-            (0.045, 0.135, 270.0),
-            (0, 0, true, 0.042, 0.132),
-        )),
-        convert_ok_test5: (U4, (
-            (0.135, 0.135, 90.0),
-            (1, 1, true, 0.042, 0.132),
-        )),
-        convert_ok_test6: (U4, (
-            (0.135, 0.135, 180.0),
-            (0, 1, false, 0.042, 0.132),
-        )),
-        convert_ok_test7: (U4, (
-            (0.045, 0.135, 0.0),
-            (0, 1, false, 0.042, 0.132),
-        )),
-    }
+    define_convert_ok_test! (
+    convert_ok_test1: (U4, (
+        (0.045, 0.045, 0.0),
+        (0, 0, false, 0.042, 0.132),
+    )));
+    define_convert_ok_test! (
+    convert_ok_test2: (U4, (
+        (0.077, 0.045, 45.0),
+        (0, 0, false, 2.0f32.sqrt() * 0.01, 2.0f32.sqrt() * 0.042),
+    )));
+    define_convert_ok_test! (
+    convert_ok_test3: (U4, (
+        (0.135, 0.045, 180.0),
+        (0, 0, false, 0.042, 0.132),
+    )));
+    define_convert_ok_test! (
+    convert_ok_test4: (U4, (
+        (0.045, 0.135, 270.0),
+        (0, 0, true, 0.042, 0.132),
+    )));
+    define_convert_ok_test! (
+    convert_ok_test5: (U4, (
+        (0.135, 0.135, 90.0),
+        (1, 1, true, 0.042, 0.132),
+    )));
+    define_convert_ok_test! (
+    convert_ok_test6: (U4, (
+        (0.135, 0.135, 180.0),
+        (0, 1, false, 0.042, 0.132),
+    )));
+    define_convert_ok_test! (
+    convert_ok_test7: (U4, (
+        (0.045, 0.135, 0.0),
+        (0, 1, false, 0.042, 0.132),
+    )));
 
-    convert_err_tests! {
-        convert_err_test1: (U4, (0.0, 0.0, 0.0)),
-        convert_err_test2: (U4, (0.405, 0.045, 0.0)),
-        convert_err_test3: (U4, (-0.045, 0.045, 0.0)),
-        convert_err_test4: (U4, (0.045, 0.045, 45.0)),
-    }
+    define_convert_err_test!(convert_err_test1: (U4, (0.0, 0.0, 0.0)));
+    define_convert_err_test!(convert_err_test2: (U4, (0.405, 0.045, 0.0)));
+    define_convert_err_test!(convert_err_test3: (U4, (-0.045, 0.045, 0.0)));
+    define_convert_err_test!(convert_err_test4: (U4, (0.045, 0.045, 45.0)));
 }
