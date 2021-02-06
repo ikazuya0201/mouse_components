@@ -1,4 +1,4 @@
-use core::cell::{Cell, RefCell};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use heapless::{consts::*, spsc::Queue};
 use spin::Mutex;
@@ -20,9 +20,9 @@ pub struct TrajectoryManager<Generator, Converter, Target, Trajectory> {
     generator: Generator,
     converter: Converter,
     trajectories: Mutex<Queue<Trajectory, QueueLength>>,
-    emergency_trajectory: RefCell<Option<Trajectory>>,
-    emergency_counter: Cell<usize>,
-    last_target: RefCell<Target>,
+    emergency_trajectory: Mutex<Option<Trajectory>>,
+    emergency_counter: AtomicUsize,
+    last_target: Mutex<Target>,
 }
 
 impl<Generator, Converter, Target, Trajectory>
@@ -36,9 +36,9 @@ impl<Generator, Converter, Target, Trajectory>
             generator,
             converter,
             trajectories: Mutex::new(Queue::new()),
-            emergency_trajectory: RefCell::new(None),
-            emergency_counter: Cell::new(0),
-            last_target: RefCell::new(Target::default()),
+            emergency_trajectory: Mutex::new(None),
+            emergency_counter: AtomicUsize::new(0),
+            last_target: Mutex::new(Target::default()),
         }
     }
 }
@@ -79,15 +79,12 @@ where
 
     fn next(&self) -> Self::Target {
         let get_or_init_emergency = || {
-            let mut trajectory = self.emergency_trajectory.borrow_mut();
+            let mut trajectory = self.emergency_trajectory.lock();
             if trajectory.is_none() {
-                trajectory.replace(
-                    self.generator
-                        .generate_emergency(&*self.last_target.borrow()),
-                );
-                self.emergency_counter.set(0);
+                trajectory.replace(self.generator.generate_emergency(&*self.last_target.lock()));
+                self.emergency_counter.store(0, Ordering::Release);
             }
-            self.emergency_counter.set(self.emergency_counter.get() + 1);
+            self.emergency_counter.fetch_add(1, Ordering::AcqRel);
             trajectory.as_mut().expect("Should never be None.").next()
         };
 
@@ -95,7 +92,9 @@ where
             if let Some(mut trajectories) = self.trajectories.try_lock() {
                 loop {
                     if let Some(trajectory) = trajectories.iter_mut().next() {
-                        if let Some(target) = trajectory.nth(self.emergency_counter.get()) {
+                        if let Some(target) =
+                            trajectory.nth(self.emergency_counter.load(Ordering::Acquire))
+                        {
                             break (Some(target), false);
                         }
                     } else {
@@ -109,15 +108,15 @@ where
         };
 
         if !is_emergency {
-            self.emergency_trajectory.replace(None);
-            self.emergency_counter.set(0);
+            *self.emergency_trajectory.lock() = None;
+            self.emergency_counter.store(0, Ordering::Release);
         }
 
         if let Some(target) = target {
-            self.last_target.replace(target.clone());
+            *self.last_target.lock() = target.clone();
             target
         } else {
-            self.last_target.borrow().clone()
+            self.last_target.lock().clone()
         }
     }
 
