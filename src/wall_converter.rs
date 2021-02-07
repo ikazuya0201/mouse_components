@@ -1,9 +1,9 @@
 use heapless::Vec;
 use typenum::{consts::*, Unsigned};
 
+use crate::mazes::WallConverter as IWallConverter;
+use crate::nodes::{NodeCreationError, Pattern, SearchNode};
 use crate::types::data::AbsoluteDirection;
-use crate::maze::WallConverter as IWallConverter;
-use crate::node::{NodeCreationError, Pattern, SearchNode};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
 

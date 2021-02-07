@@ -3,9 +3,9 @@ use core::marker::PhantomData;
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, Length};
 
-use crate::types::data::{AbsoluteDirection, Pose};
-use crate::node::Node;
+use crate::nodes::Node;
 use crate::trajectory_managers::CommandConverter as ICommandConverter;
+use crate::types::data::{AbsoluteDirection, Pose};
 
 //NOTE: This struct is intended to be used by SearchOperator
 #[derive(Clone, PartialEq, Debug)]
