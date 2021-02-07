@@ -115,22 +115,20 @@ impl<'a, Manager, WallConverterType> Maze<'a, Manager, WallConverterType> {
     }
 }
 
-impl<'a, Node, Manager, WallConverterType> Graph<Node> for Maze<'a, Manager, WallConverterType>
-where
-    Node: GraphNode,
-    Manager: WallChecker<Node::Wall>,
-    Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
-{
-    type Cost = Node::Cost;
-    type Edges = Vec<(Node, Self::Cost), Node::NeighborNum>;
-
-    fn successors(&self, node: &Node) -> Self::Edges {
+impl<'a, Manager, WallConverterType> Maze<'a, Manager, WallConverterType> {
+    fn _successors<Node, F>(node: &Node, is_blocked: F) -> <Self as Graph<Node>>::Edges
+    where
+        F: Fn(&Node::Wall) -> bool,
+        Node: GraphNode,
+        Manager: WallChecker<Node::Wall>,
+        Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
+    {
         let mut successors = ForcedVec::new();
         for wall_nodes in node.successors() {
             for wall_node in wall_nodes {
                 match wall_node {
                     WallNode::Wall(wall) => {
-                        if self.manager.exists(&wall) {
+                        if is_blocked(&wall) {
                             break;
                         }
                     }
@@ -143,13 +141,19 @@ where
         successors.into()
     }
 
-    fn predecessors(&self, node: &Node) -> Self::Edges {
+    fn _predecessors<Node, F>(node: &Node, is_blocked: F) -> <Self as Graph<Node>>::Edges
+    where
+        F: Fn(&Node::Wall) -> bool,
+        Node: GraphNode,
+        Manager: WallChecker<Node::Wall>,
+        Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
+    {
         let mut predecessors = ForcedVec::new();
         for wall_nodes in node.predecessors() {
             for wall_node in wall_nodes {
                 match wall_node {
                     WallNode::Wall(wall) => {
-                        if self.manager.exists(&wall) {
+                        if is_blocked(&wall) {
                             break;
                         }
                     }
@@ -160,6 +164,26 @@ where
             }
         }
         predecessors.into()
+    }
+}
+
+impl<'a, Node, Manager, WallConverterType> Graph<Node> for Maze<'a, Manager, WallConverterType>
+where
+    Node: GraphNode,
+    Manager: WallChecker<Node::Wall>,
+    Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
+{
+    type Cost = Node::Cost;
+    type Edges = Vec<(Node, Self::Cost), Node::NeighborNum>;
+
+    fn successors(&self, node: &Node) -> Self::Edges {
+        //Define blocked state as existence of wall (doesn't consider whether a wall is checked or not).
+        Self::_successors(node, |wall| self.manager.exists(wall))
+    }
+
+    fn predecessors(&self, node: &Node) -> Self::Edges {
+        //Define blocked state as existence of wall (doesn't consider whether a wall is checked or not).
+        Self::_predecessors(node, |wall| self.manager.exists(wall))
     }
 }
 
@@ -214,6 +238,51 @@ where
             }
         }
         Err(CannotCheckError)
+    }
+}
+
+/// A derivation of [Maze](Maze).
+///
+/// The implementation of [Graph](crate::commanders::Graph) is deffered from [Maze](Maze).
+///
+/// This checks whether a wall is checked or not in the implementation of [Graph](crate::commanders::Graph).
+pub struct CheckedMaze<'a, Manager, Converter>(Maze<'a, Manager, Converter>);
+
+impl<'a, Manager, Converter> CheckedMaze<'a, Manager, Converter> {
+    pub fn new(manager: &'a Manager, converter: Converter) -> Self {
+        Self(<Self as core::ops::Deref>::Target::new(manager, converter))
+    }
+}
+
+impl<'a, Manager, Converter> core::ops::Deref for CheckedMaze<'a, Manager, Converter> {
+    type Target = Maze<'a, Manager, Converter>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a, Node, Manager, Converter> Graph<Node> for CheckedMaze<'a, Manager, Converter>
+where
+    Node: GraphNode,
+    Manager: WallChecker<Node::Wall>,
+    Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
+{
+    type Cost = Node::Cost;
+    type Edges = Vec<(Node, Self::Cost), Node::NeighborNum>;
+
+    fn successors(&self, node: &Node) -> Self::Edges {
+        //Define the blocked state as a state where a wall is not checked or exists.
+        <Self as core::ops::Deref>::Target::_successors(node, |wall| {
+            !self.manager.is_checked(wall) || self.manager.exists(wall)
+        })
+    }
+
+    fn predecessors(&self, node: &Node) -> Self::Edges {
+        //Define the blocked state as a state where a wall is not checked or exists.
+        <Self as core::ops::Deref>::Target::_predecessors(node, |wall| {
+            !self.manager.is_checked(wall) || self.manager.exists(wall)
+        })
     }
 }
 
@@ -286,6 +355,82 @@ mod tests {
         let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
         assert_eq!(maze.successors(&0), expected.as_slice());
         assert_eq!(maze.predecessors(&0), expected.as_slice());
+    }
+
+    #[test]
+    fn test_checked_maze_graph() {
+        use std::vec::Vec;
+
+        #[derive(Debug, PartialEq, Eq)]
+        struct NodeType(usize);
+
+        struct WallType(usize);
+
+        impl WallSpaceNode for NodeType {
+            type Wall = WallType;
+        }
+
+        impl GraphNode for NodeType {
+            type NeighborNum = U10;
+            type Cost = usize;
+            type WallNodes = Vec<WallNode<WallType, (NodeType, usize)>>;
+            type WallNodesList = Vec<Self::WallNodes>;
+
+            fn successors(&self) -> Self::WallNodesList {
+                let mut res = Vec::new();
+                let mut tmp = Vec::new();
+                tmp.push(WallNode::Wall(WallType(0)));
+                tmp.push(WallNode::Node((NodeType(2), 2)));
+                tmp.push(WallNode::Wall(WallType(1)));
+                tmp.push(WallNode::Wall(WallType(2)));
+                tmp.push(WallNode::Node((NodeType(5), 3)));
+                res.push(tmp);
+
+                let mut tmp = Vec::new();
+                tmp.push(WallNode::Wall(WallType(3)));
+                tmp.push(WallNode::Node((NodeType(2), 1)));
+                tmp.push(WallNode::Wall(WallType(4)));
+                tmp.push(WallNode::Node((NodeType(4), 2)));
+                tmp.push(WallNode::Wall(WallType(5)));
+                tmp.push(WallNode::Node((NodeType(6), 3)));
+                res.push(tmp);
+                res
+            }
+
+            fn predecessors(&self) -> Self::WallNodesList {
+                self.successors()
+            }
+        }
+
+        struct WallManagerType;
+
+        impl WallChecker<WallType> for WallManagerType {
+            type Error = core::convert::Infallible;
+
+            fn try_exists(&self, wall: &WallType) -> Result<bool, Self::Error> {
+                match wall.0 {
+                    2 | 5 => Ok(true),
+                    _ => Ok(false),
+                }
+            }
+
+            fn try_is_checked(&self, wall: &WallType) -> Result<bool, Self::Error> {
+                match wall.0 {
+                    0 | 1 | 2 | 3 | 5 => Ok(true),
+                    _ => Ok(false),
+                }
+            }
+        }
+
+        let manager = WallManagerType;
+
+        let maze = CheckedMaze::new(&manager, ());
+        let expected = vec![(2usize, 2usize), (2, 1)]
+            .into_iter()
+            .map(|(node, cost)| (NodeType(node), cost))
+            .collect::<Vec<(NodeType, usize)>>();
+        assert_eq!(maze.successors(&NodeType(0)), expected.as_slice());
+        assert_eq!(maze.predecessors(&NodeType(0)), expected.as_slice());
     }
 
     #[test]
