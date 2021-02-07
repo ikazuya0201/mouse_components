@@ -1,6 +1,10 @@
+mod return_setup_trajectory_manager;
 mod run_trajectory_manager;
 mod search_trajectory_manager;
 
+pub use return_setup_trajectory_manager::{
+    ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryManager,
+};
 pub use run_trajectory_manager::{
     RunTrajectoryGenerator, TrajectoryManager as RunTrajectoryManager,
 };
