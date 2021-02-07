@@ -89,3 +89,69 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_return_setup_operator() {
+        use core::cell::RefCell;
+
+        struct Agent {
+            command: RefCell<Option<usize>>,
+            state: RefCell<usize>,
+        }
+
+        impl ReturnSetupCommandConsumer<usize> for Agent {
+            type Error = core::convert::Infallible;
+
+            fn set_command(&self, command: &usize) -> Result<(), Self::Error> {
+                self.command.replace(Some(*command));
+                Ok(())
+            }
+        }
+
+        impl ReturnSetupAgent for Agent {
+            type Error = core::convert::Infallible;
+
+            fn track_next(&self) -> Result<(), ReturnSetupAgentError<Self::Error>> {
+                let mut state = self.state.borrow_mut();
+                if *state >= 2 {
+                    Err(ReturnSetupAgentError::Completed)
+                } else {
+                    *state += 1;
+                    Ok(())
+                }
+            }
+        }
+
+        struct Commander;
+
+        impl ReturnSetupCommander for Commander {
+            type Error = core::convert::Infallible;
+            type Command = usize;
+
+            fn setup_command(&self) -> Result<Self::Command, Self::Error> {
+                Ok(1)
+            }
+        }
+
+        let operator = ReturnSetupOperator::new(
+            Agent {
+                command: RefCell::new(None),
+                state: RefCell::new(0),
+            },
+            Commander,
+        );
+
+        assert_eq!(operator.agent.command, RefCell::new(Some(1)));
+
+        assert_eq!(operator.tick(), Ok(()));
+        assert_eq!(operator.run(), Ok(()));
+        assert_eq!(operator.tick(), Ok(()));
+        assert_eq!(operator.run(), Ok(()));
+        assert_eq!(operator.tick(), Ok(()));
+        assert_eq!(operator.run(), Err(Ok(IncompletedError)));
+    }
+}
