@@ -11,9 +11,7 @@ use typenum::Unsigned;
 
 use crate::utils::{forced_vec::ForcedVec, itertools::repeat_n};
 pub use run_commander::{RunCommander, RunCommanderError};
-pub use search_commander::{
-    CannotCheckError, GraphConverter, NextNode, NodeChecker, SearchCommander,
-};
+pub use search_commander::{GraphConverter, NextNode, NodeChecker, SearchCommander};
 
 pub trait Graph<Node> {
     type Cost;

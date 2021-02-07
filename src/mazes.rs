@@ -4,7 +4,7 @@ use core::fmt;
 
 use heapless::{ArrayLength, Vec};
 
-use crate::commanders::{BoundedNode, CannotCheckError, Graph, GraphConverter, NodeChecker};
+use crate::commanders::{BoundedNode, Graph, GraphConverter, NodeChecker};
 use crate::utils::forced_vec::ForcedVec;
 
 macro_rules! block {
@@ -225,16 +225,16 @@ where
     SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
     Manager: WallChecker<SearchNode::Wall>,
 {
-    fn is_available(&self, node: &SearchNode) -> Result<bool, CannotCheckError> {
+    fn is_available(&self, node: &SearchNode) -> Option<bool> {
         let wall = node.clone().into();
         if let Ok(check) = self.manager.try_is_checked(&wall) {
             if check {
                 if let Ok(existence) = self.manager.try_exists(&wall) {
-                    return Ok(!existence);
+                    return Some(!existence);
                 }
             }
         }
-        Err(CannotCheckError)
+        None
     }
 }
 
@@ -535,10 +535,10 @@ mod tests {
 
         let maze = Maze::new(&manager, ());
         let test_cases = vec![
-            (0, Ok(false)),
-            (1, Ok(true)),
-            (2, Err(CannotCheckError)),
-            (3, Ok(false)),
+            (0, Some(false)),
+            (1, Some(true)),
+            (2, None),
+            (3, Some(false)),
         ];
         for (node, expected) in test_cases {
             assert_eq!(maze.is_available(&node), expected);

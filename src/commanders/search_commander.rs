@@ -27,11 +27,8 @@ pub trait GraphConverter<Node> {
     ) -> Self::SearchNodes;
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct CannotCheckError;
-
 pub trait NodeChecker<Node> {
-    fn is_available(&self, node: &Node) -> Result<bool, CannotCheckError>;
+    fn is_available(&self, node: &Node) -> Option<bool>;
 }
 
 pub trait NextNode<Route>: Sized {
@@ -176,7 +173,7 @@ where
                     let is_available = self
                         .maze
                         .is_available(&node)
-                        .map_err(|_| SearchCommanderError::Waiting)?;
+                        .ok_or(SearchCommanderError::Waiting)?;
                     if is_available {
                         next = Some(node);
                         break;
