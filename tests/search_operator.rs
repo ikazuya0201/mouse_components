@@ -6,7 +6,7 @@ use components::{
     controllers::{RotationControllerBuilder, TranslationControllerBuilder},
     defaults,
     estimator::EstimatorBuilder,
-    maze::Maze,
+    mazes::Maze,
     node::RunNode,
     obstacle_detector::ObstacleDetector,
     operators::SearchOperator,

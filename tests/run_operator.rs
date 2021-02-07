@@ -11,7 +11,7 @@ use components::{
     controllers::{RotationControllerBuilder, TranslationControllerBuilder},
     defaults,
     estimator::EstimatorBuilder,
-    maze::CheckedMaze,
+    mazes::CheckedMaze,
     node::RunNode,
     obstacle_detector::ObstacleDetector,
     operators::RunOperator,

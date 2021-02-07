@@ -6,7 +6,7 @@ use generic_array::{ArrayLength, GenericArray};
 use spin::Mutex;
 use typenum::{consts::U2, PowerOfTwo, Unsigned};
 
-use crate::maze::WallChecker;
+use crate::mazes::WallChecker;
 use crate::utils::{itertools::repeat_n, probability::Probability};
 use crate::wall_detector::WallProbabilityManager;
 

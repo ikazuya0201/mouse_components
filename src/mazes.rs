@@ -1,4 +1,4 @@
-//! Definition of [Maze](crate::maze::Maze) and its dependent traits.
+//! Definition of [Maze](crate::mazes::Maze) and its dependent traits.
 
 mod direction;
 

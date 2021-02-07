@@ -28,10 +28,10 @@ pub use crate::sensors::IMU as _components_sensors_IMU;
 
 pub use crate::utils::math::Math as _utils_math_Math;
 
-pub use crate::maze::GraphNode as _components_maze_GraphNode;
-pub use crate::maze::WallChecker as _components_maze_WallManager;
-pub use crate::maze::WallFinderNode as _components_maze_WallFinderNode;
-pub use crate::maze::WallSpaceNode as _components_maze_WallSpaceNode;
+pub use crate::mazes::GraphNode as _components_maze_GraphNode;
+pub use crate::mazes::WallChecker as _components_maze_WallManager;
+pub use crate::mazes::WallFinderNode as _components_maze_WallFinderNode;
+pub use crate::mazes::WallSpaceNode as _components_maze_WallSpaceNode;
 
 pub use crate::trajectory_managers::CommandConverter as _components_trajectory_managers_CommandConverter;
 pub use crate::trajectory_managers::RunTrajectoryGenerator as _components_trajectory_managers_RunTrajectoryGenerator;
