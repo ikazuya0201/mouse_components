@@ -1,14 +1,11 @@
 //! Definition of [Maze](crate::mazes::Maze) and its dependent traits.
 
-mod direction;
-
 use core::fmt;
 
 use heapless::{ArrayLength, Vec};
 
 use crate::commanders::{BoundedNode, CannotCheckError, Graph, GraphConverter, NodeChecker};
 use crate::utils::forced_vec::ForcedVec;
-pub use direction::{AbsoluteDirection, RelativeDirection};
 
 macro_rules! block {
     ($expr: expr) => {

@@ -1,3 +1,5 @@
+mod direction;
+
 use core::marker::PhantomData;
 use core::ops::Mul;
 
@@ -7,9 +9,9 @@ use typenum::{consts::*, PowerOfTwo, Unsigned};
 use crate::commanders::{BoundedNode, BoundedPathNode, NextNode, RouteNode};
 use crate::mazes::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
-use crate::types::data::{AbsoluteDirection, RelativeDirection};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
+pub use direction::{AbsoluteDirection, RelativeDirection};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Pattern {

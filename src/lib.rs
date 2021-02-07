@@ -43,8 +43,7 @@ pub mod types {
     pub mod data {
         use super::*;
 
-        pub use mazes::{AbsoluteDirection, RelativeDirection};
-        pub use nodes::Pattern;
+        pub use nodes::{AbsoluteDirection, Pattern, RelativeDirection};
         pub use obstacle_detector::Obstacle;
         pub use tracker::{AngleState, LengthState, State};
         pub use trajectory_generators::Pose;
