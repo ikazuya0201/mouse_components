@@ -185,7 +185,7 @@ pub mod defaults {
 
     pub type RunCommander<'a, Size> = commanders::RunCommander<
         node::RunNode<Size>,
-        maze::Maze<'a, wall_manager::WallManager<Size>, wall_converter::WallConverter>,
+        maze::CheckedMaze<'a, wall_manager::WallManager<Size>, wall_converter::WallConverter>,
     >;
 
     pub type RunOperator<
