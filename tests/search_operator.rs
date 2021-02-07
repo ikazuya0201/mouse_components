@@ -7,7 +7,7 @@ use components::{
     defaults,
     estimator::EstimatorBuilder,
     mazes::Maze,
-    node::RunNode,
+    nodes::RunNode,
     obstacle_detector::ObstacleDetector,
     operators::SearchOperator,
     pose_converter::PoseConverter,

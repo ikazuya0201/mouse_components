@@ -3,7 +3,7 @@ extern crate components;
 use components::{
     defaults::SearchCommander,
     mazes::Maze,
-    node::RunNode,
+    nodes::RunNode,
     types::data::{AbsoluteDirection, Pattern, SearchKind, Wall},
     utils::probability::Probability,
     wall_converter::WallConverter,

@@ -12,7 +12,7 @@ use components::{
     defaults,
     estimator::EstimatorBuilder,
     mazes::CheckedMaze,
-    node::RunNode,
+    nodes::RunNode,
     obstacle_detector::ObstacleDetector,
     operators::RunOperator,
     pose_converter::PoseConverter,

@@ -10,7 +10,7 @@ pub mod commanders;
 pub mod controllers;
 pub mod estimator;
 pub mod mazes;
-pub mod node;
+pub mod nodes;
 pub mod obstacle_detector;
 pub mod operators;
 pub mod pose_converter;
@@ -44,7 +44,7 @@ pub mod types {
         use super::*;
 
         pub use mazes::{AbsoluteDirection, RelativeDirection};
-        pub use node::Pattern;
+        pub use nodes::Pattern;
         pub use obstacle_detector::Obstacle;
         pub use tracker::{AngleState, LengthState, State};
         pub use trajectory_generators::Pose;
@@ -81,7 +81,7 @@ pub mod defaults {
         Logger = tracker::NullLogger,
     > = agents::RunAgent<
         trajectory_managers::RunTrajectoryManager<
-            (node::RunNode<Size>, types::data::RunKind),
+            (nodes::RunNode<Size>, types::data::RunKind),
             trajectory_generators::RunTrajectoryGenerator<Math, MaxPathLength>,
             command_converter::CommandConverter,
         >,
@@ -149,9 +149,9 @@ pub mod defaults {
     >;
 
     pub type SearchCommander<'a, Size> = commanders::SearchCommander<
-        node::Node<Size>,
-        node::RunNode<Size>,
-        node::SearchNode<Size>,
+        nodes::Node<Size>,
+        nodes::RunNode<Size>,
+        nodes::SearchNode<Size>,
         types::data::SearchKind,
         mazes::Maze<'a, wall_manager::WallManager<Size>, wall_converter::WallConverter>,
     >;
@@ -184,7 +184,7 @@ pub mod defaults {
     >;
 
     pub type RunCommander<'a, Size> = commanders::RunCommander<
-        node::RunNode<Size>,
+        nodes::RunNode<Size>,
         mazes::CheckedMaze<'a, wall_manager::WallManager<Size>, wall_converter::WallConverter>,
     >;
 
@@ -210,7 +210,7 @@ pub mod defaults {
             DistanceSensor,
             Size,
             Math,
-            <node::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
+            <nodes::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
         RunCommander<'a, Size>,
