@@ -5,7 +5,7 @@ use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
 use super::{compute_shortest_path, BoundedNode, BoundedPathNode, Graph};
-use crate::operators::ReturnSetupCommander as IReturnSetupCommander;
+use crate::operators::InitialCommander;
 
 /// An implementation of [ReturnSetupCommander](crate::operators::ReturnSetupCommander).
 ///
@@ -39,7 +39,7 @@ pub trait RotationNode: Sized {
     fn rotation_nodes(&self) -> Self::Nodes;
 }
 
-impl<Node, Maze> IReturnSetupCommander for ReturnSetupCommander<Node, Maze>
+impl<Node, Maze> InitialCommander for ReturnSetupCommander<Node, Maze>
 where
     Node: BoundedPathNode + BoundedNode + Clone + Into<usize> + PartialEq + RotationNode,
     Node::PathUpperBound: ArrayLength<Node>,
@@ -53,11 +53,12 @@ where
 {
     type Error = ReturnSetupCommanderError;
     type Command = Node::Kind;
+    type Commands = Option<Self::Command>;
 
-    fn setup_command(&self) -> Result<Self::Command, Self::Error> {
+    fn initial_commands(&self) -> Result<Self::Commands, Self::Error> {
         for (node, kind) in self.current.rotation_nodes() {
             if let Some(_) = compute_shortest_path(&node, &[self.start.clone()], &self.maze) {
-                return Ok(kind);
+                return Ok(Some(kind));
             }
         }
         Err(ReturnSetupCommanderError)
