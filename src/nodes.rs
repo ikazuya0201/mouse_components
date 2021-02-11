@@ -6,7 +6,7 @@ use core::ops::Mul;
 use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use crate::commanders::{BoundedNode, BoundedPathNode, NextNode, RouteNode};
+use crate::commanders::{BoundedNode, BoundedPathNode, NextNode, RotationNode, RouteNode};
 use crate::mazes::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
@@ -298,6 +298,7 @@ impl<N> SearchNode<N> {
         }
     }
 }
+
 impl<N> SearchNode<N>
 where
     N: Unsigned + PowerOfTwo,
@@ -1024,6 +1025,41 @@ where
     }
 }
 
+/// An enum that indicates kinds of rotation.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RotationKind {
+    Front,
+    Right,
+    Left,
+    Back,
+}
+
+impl<N> RotationNode for RunNode<N> {
+    type Kind = RotationKind;
+    type Nodes = Vec<(Self, Self::Kind), U4>;
+
+    fn rotation_nodes(&self) -> Self::Nodes {
+        use RelativeDirection::*;
+
+        let mut nodes = ForcedVec::new();
+        let mut add = |dir, kind| {
+            let node = Self(Node {
+                x: self.0.x,
+                y: self.0.y,
+                direction: self.0.direction.rotate(dir),
+                cost: self.0.cost,
+                _maze_width: PhantomData,
+            });
+            nodes.push((node, kind));
+        };
+        add(Front, RotationKind::Front);
+        add(Right, RotationKind::Right);
+        add(Left, RotationKind::Left);
+        add(Back, RotationKind::Back);
+        nodes.into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use typenum::consts::*;
@@ -1586,6 +1622,55 @@ mod tests {
             let node = SearchNode::<Size>::new(node.0, node.1, node.2, cost).unwrap();
             let expected = Wall::<Size>::new(expected.0, expected.1, expected.2).unwrap();
             assert_eq!(Wall::from(node), expected);
+        }
+    }
+
+    #[test]
+    fn test_run_node_rotation() {
+        use AbsoluteDirection::*;
+        use RotationKind::*;
+
+        type Size = U4;
+
+        fn cost(_pattern: Pattern) -> u16 {
+            unreachable!()
+        }
+
+        let test_cases = vec![
+            (
+                (0, 0, East),
+                vec![
+                    ((0, 0, East), Front),
+                    ((0, 0, South), Right),
+                    ((0, 0, North), Left),
+                    ((0, 0, West), Back),
+                ],
+            ),
+            (
+                (2, 0, South),
+                vec![
+                    ((2, 0, South), Front),
+                    ((2, 0, West), Right),
+                    ((2, 0, East), Left),
+                    ((2, 0, North), Back),
+                ],
+            ),
+        ];
+
+        use std::vec::Vec;
+
+        for (node, expected) in test_cases {
+            let node = RunNode::<Size>::new(node.0, node.1, node.2, cost).unwrap();
+            let expected = expected
+                .into_iter()
+                .map(|(node, kind)| {
+                    (
+                        RunNode::<Size>::new(node.0, node.1, node.2, cost).unwrap(),
+                        kind,
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(node.rotation_nodes(), expected.as_slice());
         }
     }
 }

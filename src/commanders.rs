@@ -1,3 +1,6 @@
+//! Implementations of commanders which is required by operators in [operators](crate::operators).
+
+mod return_setup_commander;
 mod run_commander;
 mod search_commander;
 
@@ -10,6 +13,7 @@ use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
 use crate::utils::{forced_vec::ForcedVec, itertools::repeat_n};
+pub use return_setup_commander::{ReturnSetupCommander, ReturnSetupCommanderError, RotationNode};
 pub use run_commander::{RunCommander, RunCommanderError};
 pub use search_commander::{GraphConverter, NextNode, NodeChecker, SearchCommander};
 
@@ -40,7 +44,7 @@ type GoalSizeUpperBound = U8;
 
 fn compute_shortest_path<Node, Maze>(
     start: &Node,
-    goals: &Vec<Node, GoalSizeUpperBound>,
+    goals: &[Node],
     maze: &Maze,
 ) -> Option<Vec<Node, Node::PathUpperBound>>
 where

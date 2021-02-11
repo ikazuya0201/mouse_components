@@ -6,7 +6,7 @@ extern crate typenum;
 use core::f32::consts::PI;
 
 use components::{
-    agents::RunAgent,
+    agents::TrackingAgent,
     command_converter::CommandConverter,
     controllers::{RotationControllerBuilder, TranslationControllerBuilder},
     defaults,
@@ -14,13 +14,13 @@ use components::{
     mazes::CheckedMaze,
     nodes::RunNode,
     obstacle_detector::ObstacleDetector,
-    operators::RunOperator,
+    operators::TrackingOperator,
     pose_converter::PoseConverter,
     prelude::*,
     robot::Robot,
     tracker::TrackerBuilder,
     trajectory_generators::{slalom_parameters_map, RunTrajectoryGeneratorBuilder},
-    trajectory_managers::RunTrajectoryManager,
+    trajectory_managers::TrackingTrajectoryManager,
     types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, State},
     utils::probability::Probability,
     wall_converter::WallConverter,
@@ -228,9 +228,9 @@ fn test_run_operator() {
                 .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
                 .build::<MathFake, MaxPathLength>()
                 .expect("Should never panic");
-            RunTrajectoryManager::new(trajectory_generator, CommandConverter::default())
+            TrackingTrajectoryManager::new(trajectory_generator, CommandConverter::default())
         };
-        RunAgent::new(trajectory_manager, robot)
+        TrackingAgent::new(trajectory_manager, robot)
     };
 
     use AbsoluteDirection::*;
@@ -246,7 +246,7 @@ fn test_run_operator() {
         defaults::RunCommander::new(start, goals, maze)
     };
 
-    let operator = RunOperator::new(agent, commander);
+    let operator = TrackingOperator::new(agent, commander);
     while operator.run().is_err() {
         stepper.step();
         assert!(!operator.tick().is_err());
