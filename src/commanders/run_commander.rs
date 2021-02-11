@@ -11,6 +11,7 @@ use super::{
 };
 use crate::operators::InitialCommander;
 
+/// An implementation of [InitialCommander](crate::operators::InitialCommander).
 pub struct RunCommander<Node, Maze> {
     start: Node,
     goals: Vec<Node, GoalSizeUpperBound>,
@@ -27,14 +28,13 @@ impl<Node, Maze> RunCommander<Node, Maze> {
     }
 }
 
+/// Error on [RunCommander](RunCommander).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RunCommanderError {
     UnreachableError,
     ConversionError,
 }
 
-///NOTO: multiple implementations of Converter<_> can exist for different Target,
-///but we assume there is only an implementation.
 //TODO: write test
 impl<Node, Maze> InitialCommander for RunCommander<Node, Maze>
 where
