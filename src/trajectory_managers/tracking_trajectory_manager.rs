@@ -28,6 +28,20 @@ where
     iter: AtomicUsize,
 }
 
+impl<Command, Generator, Converter> core::fmt::Debug
+    for TrajectoryManager<Command, Generator, Converter>
+where
+    Generator: InitialTrajectoryGenerator<Converter::Output>,
+    Converter: CommandConverter<Command>,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("TrackingTrajectoryManager")
+            .field("trajectories.len()", &self.trajectories.lock().len())
+            .field("iter", &self.iter)
+            .finish()
+    }
+}
+
 impl<Command, Generator, Converter> TrajectoryManager<Command, Generator, Converter>
 where
     Generator: InitialTrajectoryGenerator<Converter::Output>,
@@ -72,7 +86,7 @@ where
 
     fn next(&self) -> Option<Self::Target> {
         let mut trajectories = self.trajectories.lock();
-        while !trajectories.is_empty() {
+        while self.iter.load(Ordering::Acquire) < trajectories.len() {
             if let Some(target) = trajectories[self.iter.load(Ordering::Acquire)].next() {
                 return Some(target);
             } else {

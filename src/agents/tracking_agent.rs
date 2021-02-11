@@ -11,6 +11,7 @@ pub trait TrajectoryManager {
 }
 
 /// An implementation of [TrackingAgent](crate::operators::TrackingAgent).
+#[derive(Debug)]
 pub struct TrackingAgent<Manager, Robot> {
     manager: Manager,
     robot: Mutex<Robot>,

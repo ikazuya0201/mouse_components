@@ -30,12 +30,26 @@ pub trait WallDetector<State> {
 }
 
 /// An implementation of [Robot](crate::agents::Robot).
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Robot<Estimator, Tracker, Detector, State> {
     estimator: Estimator,
     tracker: Tracker,
     detector: Detector,
     _state: PhantomData<fn() -> State>,
+}
+
+impl<Estimator, Tracker, Detector, State> core::fmt::Debug
+    for Robot<Estimator, Tracker, Detector, State>
+where
+    Estimator: core::fmt::Debug,
+    Tracker: core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Robot")
+            .field("estimator", &self.estimator)
+            .field("tracker", &self.tracker)
+            .finish()
+    }
 }
 
 impl<Estimator, Tracker, Detector, State> Robot<Estimator, Tracker, Detector, State> {

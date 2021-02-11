@@ -7,6 +7,7 @@ use crate::administrator::{Operator, OperatorError};
 ///
 /// This operator executes a tracking process.
 /// The commands for tracking are given once at the initialization phase.
+#[derive(Debug)]
 pub struct TrackingOperator<Agent> {
     is_completed: AtomicBool,
     agent: Agent,
@@ -87,9 +88,9 @@ where
 
     fn run(&self) -> Result<(), OperatorError<Self::Error>> {
         if self.is_completed.load(Ordering::Acquire) {
-            Err(OperatorError::Incompleted)
-        } else {
             Ok(())
+        } else {
+            Err(OperatorError::Incompleted)
         }
     }
 }
@@ -156,10 +157,10 @@ mod tests {
         assert_eq!(operator.agent.command, RefCell::new(Some(1)));
 
         assert_eq!(operator.tick(), Ok(()));
-        assert_eq!(operator.run(), Ok(()));
-        assert_eq!(operator.tick(), Ok(()));
-        assert_eq!(operator.run(), Ok(()));
+        assert_eq!(operator.run(), Err(OperatorError::Incompleted));
         assert_eq!(operator.tick(), Ok(()));
         assert_eq!(operator.run(), Err(OperatorError::Incompleted));
+        assert_eq!(operator.tick(), Ok(()));
+        assert_eq!(operator.run(), Ok(()));
     }
 }
