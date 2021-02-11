@@ -1,3 +1,4 @@
+mod return_setup_trajectory_generator;
 mod run_trajectory_generator;
 mod search_trajectory_generator;
 mod slalom_generator;
@@ -5,6 +6,9 @@ mod spin_generator;
 mod straight_generator;
 mod trajectory;
 
+pub use return_setup_trajectory_generator::{
+    ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryGeneratorBuilder,
+};
 pub use run_trajectory_generator::{
     RunKind, RunTrajectory, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
 };
