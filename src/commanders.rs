@@ -17,6 +17,7 @@ pub use return_setup_commander::{ReturnSetupCommander, ReturnSetupCommanderError
 pub use run_commander::{RunCommander, RunCommanderError};
 pub use search_commander::{GraphConverter, NextNode, NodeChecker, SearchCommander};
 
+/// A trait that behaves like a directed graph which has weighted edges.
 pub trait Graph<Node> {
     type Cost;
     type Edges: IntoIterator<Item = (Node, Self::Cost)>;
@@ -25,14 +26,17 @@ pub trait Graph<Node> {
     fn predecessors(&self, node: &Node) -> Self::Edges;
 }
 
+/// A trait that has a type level upper bound for any paths on a given node type.
 pub trait BoundedPathNode {
     type PathUpperBound;
 }
 
+/// A trait that has a type level upper bound for the number of the given node type.
 pub trait BoundedNode {
     type UpperBound;
 }
 
+/// A trait that computes a route value between itself and another node.
 pub trait RouteNode {
     type Error;
     type Route;

@@ -15,6 +15,7 @@ use super::{
 use crate::operators::{SearchCommander as ISearchCommander, SearchCommanderError};
 use crate::utils::itertools::repeat_n;
 
+/// A trait that converts a given path to nodes which are on the path.
 pub trait GraphConverter<Node> {
     type SearchNode;
     type SearchNodes: IntoIterator<Item = Self::SearchNode>;
@@ -27,10 +28,14 @@ pub trait GraphConverter<Node> {
     ) -> Self::SearchNodes;
 }
 
+/// A trait that checks whether a given node can be visited or not.
+///
+/// This returns None when it does not have enough information to check.
 pub trait NodeChecker<Node> {
     fn is_available(&self, node: &Node) -> Option<bool>;
 }
 
+/// A trait that returns a node determined by itself and a given route.
 pub trait NextNode<Route>: Sized {
     type Error;
 
@@ -47,7 +52,8 @@ enum State {
 
 type CandidateSizeUpperBound = U4;
 
-//NOTE: The upper bounds of goal size and candidates size are fixed.
+/// An implementation of [SearchCommander](crate::operators::SearchCommander) required by
+/// [SearchOperator](crate::operators::SearchOperator).
 pub struct SearchCommander<Node, RunNode, SearchNode, Route, Maze> {
     start: RunNode,
     goals: Vec<RunNode, GoalSizeUpperBound>,

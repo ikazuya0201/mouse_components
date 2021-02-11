@@ -1,3 +1,5 @@
+//! An implementation of [Robot](crate::agents::Robot) and its dependencies.
+
 use core::marker::PhantomData;
 
 use crate::agents::Robot as IRobot;

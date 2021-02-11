@@ -32,6 +32,7 @@ impl<Manager, Robot> SearchAgent<Manager, Robot> {
     }
 }
 
+/// Error on [SearchAgent](SearchAgent).
 #[derive(Debug)]
 pub enum SearchAgentError<T, U> {
     Robot(T),
