@@ -1,4 +1,4 @@
-use crate::administrator::{IncompletedError, Operator};
+use crate::administrator::{Operator, OperatorError};
 
 /// A trait that processes command and moves the machine.
 ///
@@ -73,21 +73,21 @@ where
             .map_err(|err| SearchOperatorError::Agent(err))
     }
 
-    fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>> {
+    fn run(&self) -> Result<(), OperatorError<Self::Error>> {
         use SearchCommanderError::*;
 
         if let Some(is_full) = self.agent.is_full() {
             if is_full {
-                return Err(Ok(IncompletedError));
+                return Err(OperatorError::Incompleted);
             }
         } else {
-            return Err(Ok(IncompletedError));
+            return Err(OperatorError::Incompleted);
         }
 
         match self.commander.next_command() {
             Ok(command) => match self.agent.set_command(&command) {
-                Ok(_) => Err(Ok(IncompletedError)),
-                Err(err) => Err(Err(SearchOperatorError::Agent(err))),
+                Ok(_) => Err(OperatorError::Incompleted),
+                Err(err) => Err(OperatorError::Other(SearchOperatorError::Agent(err))),
             },
             Err(err) => match err {
                 SearchFinish => {
@@ -96,10 +96,10 @@ where
                             return Ok(());
                         }
                     }
-                    Err(Ok(IncompletedError))
+                    Err(OperatorError::Incompleted)
                 }
-                Waiting => Err(Ok(IncompletedError)),
-                Other(err) => Err(Err(SearchOperatorError::Commander(err))),
+                Waiting => Err(OperatorError::Incompleted),
+                Other(err) => Err(OperatorError::Other(SearchOperatorError::Commander(err))),
             },
         }
     }
