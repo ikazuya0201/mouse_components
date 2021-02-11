@@ -1,19 +1,24 @@
+//! Definition of [Administrator](Administrator) and its dependencies.
+
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use spin::Mutex;
 
+/// Error on [Operator](Operator).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperatorError<T> {
     Incompleted,
     Other(T),
 }
 
+/// A trait that consumes and initializes operators.
 pub trait OperatorStore<Mode, Operator> {
     fn exchange(&self, operator: Operator, mode: Mode) -> Operator;
     fn next(&self, operator: Operator) -> Operator;
 }
 
+/// A trait that operates a given process.
 pub trait Operator {
     type Error;
 
@@ -21,12 +26,14 @@ pub trait Operator {
     fn run(&self) -> Result<(), OperatorError<Self::Error>>;
 }
 
+/// A trait that is used for selecting a mode.
 pub trait Selector<Mode> {
     fn reset(&self);
     fn mode(&self) -> Mode;
     fn is_enabled(&self) -> bool;
 }
 
+/// A type that manages modes and orchestrates operators.
 pub struct Administrator<Mode, ISelector, Operator, Store> {
     is_select: AtomicBool,
     selector: ISelector,
