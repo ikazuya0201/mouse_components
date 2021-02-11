@@ -1,6 +1,8 @@
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
+use heapless::Vec;
+
 use super::spin_generator::{SpinGenerator, SpinTrajectory};
 use super::{ok_or, RequiredFieldEmptyError, Target};
 use crate::nodes::RotationKind;
@@ -14,26 +16,30 @@ pub struct ReturnSetupTrajectoryGenerator<M> {
 }
 
 impl<M: Math> InitialTrajectoryGenerator<RotationKind> for ReturnSetupTrajectoryGenerator<M> {
-    type MaxLength = typenum::consts::U1;
     type Target = Target;
     type Trajectory = SpinTrajectory;
-    type Trajectories = Option<Self::Trajectory>;
+    type Trajectories = Vec<Self::Trajectory, typenum::consts::U1>;
 
     fn generate<Commands: IntoIterator<Item = RotationKind>>(
         &self,
         commands: Commands,
     ) -> Self::Trajectories {
-        commands.into_iter().next().map(|command| {
-            use RotationKind::*;
+        commands
+            .into_iter()
+            .next()
+            .map(|command| {
+                use RotationKind::*;
 
-            let theta = match command {
-                Front => Default::default(),
-                Right => Angle::new::<degree>(-90.0),
-                Left => Angle::new::<degree>(90.0),
-                Back => Angle::new::<degree>(180.0),
-            };
-            self.spin_generator.generate(Default::default(), theta)
-        })
+                let theta = match command {
+                    Front => Default::default(),
+                    Right => Angle::new::<degree>(-90.0),
+                    Left => Angle::new::<degree>(90.0),
+                    Back => Angle::new::<degree>(180.0),
+                };
+                self.spin_generator.generate(Default::default(), theta)
+            })
+            .into_iter()
+            .collect()
     }
 }
 

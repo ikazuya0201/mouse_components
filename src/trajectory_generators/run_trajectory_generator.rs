@@ -71,7 +71,6 @@ where
     M: Math,
     MaxLength: ArrayLength<ShiftTrajectory<RunTrajectory<M>, M>>,
 {
-    type MaxLength = MaxLength;
     type Target = Target;
     type Trajectory = ShiftTrajectory<RunTrajectory<M>, M>;
     type Trajectories = Vec<Self::Trajectory, MaxLength>;
