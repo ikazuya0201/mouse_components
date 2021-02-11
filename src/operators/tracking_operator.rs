@@ -1,6 +1,6 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::administrator::{IncompletedError, Operator};
+use crate::administrator::{Operator, OperatorError};
 
 /// An implementation of [Operator](crate::administrator::Operator) required by
 /// [Administrator](crate::administrator::Administrator).
@@ -85,9 +85,9 @@ where
         }
     }
 
-    fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>> {
+    fn run(&self) -> Result<(), OperatorError<Self::Error>> {
         if self.is_completed.load(Ordering::Acquire) {
-            Err(Ok(IncompletedError))
+            Err(OperatorError::Incompleted)
         } else {
             Ok(())
         }
@@ -160,6 +160,6 @@ mod tests {
         assert_eq!(operator.tick(), Ok(()));
         assert_eq!(operator.run(), Ok(()));
         assert_eq!(operator.tick(), Ok(()));
-        assert_eq!(operator.run(), Err(Ok(IncompletedError)));
+        assert_eq!(operator.run(), Err(OperatorError::Incompleted));
     }
 }

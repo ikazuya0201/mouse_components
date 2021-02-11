@@ -4,7 +4,10 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use spin::Mutex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct IncompletedError;
+pub enum OperatorError<T> {
+    Incompleted,
+    Other(T),
+}
 
 pub trait OperatorStore<Mode, Operator> {
     fn exchange(&self, operator: Operator, mode: Mode) -> Operator;
@@ -15,7 +18,7 @@ pub trait Operator {
     type Error;
 
     fn tick(&self) -> Result<(), Self::Error>;
-    fn run(&self) -> Result<(), Result<IncompletedError, Self::Error>>;
+    fn run(&self) -> Result<(), OperatorError<Self::Error>>;
 }
 
 pub trait Selector<Mode> {
