@@ -7,7 +7,7 @@ use typenum::Unsigned;
 use super::{compute_shortest_path, BoundedNode, BoundedPathNode, Graph};
 use crate::operators::InitialCommander;
 
-/// An implementation of [ReturnSetupCommander](crate::operators::ReturnSetupCommander).
+/// An implementation of [InitialCommander](crate::operators::InitialCommander).
 ///
 /// This produces a setup command for returning to start position.
 pub struct ReturnSetupCommander<Node, Maze> {
