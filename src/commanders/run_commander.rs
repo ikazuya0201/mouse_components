@@ -9,7 +9,7 @@ use typenum::Unsigned;
 use super::{
     compute_shortest_path, BoundedNode, BoundedPathNode, GoalSizeUpperBound, Graph, RouteNode,
 };
-use crate::operators::RunCommander as IRunCommander;
+use crate::operators::InitialCommander;
 
 pub struct RunCommander<Node, Maze> {
     start: Node,
@@ -36,7 +36,7 @@ pub enum RunCommanderError {
 ///NOTO: multiple implementations of Converter<_> can exist for different Target,
 ///but we assume there is only an implementation.
 //TODO: write test
-impl<Node, Maze> IRunCommander for RunCommander<Node, Maze>
+impl<Node, Maze> InitialCommander for RunCommander<Node, Maze>
 where
     Node::UpperBound: ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
@@ -55,7 +55,7 @@ where
     type Command = (Node, Node::Route);
     type Commands = Vec<Self::Command, Node::UpperBound>;
 
-    fn compute_commands(&self) -> Result<Self::Commands, Self::Error> {
+    fn initial_commands(&self) -> Result<Self::Commands, Self::Error> {
         let path = compute_shortest_path(&self.start, &self.goals, &self.maze)
             .ok_or(RunCommanderError::UnreachableError)?;
 

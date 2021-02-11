@@ -1,15 +1,15 @@
 mod return_setup_trajectory_manager;
-mod run_trajectory_manager;
 mod search_trajectory_manager;
+mod tracking_trajectory_manager;
 
 pub use return_setup_trajectory_manager::{
     ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryManager,
 };
-pub use run_trajectory_manager::{
-    RunTrajectoryGenerator, TrajectoryManager as RunTrajectoryManager,
-};
 pub use search_trajectory_manager::{
     SearchTrajectoryGenerator, TrajectoryManager as SearchTrajectoryManager,
+};
+pub use tracking_trajectory_manager::{
+    InitialTrajectoryGenerator, TrajectoryManager as TrackingTrajectoryManager,
 };
 
 pub trait CommandConverter<Command> {

@@ -33,7 +33,7 @@ pub mod traits {
         BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker, RouteNode,
     };
     pub use mazes::{GraphNode, WallChecker, WallConverter, WallFinderNode, WallSpaceNode};
-    pub use operators::{RunAgent, RunCommander};
+    pub use operators::{InitialCommander, TrackingAgent, TrackingInitializer};
     pub use tracker::{Logger, RotationController, TranslationController};
     pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};
 }
@@ -78,8 +78,8 @@ pub mod defaults {
         Math,
         MaxPathLength,
         Logger = tracker::NullLogger,
-    > = agents::RunAgent<
-        trajectory_managers::RunTrajectoryManager<
+    > = agents::TrackingAgent<
+        trajectory_managers::TrackingTrajectoryManager<
             (nodes::RunNode<Size>, types::data::RunKind),
             trajectory_generators::RunTrajectoryGenerator<Math, MaxPathLength>,
             command_converter::CommandConverter,
@@ -198,7 +198,7 @@ pub mod defaults {
         Math,
         Size,
         Logger = tracker::NullLogger,
-    > = operators::RunOperator<
+    > = operators::TrackingOperator<
         RunAgent<
             'a,
             LeftEncoder,
@@ -212,6 +212,5 @@ pub mod defaults {
             <nodes::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
             Logger,
         >,
-        RunCommander<'a, Size>,
     >;
 }

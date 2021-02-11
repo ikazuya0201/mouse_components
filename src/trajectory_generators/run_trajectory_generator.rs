@@ -8,7 +8,7 @@ use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator}
 use super::trajectory::{ShiftTrajectory, Target};
 use super::{ok_or, Pose, RequiredFieldEmptyError};
 use crate::traits::Math;
-use crate::trajectory_managers::RunTrajectoryGenerator as IRunTrajectoryGenerator;
+use crate::trajectory_managers::InitialTrajectoryGenerator;
 use uom::si::{
     f32::{
         Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
@@ -65,7 +65,8 @@ impl<M: Math, MaxLength> RunTrajectoryGenerator<M, MaxLength> {
 //because trajectory does not accelerate in slalom.
 //Then, we assume that the initial command is straight.
 //TODO: To deal with arbitrary initial commands
-impl<M, MaxLength> IRunTrajectoryGenerator<(Pose, RunKind)> for RunTrajectoryGenerator<M, MaxLength>
+impl<M, MaxLength> InitialTrajectoryGenerator<(Pose, RunKind)>
+    for RunTrajectoryGenerator<M, MaxLength>
 where
     M: Math,
     MaxLength: ArrayLength<ShiftTrajectory<RunTrajectory<M>, M>>,

@@ -1,10 +1,11 @@
 use heapless::{spsc::Queue, ArrayLength};
 use spin::Mutex;
 
-use crate::agents::RunTrajectoryManager;
+use crate::agents::TrackingTrajectoryManager;
+use crate::operators::TrackingInitializer;
 use crate::trajectory_managers::CommandConverter;
 
-pub trait RunTrajectoryGenerator<Command> {
+pub trait InitialTrajectoryGenerator<Command> {
     type MaxLength;
     type Target;
     type Trajectory: Iterator<Item = Self::Target>;
@@ -18,7 +19,7 @@ pub trait RunTrajectoryGenerator<Command> {
 
 pub struct TrajectoryManager<Command, Generator, Converter>
 where
-    Generator: RunTrajectoryGenerator<Converter::Output>,
+    Generator: InitialTrajectoryGenerator<Converter::Output>,
     Converter: CommandConverter<Command>,
     Generator::MaxLength: ArrayLength<Generator::Trajectory>,
 {
@@ -29,7 +30,7 @@ where
 
 impl<Command, Generator, Converter> TrajectoryManager<Command, Generator, Converter>
 where
-    Generator: RunTrajectoryGenerator<Converter::Output>,
+    Generator: InitialTrajectoryGenerator<Converter::Output>,
     Converter: CommandConverter<Command>,
     Generator::MaxLength: ArrayLength<Generator::Trajectory>,
 {
@@ -42,28 +43,38 @@ where
     }
 }
 
-impl<Command, Generator, Converter> RunTrajectoryManager<Command>
+impl<Command, Generator, Converter> TrackingInitializer<Command>
     for TrajectoryManager<Command, Generator, Converter>
 where
-    Generator: RunTrajectoryGenerator<Converter::Output>,
+    Generator: InitialTrajectoryGenerator<Converter::Output>,
+    Converter: CommandConverter<Command>,
+    Generator::MaxLength: ArrayLength<Generator::Trajectory>,
+{
+    type Error = core::convert::Infallible;
+
+    fn initialize<Commands: IntoIterator<Item = Command>>(
+        &self,
+        commands: Commands,
+    ) -> Result<(), Self::Error> {
+        let commands = commands.into_iter().map(|com| self.converter.convert(&com));
+        let mut trajectories = self.trajectories.lock();
+        for trajectory in self.generator.generate(commands) {
+            trajectories.enqueue(trajectory).unwrap_or_else(|_| {
+                unreachable!("Should never exceed the length of trajectory queue")
+            });
+        }
+        Ok(())
+    }
+}
+
+impl<Command, Generator, Converter> TrackingTrajectoryManager
+    for TrajectoryManager<Command, Generator, Converter>
+where
+    Generator: InitialTrajectoryGenerator<Converter::Output>,
     Converter: CommandConverter<Command>,
     Generator::MaxLength: ArrayLength<Generator::Trajectory>,
 {
     type Target = Generator::Target;
-
-    fn set_commands<Commands: IntoIterator<Item = Command>>(&self, commands: Commands) {
-        let commands = commands
-            .into_iter()
-            .map(|command| self.converter.convert(&command));
-        for trajectory in self.generator.generate(commands) {
-            self.trajectories
-                .lock()
-                .enqueue(trajectory)
-                .unwrap_or_else(|_| {
-                    unreachable!("Should never exceed the length of trajectory queue")
-                });
-        }
-    }
 
     fn next(&self) -> Option<Self::Target> {
         let mut trajectories = self.trajectories.lock();
