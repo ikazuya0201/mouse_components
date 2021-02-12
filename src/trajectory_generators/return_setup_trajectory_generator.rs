@@ -5,9 +5,10 @@ use uom::si::angle::degree;
 use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
 use super::spin_generator::{SpinGenerator, SpinTrajectory};
-use super::{ok_or, RequiredFieldEmptyError, Target};
+use super::Target;
 use crate::nodes::RotationKind;
 use crate::trajectory_managers::InitialTrajectoryGenerator;
+use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
 use crate::utils::math::{LibmMath, Math};
 
 /// An implementation of

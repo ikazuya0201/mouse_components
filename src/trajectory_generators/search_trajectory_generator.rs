@@ -7,8 +7,9 @@ use super::spin_generator::{SpinGenerator, SpinTrajectory};
 use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::StopTrajectory;
 use super::trajectory::{ShiftTrajectory, Target};
-use super::{ok_or, Pose, RequiredFieldEmptyError};
+use super::Pose;
 use crate::trajectory_managers::SearchTrajectoryGenerator as ISearchTrajectoryGenerator;
+use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
 use crate::utils::math::{LibmMath, Math};
 use uom::si::{
     angle::degree,

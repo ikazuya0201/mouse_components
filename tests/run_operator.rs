@@ -185,7 +185,7 @@ fn test_run_operator() {
                     .model_time_constant(rot_model_time_constant)
                     .build();
 
-                TrackerBuilder::new()
+                TrackerBuilder::default()
                     .right_motor(right_motor)
                     .left_motor(left_motor)
                     .period(period)
@@ -199,7 +199,8 @@ fn test_run_operator() {
                     .low_zeta(1.0)
                     .low_b(1e-3)
                     .fail_safe_distance(Length::new::<meter>(0.05))
-                    .build::<MathFake>()
+                    .build()
+                    .unwrap()
             };
 
             let wall_detector = {

@@ -6,8 +6,9 @@ use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParameters};
 use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::{ShiftTrajectory, Target};
-use super::{ok_or, Pose, RequiredFieldEmptyError};
+use super::Pose;
 use crate::trajectory_managers::InitialTrajectoryGenerator;
+use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
 use crate::utils::math::{LibmMath, Math};
 use uom::si::{
     f32::{
