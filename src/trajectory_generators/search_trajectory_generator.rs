@@ -7,9 +7,10 @@ use super::spin_generator::{SpinGenerator, SpinTrajectory};
 use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::StopTrajectory;
 use super::trajectory::{ShiftTrajectory, Target};
-use super::{ok_or, Pose, RequiredFieldEmptyError};
-use crate::traits::Math;
+use super::Pose;
 use crate::trajectory_managers::SearchTrajectoryGenerator as ISearchTrajectoryGenerator;
+use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
+use crate::utils::math::{LibmMath, Math};
 use uom::si::{
     angle::degree,
     f32::{
@@ -258,7 +259,7 @@ where
     }
 }
 
-pub struct SearchTrajectoryGeneratorBuilder {
+pub struct SearchTrajectoryGeneratorBuilder<M = LibmMath> {
     angular_velocity_ref: Option<AngularVelocity>,
     angular_acceleration_ref: Option<AngularAcceleration>,
     angular_jerk_ref: Option<AngularJerk>,
@@ -273,9 +274,16 @@ pub struct SearchTrajectoryGeneratorBuilder {
     spin_angular_velocity: Option<AngularVelocity>,
     spin_angular_acceleration: Option<AngularAcceleration>,
     spin_angular_jerk: Option<AngularJerk>,
+    _math: PhantomData<fn() -> M>,
 }
 
-impl SearchTrajectoryGeneratorBuilder {
+impl Default for SearchTrajectoryGeneratorBuilder<LibmMath> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<M> SearchTrajectoryGeneratorBuilder<M> {
     const DEFAULT_FRONT_OFFSET: Length = Length {
         dimension: PhantomData,
         units: PhantomData,
@@ -303,10 +311,14 @@ impl SearchTrajectoryGeneratorBuilder {
             spin_angular_velocity: None,
             spin_angular_acceleration: None,
             spin_angular_jerk: None,
+            _math: PhantomData,
         }
     }
 
-    pub fn build<M: Math>(self) -> Result<SearchTrajectoryGenerator<M>, RequiredFieldEmptyError> {
+    pub fn build(self) -> Result<SearchTrajectoryGenerator<M>, RequiredFieldEmptyError>
+    where
+        M: Math,
+    {
         Ok(SearchTrajectoryGenerator::<M>::new(
             ok_or(self.angular_velocity_ref, "angular_velocity_ref")?,
             ok_or(self.angular_acceleration_ref, "angular_acceleration_ref")?,
@@ -459,7 +471,7 @@ mod tests {
                 let period = Time::new::<second>(0.001);
                 let search_velocity = Velocity::new::<meter_per_second>(0.2);
 
-                let generator = SearchTrajectoryGeneratorBuilder::new()
+                let generator = SearchTrajectoryGeneratorBuilder::default()
                     .period(period)
                     .max_velocity(Velocity::new::<meter_per_second>(2.0))
                     .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
@@ -476,7 +488,7 @@ mod tests {
                         AngularAcceleration::new::<degree_per_second_squared>(90.0),
                     )
                     .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
-                    .build::<MathFake>()
+                    .build()
                     .unwrap();
 
                 let (kind, last_x, last_y, last_theta) = $value;

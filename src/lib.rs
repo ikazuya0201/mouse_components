@@ -77,7 +77,6 @@ pub mod defaults {
         Size,
         Math,
         MaxPathLength,
-        Logger = tracker::NullLogger,
     > = agents::TrackingAgent<
         trajectory_managers::TrackingTrajectoryManager<
             (nodes::RunNode<Size>, types::data::RunKind),
@@ -92,7 +91,6 @@ pub mod defaults {
                 Math,
                 controllers::TranslationController,
                 controllers::RotationController,
-                Logger,
             >,
             wall_detector::WallDetector<
                 'a,
@@ -115,7 +113,6 @@ pub mod defaults {
         DistanceSensor,
         Size,
         Math,
-        Logger,
     > = agents::SearchAgent<
         trajectory_managers::SearchTrajectoryManager<
             trajectory_generators::SearchTrajectoryGenerator<Math>,
@@ -134,7 +131,6 @@ pub mod defaults {
                 Math,
                 controllers::TranslationController,
                 controllers::RotationController,
-                Logger,
             >,
             wall_detector::WallDetector<
                 'a,
@@ -165,7 +161,6 @@ pub mod defaults {
         DistanceSensor,
         Math,
         Size,
-        Logger = tracker::NullLogger,
     > = operators::SearchOperator<
         SearchCommander<'a, Size>,
         SearchAgent<
@@ -178,7 +173,6 @@ pub mod defaults {
             DistanceSensor,
             Size,
             Math,
-            Logger,
         >,
     >;
 
@@ -197,7 +191,6 @@ pub mod defaults {
         DistanceSensor,
         Math,
         Size,
-        Logger = tracker::NullLogger,
     > = operators::TrackingOperator<
         RunAgent<
             'a,
@@ -210,7 +203,6 @@ pub mod defaults {
             Size,
             Math,
             <nodes::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
-            Logger,
         >,
     >;
 }

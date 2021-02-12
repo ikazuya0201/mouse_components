@@ -133,7 +133,7 @@ macro_rules! impl_search_operator_test {
                 let agent = {
                     let robot = {
                         let estimator = {
-                            EstimatorBuilder::new()
+                            EstimatorBuilder::default()
                                 .left_encoder(left_encoder)
                                 .right_encoder(right_encoder)
                                 .imu(imu)
@@ -142,7 +142,7 @@ macro_rules! impl_search_operator_test {
                                 .initial_state(start_state)
                                 .wheel_interval(wheel_interval)
                                 .correction_weight(0.1)
-                                .build::<MathFake>()
+                                .build()
                                 .unwrap()
                         };
 
@@ -165,7 +165,7 @@ macro_rules! impl_search_operator_test {
                                 .model_time_constant(rot_model_time_constant)
                                 .build();
 
-                            TrackerBuilder::new()
+                            TrackerBuilder::default()
                                 .right_motor(right_motor)
                                 .left_motor(left_motor)
                                 .period(period)
@@ -179,7 +179,8 @@ macro_rules! impl_search_operator_test {
                                 .low_zeta(1.0)
                                 .low_b(1e-3)
                                 .fail_safe_distance(Length::new::<meter>(0.05))
-                                .build::<MathFake>()
+                                .build()
+                                .unwrap()
                         };
 
                         let wall_detector = {
@@ -197,7 +198,7 @@ macro_rules! impl_search_operator_test {
 
                     let search_velocity = Velocity::new::<meter_per_second>(0.12);
 
-                    let trajectory_generator = SearchTrajectoryGeneratorBuilder::new()
+                    let trajectory_generator = SearchTrajectoryGeneratorBuilder::default()
                         .period(period)
                         .max_velocity(Velocity::new::<meter_per_second>(2.0))
                         .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
@@ -215,7 +216,7 @@ macro_rules! impl_search_operator_test {
                             degree_per_second_squared,
                         >(1800.0))
                         .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
-                        .build::<MathFake>()
+                        .build()
                         .expect("Should never panic");
 
                     let trajectory_manager = SearchTrajectoryManager::new(

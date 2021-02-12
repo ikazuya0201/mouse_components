@@ -69,6 +69,38 @@ pub trait Math {
     }
 }
 
+pub struct LibmMath;
+
+impl Math for LibmMath {
+    fn sqrtf(val: f32) -> f32 {
+        libm::sqrtf(val)
+    }
+
+    fn sinf(val: f32) -> f32 {
+        libm::sinf(val)
+    }
+
+    fn cosf(val: f32) -> f32 {
+        libm::cosf(val)
+    }
+
+    fn expf(val: f32) -> f32 {
+        libm::expf(val)
+    }
+
+    fn atan2f(y: f32, x: f32) -> f32 {
+        libm::atan2f(y, x)
+    }
+
+    fn rem_euclidf(lhs: f32, rhs: f32) -> f32 {
+        libm::remainderf(lhs, rhs)
+    }
+
+    fn sincosf(val: f32) -> (f32, f32) {
+        (Self::sinf(val), Self::cosf(val))
+    }
+}
+
 #[cfg(test)]
 pub use dummy::MathFake;
 
@@ -101,7 +133,12 @@ mod dummy {
         }
 
         fn rem_euclidf(lhs: f32, rhs: f32) -> f32 {
-            lhs.rem_euclid(rhs)
+            let val = lhs.rem_euclid(rhs);
+            if val.is_sign_positive() {
+                val
+            } else {
+                val + rhs
+            }
         }
     }
 }
