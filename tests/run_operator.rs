@@ -154,7 +154,7 @@ fn test_run_operator() {
     let agent = {
         let robot = {
             let estimator = {
-                EstimatorBuilder::new()
+                EstimatorBuilder::default()
                     .left_encoder(left_encoder)
                     .right_encoder(right_encoder)
                     .imu(imu)
@@ -162,7 +162,7 @@ fn test_run_operator() {
                     .cut_off_frequency(Frequency::new::<hertz>(50.0))
                     .initial_state(start_state)
                     .wheel_interval(wheel_interval)
-                    .build::<MathFake>()
+                    .build()
                     .unwrap()
             };
 
@@ -214,7 +214,7 @@ fn test_run_operator() {
             Robot::new(estimator, tracker, wall_detector)
         };
         let trajectory_manager = {
-            let trajectory_generator = RunTrajectoryGeneratorBuilder::new()
+            let trajectory_generator = RunTrajectoryGeneratorBuilder::default()
                 .period(period)
                 .max_velocity(Velocity::new::<meter_per_second>(2.0))
                 .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
@@ -226,7 +226,7 @@ fn test_run_operator() {
                 ))
                 .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
                 .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
-                .build::<MathFake, MaxPathLength>()
+                .build::<MaxPathLength>()
                 .expect("Should never panic");
             TrackingTrajectoryManager::new(trajectory_generator, CommandConverter::default())
         };

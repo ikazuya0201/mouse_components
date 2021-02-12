@@ -1,13 +1,14 @@
-use uom::si::angle::degree;
-use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
+use core::marker::PhantomData;
 
 use heapless::Vec;
+use uom::si::angle::degree;
+use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
 use super::spin_generator::{SpinGenerator, SpinTrajectory};
 use super::{ok_or, RequiredFieldEmptyError, Target};
 use crate::nodes::RotationKind;
 use crate::trajectory_managers::InitialTrajectoryGenerator;
-use crate::utils::math::Math;
+use crate::utils::math::{LibmMath, Math};
 
 /// An implementation of
 /// [InitialTrajectoryGenerator](crate::trajectory_managers::InitialTrajectoryGenerator).
@@ -44,14 +45,31 @@ impl<M: Math> InitialTrajectoryGenerator<RotationKind> for ReturnSetupTrajectory
 }
 
 /// A builder for [ReturnSetupTrajectoryGenerator](ReturnSetupTrajectoryGenerator).
-pub struct ReturnSetupTrajectoryGeneratorBuilder {
+pub struct ReturnSetupTrajectoryGeneratorBuilder<M = LibmMath> {
     max_angular_velocity: Option<AngularVelocity>,
     max_angular_acceleration: Option<AngularAcceleration>,
     max_angular_jerk: Option<AngularJerk>,
     period: Option<Time>,
+    _math: PhantomData<fn() -> M>,
 }
 
-impl ReturnSetupTrajectoryGeneratorBuilder {
+impl Default for ReturnSetupTrajectoryGeneratorBuilder<LibmMath> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<M> ReturnSetupTrajectoryGeneratorBuilder<M> {
+    pub fn new() -> Self {
+        Self {
+            max_angular_velocity: None,
+            max_angular_acceleration: None,
+            max_angular_jerk: None,
+            period: None,
+            _math: PhantomData,
+        }
+    }
+
     pub fn max_angular_velocity(mut self, max_angular_velocity: AngularVelocity) -> Self {
         self.max_angular_velocity = Some(max_angular_velocity);
         self
@@ -75,9 +93,7 @@ impl ReturnSetupTrajectoryGeneratorBuilder {
         self
     }
 
-    pub fn build<M: Math>(
-        self,
-    ) -> Result<ReturnSetupTrajectoryGenerator<M>, RequiredFieldEmptyError> {
+    pub fn build(self) -> Result<ReturnSetupTrajectoryGenerator<M>, RequiredFieldEmptyError> {
         Ok(ReturnSetupTrajectoryGenerator {
             spin_generator: SpinGenerator::<M>::new(
                 ok_or(self.max_angular_velocity, "max_angular_velocity")?,

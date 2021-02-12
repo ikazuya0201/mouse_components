@@ -11,7 +11,7 @@ use uom::si::{
 
 use crate::robot::StateEstimator;
 use crate::tracker::State;
-use crate::traits::Math;
+use crate::utils::math::{LibmMath, Math};
 use crate::wall_detector::CorrectInfo;
 
 pub trait IMU {
@@ -171,7 +171,7 @@ where
 ///     .build::<Math>()
 ///     .unwrap();
 /// ```
-pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
+pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M = LibmMath> {
     left_encoder: Option<LeftEncoder>,
     right_encoder: Option<RightEncoder>,
     imu: Option<Imu>,
@@ -180,30 +180,43 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     initial_state: Option<State>,
     wheel_interval: Option<Length>,
     correction_weight: Option<f32>,
+    _math: PhantomData<fn() -> M>,
 }
 
-impl<LeftEncoder: Encoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
+impl<LeftEncoder: Encoder, RightEncoder, Imu, M>
+    EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M>
+{
     pub fn left_encoder(mut self, left_encoder: LeftEncoder) -> Self {
         self.left_encoder = Some(left_encoder);
         self
     }
 }
 
-impl<LeftEncoder, RightEncoder: Encoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
+impl<LeftEncoder, RightEncoder: Encoder, Imu, M>
+    EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M>
+{
     pub fn right_encoder(mut self, right_encoder: RightEncoder) -> Self {
         self.right_encoder = Some(right_encoder);
         self
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu: IMU> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
+impl<LeftEncoder, RightEncoder, Imu: IMU, M> EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M> {
     pub fn imu(mut self, imu: Imu) -> Self {
         self.imu = Some(imu);
         self
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
+impl<LeftEncoder, RightEncoder, Imu> Default
+    for EstimatorBuilder<LeftEncoder, RightEncoder, Imu, LibmMath>
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M> {
     pub fn new() -> Self {
         Self {
             left_encoder: None,
@@ -214,6 +227,7 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
             initial_state: None,
             wheel_interval: None,
             correction_weight: None,
+            _math: PhantomData,
         }
     }
 
@@ -252,12 +266,10 @@ fn ok_or<T>(value: Option<T>, field_name: &'static str) -> Result<T, BuildError>
     value.ok_or(BuildError { field_name })
 }
 
-impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
-    EstimatorBuilder<LeftEncoder, RightEncoder, Imu>
+impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU, M: Math>
+    EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M>
 {
-    pub fn build<M: Math>(
-        self,
-    ) -> Result<Estimator<LeftEncoder, RightEncoder, Imu, M>, BuildError> {
+    pub fn build(self) -> Result<Estimator<LeftEncoder, RightEncoder, Imu, M>, BuildError> {
         let period = ok_or(self.period, "period")?;
         let cut_off_frequency = ok_or(self.cut_off_frequency, "cut_off_frequency")?;
         let alpha =
@@ -487,14 +499,14 @@ mod tests {
 
                 let simulator = AgentSimulator::new(trajectory);
                 let (right_encoder, left_encoder, imu) = simulator.split(wheel_interval);
-                let mut estimator = EstimatorBuilder::new()
+                let mut estimator = EstimatorBuilder::default()
                     .left_encoder(left_encoder)
                     .right_encoder(right_encoder)
                     .imu(imu)
                     .period(PERIOD)
                     .cut_off_frequency(Frequency::new::<hertz>(50.0))
                     .wheel_interval(wheel_interval)
-                    .build::<MathFake>()
+                    .build()
                     .unwrap();
 
                 while let Ok(expected_state) = simulator.step() {

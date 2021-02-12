@@ -7,8 +7,8 @@ use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::{ShiftTrajectory, Target};
 use super::{ok_or, Pose, RequiredFieldEmptyError};
-use crate::traits::Math;
 use crate::trajectory_managers::InitialTrajectoryGenerator;
+use crate::utils::math::{LibmMath, Math};
 use uom::si::{
     f32::{
         Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
@@ -158,7 +158,7 @@ where
     }
 }
 
-pub struct RunTrajectoryGeneratorBuilder {
+pub struct RunTrajectoryGeneratorBuilder<M = LibmMath> {
     run_slalom_velocity: Option<Velocity>,
     max_velocity: Option<Velocity>,
     max_acceleration: Option<Acceleration>,
@@ -168,9 +168,16 @@ pub struct RunTrajectoryGeneratorBuilder {
     angular_jerk_ref: Option<AngularJerk>,
     slalom_parameters_map: Option<fn(SlalomKind, SlalomDirection) -> SlalomParameters>,
     period: Option<Time>,
+    _math: PhantomData<fn() -> M>,
 }
 
-impl RunTrajectoryGeneratorBuilder {
+impl Default for RunTrajectoryGeneratorBuilder<LibmMath> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<M> RunTrajectoryGeneratorBuilder<M> {
     pub fn new() -> Self {
         Self {
             run_slalom_velocity: None,
@@ -182,12 +189,16 @@ impl RunTrajectoryGeneratorBuilder {
             angular_jerk_ref: None,
             slalom_parameters_map: None,
             period: None,
+            _math: PhantomData,
         }
     }
 
-    pub fn build<M: Math, MaxLength>(
+    pub fn build<MaxLength>(
         self,
-    ) -> Result<RunTrajectoryGenerator<M, MaxLength>, RequiredFieldEmptyError> {
+    ) -> Result<RunTrajectoryGenerator<M, MaxLength>, RequiredFieldEmptyError>
+    where
+        M: Math,
+    {
         Ok(RunTrajectoryGenerator::<M, MaxLength>::new(
             ok_or(self.run_slalom_velocity, "run_slalom_velocity")?,
             ok_or(self.max_velocity, "max_velocity")?,
