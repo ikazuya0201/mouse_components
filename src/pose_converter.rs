@@ -16,6 +16,7 @@ pub struct PoseConverter<N, M> {
     square_width_half: Length,
     square_width: Length,
     ignore_radius_from_pillar: Length,
+    ignore_length_from_wall: Length,
     p1: Length,
     p2: Length,
     n1: Length,
@@ -40,6 +41,11 @@ impl<N, M> PoseConverter<N, M> {
         units: PhantomData,
         value: 0.01,
     };
+    const DEFAULT_IGNORE_LENGTH: Length = Length {
+        value: 0.008,
+        dimension: PhantomData,
+        units: PhantomData,
+    };
 }
 
 impl<N, M> Default for PoseConverter<N, M> {
@@ -48,6 +54,7 @@ impl<N, M> Default for PoseConverter<N, M> {
             Self::DEFAULT_SQUARE_WIDTH,
             Self::DEFAULT_WALL_WIDTH,
             Self::DEFAULT_IGNORE_RADIUS,
+            Self::DEFAULT_IGNORE_LENGTH,
         )
     }
 }
@@ -57,6 +64,7 @@ impl<N, M> PoseConverter<N, M> {
         square_width: Length,
         wall_width: Length,
         ignore_radius_from_pillar: Length,
+        ignore_length_from_wall: Length,
     ) -> Self {
         let p1 = square_width - wall_width / 2.0;
         let p2 = p1 + square_width;
@@ -67,6 +75,7 @@ impl<N, M> PoseConverter<N, M> {
             square_width_half: square_width / 2.0,
             square_width,
             ignore_radius_from_pillar,
+            ignore_length_from_wall,
             p1,
             p2,
             n1,
@@ -247,11 +256,11 @@ where
                 } else {
                     dist
                 };
-                (direction, Total(dist))
+                (direction, dist)
             })
             .collect::<GenericArray<_, U4>>();
 
-        axes_distance.sort_unstable_by_key(|e| e.1);
+        axes_distance.sort_unstable_by_key(|e| Total(e.1));
 
         let wall = match axes_distance[0].0 {
             Right => {
@@ -280,10 +289,17 @@ where
             }
         }?;
 
+        let existing_distance = axes_distance[0].1; //the nearest one
+        let not_existing_distance = axes_distance[1].1; //the 2nd nearest one
+
+        if existing_distance <= self.ignore_length_from_wall {
+            return create_error();
+        }
+
         Ok(WallInfo {
             wall,
-            existing_distance: (axes_distance[0].1).0,
-            not_existing_distance: (axes_distance[1].1).0,
+            existing_distance,
+            not_existing_distance,
         })
     }
 }
@@ -319,6 +335,7 @@ mod tests {
                     Length::new::<meter>(0.09),
                     Length::new::<meter>(0.006),
                     Length::new::<meter>(0.01),
+                    Length::new::<meter>(0.008),
                 );
                 let info = converter.convert(&input).unwrap();
                 assert_eq!(info.wall, expected.wall);
@@ -349,6 +366,7 @@ mod tests {
                     Length::new::<meter>(0.09),
                     Length::new::<meter>(0.006),
                     Length::new::<meter>(0.01),
+                    Length::new::<meter>(0.008),
                 );
                 assert!(converter.convert(&input).is_err());
             }
@@ -395,4 +413,5 @@ mod tests {
     define_convert_err_test!(convert_err_test2: (U4, (0.405, 0.045, 0.0)));
     define_convert_err_test!(convert_err_test3: (U4, (-0.045, 0.045, 0.0)));
     define_convert_err_test!(convert_err_test4: (U4, (0.045, 0.045, 45.0)));
+    define_convert_err_test!(convert_err_test5: (U4, (0.085, 0.045, 0.0)));
 }
