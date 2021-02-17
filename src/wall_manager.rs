@@ -7,6 +7,7 @@ use spin::Mutex;
 use typenum::{consts::U2, PowerOfTwo, Unsigned};
 
 use crate::mazes::WallChecker;
+use crate::nodes::SearchNode;
 use crate::utils::{itertools::repeat_n, probability::Probability};
 use crate::wall_detector::WallProbabilityManager;
 
@@ -16,6 +17,28 @@ pub struct Wall<N> {
     y: u16,
     top: bool,
     _maze_width: PhantomData<fn() -> N>,
+}
+
+impl<N> Into<[SearchNode<N>; 2]> for Wall<N>
+where
+    N: typenum::Unsigned,
+{
+    fn into(self) -> [SearchNode<N>; 2] {
+        use crate::types::data::AbsoluteDirection::*;
+
+        let (dx, dy, dirs) = if self.is_top() {
+            (0, 1, [North, South])
+        } else {
+            (1, 0, [East, West])
+        };
+        let x = (self.x() * 2 + dx) as i16;
+        let y = (self.y() * 2 + dy) as i16;
+        let new = |x, y, dir| {
+            SearchNode::<N>::new(x, y, dir)
+                .unwrap_or_else(|err| unreachable!("Should never be error: {:?}", err))
+        };
+        [new(x, y, dirs[0]), new(x, y, dirs[1])]
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
