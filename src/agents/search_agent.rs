@@ -32,6 +32,20 @@ impl<Manager, Robot> SearchAgent<Manager, Robot> {
     }
 }
 
+impl<'a, Resource, Config, State, Manager, Robot> From<(Resource, &'a Config, &'a State)>
+    for SearchAgent<Manager, Robot>
+where
+    Manager: From<(&'a Config, &'a State)>,
+    Robot: From<(Resource, &'a Config, &'a State)>,
+{
+    fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
+        Self::new(
+            Manager::from((config, state)),
+            Robot::from((resource, config, state)),
+        )
+    }
+}
+
 /// Error on [SearchAgent](SearchAgent).
 #[derive(Debug)]
 pub enum SearchAgentError<T, U> {
