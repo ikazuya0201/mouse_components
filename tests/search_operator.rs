@@ -7,7 +7,7 @@ use components::{
     defaults,
     estimator::EstimatorBuilder,
     mazes::Maze,
-    nodes::RunNode,
+    nodes::{RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::SearchOperator,
     pose_converter::PoseConverter,
@@ -22,7 +22,6 @@ use components::{
         SlalomKind, SlalomParameters, State,
     },
     utils::probability::Probability,
-    wall_converter::WallConverter,
     wall_detector::WallDetector,
     wall_manager::WallManager,
 };
@@ -79,7 +78,7 @@ macro_rules! impl_search_operator_test {
                 let input_str = $input_str;
                 let goals = $goals
                     .into_iter()
-                    .map(|goal| RunNode::<Size>::new(goal.0, goal.1, goal.2, cost).unwrap())
+                    .map(|goal| RunNode::<Size>::new(goal.0, goal.1, goal.2).unwrap())
                     .collect::<Vec<_>>();
 
                 let start_state = State {
@@ -230,9 +229,8 @@ macro_rules! impl_search_operator_test {
                 use AbsoluteDirection::*;
 
                 let create_commander = |wall_storage| {
-                    let wall_converter = WallConverter::new(cost);
-                    let maze = Maze::new(wall_storage, wall_converter);
-                    let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
+                    let maze: Maze<_, _, _, SearchNode<Size>> = Maze::new(wall_storage, cost);
+                    let start = RunNode::<Size>::new(0, 0, North).unwrap();
                     defaults::SearchCommander::new(
                         start,
                         goals.clone(),

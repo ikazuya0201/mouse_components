@@ -1,6 +1,7 @@
 //! Definition of [Maze](crate::mazes::Maze) and its dependent traits.
 
 use core::fmt;
+use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
 
@@ -48,8 +49,8 @@ pub trait WallSpaceNode {
 /// A trait that enumerates wall-node successors and predecessors of a node.
 pub trait GraphNode: Sized + WallSpaceNode {
     type NeighborNum;
-    type Cost;
-    type WallNodes: IntoIterator<Item = WallNode<Self::Wall, (Self, Self::Cost)>>;
+    type Pattern;
+    type WallNodes: IntoIterator<Item = WallNode<Self::Wall, (Self, Self::Pattern)>>;
     type WallNodesList: IntoIterator<Item = Self::WallNodes>;
 
     fn successors(&self) -> Self::WallNodesList;
@@ -63,38 +64,30 @@ pub trait WallFinderNode: WallSpaceNode {
     fn walls_between(&self, other: &Self) -> Self::Walls;
 }
 
-/// A trait that converts a wall to corresponding SearchNodes.
-pub trait WallConverter<Wall> {
-    type Error;
-    type SearchNode;
-    type SearchNodes: IntoIterator<Item = Self::SearchNode>;
-
-    fn convert(&self, wall: &Wall) -> Result<Self::SearchNodes, Self::Error>;
-}
-
 /// An implementation of [Graph](crate::commanders::Graph),
 /// [GraphConverter](crate::commanders::GraphConverter) and
 /// [NodeChecker](crate::commanders::NodeChecker) required by
 /// [SearchCommander](crate::commanders::SearchCommander).
-pub struct Maze<'a, Manager, WallConverterType> {
+pub struct Maze<'a, Manager, Pattern, Cost, SearchNode> {
     manager: &'a Manager,
-    wall_converter: WallConverterType,
+    cost_fn: fn(Pattern) -> Cost,
+    _search_node: PhantomData<fn() -> SearchNode>,
 }
 
-impl<'a, Manager, WallConverterType> fmt::Debug for Maze<'a, Manager, WallConverterType>
+impl<'a, Manager, Pattern, Cost, SearchNode> fmt::Debug
+    for Maze<'a, Manager, Pattern, Cost, SearchNode>
 where
     Manager: fmt::Debug,
-    WallConverterType: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Maze")
             .field("manager", &self.manager)
-            .field("wall_converter", &self.wall_converter)
             .finish()
     }
 }
 
-impl<'a, Manager, WallConverterType> fmt::Display for Maze<'a, Manager, WallConverterType>
+impl<'a, Manager, Pattern, Cost, SearchNode> fmt::Display
+    for Maze<'a, Manager, Pattern, Cost, SearchNode>
 where
     Manager: fmt::Display,
 {
@@ -103,22 +96,23 @@ where
     }
 }
 
-impl<'a, Manager, WallConverterType> Maze<'a, Manager, WallConverterType> {
-    pub fn new(manager: &'a Manager, wall_converter: WallConverterType) -> Self {
+impl<'a, Manager, Pattern, Cost, SearchNode> Maze<'a, Manager, Pattern, Cost, SearchNode> {
+    pub fn new(manager: &'a Manager, cost_fn: fn(Pattern) -> Cost) -> Self {
         Self {
             manager,
-            wall_converter,
+            cost_fn,
+            _search_node: PhantomData,
         }
     }
 }
 
-impl<'a, Manager, WallConverterType> Maze<'a, Manager, WallConverterType> {
-    fn _successors<Node, F>(node: &Node, is_blocked: F) -> <Self as Graph<Node>>::Edges
+impl<'a, Manager, Pattern, Cost, SearchNode> Maze<'a, Manager, Pattern, Cost, SearchNode> {
+    fn _successors<Node, F>(&self, node: &Node, is_blocked: F) -> <Self as Graph<Node>>::Edges
     where
         F: Fn(&Node::Wall) -> bool,
-        Node: GraphNode,
+        Node: GraphNode<Pattern = Pattern>,
         Manager: WallChecker<Node::Wall>,
-        Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
+        Node::NeighborNum: ArrayLength<(Node, Cost)>,
     {
         let mut successors = ForcedVec::new();
         for wall_nodes in node.successors() {
@@ -129,8 +123,8 @@ impl<'a, Manager, WallConverterType> Maze<'a, Manager, WallConverterType> {
                             break;
                         }
                     }
-                    WallNode::Node(node) => {
-                        successors.push(node);
+                    WallNode::Node((node, pattern)) => {
+                        successors.push((node, (self.cost_fn)(pattern)));
                     }
                 }
             }
@@ -138,12 +132,12 @@ impl<'a, Manager, WallConverterType> Maze<'a, Manager, WallConverterType> {
         successors.into()
     }
 
-    fn _predecessors<Node, F>(node: &Node, is_blocked: F) -> <Self as Graph<Node>>::Edges
+    fn _predecessors<Node, F>(&self, node: &Node, is_blocked: F) -> <Self as Graph<Node>>::Edges
     where
         F: Fn(&Node::Wall) -> bool,
-        Node: GraphNode,
+        Node: GraphNode<Pattern = Pattern>,
         Manager: WallChecker<Node::Wall>,
-        Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
+        Node::NeighborNum: ArrayLength<(Node, Cost)>,
     {
         let mut predecessors = ForcedVec::new();
         for wall_nodes in node.predecessors() {
@@ -154,8 +148,8 @@ impl<'a, Manager, WallConverterType> Maze<'a, Manager, WallConverterType> {
                             break;
                         }
                     }
-                    WallNode::Node(node) => {
-                        predecessors.push(node);
+                    WallNode::Node((node, pattern)) => {
+                        predecessors.push((node, (self.cost_fn)(pattern)));
                     }
                 }
             }
@@ -164,39 +158,38 @@ impl<'a, Manager, WallConverterType> Maze<'a, Manager, WallConverterType> {
     }
 }
 
-impl<'a, Node, Manager, WallConverterType> Graph<Node> for Maze<'a, Manager, WallConverterType>
+impl<'a, Node, Manager, Cost, SearchNode> Graph<Node>
+    for Maze<'a, Manager, Node::Pattern, Cost, SearchNode>
 where
     Node: GraphNode,
     Manager: WallChecker<Node::Wall>,
-    Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
+    Node::NeighborNum: ArrayLength<(Node, Cost)>,
 {
-    type Cost = Node::Cost;
+    type Cost = Cost;
     type Edges = Vec<(Node, Self::Cost), Node::NeighborNum>;
 
     fn successors(&self, node: &Node) -> Self::Edges {
         //Define blocked state as existence of wall (doesn't consider whether a wall is checked or not).
-        Self::_successors(node, |wall| self.manager.exists(wall))
+        self._successors(node, |wall| self.manager.exists(wall))
     }
 
     fn predecessors(&self, node: &Node) -> Self::Edges {
         //Define blocked state as existence of wall (doesn't consider whether a wall is checked or not).
-        Self::_predecessors(node, |wall| self.manager.exists(wall))
+        self._predecessors(node, |wall| self.manager.exists(wall))
     }
 }
 
-impl<'a, Node, Manager, WallConverterType> GraphConverter<Node>
-    for Maze<'a, Manager, WallConverterType>
+impl<'a, Node, Manager, Pattern, Cost, SearchNode> GraphConverter<Node>
+    for Maze<'a, Manager, Pattern, Cost, SearchNode>
 where
     Node: WallFinderNode,
-    WallConverterType: WallConverter<Node::Wall>,
-    WallConverterType::SearchNode: BoundedNode,
     Manager: WallChecker<Node::Wall>,
-    <WallConverterType::SearchNode as BoundedNode>::UpperBound:
-        ArrayLength<WallConverterType::SearchNode>,
+    Node::Wall: Into<[SearchNode; 2]>,
+    SearchNode: BoundedNode,
+    SearchNode::UpperBound: ArrayLength<SearchNode>,
 {
-    type SearchNode = WallConverterType::SearchNode;
-    type SearchNodes =
-        Vec<Self::SearchNode, <WallConverterType::SearchNode as BoundedNode>::UpperBound>;
+    type SearchNode = SearchNode;
+    type SearchNodes = Vec<Self::SearchNode, SearchNode::UpperBound>;
 
     fn convert_to_checker_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
         &self,
@@ -208,19 +201,17 @@ where
                 if self.manager.is_checked(&wall) {
                     continue;
                 }
-                if let Ok(wall_nodes) = self.wall_converter.convert(&wall) {
-                    for node in wall_nodes {
-                        nodes.push(node);
-                    }
-                }
+                let [node1, node2] = wall.into();
+                nodes.push(node1);
+                nodes.push(node2);
             }
         }
         nodes.into()
     }
 }
 
-impl<'a, SearchNode, Manager, WallConverterType> NodeChecker<SearchNode>
-    for Maze<'a, Manager, WallConverterType>
+impl<'a, Manager, Pattern, Cost, SearchNode> NodeChecker<SearchNode>
+    for Maze<'a, Manager, Pattern, Cost, SearchNode>
 where
     SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
     Manager: WallChecker<SearchNode::Wall>,
@@ -243,41 +234,46 @@ where
 /// The implementation of [Graph](crate::commanders::Graph) is deffered from [Maze](Maze).
 ///
 /// This checks whether a wall is checked or not in the implementation of [Graph](crate::commanders::Graph).
-pub struct CheckedMaze<'a, Manager, Converter>(Maze<'a, Manager, Converter>);
+pub struct CheckedMaze<'a, Manager, Pattern, Cost, SearchNode>(
+    Maze<'a, Manager, Pattern, Cost, SearchNode>,
+);
 
-impl<'a, Manager, Converter> CheckedMaze<'a, Manager, Converter> {
-    pub fn new(manager: &'a Manager, converter: Converter) -> Self {
-        Self(<Self as core::ops::Deref>::Target::new(manager, converter))
+impl<'a, Manager, Pattern, Cost, SearchNode> CheckedMaze<'a, Manager, Pattern, Cost, SearchNode> {
+    pub fn new(manager: &'a Manager, cost_fn: fn(Pattern) -> Cost) -> Self {
+        Self(<Self as core::ops::Deref>::Target::new(manager, cost_fn))
     }
 }
 
-impl<'a, Manager, Converter> core::ops::Deref for CheckedMaze<'a, Manager, Converter> {
-    type Target = Maze<'a, Manager, Converter>;
+impl<'a, Manager, Pattern, Cost, SearchNode> core::ops::Deref
+    for CheckedMaze<'a, Manager, Pattern, Cost, SearchNode>
+{
+    type Target = Maze<'a, Manager, Pattern, Cost, SearchNode>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'a, Node, Manager, Converter> Graph<Node> for CheckedMaze<'a, Manager, Converter>
+impl<'a, Node, Manager, Pattern, Cost, SearchNode> Graph<Node>
+    for CheckedMaze<'a, Manager, Pattern, Cost, SearchNode>
 where
-    Node: GraphNode,
+    Node: GraphNode<Pattern = Pattern>,
     Manager: WallChecker<Node::Wall>,
-    Node::NeighborNum: ArrayLength<(Node, Node::Cost)>,
+    Node::NeighborNum: ArrayLength<(Node, Cost)>,
 {
-    type Cost = Node::Cost;
+    type Cost = Cost;
     type Edges = Vec<(Node, Self::Cost), Node::NeighborNum>;
 
     fn successors(&self, node: &Node) -> Self::Edges {
         //Define the blocked state as a state where a wall is not checked or exists.
-        <Self as core::ops::Deref>::Target::_successors(node, |wall| {
+        self._successors(node, |wall| {
             !self.manager.is_checked(wall) || self.manager.exists(wall)
         })
     }
 
     fn predecessors(&self, node: &Node) -> Self::Edges {
         //Define the blocked state as a state where a wall is not checked or exists.
-        <Self as core::ops::Deref>::Target::_predecessors(node, |wall| {
+        self._predecessors(node, |wall| {
             !self.manager.is_checked(wall) || self.manager.exists(wall)
         })
     }
@@ -299,7 +295,7 @@ mod tests {
 
         impl GraphNode for usize {
             type NeighborNum = U10;
-            type Cost = usize;
+            type Pattern = usize;
             type WallNodes = Vec<WallNode<usize, (usize, usize)>>;
             type WallNodesList = Vec<Self::WallNodes>;
 
@@ -348,7 +344,9 @@ mod tests {
 
         let manager = WallManagerType;
 
-        let maze = Maze::new(&manager, ());
+        let cost = |pattern: usize| -> usize { pattern };
+
+        let maze = Maze::<_, _, _, usize>::new(&manager, cost);
         let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
         assert_eq!(maze.successors(&0), expected.as_slice());
         assert_eq!(maze.predecessors(&0), expected.as_slice());
@@ -369,7 +367,7 @@ mod tests {
 
         impl GraphNode for NodeType {
             type NeighborNum = U10;
-            type Cost = usize;
+            type Pattern = usize;
             type WallNodes = Vec<WallNode<WallType, (NodeType, usize)>>;
             type WallNodesList = Vec<Self::WallNodes>;
 
@@ -421,7 +419,9 @@ mod tests {
 
         let manager = WallManagerType;
 
-        let maze = CheckedMaze::new(&manager, ());
+        let cost = |pattern: usize| -> usize { pattern };
+
+        let maze = CheckedMaze::<_, _, _, usize>::new(&manager, cost);
         let expected = vec![(2usize, 2usize), (2, 1)]
             .into_iter()
             .map(|(node, cost)| (NodeType(node), cost))
@@ -469,18 +469,6 @@ mod tests {
             }
         }
 
-        struct WallConverterType;
-
-        impl WallConverter<Wall> for WallConverterType {
-            type Error = core::convert::Infallible;
-            type SearchNode = SearchNode;
-            type SearchNodes = Vec<Self::SearchNode>;
-
-            fn convert(&self, wall: &Wall) -> Result<Self::SearchNodes, Self::Error> {
-                Ok(vec![SearchNode(wall.0), SearchNode(wall.0 + 1)])
-            }
-        }
-
         struct WallManagerType;
 
         impl WallChecker<Wall> for WallManagerType {
@@ -496,7 +484,10 @@ mod tests {
         }
 
         let manager = WallManagerType;
-        let maze = Maze::new(&manager, WallConverterType);
+
+        let cost = |_pattern: usize| -> usize { unreachable!() };
+
+        let maze = Maze::<_, _, _, SearchNode>::new(&manager, cost);
 
         let path = vec![0, 1, 1, 2, 3, 5, 8]
             .into_iter()
@@ -533,7 +524,9 @@ mod tests {
 
         let manager = WallManagerType;
 
-        let maze = Maze::new(&manager, ());
+        let cost = |_pattern: usize| -> usize { unreachable!() };
+
+        let maze = Maze::<_, _, _, usize>::new(&manager, cost);
         let test_cases = vec![
             (0, Some(false)),
             (1, Some(true)),

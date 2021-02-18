@@ -12,7 +12,7 @@ use components::{
     defaults,
     estimator::EstimatorBuilder,
     mazes::CheckedMaze,
-    nodes::RunNode,
+    nodes::{RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
     pose_converter::PoseConverter,
@@ -23,7 +23,6 @@ use components::{
     trajectory_managers::TrackingTrajectoryManager,
     types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, State},
     utils::probability::Probability,
-    wall_converter::WallConverter,
     wall_detector::WallDetector,
     wall_manager::WallManager,
 };
@@ -237,12 +236,11 @@ fn test_run_operator() {
     use AbsoluteDirection::*;
 
     let commander = {
-        let wall_converter = WallConverter::new(cost);
-        let maze = CheckedMaze::new(&wall_storage, wall_converter);
-        let start = RunNode::<Size>::new(0, 0, North, cost).unwrap();
+        let maze = CheckedMaze::<_, _, _, SearchNode<Size>>::new(&wall_storage, cost);
+        let start = RunNode::<Size>::new(0, 0, North).unwrap();
         let goals = vec![
-            RunNode::<Size>::new(2, 0, South, cost).unwrap(),
-            RunNode::<Size>::new(2, 0, West, cost).unwrap(),
+            RunNode::<Size>::new(2, 0, South).unwrap(),
+            RunNode::<Size>::new(2, 0, West).unwrap(),
         ];
         defaults::RunCommander::new(start, goals, maze)
     };

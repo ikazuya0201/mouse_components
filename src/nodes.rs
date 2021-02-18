@@ -32,7 +32,6 @@ pub struct Node<N> {
     x: i16,
     y: i16,
     direction: AbsoluteDirection,
-    cost: fn(Pattern) -> u16,
     _maze_width: PhantomData<fn() -> N>,
 }
 
@@ -92,17 +91,11 @@ enum Location {
 }
 
 impl<N> Node<N> {
-    unsafe fn new_unchecked(
-        x: i16,
-        y: i16,
-        direction: AbsoluteDirection,
-        cost: fn(Pattern) -> u16,
-    ) -> Self {
+    unsafe fn new_unchecked(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
         Self {
             x,
             y,
             direction,
-            cost,
             _maze_width: PhantomData,
         }
     }
@@ -159,16 +152,11 @@ impl<N> Node<N>
 where
     N: Unsigned,
 {
-    fn new(
-        x: i16,
-        y: i16,
-        direction: AbsoluteDirection,
-        cost: fn(Pattern) -> u16,
-    ) -> Result<Self, NodeCreationError> {
+    fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         if x < 0 || y < 0 || x > Self::max() || y > Self::max() {
             Err(NodeCreationError { x, y, direction })
         } else {
-            Ok(unsafe { Self::new_unchecked(x, y, direction, cost) })
+            Ok(unsafe { Self::new_unchecked(x, y, direction) })
         }
     }
 
@@ -193,12 +181,7 @@ where
             Left => (-dy, dx),
             _ => unreachable!(),
         };
-        Self::new(
-            self.x + dx,
-            self.y + dy,
-            self.direction.rotate(ddir),
-            self.cost,
-        )
+        Self::new(self.x + dx, self.y + dy, self.direction.rotate(ddir))
     }
 }
 
@@ -270,13 +253,8 @@ impl<N> core::fmt::Debug for SearchNode<N> {
 }
 
 impl<N> SearchNode<N> {
-    pub unsafe fn new_unchecked(
-        x: i16,
-        y: i16,
-        direction: AbsoluteDirection,
-        cost: fn(Pattern) -> u16,
-    ) -> Self {
-        Self(Node::<N>::new_unchecked(x, y, direction, cost))
+    pub unsafe fn new_unchecked(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
+        Self(Node::<N>::new_unchecked(x, y, direction))
     }
 
     #[inline]
@@ -372,14 +350,9 @@ impl<N> SearchNode<N>
 where
     N: Unsigned,
 {
-    pub fn new(
-        x: i16,
-        y: i16,
-        direction: AbsoluteDirection,
-        cost: fn(Pattern) -> u16,
-    ) -> Result<Self, NodeCreationError> {
+    pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use core::convert::TryInto;
-        Node::<N>::new(x, y, direction, cost)?.try_into()
+        Node::<N>::new(x, y, direction)?.try_into()
     }
 
     fn relative(
@@ -412,7 +385,7 @@ where
                 wall_nodes.push(WallNode::Node((
                     self.relative(dx, dy, ddir, North)
                         .expect("Should never panic!"),
-                    (self.0.cost)(pattern),
+                    pattern,
                 )));
                 list.push(wall_nodes.into());
             }
@@ -460,8 +433,8 @@ where
     N: Unsigned + PowerOfTwo,
 {
     type NeighborNum = U4;
-    type Cost = u16;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Cost)>, U2>;
+    type Pattern = Pattern;
+    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, U2>;
     type WallNodesList = Vec<Self::WallNodes, U4>;
 
     fn successors(&self) -> Self::WallNodesList {
@@ -628,13 +601,8 @@ where
 }
 
 impl<N> RunNode<N> {
-    pub unsafe fn new_unchecked(
-        x: i16,
-        y: i16,
-        direction: AbsoluteDirection,
-        cost: fn(Pattern) -> u16,
-    ) -> Self {
-        Self(Node::<N>::new_unchecked(x, y, direction, cost))
+    pub unsafe fn new_unchecked(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
+        Self(Node::<N>::new_unchecked(x, y, direction))
     }
 
     #[inline]
@@ -670,14 +638,9 @@ impl<N> RunNode<N>
 where
     N: Unsigned,
 {
-    pub fn new(
-        x: i16,
-        y: i16,
-        direction: AbsoluteDirection,
-        cost: fn(Pattern) -> u16,
-    ) -> Result<Self, NodeCreationError> {
+    pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use core::convert::TryInto;
-        Node::<N>::new(x, y, direction, cost)?.try_into()
+        Node::<N>::new(x, y, direction)?.try_into()
     }
 
     fn relative(
@@ -695,7 +658,7 @@ where
 impl<N> RunNode<N>
 where
     N: Unsigned + PowerOfTwo + Mul<U4>,
-    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
+    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, Pattern)>>,
 {
     fn neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
         use AbsoluteDirection::*;
@@ -723,11 +686,11 @@ where
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, N::Output>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
         i16,
         i16,
     ) -> Result<(), ()> {
-        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, N::Output>,
+        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
               dx: i16,
               dy: i16| {
             let (dx, dy) = if is_succ { (dx, dy) } else { (-dx, -dy) };
@@ -743,20 +706,20 @@ where
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, N::Output>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
         i16,
         i16,
         RelativeDirection,
         Pattern,
     ) -> Result<(), ()> {
-        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, u16)>, N::Output>,
+        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
               dx: i16,
               dy: i16,
               ddir: RelativeDirection,
               pattern: Pattern| {
             let (dx, dy) = if is_succ { (dx, dy) } else { (-dx, -dy) };
             let node = self.relative(dx, dy, ddir, base_dir).map_err(|_| ())?;
-            list.push(WallNode::Node((node, (self.0.cost)(pattern))));
+            list.push(WallNode::Node((node, pattern)));
             Ok(())
         }
     }
@@ -906,11 +869,11 @@ impl<N> WallSpaceNode for RunNode<N> {
 impl<N> GraphNode for RunNode<N>
 where
     N: Unsigned + PowerOfTwo + Mul<U4>,
-    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, u16)>>,
+    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, Pattern)>>,
 {
     type NeighborNum = N::Output;
-    type Cost = u16;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Cost)>, N::Output>;
+    type Pattern = Pattern;
+    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, N::Output>;
     type WallNodesList = Vec<Self::WallNodes, U3>;
 
     fn successors(&self) -> Self::WallNodesList {
@@ -1047,7 +1010,6 @@ impl<N> RotationNode for RunNode<N> {
                 x: self.0.x,
                 y: self.0.y,
                 direction: self.0.direction.rotate(dir),
-                cost: self.0.cost,
                 _maze_width: PhantomData,
             });
             nodes.push((node, kind));
@@ -1069,10 +1031,6 @@ mod tests {
     #[test]
     fn test_search_node_new() {
         use AbsoluteDirection::*;
-
-        fn cost(_pattern: Pattern) -> u16 {
-            unimplemented!()
-        }
 
         let test_cases = vec![
             (
@@ -1103,7 +1061,6 @@ mod tests {
                     x: 0,
                     y: 1,
                     direction: North,
-                    cost,
                     _maze_width: PhantomData,
                 })),
             ),
@@ -1115,7 +1072,6 @@ mod tests {
                     x: 0,
                     y: 1,
                     direction: South,
-                    cost,
                     _maze_width: PhantomData,
                 })),
             ),
@@ -1137,7 +1093,6 @@ mod tests {
                     x: 1,
                     y: 0,
                     direction: East,
-                    cost,
                     _maze_width: PhantomData,
                 })),
             ),
@@ -1164,7 +1119,7 @@ mod tests {
         ];
 
         for (x, y, dir, expected) in test_cases {
-            assert_eq!(SearchNode::<U4>::new(x, y, dir, cost), expected);
+            assert_eq!(SearchNode::<U4>::new(x, y, dir,), expected);
         }
     }
 
@@ -1172,32 +1127,21 @@ mod tests {
     fn test_search_node_graph() {
         use AbsoluteDirection::*;
 
-        fn cost(pattern: Pattern) -> u16 {
-            use Pattern::*;
-
-            match pattern {
-                Search90 => 1,
-                Straight(1) => 2,
-                SpinBack => 3,
-                _ => unreachable!(),
-            }
-        }
-
         let test_cases = vec![
             (
                 (0, 1, North),
                 vec![
                     vec![
                         WallNode::Wall((0, 1, false)),
-                        WallNode::Node((1, 2, East, 1)),
+                        WallNode::Node((1, 2, East, Pattern::Search90)),
                     ],
                     vec![
                         WallNode::Wall((0, 1, true)),
-                        WallNode::Node((0, 3, North, 2)),
+                        WallNode::Node((0, 3, North, Pattern::Straight(1))),
                     ],
                     vec![
                         WallNode::Wall((0, 0, true)),
-                        WallNode::Node((0, 1, South, 3)),
+                        WallNode::Node((0, 1, South, Pattern::SpinBack)),
                     ],
                 ],
             ),
@@ -1206,29 +1150,29 @@ mod tests {
                 vec![
                     vec![
                         WallNode::Wall((1, 0, true)),
-                        WallNode::Node((2, 1, South, 1)),
+                        WallNode::Node((2, 1, South, Pattern::Search90)),
                     ],
                     vec![
                         WallNode::Wall((1, 1, false)),
-                        WallNode::Node((3, 2, East, 2)),
+                        WallNode::Node((3, 2, East, Pattern::Straight(1))),
                     ],
                     vec![
                         WallNode::Wall((1, 1, true)),
-                        WallNode::Node((2, 3, North, 1)),
+                        WallNode::Node((2, 3, North, Pattern::Search90)),
                     ],
                     vec![
                         WallNode::Wall((0, 1, false)),
-                        WallNode::Node((1, 2, West, 3)),
+                        WallNode::Node((1, 2, West, Pattern::SpinBack)),
                     ],
                 ],
             ),
         ];
 
-        type List = Vec<Vec<WallNode<Wall<U4>, (SearchNode<U4>, u16)>>>;
+        type List = Vec<Vec<WallNode<Wall<U4>, (SearchNode<U4>, Pattern)>>>;
 
         use std::vec::Vec;
         for ((x, y, dir), expected) in test_cases {
-            let node = SearchNode::<U4>::new(x, y, dir, cost).unwrap();
+            let node = SearchNode::<U4>::new(x, y, dir).unwrap();
             let successors: List = node
                 .successors()
                 .into_iter()
@@ -1244,7 +1188,7 @@ mod tests {
                                 WallNode::Wall(Wall::<U4>::new(x, y, top).unwrap())
                             }
                             WallNode::Node((x, y, dir, c)) => {
-                                WallNode::Node((SearchNode::<U4>::new(x, y, dir, cost).unwrap(), c))
+                                WallNode::Node((SearchNode::<U4>::new(x, y, dir).unwrap(), c))
                             }
                         })
                         .collect()
@@ -1258,10 +1202,6 @@ mod tests {
     fn test_run_node_new() {
         use AbsoluteDirection::*;
 
-        fn cost(_pattern: Pattern) -> u16 {
-            unreachable!()
-        }
-
         let test_cases = vec![
             (
                 0,
@@ -1271,7 +1211,6 @@ mod tests {
                     x: 0,
                     y: 0,
                     direction: North,
-                    cost,
                     _maze_width: PhantomData,
                 })),
             ),
@@ -1283,7 +1222,6 @@ mod tests {
                     x: 0,
                     y: 1,
                     direction: NorthEast,
-                    cost,
                     _maze_width: PhantomData,
                 })),
             ),
@@ -1300,28 +1238,14 @@ mod tests {
         ];
 
         for (x, y, dir, expected) in test_cases {
-            assert_eq!(RunNode::<U4>::new(x, y, dir, cost), expected);
+            assert_eq!(RunNode::<U4>::new(x, y, dir,), expected);
         }
     }
 
     #[test]
     fn test_run_node_graph() {
         use AbsoluteDirection::*;
-
-        fn cost(pattern: Pattern) -> u16 {
-            use Pattern::*;
-
-            match pattern {
-                FastRun45 => 1,
-                FastRun90 => 2,
-                FastRun135 => 3,
-                FastRun180 => 4,
-                FastRunDiagonal90 => 5,
-                Straight(x) => x + 5,
-                StraightDiagonal(x) => x + 6,
-                _ => unreachable!(),
-            }
-        }
+        use Pattern::*;
 
         let test_cases = vec![
             (
@@ -1330,16 +1254,16 @@ mod tests {
                     vec![
                         WallNode::Wall((0, 0, true)),
                         WallNode::Wall((0, 1, false)),
-                        WallNode::Node((1, 2, NorthEast, 1)),
-                        WallNode::Node((2, 2, East, 2)),
+                        WallNode::Node((1, 2, NorthEast, FastRun45)),
+                        WallNode::Node((2, 2, East, FastRun90)),
                         WallNode::Wall((1, 0, true)),
-                        WallNode::Node((2, 1, SouthEast, 3)),
-                        WallNode::Node((2, 0, South, 4)),
+                        WallNode::Node((2, 1, SouthEast, FastRun135)),
+                        WallNode::Node((2, 0, South, FastRun180)),
                     ],
                     vec![WallNode::Wall((0, 0, true))],
                     vec![
                         WallNode::Wall((0, 0, true)),
-                        WallNode::Node((0, 2, North, 6)),
+                        WallNode::Node((0, 2, North, Straight(1))),
                         WallNode::Wall((0, 1, true)),
                     ],
                 ],
@@ -1349,16 +1273,16 @@ mod tests {
                 vec![
                     vec![
                         WallNode::Wall((0, 1, false)),
-                        WallNode::Node((2, 2, East, 1)),
+                        WallNode::Node((2, 2, East, FastRun45)),
                         WallNode::Wall((1, 0, true)),
-                        WallNode::Node((2, 1, SouthEast, 5)),
-                        WallNode::Node((2, 0, South, 3)),
+                        WallNode::Node((2, 1, SouthEast, FastRunDiagonal90)),
+                        WallNode::Node((2, 0, South, FastRun135)),
                     ],
                     vec![
                         WallNode::Wall((0, 1, false)),
-                        WallNode::Node((1, 2, NorthEast, 7)),
+                        WallNode::Node((1, 2, NorthEast, StraightDiagonal(1))),
                         WallNode::Wall((1, 1, true)),
-                        WallNode::Node((2, 3, NorthEast, 8)),
+                        WallNode::Node((2, 3, NorthEast, StraightDiagonal(2))),
                     ],
                 ],
             ),
@@ -1367,16 +1291,16 @@ mod tests {
                 vec![
                     vec![
                         WallNode::Wall((1, 0, true)),
-                        WallNode::Node((2, 2, North, 1)),
+                        WallNode::Node((2, 2, North, FastRun45)),
                         WallNode::Wall((0, 1, false)),
-                        WallNode::Node((1, 2, NorthWest, 5)),
-                        WallNode::Node((0, 2, West, 3)),
+                        WallNode::Node((1, 2, NorthWest, FastRunDiagonal90)),
+                        WallNode::Node((0, 2, West, FastRun135)),
                     ],
                     vec![
                         WallNode::Wall((1, 0, true)),
-                        WallNode::Node((2, 1, NorthEast, 7)),
+                        WallNode::Node((2, 1, NorthEast, StraightDiagonal(1))),
                         WallNode::Wall((1, 1, false)),
-                        WallNode::Node((3, 2, NorthEast, 8)),
+                        WallNode::Node((3, 2, NorthEast, StraightDiagonal(2))),
                     ],
                 ],
             ),
@@ -1386,20 +1310,20 @@ mod tests {
                     vec![
                         WallNode::Wall((1, 0, true)),
                         WallNode::Wall((1, 1, false)),
-                        WallNode::Node((3, 2, NorthEast, 1)),
+                        WallNode::Node((3, 2, NorthEast, FastRun45)),
                     ],
                     vec![
                         WallNode::Wall((1, 0, true)),
                         WallNode::Wall((0, 1, false)),
-                        WallNode::Node((1, 2, NorthWest, 1)),
-                        WallNode::Node((0, 2, West, 2)),
+                        WallNode::Node((1, 2, NorthWest, FastRun45)),
+                        WallNode::Node((0, 2, West, FastRun90)),
                         WallNode::Wall((0, 0, true)),
-                        WallNode::Node((0, 1, SouthWest, 3)),
-                        WallNode::Node((0, 0, South, 4)),
+                        WallNode::Node((0, 1, SouthWest, FastRun135)),
+                        WallNode::Node((0, 0, South, FastRun180)),
                     ],
                     vec![
                         WallNode::Wall((1, 0, true)),
-                        WallNode::Node((2, 2, North, 6)),
+                        WallNode::Node((2, 2, North, Straight(1))),
                         WallNode::Wall((1, 1, true)),
                     ],
                 ],
@@ -1409,16 +1333,16 @@ mod tests {
                 vec![
                     vec![
                         WallNode::Wall((0, 1, false)),
-                        WallNode::Node((0, 2, West, 1)),
+                        WallNode::Node((0, 2, West, FastRun45)),
                         WallNode::Wall((0, 0, true)),
-                        WallNode::Node((0, 1, SouthWest, 5)),
-                        WallNode::Node((0, 0, South, 3)),
+                        WallNode::Node((0, 1, SouthWest, FastRunDiagonal90)),
+                        WallNode::Node((0, 0, South, FastRun135)),
                     ],
                     vec![
                         WallNode::Wall((0, 1, false)),
-                        WallNode::Node((1, 2, NorthWest, 7)),
+                        WallNode::Node((1, 2, NorthWest, StraightDiagonal(1))),
                         WallNode::Wall((0, 1, true)),
-                        WallNode::Node((0, 3, NorthWest, 8)),
+                        WallNode::Node((0, 3, NorthWest, StraightDiagonal(2))),
                     ],
                 ],
             ),
@@ -1427,10 +1351,10 @@ mod tests {
         use std::vec::Vec;
 
         type Size = U2;
-        type List = Vec<Vec<WallNode<Wall<Size>, (RunNode<Size>, u16)>>>;
+        type List = Vec<Vec<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>>;
 
         for ((x, y, dir), expected) in test_cases {
-            let node = RunNode::<Size>::new(x, y, dir, cost).unwrap();
+            let node = RunNode::<Size>::new(x, y, dir).unwrap();
             let successors: List = node
                 .successors()
                 .into_iter()
@@ -1446,7 +1370,7 @@ mod tests {
                                 WallNode::Wall(Wall::<Size>::new(x, y, top).unwrap())
                             }
                             WallNode::Node((x, y, dir, c)) => {
-                                WallNode::Node((RunNode::<Size>::new(x, y, dir, cost).unwrap(), c))
+                                WallNode::Node((RunNode::<Size>::new(x, y, dir).unwrap(), c))
                             }
                         })
                         .collect()
@@ -1460,10 +1384,6 @@ mod tests {
     #[test]
     fn test_run_node_wall_finder() {
         use AbsoluteDirection::*;
-
-        fn cost(_pattern: Pattern) -> u16 {
-            unreachable!();
-        }
 
         type Size = U4;
 
@@ -1499,8 +1419,8 @@ mod tests {
         use std::vec::Vec;
 
         for (src, dst, expected) in test_cases {
-            let src = RunNode::<Size>::new(src.0, src.1, src.2, cost).unwrap();
-            let dst = RunNode::<Size>::new(dst.0, dst.1, dst.2, cost).unwrap();
+            let src = RunNode::<Size>::new(src.0, src.1, src.2).unwrap();
+            let dst = RunNode::<Size>::new(dst.0, dst.1, dst.2).unwrap();
             let expected: Vec<Wall<Size>> = expected
                 .into_iter()
                 .map(|(x, y, top)| Wall::<Size>::new(x, y, top).unwrap())
@@ -1515,10 +1435,6 @@ mod tests {
         use AbsoluteDirection::*;
         use SearchKind::*;
 
-        fn cost(_pattern: Pattern) -> u16 {
-            unreachable!()
-        }
-
         let test_cases = vec![
             ((0, 1, North), (1, 2, East), Ok(Right)),
             ((0, 1, North), (0, 3, North), Ok(Front)),
@@ -1530,8 +1446,8 @@ mod tests {
         type Size = U4;
 
         for (src, dst, expected) in test_cases {
-            let src = SearchNode::<Size>::new(src.0, src.1, src.2, cost).unwrap();
-            let dst = SearchNode::<Size>::new(dst.0, dst.1, dst.2, cost).unwrap();
+            let src = SearchNode::<Size>::new(src.0, src.1, src.2).unwrap();
+            let dst = SearchNode::<Size>::new(dst.0, dst.1, dst.2).unwrap();
             let expected = expected.map_err(|_| RouteError {
                 src: src.clone(),
                 dst: dst.clone(),
@@ -1546,10 +1462,6 @@ mod tests {
         use RunKind::*;
         use SlalomDirection::{Left as SLeft, Right as SRight};
         use SlalomKind::*;
-
-        fn cost(_pattern: Pattern) -> u16 {
-            unreachable!()
-        }
 
         let test_cases = vec![
             (
@@ -1590,8 +1502,8 @@ mod tests {
         type Size = U4;
 
         for (src, dst, expected) in test_cases {
-            let src = RunNode::<Size>::new(src.0, src.1, src.2, cost).unwrap();
-            let dst = RunNode::<Size>::new(dst.0, dst.1, dst.2, cost).unwrap();
+            let src = RunNode::<Size>::new(src.0, src.1, src.2).unwrap();
+            let dst = RunNode::<Size>::new(dst.0, dst.1, dst.2).unwrap();
             let expected = expected.map_err(|_| RouteError {
                 src: src.clone(),
                 dst: dst.clone(),
@@ -1606,10 +1518,6 @@ mod tests {
 
         type Size = U4;
 
-        fn cost(_pattern: Pattern) -> u16 {
-            unreachable!()
-        }
-
         let test_cases = vec![
             ((1, 0, East), (0, 0, false)),
             ((0, 1, North), (0, 0, true)),
@@ -1619,7 +1527,7 @@ mod tests {
         ];
 
         for (node, expected) in test_cases {
-            let node = SearchNode::<Size>::new(node.0, node.1, node.2, cost).unwrap();
+            let node = SearchNode::<Size>::new(node.0, node.1, node.2).unwrap();
             let expected = Wall::<Size>::new(expected.0, expected.1, expected.2).unwrap();
             assert_eq!(Wall::from(node), expected);
         }
@@ -1631,10 +1539,6 @@ mod tests {
         use RotationKind::*;
 
         type Size = U4;
-
-        fn cost(_pattern: Pattern) -> u16 {
-            unreachable!()
-        }
 
         let test_cases = vec![
             (
@@ -1660,15 +1564,10 @@ mod tests {
         use std::vec::Vec;
 
         for (node, expected) in test_cases {
-            let node = RunNode::<Size>::new(node.0, node.1, node.2, cost).unwrap();
+            let node = RunNode::<Size>::new(node.0, node.1, node.2).unwrap();
             let expected = expected
                 .into_iter()
-                .map(|(node, kind)| {
-                    (
-                        RunNode::<Size>::new(node.0, node.1, node.2, cost).unwrap(),
-                        kind,
-                    )
-                })
+                .map(|(node, kind)| (RunNode::<Size>::new(node.0, node.1, node.2).unwrap(), kind))
                 .collect::<Vec<_>>();
             assert_eq!(node.rotation_nodes(), expected.as_slice());
         }
