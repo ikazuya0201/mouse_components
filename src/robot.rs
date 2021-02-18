@@ -64,6 +64,43 @@ impl<Estimator, Tracker, Detector, State> Robot<Estimator, Tracker, Detector, St
     }
 }
 
+impl<
+        'a,
+        EstimatorResource,
+        TrackerResource,
+        DetectorResource,
+        Config,
+        State,
+        Estimator,
+        Tracker,
+        Detector,
+        RState,
+    >
+    From<(
+        (EstimatorResource, TrackerResource, DetectorResource),
+        &'a Config,
+        &'a State,
+    )> for Robot<Estimator, Tracker, Detector, RState>
+where
+    Estimator: From<(EstimatorResource, &'a Config, &'a State)>,
+    Tracker: From<(TrackerResource, &'a Config, &'a State)>,
+    Detector: From<(DetectorResource, &'a Config, &'a State)>,
+{
+    fn from(
+        ((eresource, tresource, dresource), config, state): (
+            (EstimatorResource, TrackerResource, DetectorResource),
+            &'a Config,
+            &'a State,
+        ),
+    ) -> Self {
+        Self::new(
+            Estimator::from((eresource, config, state)),
+            Tracker::from((tresource, config, state)),
+            Detector::from((dresource, config, state)),
+        )
+    }
+}
+
 impl<Estimator, TrackerType, Detector, Target, State> IRobot<Target>
     for Robot<Estimator, TrackerType, Detector, State>
 where
