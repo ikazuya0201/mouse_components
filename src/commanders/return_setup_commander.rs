@@ -26,6 +26,33 @@ impl<Node, Maze> ReturnSetupCommander<Node, Maze> {
     }
 }
 
+/// A config for initializing [ReturnSetupCommander](ReturnSetupCommander).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReturnSetupCommanderConfig<Node> {
+    pub start: Node,
+}
+
+/// A state for initializing [ReturnSetupCommander](ReturnSetupCommander).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReturnSetupCommanderState<Node> {
+    pub current: Node,
+}
+
+impl<'a, Resource, Config, State, Node, Maze> From<(Resource, &'a Config, &'a State)>
+    for ReturnSetupCommander<Node, Maze>
+where
+    Maze: From<(Resource, &'a Config, &'a State)>,
+    &'a Config: Into<ReturnSetupCommanderConfig<Node>>,
+    &'a State: Into<ReturnSetupCommanderState<Node>>,
+{
+    fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
+        let maze = Maze::from((resource, config, state));
+        let config = config.into();
+        let state = state.into();
+        Self::new(state.current, config.start, maze)
+    }
+}
+
 /// Error on [ReturnSetupCommander](ReturnSetupCommander).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ReturnSetupCommanderError;

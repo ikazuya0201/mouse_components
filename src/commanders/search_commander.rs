@@ -67,26 +67,66 @@ pub struct SearchCommander<Node, RunNode, SearchNode, Route, Maze> {
 
 impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, SearchNode, Route, Maze>
 where
-    Node: From<RunNode>,
     RunNode: Clone,
 {
-    pub fn new<RunNodes: IntoIterator<Item = RunNode>>(
+    pub fn new(
         start: RunNode,
-        goals: RunNodes,
+        goals: &[RunNode],
+        current: Node,
         initial_route: Route,
         final_route: Route,
         maze: Maze,
     ) -> Self {
         Self {
             start: start.clone(),
-            goals: goals.into_iter().collect(),
+            goals: goals.into_iter().cloned().collect(),
             initial_route,
             final_route,
-            current: Mutex::new(start.into()),
+            current: Mutex::new(current),
             state: Mutex::new(State::Initial),
             candidates: Mutex::new(Vec::new()),
             maze,
         }
+    }
+}
+
+/// A config for initializing [SearchCommander](SearchCommander).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SearchCommanderConfig<'a, RunNode, Route> {
+    pub start: RunNode,
+    pub goals: &'a [RunNode],
+    pub initial_route: Route,
+    pub final_route: Route,
+}
+
+/// A state for initializing [SearchCommander](SearchCommander).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SearchCommanderState<Node> {
+    pub current: Node,
+}
+
+impl<'a, Resource, Config, State, Node, RunNode, SearchNode, Route, Maze>
+    From<(Resource, &'a Config, &'a State)>
+    for SearchCommander<Node, RunNode, SearchNode, Route, Maze>
+where
+    Maze: From<(Resource, &'a Config, &'a State)>,
+    Node: From<RunNode>,
+    RunNode: Clone + 'a,
+    &'a Config: Into<SearchCommanderConfig<'a, RunNode, Route>>,
+    &'a State: Into<SearchCommanderState<Node>>,
+{
+    fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
+        let maze = Maze::from((resource, config, state));
+        let config = config.into();
+        let state = state.into();
+        Self::new(
+            config.start,
+            config.goals,
+            state.current,
+            config.initial_route,
+            config.final_route,
+            maze,
+        )
     }
 }
 

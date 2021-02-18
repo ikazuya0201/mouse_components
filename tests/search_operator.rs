@@ -232,8 +232,9 @@ macro_rules! impl_search_operator_test {
                     let maze: Maze<_, _, _, SearchNode<Size>> = Maze::new(wall_storage, cost);
                     let start = RunNode::<Size>::new(0, 0, North).unwrap();
                     defaults::SearchCommander::new(
-                        start,
-                        goals.clone(),
+                        start.clone(),
+                        &goals,
+                        start.into(),
                         SearchKind::Init,
                         SearchKind::Final,
                         maze,

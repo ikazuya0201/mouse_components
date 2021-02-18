@@ -203,6 +203,7 @@ pub mod defaults {
         Math,
         Size,
     > = operators::TrackingOperator<
+        RunCommander<'a, Size>,
         RunAgent<
             'a,
             LeftEncoder,
