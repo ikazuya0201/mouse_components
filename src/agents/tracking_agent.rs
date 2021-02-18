@@ -26,6 +26,20 @@ impl<Manager, Robot> TrackingAgent<Manager, Robot> {
     }
 }
 
+impl<'a, Resource, Config, State, Manager, Robot> From<(Resource, &'a Config, &'a State)>
+    for TrackingAgent<Manager, Robot>
+where
+    Manager: From<(&'a Config, &'a State)>,
+    Robot: From<(Resource, &'a Config, &'a State)>,
+{
+    fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
+        Self::new(
+            Manager::from((config, state)),
+            Robot::from((resource, config, state)),
+        )
+    }
+}
+
 impl<Command, Manager, Robot> TrackingInitializer<Command> for TrackingAgent<Manager, Robot>
 where
     Manager: TrackingInitializer<Command>,
