@@ -8,6 +8,7 @@ use crate::trajectory_managers::CommandConverter as ICommandConverter;
 use crate::types::data::{AbsoluteDirection, Pose};
 
 //NOTE: This struct is intended to be used by SearchOperator
+/// An implementation of [CommandConverter](crate::trajectory_managers::CommandConverter).
 #[derive(Clone, PartialEq, Debug)]
 pub struct CommandConverter {
     square_width_half: Length,
@@ -20,6 +21,23 @@ impl CommandConverter {
             square_width_half: square_width / 2.0,
             front_offset,
         }
+    }
+}
+
+/// A config for [CommandConverter](CommandConverter).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CommandConverterConfig {
+    pub square_width: Length,
+    pub front_offset: Length,
+}
+
+impl<'a, Config, State> From<(&'a Config, &'a State)> for CommandConverter
+where
+    &'a Config: Into<CommandConverterConfig>,
+{
+    fn from((config, _): (&'a Config, &'a State)) -> Self {
+        let config = config.into();
+        Self::new(config.square_width, config.front_offset)
     }
 }
 
