@@ -1,3 +1,5 @@
+//! An implementation of [PoseConverter](crate::wall_detector::PoseConverter).
+
 use core::marker::PhantomData;
 
 use generic_array::GenericArray;
@@ -10,6 +12,7 @@ use crate::utils::{math::Math, total::Total};
 use crate::wall_detector::{PoseConverter as IPoseConverter, WallInfo};
 use crate::wall_manager::Wall;
 
+/// An implementation of [PoseConverter](crate::wall_detector::PoseConverter).
 #[derive(Clone, PartialEq, Debug)]
 pub struct PoseConverter<N, M> {
     i_square_width: i32, //[mm]
@@ -93,6 +96,30 @@ impl<N, M> PoseConverter<N, M> {
     }
 }
 
+/// A config for [PoseConverter](PoseConverter).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PoseConverterConfig {
+    pub square_width: Length,
+    pub wall_width: Length,
+    pub ignore_radius_from_pillar: Length,
+    pub ignore_length_from_wall: Length,
+}
+
+impl<'a, N, M, Config, State> From<(&'a Config, &'a State)> for PoseConverter<N, M>
+where
+    &'a Config: Into<PoseConverterConfig>,
+{
+    fn from((config, _): (&'a Config, &'a State)) -> Self {
+        let config = config.into();
+        Self::new(
+            config.square_width,
+            config.wall_width,
+            config.ignore_radius_from_pillar,
+            config.ignore_length_from_wall,
+        )
+    }
+}
+
 impl<N, M> PoseConverter<N, M>
 where
     M: Math,
@@ -135,6 +162,7 @@ where
     }
 }
 
+/// Error on [PoseConverter](PoseConverter).
 #[derive(Clone, PartialEq, Debug)]
 pub struct OutOfBoundError {
     pose: Pose,
