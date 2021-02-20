@@ -1,24 +1,29 @@
+//! An implementation of [WallDetector](crate::robot::WallDetector).
+
 use core::marker::PhantomData;
 
 use heapless::Vec;
 use uom::si::f32::Length;
 
-use crate::types::data::{Obstacle, Pose};
 use crate::robot::WallDetector as IWallDetector;
+use crate::types::data::{Obstacle, Pose};
 use crate::utils::{forced_vec::ForcedVec, math::Math as IMath, probability::Probability};
 
+/// An info for corrects the state of robot.
 #[derive(Debug, Clone)]
 pub struct CorrectInfo {
     pub obstacle: Obstacle,
     pub diff_from_expected: Length,
 }
 
+/// An info for wall state.
 pub struct WallInfo<Wall> {
     pub wall: Wall,
     pub existing_distance: Length,
     pub not_existing_distance: Length,
 }
 
+/// A trait that converts a given sensor pose to wall info.
 pub trait PoseConverter<Pose> {
     type Error;
     type Wall;
@@ -26,6 +31,7 @@ pub trait PoseConverter<Pose> {
     fn convert(&self, pose: &Pose) -> Result<WallInfo<Self::Wall>, Self::Error>;
 }
 
+/// A trait that detects obstacle.
 pub trait ObstacleDetector<State> {
     type Obstacle;
     type Obstacles: IntoIterator<Item = Self::Obstacle>;
@@ -33,6 +39,7 @@ pub trait ObstacleDetector<State> {
     fn detect(&mut self, state: &State) -> Self::Obstacles;
 }
 
+/// A trait that manages existence probabilities of walls.
 pub trait WallProbabilityManager<Wall>: Send + Sync {
     type Error;
 
@@ -40,6 +47,7 @@ pub trait WallProbabilityManager<Wall>: Send + Sync {
     fn try_update(&self, wall: &Wall, probablity: &Probability) -> Result<(), Self::Error>;
 }
 
+/// An implementation of [WallDetector](crate::robot::WallDetector).
 pub struct WallDetector<'a, Manager, Detector, Converter, Math> {
     manager: &'a Manager,
     detector: Detector,
@@ -55,6 +63,20 @@ impl<'a, Manager, Detector, Converter, Math> WallDetector<'a, Manager, Detector,
             converter,
             _math: PhantomData,
         }
+    }
+}
+
+impl<'a, Manager, Detector, Converter, Math, Config, State>
+    From<((&'a Manager, Detector), &'a Config, &'a State)>
+    for WallDetector<'a, Manager, Detector, Converter, Math>
+where
+    Converter: From<(&'a Config, &'a State)>,
+{
+    fn from(
+        ((manager, detector), config, state): ((&'a Manager, Detector), &'a Config, &'a State),
+    ) -> Self {
+        let converter = Converter::from((config, state));
+        Self::new(manager, detector, converter)
     }
 }
 
