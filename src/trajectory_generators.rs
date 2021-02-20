@@ -1,3 +1,5 @@
+//! Implementations of trajectory generators.
+
 mod return_setup_trajectory_generator;
 mod run_trajectory_generator;
 mod search_trajectory_generator;
