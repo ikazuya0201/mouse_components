@@ -6,6 +6,7 @@ use spin::Mutex;
 use crate::agents::SearchTrajectoryManager;
 use crate::trajectory_managers::CommandConverter;
 
+/// A trait that generates trajectory for search.
 pub trait SearchTrajectoryGenerator<Command> {
     type Target;
     type Trajectory: Iterator<Item = Self::Target>;
@@ -46,6 +47,21 @@ impl<Generator, Converter, Target, Trajectory>
     }
 }
 
+impl<'a, Config, State, Generator, Converter, Target, Trajectory> From<(&'a Config, &'a State)>
+    for TrajectoryManager<Generator, Converter, Target, Trajectory>
+where
+    Generator: From<(&'a Config, &'a State)>,
+    Converter: From<(&'a Config, &'a State)>,
+    Target: Default,
+{
+    fn from((config, state): (&'a Config, &'a State)) -> Self {
+        let generator = Generator::from((config, state));
+        let converter = Converter::from((config, state));
+        Self::new(generator, converter)
+    }
+}
+
+/// Error on [TrajectoryManager](TrajectoryManager).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TrajectoryManagerError {
     FullQueue,
