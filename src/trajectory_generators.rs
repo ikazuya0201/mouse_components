@@ -14,6 +14,7 @@ pub use run_trajectory_generator::{
 };
 pub use search_trajectory_generator::{
     SearchKind, SearchTrajectory, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
+    SearchTrajectoryGeneratorConfig,
 };
 pub use slalom_generator::{
     slalom_parameters_map, slalom_parameters_map2, SlalomDirection, SlalomKind, SlalomParameters,
