@@ -8,6 +8,7 @@ mod trajectory;
 
 pub use return_setup_trajectory_generator::{
     ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryGeneratorBuilder,
+    ReturnSetupTrajectoryGeneratorConfig,
 };
 pub use run_trajectory_generator::{
     RunKind, RunTrajectory, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
