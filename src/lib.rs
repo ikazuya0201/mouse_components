@@ -33,7 +33,7 @@ pub mod traits {
     };
     pub use mazes::{GraphNode, WallChecker, WallFinderNode, WallSpaceNode};
     pub use operators::{InitialCommander, TrackingAgent, TrackingInitializer};
-    pub use tracker::{Logger, RotationController, TranslationController};
+    pub use tracker::{RotationController, TranslationController};
     pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};
 }
 

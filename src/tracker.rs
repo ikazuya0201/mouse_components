@@ -38,16 +38,7 @@ macro_rules! controller_trait {
 controller_trait!(TranslationController: Velocity, Acceleration);
 controller_trait!(RotationController: AngularVelocity, AngularAcceleration);
 
-pub trait Logger {
-    fn log(&self, state: &State, target: &Target);
-}
-
-pub struct NullLogger;
-
-impl Logger for NullLogger {
-    fn log(&self, _state: &State, _target: &Target) {}
-}
-
+/// An implementation of [Tracker](crate::robot::Tracker).
 pub struct Tracker<
     LM,
     RM,
@@ -72,12 +63,59 @@ pub struct Tracker<
     _phantom: PhantomData<fn() -> M>,
 }
 
+/// A config for initializing [Tracker](Tracker).
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct TrackerConfig {
+    pub kx: f32,
+    pub kdx: f32,
+    pub ky: f32,
+    pub kdy: f32,
+    pub valid_control_lower_bound: Velocity,
+    pub fail_safe_distance: Length,
+    pub low_zeta: f32,
+    pub low_b: f32,
+    pub period: Time,
+}
+
+impl<'a, LM, RM, M, TC, RC, Config, State> From<((LM, RM), &'a Config, &'a State)>
+    for Tracker<LM, RM, M, TC, RC>
+where
+    LM: Motor,
+    RM: Motor,
+    TC: From<(&'a Config, &'a State)> + TranslationController,
+    RC: From<(&'a Config, &'a State)> + RotationController,
+    &'a Config: Into<TrackerConfig>,
+{
+    fn from(((left_motor, right_motor), config, state): ((LM, RM), &'a Config, &'a State)) -> Self {
+        let translational_controller = TC::from((config, state));
+        let rotational_controller = RC::from((config, state));
+        let config = config.into();
+        TrackerBuilder::new()
+            .period(config.period)
+            .left_motor(left_motor)
+            .right_motor(right_motor)
+            .translation_controller(translational_controller)
+            .rotation_controller(rotational_controller)
+            .kx(config.kx)
+            .ky(config.ky)
+            .kdx(config.kdx)
+            .kdy(config.kdy)
+            .low_zeta(config.low_zeta)
+            .low_b(config.low_b)
+            .fail_safe_distance(config.fail_safe_distance)
+            .valid_control_lower_bound(config.valid_control_lower_bound)
+            .build()
+            .unwrap_or_else(|err| unreachable!("This should be a bug: {:?}", err))
+    }
+}
+
 impl<LM, RM, M, TC, RC> core::fmt::Debug for Tracker<LM, RM, M, TC, RC> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "Tracker{{ xi:{:?} }}", self.xi)
     }
 }
 
+/// Error on [Tracker](Tracker).
 #[derive(Clone, PartialEq, Debug)]
 pub struct FailSafeError {
     state: State,
