@@ -293,6 +293,24 @@ fn into_parameters(
     }
 }
 
+pub const DEFAULT_ANGULAR_VELOCITY_REF: AngularVelocity = AngularVelocity {
+    value: 9.424778,
+    dimension: PhantomData,
+    units: PhantomData,
+};
+
+pub const DEFAULT_ANGULAR_ACCELERATION_REF: AngularAcceleration = AngularAcceleration {
+    value: 113.097336,
+    dimension: PhantomData,
+    units: PhantomData,
+};
+
+pub const DEFAULT_ANGULAR_JERK_REF: AngularJerk = AngularJerk {
+    value: 3769.9114,
+    dimension: PhantomData,
+    units: PhantomData,
+};
+
 pub fn slalom_parameters_map(kind: SlalomKind, dir: SlalomDirection) -> SlalomParameters {
     use SlalomKind::*;
 

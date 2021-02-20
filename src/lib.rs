@@ -7,6 +7,7 @@ pub mod administrator;
 pub mod agents;
 pub mod command_converter;
 pub mod commanders;
+pub mod config;
 pub mod controllers;
 pub mod estimator;
 pub mod mazes;

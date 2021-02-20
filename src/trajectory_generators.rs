@@ -22,6 +22,7 @@ pub use search_trajectory_generator::{
 };
 pub use slalom_generator::{
     slalom_parameters_map, slalom_parameters_map2, SlalomDirection, SlalomKind, SlalomParameters,
+    DEFAULT_ANGULAR_ACCELERATION_REF, DEFAULT_ANGULAR_JERK_REF, DEFAULT_ANGULAR_VELOCITY_REF,
 };
 pub use trajectory::{AngleTarget, LengthTarget, MoveTarget, ShiftTrajectory, Target};
 use uom::si::f32::{Angle, Length};

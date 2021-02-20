@@ -28,36 +28,34 @@ pub struct PoseConverter<N, M> {
     _math: PhantomData<fn() -> M>,
 }
 
-impl<N, M> PoseConverter<N, M> {
-    const DEFAULT_SQUARE_WIDTH: Length = Length {
-        dimension: PhantomData,
-        units: PhantomData,
-        value: 0.09,
-    };
-    const DEFAULT_WALL_WIDTH: Length = Length {
-        dimension: PhantomData,
-        units: PhantomData,
-        value: 0.006,
-    };
-    const DEFAULT_IGNORE_RADIUS: Length = Length {
-        dimension: PhantomData,
-        units: PhantomData,
-        value: 0.01,
-    };
-    const DEFAULT_IGNORE_LENGTH: Length = Length {
-        value: 0.008,
-        dimension: PhantomData,
-        units: PhantomData,
-    };
-}
+pub const DEFAULT_SQUARE_WIDTH: Length = Length {
+    dimension: PhantomData,
+    units: PhantomData,
+    value: 0.09,
+};
+pub const DEFAULT_WALL_WIDTH: Length = Length {
+    dimension: PhantomData,
+    units: PhantomData,
+    value: 0.006,
+};
+pub const DEFAULT_IGNORE_RADIUS: Length = Length {
+    dimension: PhantomData,
+    units: PhantomData,
+    value: 0.01,
+};
+pub const DEFAULT_IGNORE_LENGTH: Length = Length {
+    value: 0.008,
+    dimension: PhantomData,
+    units: PhantomData,
+};
 
 impl<N, M> Default for PoseConverter<N, M> {
     fn default() -> Self {
         Self::new(
-            Self::DEFAULT_SQUARE_WIDTH,
-            Self::DEFAULT_WALL_WIDTH,
-            Self::DEFAULT_IGNORE_RADIUS,
-            Self::DEFAULT_IGNORE_LENGTH,
+            DEFAULT_SQUARE_WIDTH,
+            DEFAULT_WALL_WIDTH,
+            DEFAULT_IGNORE_RADIUS,
+            DEFAULT_IGNORE_LENGTH,
         )
     }
 }
