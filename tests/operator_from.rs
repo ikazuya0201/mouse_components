@@ -39,7 +39,7 @@ macro_rules! impl_operator_from_test {
                 angular_velocity::degree_per_second,
                 jerk::meter_per_second_cubed,
                 length::{meter, millimeter},
-                time::{millisecond, second},
+                time::second,
                 velocity::meter_per_second,
             };
             use utils::math::MathFake;
@@ -71,11 +71,6 @@ macro_rules! impl_operator_from_test {
                 },
             };
 
-            let period = Time::new::<millisecond>(1.0);
-            let trans_model_gain = 1.0;
-            let trans_model_time_constant = Time::new::<second>(0.3694);
-            let rot_model_gain = 10.0;
-            let rot_model_time_constant = Time::new::<second>(0.1499);
             let existence_threshold = Probability::new(0.1).unwrap();
             let wheel_interval = Length::new::<millimeter>(33.5);
 
@@ -98,39 +93,6 @@ macro_rules! impl_operator_from_test {
                     theta: Angle::new::<degree>(-90.0),
                 },
             ];
-
-            let simulator = AgentSimulator::new(
-                start_state.clone(),
-                period,
-                trans_model_gain,
-                trans_model_time_constant,
-                rot_model_gain,
-                rot_model_time_constant,
-                WallManager::<Size>::with_str(existence_threshold, input_str),
-                distance_sensors_poses,
-            );
-
-            let (
-                _,
-                _observer,
-                right_encoder,
-                left_encoder,
-                imu,
-                right_motor,
-                left_motor,
-                distance_sensors,
-            ) = simulator.split(wheel_interval);
-
-            let obstacle_detector = ObstacleDetector::<_, MathFake>::new(distance_sensors);
-
-            let resource = (
-                &wall_manager,
-                (
-                    (left_encoder, right_encoder, imu),
-                    (left_motor, right_motor),
-                    (&wall_manager, obstacle_detector),
-                ),
-            );
 
             fn cost(pattern: Pattern) -> u16 {
                 use Pattern::*;
@@ -155,7 +117,7 @@ macro_rules! impl_operator_from_test {
                 .search_initial_route(SearchKind::Init)
                 .search_final_route(SearchKind::Final)
                 .cost_fn(cost)
-                .estimator_trans_velocity_alpha(0.1)
+                .estimator_translational_velocity_alpha(0.1)
                 .period(Time::new::<second>(0.001))
                 .estimator_correction_weight(0.1)
                 .translational_kp(0.9)
@@ -188,6 +150,39 @@ macro_rules! impl_operator_from_test {
                 .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
                 .build()
                 .unwrap();
+
+            let simulator = AgentSimulator::new(
+                start_state.clone(),
+                *config.period(),
+                *config.translational_model_gain(),
+                *config.translational_model_time_constant(),
+                *config.rotational_model_gain(),
+                *config.rotational_model_time_constant(),
+                WallManager::<Size>::with_str(existence_threshold, input_str),
+                distance_sensors_poses,
+            );
+
+            let (
+                _,
+                _observer,
+                right_encoder,
+                left_encoder,
+                imu,
+                right_motor,
+                left_motor,
+                distance_sensors,
+            ) = simulator.split(wheel_interval);
+
+            let obstacle_detector = ObstacleDetector::<_, MathFake>::new(distance_sensors);
+
+            let resource = (
+                &wall_manager,
+                (
+                    (left_encoder, right_encoder, imu),
+                    (left_motor, right_motor),
+                    (&wall_manager, obstacle_detector),
+                ),
+            );
 
             let state = State::new($current_node, start_state);
 
