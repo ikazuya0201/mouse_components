@@ -108,7 +108,7 @@ where
     Node: From<RunNode>,
     RunNode: Clone + 'a,
     &'a Config: Into<SearchCommanderConfig<'a, RunNode, Route>>,
-    &'a State: Into<CommanderState<Node>>,
+    &'a State: Into<CommanderState<RunNode>>,
 {
     fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
         let maze = Maze::from((resource, config, state));
@@ -117,7 +117,7 @@ where
         Self::new(
             config.start,
             config.goals,
-            state.current_node,
+            state.current_node.into(),
             config.initial_route,
             config.final_route,
             maze,
