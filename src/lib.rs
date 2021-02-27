@@ -16,6 +16,7 @@ pub mod obstacle_detector;
 pub mod operators;
 pub mod pose_converter;
 pub mod prelude;
+pub mod resource;
 pub mod robot;
 pub mod state;
 pub mod tracker;

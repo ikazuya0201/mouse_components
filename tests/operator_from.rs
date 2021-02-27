@@ -17,6 +17,7 @@ macro_rules! impl_operator_from_test {
             use components::{
                 config::{Config, ConfigBuilder},
                 nodes::RunNode,
+                resource::ResourceBuilder,
                 state::State,
                 types::data::{
                     AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState,
@@ -172,14 +173,17 @@ macro_rules! impl_operator_from_test {
                 distance_sensors,
             ) = simulator.split(wheel_interval);
 
-            let resource = (
-                &wall_manager,
-                (
-                    (left_encoder, right_encoder, imu),
-                    (left_motor, right_motor),
-                    (&wall_manager, distance_sensors),
-                ),
-            );
+            let resource = ResourceBuilder::new()
+                .left_encoder(left_encoder)
+                .right_encoder(right_encoder)
+                .imu(imu)
+                .right_motor(right_motor)
+                .left_motor(left_motor)
+                .distance_sensors(distance_sensors)
+                .wall_manager(&wall_manager)
+                .build()
+                .unwrap()
+                .into();
 
             let state = State::new($current_node, start_state);
 
