@@ -117,3 +117,19 @@ where
         )
     }
 }
+
+pub struct ThroughCommandConverter;
+
+impl<'a, Config, State> From<(&'a Config, &'a State)> for ThroughCommandConverter {
+    fn from((_, _): (&'a Config, &'a State)) -> Self {
+        Self
+    }
+}
+
+impl<K: Clone> ICommandConverter<K> for ThroughCommandConverter {
+    type Output = K;
+
+    fn convert(&self, kind: &K) -> Self::Output {
+        kind.clone()
+    }
+}
