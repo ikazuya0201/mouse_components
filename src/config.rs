@@ -20,54 +20,78 @@ use crate::trajectory_generators::{
 use crate::trajectory_generators::{SlalomDirection, SlalomKind, SlalomParameters};
 use crate::utils::builder::{ok_or, BuilderResult};
 
-/// An implementation of config.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Config<'a, Node, Route, Pattern, Cost> {
-    square_width: Length,
-    front_offset: Length,
-    start: Node,
-    return_goal: Node,
-    goals: &'a [Node],
-    search_initial_route: Route,
-    search_final_route: Route,
-    trans_kp: f32,
-    trans_ki: f32,
-    trans_kd: f32,
-    period: Time,
-    trans_model_gain: f32,
-    trans_model_time_constant: Time,
-    rot_kp: f32,
-    rot_ki: f32,
-    rot_kd: f32,
-    rot_model_gain: f32,
-    rot_model_time_constant: Time,
-    estimator_correction_weight: f32,
-    wheel_interval: Option<Length>,
-    estimator_trans_velocity_alpha: f32,
-    cost_fn: fn(Pattern) -> Cost,
-    wall_width: Length,
-    ignore_radius_from_pillar: Length,
-    ignore_length_from_wall: Length,
-    kx: f32,
-    kdx: f32,
-    ky: f32,
-    kdy: f32,
-    valid_control_lower_bound: Velocity,
-    fail_safe_distance: Length,
-    low_zeta: f32,
-    low_b: f32,
-    run_slalom_velocity: Velocity,
-    max_velocity: Velocity,
-    max_acceleration: Acceleration,
-    max_jerk: Jerk,
-    slalom_angular_velocity_ref: AngularVelocity,
-    slalom_angular_acceleration_ref: AngularAcceleration,
-    slalom_angular_jerk_ref: AngularJerk,
-    slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-    search_velocity: Velocity,
-    spin_angular_velocity: AngularVelocity,
-    spin_angular_acceleration: AngularAcceleration,
-    spin_angular_jerk: AngularJerk,
+macro_rules! impl_with_getter {
+    (
+        $(#[$meta:meta])*
+        pub struct $name: ident <$lt: lifetime, $($param: ident),*> {
+            $($field_name: ident: $type: ty,)*
+        }
+    ) => {
+        $(#[$meta])*
+        pub struct $name<$lt, $($param),*> {
+            $($field_name: $type),*
+        }
+
+        impl<$lt, $($param),*> $name<$lt, $($param),*> {
+            $(
+                pub fn $field_name(&self) -> &$type {
+                    &self.$field_name
+                }
+            )*
+        }
+    };
+}
+
+impl_with_getter! {
+    /// An implementation of config.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct Config<'a, Node, Route, Pattern, Cost> {
+        square_width: Length,
+        front_offset: Length,
+        start: Node,
+        return_goal: Node,
+        goals: &'a [Node],
+        search_initial_route: Route,
+        search_final_route: Route,
+        translational_kp: f32,
+        translational_ki: f32,
+        translational_kd: f32,
+        period: Time,
+        translational_model_gain: f32,
+        translational_model_time_constant: Time,
+        rotational_kp: f32,
+        rotational_ki: f32,
+        rotational_kd: f32,
+        rotational_model_gain: f32,
+        rotational_model_time_constant: Time,
+        estimator_correction_weight: f32,
+        wheel_interval: Option<Length>,
+        estimator_translational_velocity_alpha: f32,
+        cost_fn: fn(Pattern) -> Cost,
+        wall_width: Length,
+        ignore_radius_from_pillar: Length,
+        ignore_length_from_wall: Length,
+        kx: f32,
+        kdx: f32,
+        ky: f32,
+        kdy: f32,
+        valid_control_lower_bound: Velocity,
+        fail_safe_distance: Length,
+        low_zeta: f32,
+        low_b: f32,
+        run_slalom_velocity: Velocity,
+        max_velocity: Velocity,
+        max_acceleration: Acceleration,
+        max_jerk: Jerk,
+        slalom_angular_velocity_ref: AngularVelocity,
+        slalom_angular_acceleration_ref: AngularAcceleration,
+        slalom_angular_jerk_ref: AngularJerk,
+        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+        search_velocity: Velocity,
+        spin_angular_velocity: AngularVelocity,
+        spin_angular_acceleration: AngularAcceleration,
+        spin_angular_jerk: AngularJerk,
+    }
 }
 
 macro_rules! impl_into {
@@ -147,23 +171,23 @@ impl_into! {
 
 impl_into! {
     RotationControllerConfig {
-        kp: rot_kp,
-        ki: rot_ki,
-        kd: rot_kd,
+        kp: rotational_kp,
+        ki: rotational_ki,
+        kd: rotational_kd,
         period: period,
-        model_gain: rot_model_gain,
-        model_time_constant: rot_model_time_constant,
+        model_gain: rotational_model_gain,
+        model_time_constant: rotational_model_time_constant,
     }
 }
 
 impl_into! {
     TranslationControllerConfig {
-        kp: trans_kp,
-        ki: trans_ki,
-        kd: trans_kd,
+        kp: translational_kp,
+        ki: translational_ki,
+        kd: translational_kd,
         period: period,
-        model_gain: trans_model_gain,
-        model_time_constant: trans_model_time_constant,
+        model_gain: translational_model_gain,
+        model_time_constant: translational_model_time_constant,
     }
 }
 
@@ -172,7 +196,7 @@ impl_into! {
         period: period,
         weight: estimator_correction_weight,
         wheel_interval: wheel_interval,
-        alpha: estimator_trans_velocity_alpha,
+        alpha: estimator_translational_velocity_alpha,
     }
 }
 
@@ -288,7 +312,7 @@ impl_into! {
 ///     .search_initial_route(SearchKind::Init)
 ///     .search_final_route(SearchKind::Final)
 ///     .cost_fn(cost)
-///     .estimator_trans_velocity_alpha(0.1)
+///     .estimator_translational_velocity_alpha(0.1)
 ///     .period(Time::new::<second>(0.001))
 ///     .estimator_correction_weight(0.1)
 ///     .translational_kp(0.9)
@@ -331,20 +355,20 @@ pub struct ConfigBuilder<'a, Node, Route, Pattern, Cost> {
     goals: Option<&'a [Node]>,
     search_initial_route: Option<Route>,
     search_final_route: Option<Route>,
-    trans_kp: Option<f32>,
-    trans_ki: Option<f32>,
-    trans_kd: Option<f32>,
+    translational_kp: Option<f32>,
+    translational_ki: Option<f32>,
+    translational_kd: Option<f32>,
     period: Option<Time>,
-    trans_model_gain: Option<f32>,
-    trans_model_time_constant: Option<Time>,
-    rot_kp: Option<f32>,
-    rot_ki: Option<f32>,
-    rot_kd: Option<f32>,
-    rot_model_gain: Option<f32>,
-    rot_model_time_constant: Option<Time>,
+    translational_model_gain: Option<f32>,
+    translational_model_time_constant: Option<Time>,
+    rotational_kp: Option<f32>,
+    rotational_ki: Option<f32>,
+    rotational_kd: Option<f32>,
+    rotational_model_gain: Option<f32>,
+    rotational_model_time_constant: Option<Time>,
     estimator_correction_weight: Option<f32>,
     wheel_interval: Option<Length>,
-    estimator_trans_velocity_alpha: Option<f32>,
+    estimator_translational_velocity_alpha: Option<f32>,
     cost_fn: Option<fn(Pattern) -> Cost>,
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
@@ -442,17 +466,17 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
     impl_setter!(
         /// **Required**,
         /// Sets the P gain for translation.
-        translational_kp: trans_kp: f32
+        translational_kp: translational_kp: f32
     );
     impl_setter!(
         /// **Required**,
         /// Sets the I gain for translation.
-        translational_ki: trans_ki: f32
+        translational_ki: translational_ki: f32
     );
     impl_setter!(
         /// **Required**,
         /// Sets the D gain for translation.
-        translational_kd: trans_kd: f32
+        translational_kd: translational_kd: f32
     );
     impl_setter!(
         /// **Required**,
@@ -461,7 +485,7 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
         /// The model is used for the input of feed-forward.
         ///
         /// Assumes the model is the first-order delay system.
-        translational_model_gain: trans_model_gain: f32
+        translational_model_gain: translational_model_gain: f32
     );
     impl_setter!(
         /// **Required**,
@@ -470,22 +494,22 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
         /// The model is used for the input of feed-forward.
         ///
         /// Assumes the model is the first-order delay system.
-        translational_model_time_constant: trans_model_time_constant: Time
+        translational_model_time_constant: translational_model_time_constant: Time
     );
     impl_setter!(
         /// **Required**,
         /// Sets the P gain for rotation.
-        rotational_kp: rot_kp: f32
+        rotational_kp: rotational_kp: f32
     );
     impl_setter!(
         /// **Required**,
         /// Sets the I gain for rotation.
-        rotational_ki: rot_ki: f32
+        rotational_ki: rotational_ki: f32
     );
     impl_setter!(
         /// **Required**,
         /// Sets the D gain for rotation.
-        rotational_kd: rot_kd: f32
+        rotational_kd: rotational_kd: f32
     );
     impl_setter!(
         /// **Required**,
@@ -494,7 +518,7 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
         /// The model is used for the input of feed-forward.
         ///
         /// Assumes the model is the first-order delay system.
-        rotational_model_gain: rot_model_gain: f32
+        rotational_model_gain: rotational_model_gain: f32
     );
     impl_setter!(
         /// **Required**,
@@ -503,7 +527,7 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
         /// The model is used for the input of feed-forward.
         ///
         /// Assumes the model is the first-order delay system.
-        rotational_model_time_constant: rot_model_time_constant: Time
+        rotational_model_time_constant: rotational_model_time_constant: Time
     );
     impl_setter!(
         /// **Optional**,
@@ -524,7 +548,7 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
     impl_setter!(
         /// **Required**,
         /// Sets the alpha for low pass filter of translational velocity.
-        estimator_trans_velocity_alpha: f32
+        estimator_translational_velocity_alpha: f32
     );
     impl_setter!(
         /// **Required**,
@@ -685,20 +709,20 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
             goals: None,
             search_initial_route: None,
             search_final_route: None,
-            trans_kp: None,
-            trans_ki: None,
-            trans_kd: None,
+            translational_kp: None,
+            translational_ki: None,
+            translational_kd: None,
             period: None,
-            trans_model_gain: None,
-            trans_model_time_constant: None,
-            rot_kp: None,
-            rot_ki: None,
-            rot_kd: None,
-            rot_model_gain: None,
-            rot_model_time_constant: None,
+            translational_model_gain: None,
+            translational_model_time_constant: None,
+            rotational_kp: None,
+            rotational_ki: None,
+            rotational_kd: None,
+            rotational_model_gain: None,
+            rotational_model_time_constant: None,
             estimator_correction_weight: None,
             wheel_interval: None,
-            estimator_trans_velocity_alpha: None,
+            estimator_translational_velocity_alpha: None,
             cost_fn: None,
             wall_width: None,
             ignore_radius_from_pillar: None,
@@ -752,22 +776,22 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
             goals: get!(goals),
             search_initial_route: get!(search_initial_route),
             search_final_route: get!(search_final_route),
-            trans_kp: get!(trans_kp),
-            trans_ki: get!(trans_ki),
-            trans_kd: get!(trans_kd),
+            translational_kp: get!(translational_kp),
+            translational_ki: get!(translational_ki),
+            translational_kd: get!(translational_kd),
             period: get!(period),
-            trans_model_gain: get!(trans_model_gain),
-            trans_model_time_constant: get!(trans_model_time_constant),
-            rot_kp: get!(rot_kp),
-            rot_ki: get!(rot_ki),
-            rot_kd: get!(rot_kd),
-            rot_model_gain: get!(rot_model_gain),
-            rot_model_time_constant: get!(rot_model_time_constant),
+            translational_model_gain: get!(translational_model_gain),
+            translational_model_time_constant: get!(translational_model_time_constant),
+            rotational_kp: get!(rotational_kp),
+            rotational_ki: get!(rotational_ki),
+            rotational_kd: get!(rotational_kd),
+            rotational_model_gain: get!(rotational_model_gain),
+            rotational_model_time_constant: get!(rotational_model_time_constant),
             estimator_correction_weight: self
                 .estimator_correction_weight
                 .unwrap_or(Default::default()),
             wheel_interval: self.wheel_interval,
-            estimator_trans_velocity_alpha: get!(estimator_trans_velocity_alpha),
+            estimator_translational_velocity_alpha: get!(estimator_translational_velocity_alpha),
             cost_fn: get!(cost_fn),
             wall_width: self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
             ignore_radius_from_pillar: self
@@ -845,7 +869,7 @@ mod tests {
             .search_initial_route(SearchKind::Init)
             .search_final_route(SearchKind::Final)
             .cost_fn(cost)
-            .estimator_trans_velocity_alpha(0.1)
+            .estimator_translational_velocity_alpha(0.1)
             .period(Time::new::<second>(0.001))
             .estimator_correction_weight(0.1)
             .translational_kp(0.9)
