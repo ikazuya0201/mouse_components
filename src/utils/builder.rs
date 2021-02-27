@@ -16,3 +16,5 @@ impl core::fmt::Display for RequiredFieldEmptyError {
 pub fn ok_or<T>(value: Option<T>, field_name: &'static str) -> Result<T, RequiredFieldEmptyError> {
     value.ok_or(RequiredFieldEmptyError { field_name })
 }
+
+pub type BuilderResult<T> = Result<T, RequiredFieldEmptyError>;

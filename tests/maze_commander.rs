@@ -73,8 +73,9 @@ fn test_compute_shortest_path_u4() {
 
         let maze = Maze::<_, _, _, SearchNode<Size>>::new(&wall_manager, cost);
         let commander = SearchCommander::new(
-            start,
-            goals.clone(),
+            start.clone(),
+            &goals,
+            start.into(),
             SearchKind::Init,
             SearchKind::Final,
             maze,

@@ -18,8 +18,8 @@ use components::{
     },
     trajectory_managers::SearchTrajectoryManager,
     types::data::{
-        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, SearchKind, SlalomDirection,
-        SlalomKind, SlalomParameters, State,
+        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState, SearchKind,
+        SlalomDirection, SlalomKind, SlalomParameters,
     },
     utils::probability::Probability,
     wall_detector::WallDetector,
@@ -81,7 +81,7 @@ macro_rules! impl_search_operator_test {
                     .map(|goal| RunNode::<Size>::new(goal.0, goal.1, goal.2).unwrap())
                     .collect::<Vec<_>>();
 
-                let start_state = State {
+                let start_state = RobotState {
                     x: LengthState {
                         x: Length::new::<millimeter>(45.0),
                         ..Default::default()
@@ -232,8 +232,9 @@ macro_rules! impl_search_operator_test {
                     let maze: Maze<_, _, _, SearchNode<Size>> = Maze::new(wall_storage, cost);
                     let start = RunNode::<Size>::new(0, 0, North).unwrap();
                     defaults::SearchCommander::new(
-                        start,
-                        goals.clone(),
+                        start.clone(),
+                        &goals,
+                        start.into(),
                         SearchKind::Init,
                         SearchKind::Final,
                         maze,

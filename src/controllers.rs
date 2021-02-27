@@ -16,8 +16,10 @@ use uom::si::{
 macro_rules! impl_controller {
     (
         $controller_name: ident,
+        $config_name: ident,
         $trait: ident,
-        $builder_name: ident: $t: ty,
+        $builder_name: ident,
+        $t: ty,
         $dt: ty,
         $ddt: ty,
         $tunit: ty,
@@ -53,6 +55,33 @@ macro_rules! impl_controller {
                     kd,
                     period,
                 }
+            }
+        }
+
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        pub struct $config_name {
+            pub kp: f32,
+            pub ki: f32,
+            pub kd: f32,
+            pub period: Time,
+            pub model_gain: f32,
+            pub model_time_constant: Time,
+        }
+
+        impl<'a, Config, State> From<(&'a Config, &'a State)> for $controller_name
+        where
+            &'a Config: Into<$config_name>,
+        {
+            fn from((config, _): (&'a Config, &'a State)) -> Self {
+                let config = config.into();
+                Self::new(
+                    config.kp,
+                    config.ki,
+                    config.kd,
+                    config.period,
+                    config.model_gain,
+                    config.model_time_constant,
+                )
             }
         }
 
@@ -193,8 +222,10 @@ macro_rules! impl_controller {
 
 impl_controller!(
     TranslationController,
+    TranslationControllerConfig,
     TranslationController,
-    TranslationControllerBuilder: Length,
+    TranslationControllerBuilder,
+    Length,
     Velocity,
     Acceleration,
     meter,
@@ -204,8 +235,10 @@ impl_controller!(
 
 impl_controller!(
     RotationController,
+    RotationControllerConfig,
     RotationController,
-    RotationControllerBuilder: Angle,
+    RotationControllerBuilder,
+    Angle,
     AngularVelocity,
     AngularAcceleration,
     radian,

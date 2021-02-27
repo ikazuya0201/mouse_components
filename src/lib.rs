@@ -7,6 +7,7 @@ pub mod administrator;
 pub mod agents;
 pub mod command_converter;
 pub mod commanders;
+pub mod config;
 pub mod controllers;
 pub mod estimator;
 pub mod mazes;
@@ -16,6 +17,7 @@ pub mod operators;
 pub mod pose_converter;
 pub mod prelude;
 pub mod robot;
+pub mod state;
 pub mod tracker;
 pub mod trajectory_generators;
 pub mod trajectory_managers;
@@ -33,7 +35,7 @@ pub mod traits {
     };
     pub use mazes::{GraphNode, WallChecker, WallFinderNode, WallSpaceNode};
     pub use operators::{InitialCommander, TrackingAgent, TrackingInitializer};
-    pub use tracker::{Logger, RotationController, TranslationController};
+    pub use tracker::{RotationController, TranslationController};
     pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};
 }
 
@@ -42,9 +44,9 @@ pub mod types {
     pub mod data {
         use super::*;
 
-        pub use nodes::{AbsoluteDirection, Pattern, RelativeDirection};
+        pub use nodes::{AbsoluteDirection, Pattern, RelativeDirection, RotationKind};
         pub use obstacle_detector::Obstacle;
-        pub use tracker::{AngleState, LengthState, State};
+        pub use tracker::{AngleState, LengthState, RobotState};
         pub use trajectory_generators::Pose;
         pub use trajectory_generators::{
             AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection,
@@ -98,7 +100,43 @@ pub mod defaults {
                 pose_converter::PoseConverter<Size, Math>,
                 Math,
             >,
-            types::data::State,
+            types::data::RobotState,
+        >,
+    >;
+
+    pub type ReturnSetupAgent<
+        'a,
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        Size,
+        Math,
+    > = agents::TrackingAgent<
+        trajectory_managers::TrackingTrajectoryManager<
+            types::data::RotationKind,
+            trajectory_generators::ReturnSetupTrajectoryGenerator<Math>,
+            command_converter::ThroughCommandConverter,
+        >,
+        robot::Robot<
+            estimator::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
+            tracker::Tracker<
+                LeftMotor,
+                RightMotor,
+                Math,
+                controllers::TranslationController,
+                controllers::RotationController,
+            >,
+            wall_detector::WallDetector<
+                'a,
+                wall_manager::WallManager<Size>,
+                obstacle_detector::ObstacleDetector<DistanceSensor, Math>,
+                pose_converter::PoseConverter<Size, Math>,
+                Math,
+            >,
+            types::data::RobotState,
         >,
     >;
 
@@ -138,7 +176,7 @@ pub mod defaults {
                 pose_converter::PoseConverter<Size, Math>,
                 Math,
             >,
-            types::data::State,
+            types::data::RobotState,
         >,
     >;
 
@@ -192,6 +230,28 @@ pub mod defaults {
         >,
     >;
 
+    pub type ReturnCommander<'a, Size> = commanders::ReturnCommander<
+        nodes::RunNode<Size>,
+        mazes::CheckedMaze<
+            'a,
+            wall_manager::WallManager<Size>,
+            types::data::Pattern,
+            u16,
+            nodes::SearchNode<Size>,
+        >,
+    >;
+
+    pub type ReturnSetupCommander<'a, Size> = commanders::ReturnSetupCommander<
+        nodes::RunNode<Size>,
+        mazes::CheckedMaze<
+            'a,
+            wall_manager::WallManager<Size>,
+            types::data::Pattern,
+            u16,
+            nodes::SearchNode<Size>,
+        >,
+    >;
+
     pub type RunOperator<
         'a,
         LeftEncoder,
@@ -203,6 +263,7 @@ pub mod defaults {
         Math,
         Size,
     > = operators::TrackingOperator<
+        RunCommander<'a, Size>,
         RunAgent<
             'a,
             LeftEncoder,
@@ -214,6 +275,57 @@ pub mod defaults {
             Size,
             Math,
             <nodes::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
+        >,
+    >;
+
+    pub type ReturnOperator<
+        'a,
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        Math,
+        Size,
+    > = operators::TrackingOperator<
+        ReturnCommander<'a, Size>,
+        RunAgent<
+            'a,
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            LeftMotor,
+            RightMotor,
+            DistanceSensor,
+            Size,
+            Math,
+            <nodes::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
+        >,
+    >;
+
+    pub type ReturnSetupOperator<
+        'a,
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        Math,
+        Size,
+    > = operators::TrackingOperator<
+        ReturnSetupCommander<'a, Size>,
+        ReturnSetupAgent<
+            'a,
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            LeftMotor,
+            RightMotor,
+            DistanceSensor,
+            Size,
+            Math,
         >,
     >;
 }

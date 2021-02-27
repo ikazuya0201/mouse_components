@@ -62,6 +62,42 @@ impl<M: Math, MaxLength> RunTrajectoryGenerator<M, MaxLength> {
     }
 }
 
+/// A config for [RunTrajectoryGenerator](RunTrajectoryGenerator).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RunTrajectoryGeneratorConfig {
+    pub run_slalom_velocity: Velocity,
+    pub max_velocity: Velocity,
+    pub max_acceleration: Acceleration,
+    pub max_jerk: Jerk,
+    pub angular_velocity_ref: AngularVelocity,
+    pub angular_acceleration_ref: AngularAcceleration,
+    pub angular_jerk_ref: AngularJerk,
+    pub slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+    pub period: Time,
+}
+
+impl<'a, Config, State, M, MaxLength> From<(&'a Config, &'a State)>
+    for RunTrajectoryGenerator<M, MaxLength>
+where
+    M: Math,
+    &'a Config: Into<RunTrajectoryGeneratorConfig>,
+{
+    fn from((config, _): (&'a Config, &'a State)) -> Self {
+        let config = config.into();
+        Self::new(
+            config.run_slalom_velocity,
+            config.max_velocity,
+            config.max_acceleration,
+            config.max_jerk,
+            config.angular_velocity_ref,
+            config.angular_acceleration_ref,
+            config.angular_jerk_ref,
+            config.slalom_parameters_map,
+            config.period,
+        )
+    }
+}
+
 //NOTO: this code doesn't work if the initial command is slalom
 //because trajectory does not accelerate in slalom.
 //Then, we assume that the initial command is straight.

@@ -211,6 +211,51 @@ impl<M: Math> SearchTrajectoryGenerator<M> {
     }
 }
 
+/// A config for [SearchTrajectoryGenerator](SearchTrajectoryGenerator).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SearchTrajectoryGeneratorConfig {
+    pub angular_velocity_ref: AngularVelocity,
+    pub angular_acceleration_ref: AngularAcceleration,
+    pub angular_jerk_ref: AngularJerk,
+    pub slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+    pub max_velocity: Velocity,
+    pub max_acceleration: Acceleration,
+    pub max_jerk: Jerk,
+    pub period: Time,
+    pub search_velocity: Velocity,
+    pub front_offset: Length,
+    pub square_width: Length,
+    pub spin_angular_velocity: AngularVelocity,
+    pub spin_angular_acceleration: AngularAcceleration,
+    pub spin_angular_jerk: AngularJerk,
+}
+
+impl<'a, Config, State, M> From<(&'a Config, &'a State)> for SearchTrajectoryGenerator<M>
+where
+    M: Math,
+    &'a Config: Into<SearchTrajectoryGeneratorConfig>,
+{
+    fn from((config, _): (&'a Config, &'a State)) -> Self {
+        let config = config.into();
+        Self::new(
+            config.angular_velocity_ref,
+            config.angular_acceleration_ref,
+            config.angular_jerk_ref,
+            config.slalom_parameters_map,
+            config.max_velocity,
+            config.max_acceleration,
+            config.max_jerk,
+            config.period,
+            config.search_velocity,
+            config.front_offset,
+            config.square_width,
+            config.spin_angular_velocity,
+            config.spin_angular_acceleration,
+            config.spin_angular_jerk,
+        )
+    }
+}
+
 impl<M> ISearchTrajectoryGenerator<(Pose, SearchKind)> for SearchTrajectoryGenerator<M>
 where
     M: Math,

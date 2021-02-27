@@ -40,6 +40,22 @@ pub struct SearchOperator<Commander, Agent> {
     agent: Agent,
 }
 
+impl<'a, CResource, AResource, State, Config, Commander, Agent>
+    From<((CResource, AResource), &'a State, &'a Config)> for SearchOperator<Commander, Agent>
+where
+    Commander: From<(CResource, &'a State, &'a Config)> + SearchCommander,
+    Agent: From<(AResource, &'a State, &'a Config)> + SearchAgent<Commander::Command>,
+{
+    fn from(
+        ((commander, agent), state, config): ((CResource, AResource), &'a State, &'a Config),
+    ) -> Self {
+        Self::new(
+            Commander::from((commander, state, config)),
+            Agent::from((agent, state, config)),
+        )
+    }
+}
+
 impl<Commander, Agent> SearchOperator<Commander, Agent>
 where
     Commander: SearchCommander,

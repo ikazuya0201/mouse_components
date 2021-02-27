@@ -13,9 +13,21 @@ use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
 use crate::utils::{forced_vec::ForcedVec, itertools::repeat_n};
-pub use return_setup_commander::{ReturnSetupCommander, ReturnSetupCommanderError, RotationNode};
-pub use run_commander::{RunCommander, RunCommanderError};
-pub use search_commander::{GraphConverter, NextNode, NodeChecker, SearchCommander};
+pub use return_setup_commander::{
+    ReturnSetupCommander, ReturnSetupCommanderConfig, ReturnSetupCommanderError, RotationNode,
+};
+pub use run_commander::{
+    ReturnCommander, ReturnCommanderConfig, RunCommander, RunCommanderConfig, RunCommanderError,
+};
+pub use search_commander::{
+    GraphConverter, NextNode, NodeChecker, SearchCommander, SearchCommanderConfig,
+};
+
+/// A state for initializing commanders in [commanders](crate::commanders).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct CommanderState<Node> {
+    pub current_node: Node,
+}
 
 /// A trait that behaves like a directed graph which has weighted edges.
 pub trait Graph<Node> {
@@ -223,8 +235,14 @@ mod tests {
             type PathUpperBound = U10;
         }
 
-        let solver =
-            SearchCommander::<Node, RunNode, SearchNode, _, _>::new(start, goals, (), (), graph);
+        let solver = SearchCommander::<Node, RunNode, SearchNode, _, _>::new(
+            start.clone(),
+            &goals,
+            start.into(),
+            (),
+            (),
+            graph,
+        );
 
         let path = solver.compute_shortest_path();
         let expected = vec![0, 1, 3, 5, 7, 8]

@@ -1,3 +1,5 @@
+//! An implementation of [PoseConverter](crate::wall_detector::PoseConverter).
+
 use core::marker::PhantomData;
 
 use generic_array::GenericArray;
@@ -10,6 +12,7 @@ use crate::utils::{math::Math, total::Total};
 use crate::wall_detector::{PoseConverter as IPoseConverter, WallInfo};
 use crate::wall_manager::Wall;
 
+/// An implementation of [PoseConverter](crate::wall_detector::PoseConverter).
 #[derive(Clone, PartialEq, Debug)]
 pub struct PoseConverter<N, M> {
     i_square_width: i32, //[mm]
@@ -25,36 +28,34 @@ pub struct PoseConverter<N, M> {
     _math: PhantomData<fn() -> M>,
 }
 
-impl<N, M> PoseConverter<N, M> {
-    const DEFAULT_SQUARE_WIDTH: Length = Length {
-        dimension: PhantomData,
-        units: PhantomData,
-        value: 0.09,
-    };
-    const DEFAULT_WALL_WIDTH: Length = Length {
-        dimension: PhantomData,
-        units: PhantomData,
-        value: 0.006,
-    };
-    const DEFAULT_IGNORE_RADIUS: Length = Length {
-        dimension: PhantomData,
-        units: PhantomData,
-        value: 0.01,
-    };
-    const DEFAULT_IGNORE_LENGTH: Length = Length {
-        value: 0.008,
-        dimension: PhantomData,
-        units: PhantomData,
-    };
-}
+pub const DEFAULT_SQUARE_WIDTH: Length = Length {
+    dimension: PhantomData,
+    units: PhantomData,
+    value: 0.09,
+};
+pub const DEFAULT_WALL_WIDTH: Length = Length {
+    dimension: PhantomData,
+    units: PhantomData,
+    value: 0.006,
+};
+pub const DEFAULT_IGNORE_RADIUS: Length = Length {
+    dimension: PhantomData,
+    units: PhantomData,
+    value: 0.01,
+};
+pub const DEFAULT_IGNORE_LENGTH: Length = Length {
+    value: 0.008,
+    dimension: PhantomData,
+    units: PhantomData,
+};
 
 impl<N, M> Default for PoseConverter<N, M> {
     fn default() -> Self {
         Self::new(
-            Self::DEFAULT_SQUARE_WIDTH,
-            Self::DEFAULT_WALL_WIDTH,
-            Self::DEFAULT_IGNORE_RADIUS,
-            Self::DEFAULT_IGNORE_LENGTH,
+            DEFAULT_SQUARE_WIDTH,
+            DEFAULT_WALL_WIDTH,
+            DEFAULT_IGNORE_RADIUS,
+            DEFAULT_IGNORE_LENGTH,
         )
     }
 }
@@ -90,6 +91,30 @@ impl<N, M> PoseConverter<N, M> {
         let quo = (val.get::<meter>() * 1000.0) as i32 / self.i_square_width;
         let rem = val - Length::new::<meter>((quo * self.i_square_width) as f32 * 0.001);
         (rem, quo)
+    }
+}
+
+/// A config for [PoseConverter](PoseConverter).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PoseConverterConfig {
+    pub square_width: Length,
+    pub wall_width: Length,
+    pub ignore_radius_from_pillar: Length,
+    pub ignore_length_from_wall: Length,
+}
+
+impl<'a, N, M, Config, State> From<(&'a Config, &'a State)> for PoseConverter<N, M>
+where
+    &'a Config: Into<PoseConverterConfig>,
+{
+    fn from((config, _): (&'a Config, &'a State)) -> Self {
+        let config = config.into();
+        Self::new(
+            config.square_width,
+            config.wall_width,
+            config.ignore_radius_from_pillar,
+            config.ignore_length_from_wall,
+        )
     }
 }
 
@@ -135,6 +160,7 @@ where
     }
 }
 
+/// Error on [PoseConverter](PoseConverter).
 #[derive(Clone, PartialEq, Debug)]
 pub struct OutOfBoundError {
     pose: Pose,

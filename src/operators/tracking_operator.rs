@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::administrator::{Operator, OperatorError};
@@ -8,9 +9,30 @@ use crate::administrator::{Operator, OperatorError};
 /// This operator executes a tracking process.
 /// The commands for tracking are given once at the initialization phase.
 #[derive(Debug)]
-pub struct TrackingOperator<Agent> {
+pub struct TrackingOperator<Commander, Agent> {
     is_completed: AtomicBool,
     agent: Agent,
+    _commander: PhantomData<fn() -> Commander>,
+}
+
+impl<'a, CResource, AResource, State, Config, Commander, Agent>
+    From<((CResource, AResource), &'a State, &'a Config)> for TrackingOperator<Commander, Agent>
+where
+    Commander: From<(CResource, &'a State, &'a Config)>,
+    Agent: From<(AResource, &'a State, &'a Config)>,
+    Agent: TrackingInitializer<Commander::Command>,
+    Commander: InitialCommander,
+    Agent::Error: core::fmt::Debug,
+    Commander::Error: core::fmt::Debug,
+{
+    fn from(
+        ((commander, agent), state, config): ((CResource, AResource), &'a State, &'a Config),
+    ) -> Self {
+        Self::new(
+            Agent::from((agent, state, config)),
+            Commander::from((commander, state, config)),
+        )
+    }
 }
 
 /// A trait that generates initial commands.
@@ -46,8 +68,8 @@ pub trait TrackingAgent {
     fn track_next(&self) -> Result<(), TrackingAgentError<Self::Error>>;
 }
 
-impl<Agent> TrackingOperator<Agent> {
-    pub fn new<Commander>(agent: Agent, commander: Commander) -> Self
+impl<Commander, Agent> TrackingOperator<Commander, Agent> {
+    pub fn new(agent: Agent, commander: Commander) -> Self
     where
         Agent: TrackingInitializer<Commander::Command>,
         Commander: InitialCommander,
@@ -63,11 +85,12 @@ impl<Agent> TrackingOperator<Agent> {
         Self {
             agent,
             is_completed: AtomicBool::new(false),
+            _commander: PhantomData,
         }
     }
 }
 
-impl<Agent> Operator for TrackingOperator<Agent>
+impl<Commander, Agent> Operator for TrackingOperator<Commander, Agent>
 where
     Agent: TrackingAgent,
 {

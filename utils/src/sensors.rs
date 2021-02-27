@@ -10,7 +10,7 @@ use components::{
     sensors::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
     },
-    types::data::{Pose, State},
+    types::data::{Pose, RobotState},
     utils::{probability::Probability, sample::Sample},
     wall_manager::WallManager,
 };
@@ -46,7 +46,7 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     pub fn new(
-        state: State,
+        state: RobotState,
         period: Time,
         trans_model_gain: f32,
         trans_model_time_constant: Time,
@@ -143,7 +143,7 @@ pub struct Observer {
 }
 
 impl Observer {
-    pub fn state(&self) -> State {
+    pub fn state(&self) -> RobotState {
         self.inner.borrow().current.clone()
     }
 
@@ -154,8 +154,8 @@ impl Observer {
 }
 
 struct AgentSimulatorInner {
-    current: State,
-    prev: State,
+    current: RobotState,
+    prev: RobotState,
     right_voltage: ElectricPotential,
     left_voltage: ElectricPotential,
     period: Time,
@@ -195,7 +195,7 @@ impl AgentSimulatorInner {
         self.current = next;
     }
 
-    fn trans_vel(state: &State) -> Velocity {
+    fn trans_vel(state: &RobotState) -> Velocity {
         state.x.v * MathFake::cos(state.theta.x) + state.y.v * MathFake::sin(state.theta.x)
     }
 
@@ -241,17 +241,17 @@ pub struct Encoder {
 }
 
 impl Encoder {
-    fn translational_velocity(state: &State) -> Velocity {
+    fn translational_velocity(state: &RobotState) -> Velocity {
         state.x.v * state.theta.x.value.cos() + state.y.v * state.theta.x.value.sin()
     }
 
-    fn rotational_velocity(state: &State) -> AngularVelocity {
+    fn rotational_velocity(state: &RobotState) -> AngularVelocity {
         state.theta.v
     }
 
     fn average<T, F>(&self, f: &F) -> T
     where
-        F: Fn(&State) -> T,
+        F: Fn(&RobotState) -> T,
         T: core::ops::Add<T, Output = T> + core::ops::Div<f32, Output = T>,
     {
         let current = f(&self.inner.borrow().current);

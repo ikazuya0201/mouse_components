@@ -4,7 +4,7 @@ use heapless::ArrayLength;
 use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
-use super::{compute_shortest_path, BoundedNode, BoundedPathNode, Graph};
+use super::{compute_shortest_path, BoundedNode, BoundedPathNode, CommanderState, Graph};
 use crate::operators::InitialCommander;
 
 /// An implementation of [InitialCommander](crate::operators::InitialCommander).
@@ -23,6 +23,27 @@ impl<Node, Maze> ReturnSetupCommander<Node, Maze> {
             start,
             maze,
         }
+    }
+}
+
+/// A config for initializing [ReturnSetupCommander](ReturnSetupCommander).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReturnSetupCommanderConfig<Node> {
+    pub start: Node,
+}
+
+impl<'a, Resource, Config, State, Node, Maze> From<(Resource, &'a Config, &'a State)>
+    for ReturnSetupCommander<Node, Maze>
+where
+    Maze: From<(Resource, &'a Config, &'a State)>,
+    &'a Config: Into<ReturnSetupCommanderConfig<Node>>,
+    &'a State: Into<CommanderState<Node>>,
+{
+    fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
+        let maze = Maze::from((resource, config, state));
+        let config = config.into();
+        let state = state.into();
+        Self::new(state.current_node, config.start, maze)
     }
 }
 

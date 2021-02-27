@@ -106,6 +106,24 @@ impl<'a, Manager, Pattern, Cost, SearchNode> Maze<'a, Manager, Pattern, Cost, Se
     }
 }
 
+/// A config for initializing [Maze](Maze).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MazeConfig<Pattern, Cost> {
+    pub cost_fn: fn(Pattern) -> Cost,
+}
+
+impl<'a, Resource, Config, State, Manager, Pattern, Cost, SearchNode>
+    From<(Resource, &'a Config, &'a State)> for Maze<'a, Manager, Pattern, Cost, SearchNode>
+where
+    &'a Config: Into<MazeConfig<Pattern, Cost>>,
+    Resource: Into<&'a Manager>,
+{
+    fn from((resource, config, _): (Resource, &'a Config, &'a State)) -> Self {
+        let config = config.into();
+        Self::new(resource.into(), config.cost_fn)
+    }
+}
+
 impl<'a, Manager, Pattern, Cost, SearchNode> Maze<'a, Manager, Pattern, Cost, SearchNode> {
     fn _successors<Node, F>(&self, node: &Node, is_blocked: F) -> <Self as Graph<Node>>::Edges
     where
@@ -241,6 +259,18 @@ pub struct CheckedMaze<'a, Manager, Pattern, Cost, SearchNode>(
 impl<'a, Manager, Pattern, Cost, SearchNode> CheckedMaze<'a, Manager, Pattern, Cost, SearchNode> {
     pub fn new(manager: &'a Manager, cost_fn: fn(Pattern) -> Cost) -> Self {
         Self(<Self as core::ops::Deref>::Target::new(manager, cost_fn))
+    }
+}
+
+impl<'a, Resource, Config, State, Manager, Pattern, Cost, SearchNode>
+    From<(Resource, &'a Config, &'a State)> for CheckedMaze<'a, Manager, Pattern, Cost, SearchNode>
+where
+    &'a Config: Into<MazeConfig<Pattern, Cost>>,
+    Resource: Into<&'a Manager>,
+{
+    fn from((resource, config, _): (Resource, &'a Config, &'a State)) -> Self {
+        let config = config.into();
+        Self::new(resource.into(), config.cost_fn)
     }
 }
 

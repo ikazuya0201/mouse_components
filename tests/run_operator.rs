@@ -21,7 +21,7 @@ use components::{
     tracker::TrackerBuilder,
     trajectory_generators::{slalom_parameters_map, RunTrajectoryGeneratorBuilder},
     trajectory_managers::TrackingTrajectoryManager,
-    types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, State},
+    types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState},
     utils::probability::Probability,
     wall_detector::WallDetector,
     wall_manager::WallManager,
@@ -67,7 +67,7 @@ fn test_run_operator() {
     type Size = U4;
     type MaxPathLength = op!(Size * Size);
 
-    let start_state = State {
+    let start_state = RobotState {
         x: LengthState {
             x: Length::new::<millimeter>(45.0),
             ..Default::default()
@@ -242,7 +242,7 @@ fn test_run_operator() {
             RunNode::<Size>::new(2, 0, South).unwrap(),
             RunNode::<Size>::new(2, 0, West).unwrap(),
         ];
-        defaults::RunCommander::new(start, goals, maze)
+        defaults::RunCommander::new(start, &goals, maze)
     };
 
     let operator = TrackingOperator::new(agent, commander);

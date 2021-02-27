@@ -17,6 +17,47 @@ pub struct ReturnSetupTrajectoryGenerator<M> {
     spin_generator: SpinGenerator<M>,
 }
 
+impl<M> ReturnSetupTrajectoryGenerator<M> {
+    pub fn new(
+        max_angular_velocity: AngularVelocity,
+        max_angular_acceleration: AngularAcceleration,
+        max_angular_jerk: AngularJerk,
+        period: Time,
+    ) -> Self {
+        let spin_generator = SpinGenerator::<M>::new(
+            max_angular_velocity,
+            max_angular_acceleration,
+            max_angular_jerk,
+            period,
+        );
+        Self { spin_generator }
+    }
+}
+
+/// A config for [ReturnSetupTrajectoryGenerator](ReturnSetupTrajectoryGenerator).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ReturnSetupTrajectoryGeneratorConfig {
+    pub max_angular_velocity: AngularVelocity,
+    pub max_angular_acceleration: AngularAcceleration,
+    pub max_angular_jerk: AngularJerk,
+    pub period: Time,
+}
+
+impl<'a, Config, State, M> From<(&'a Config, &'a State)> for ReturnSetupTrajectoryGenerator<M>
+where
+    &'a Config: Into<ReturnSetupTrajectoryGeneratorConfig>,
+{
+    fn from((config, _): (&'a Config, &'a State)) -> Self {
+        let config = config.into();
+        Self::new(
+            config.max_angular_velocity,
+            config.max_angular_acceleration,
+            config.max_angular_jerk,
+            config.period,
+        )
+    }
+}
+
 impl<M: Math> InitialTrajectoryGenerator<RotationKind> for ReturnSetupTrajectoryGenerator<M> {
     type Target = Target;
     type Trajectory = SpinTrajectory;
@@ -95,13 +136,11 @@ impl<M> ReturnSetupTrajectoryGeneratorBuilder<M> {
     }
 
     pub fn build(self) -> Result<ReturnSetupTrajectoryGenerator<M>, RequiredFieldEmptyError> {
-        Ok(ReturnSetupTrajectoryGenerator {
-            spin_generator: SpinGenerator::<M>::new(
-                ok_or(self.max_angular_velocity, "max_angular_velocity")?,
-                ok_or(self.max_angular_acceleration, "max_angular_acceleration")?,
-                ok_or(self.max_angular_jerk, "max_angular_jerk")?,
-                ok_or(self.period, "period")?,
-            ),
-        })
+        Ok(ReturnSetupTrajectoryGenerator::new(
+            ok_or(self.max_angular_velocity, "max_angular_velocity")?,
+            ok_or(self.max_angular_acceleration, "max_angular_acceleration")?,
+            ok_or(self.max_angular_jerk, "max_angular_jerk")?,
+            ok_or(self.period, "period")?,
+        ))
     }
 }

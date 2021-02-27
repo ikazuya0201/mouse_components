@@ -10,7 +10,7 @@ use uom::si::{
 };
 
 use crate::robot::StateEstimator;
-use crate::tracker::State;
+use crate::tracker::RobotState;
 use crate::utils::math::{LibmMath, Math};
 use crate::wall_detector::CorrectInfo;
 
@@ -40,8 +40,8 @@ pub struct Estimator<LE, RE, I, M> {
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
-    initial_state: State,
-    state: State,
+    initial_state: RobotState,
+    state: RobotState,
     weight: f32,
     _phantom: PhantomData<fn() -> M>,
 }
@@ -53,6 +53,48 @@ impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
             "Estimator {{ state:{:?}, trans_velocity:{:?}, angular_velocity:{:?}, bias:{:?} }}",
             self.state, self.trans_velocity, self.angular_velocity, self.bias,
         )
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EstimatorConfig {
+    pub period: Time,
+    pub weight: f32,
+    pub wheel_interval: Option<Length>,
+    pub alpha: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EstimatorState {
+    pub state: RobotState,
+}
+
+impl<'a, LE, RE, I, Config, State, M> From<((LE, RE, I), &'a Config, &'a State)>
+    for Estimator<LE, RE, I, M>
+where
+    &'a Config: Into<EstimatorConfig>,
+    &'a State: Into<EstimatorState>,
+{
+    fn from(
+        ((left_encoder, right_encoder, imu), config, state): ((LE, RE, I), &'a Config, &'a State),
+    ) -> Self {
+        let config = config.into();
+        let state = state.into();
+        Self {
+            period: config.period,
+            alpha: config.alpha,
+            trans_velocity: Velocity::default(),
+            angular_velocity: AngularVelocity::default(),
+            bias: AngularVelocity::default(),
+            wheel_interval: config.wheel_interval,
+            left_encoder,
+            right_encoder,
+            imu,
+            initial_state: state.state.clone(),
+            state: state.state,
+            weight: config.weight,
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -75,9 +117,9 @@ where
     <I as IMU>::Error: core::fmt::Debug,
     M: Math,
 {
-    type State = State;
+    type State = RobotState;
 
-    fn state(&self) -> &State {
+    fn state(&self) -> &RobotState {
         &self.state
     }
 
@@ -177,7 +219,7 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M = LibmMath> {
     imu: Option<Imu>,
     period: Option<Time>,
     cut_off_frequency: Option<Frequency>,
-    initial_state: Option<State>,
+    initial_state: Option<RobotState>,
     wheel_interval: Option<Length>,
     correction_weight: Option<f32>,
     _math: PhantomData<fn() -> M>,
@@ -241,7 +283,7 @@ impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncod
         self
     }
 
-    pub fn initial_state(mut self, initial_state: State) -> Self {
+    pub fn initial_state(mut self, initial_state: RobotState) -> Self {
         self.initial_state = Some(initial_state);
         self
     }
@@ -356,15 +398,15 @@ mod tests {
     where
         T: Iterator<Item = Target>,
     {
-        fn step(&self) -> Result<State, FinishError> {
+        fn step(&self) -> Result<RobotState, FinishError> {
             self.inner.borrow_mut().step()
         }
     }
 
     struct AgentSimulatorInner<T> {
         trajectory: T,
-        current: State,
-        prev: State,
+        current: RobotState,
+        prev: RobotState,
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -374,10 +416,10 @@ mod tests {
     where
         T: Iterator<Item = Target>,
     {
-        fn step(&mut self) -> Result<State, FinishError> {
+        fn step(&mut self) -> Result<RobotState, FinishError> {
             if let Some(target) = self.trajectory.next() {
                 let state = match target {
-                    Target::Moving(target) => State {
+                    Target::Moving(target) => RobotState {
                         x: LengthState {
                             x: target.x.x,
                             v: target.x.v,
@@ -394,7 +436,7 @@ mod tests {
                             a: target.theta.a,
                         },
                     },
-                    Target::Spin(target) => State {
+                    Target::Spin(target) => RobotState {
                         x: Default::default(),
                         y: Default::default(),
                         theta: AngleState {
@@ -487,6 +529,59 @@ mod tests {
             .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
             .build()
             .unwrap()
+    }
+
+    #[test]
+    fn test_from() {
+        pub struct EncoderType;
+        pub struct ImuType;
+
+        impl Encoder for EncoderType {
+            type Error = ();
+
+            fn get_relative_distance(&mut self) -> Result<Length, nb::Error<Self::Error>> {
+                unreachable!()
+            }
+        }
+
+        impl IMU for ImuType {
+            type Error = ();
+
+            fn get_translational_acceleration(
+                &mut self,
+            ) -> Result<Acceleration, nb::Error<Self::Error>> {
+                unreachable!()
+            }
+
+            fn get_angular_velocity(&mut self) -> Result<AngularVelocity, nb::Error<Self::Error>> {
+                unreachable!()
+            }
+        }
+
+        let config = EstimatorConfig {
+            period: Time::default(),
+            alpha: 0.5,
+            weight: 0.0,
+            wheel_interval: None,
+        };
+
+        let state = EstimatorState {
+            state: Default::default(),
+        };
+
+        impl<'a> From<&'a EstimatorConfig> for EstimatorConfig {
+            fn from(value: &'a EstimatorConfig) -> Self {
+                (*value).clone()
+            }
+        }
+
+        impl<'a> From<&'a EstimatorState> for EstimatorState {
+            fn from(value: &'a EstimatorState) -> Self {
+                (*value).clone()
+            }
+        }
+
+        Estimator::<_, _, _, ()>::from(((EncoderType, EncoderType, ImuType), &config, &state));
     }
 
     macro_rules! impl_estimator_test {
