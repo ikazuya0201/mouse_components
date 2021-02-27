@@ -39,6 +39,16 @@ impl<D, M> ObstacleDetector<D, M> {
     }
 }
 
+impl<'a, D, M, Resource, Config, State> From<(Resource, &'a Config, &'a State)>
+    for ObstacleDetector<D, M>
+where
+    Resource: IntoIterator<Item = D>,
+{
+    fn from((resource, _, _): (Resource, &'a Config, &'a State)) -> Self {
+        Self::new(resource)
+    }
+}
+
 impl<D, M> IObstacleDetector<RobotState> for ObstacleDetector<D, M>
 where
     M: Math,

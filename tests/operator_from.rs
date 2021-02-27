@@ -17,7 +17,6 @@ macro_rules! impl_operator_from_test {
             use components::{
                 config::{Config, ConfigBuilder},
                 nodes::RunNode,
-                obstacle_detector::ObstacleDetector,
                 state::State,
                 types::data::{
                     AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState,
@@ -173,14 +172,12 @@ macro_rules! impl_operator_from_test {
                 distance_sensors,
             ) = simulator.split(wheel_interval);
 
-            let obstacle_detector = ObstacleDetector::<_, MathFake>::new(distance_sensors);
-
             let resource = (
                 &wall_manager,
                 (
                     (left_encoder, right_encoder, imu),
                     (left_motor, right_motor),
-                    (&wall_manager, obstacle_detector),
+                    (&wall_manager, distance_sensors),
                 ),
             );
 
