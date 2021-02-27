@@ -10,7 +10,8 @@ use spin::Mutex;
 use typenum::Unsigned;
 
 use super::{
-    compute_shortest_path, BoundedNode, BoundedPathNode, GoalSizeUpperBound, Graph, RouteNode,
+    compute_shortest_path, BoundedNode, BoundedPathNode, CommanderState, GoalSizeUpperBound, Graph,
+    RouteNode,
 };
 use crate::operators::{SearchCommander as ISearchCommander, SearchCommanderError};
 use crate::utils::itertools::repeat_n;
@@ -99,12 +100,6 @@ pub struct SearchCommanderConfig<'a, RunNode, Route> {
     pub final_route: Route,
 }
 
-/// A state for initializing [SearchCommander](SearchCommander).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct SearchCommanderState<Node> {
-    pub current: Node,
-}
-
 impl<'a, Resource, Config, State, Node, RunNode, SearchNode, Route, Maze>
     From<(Resource, &'a Config, &'a State)>
     for SearchCommander<Node, RunNode, SearchNode, Route, Maze>
@@ -113,7 +108,7 @@ where
     Node: From<RunNode>,
     RunNode: Clone + 'a,
     &'a Config: Into<SearchCommanderConfig<'a, RunNode, Route>>,
-    &'a State: Into<SearchCommanderState<Node>>,
+    &'a State: Into<CommanderState<Node>>,
 {
     fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
         let maze = Maze::from((resource, config, state));
@@ -122,7 +117,7 @@ where
         Self::new(
             config.start,
             config.goals,
-            state.current,
+            state.current_node,
             config.initial_route,
             config.final_route,
             maze,

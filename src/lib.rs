@@ -17,6 +17,7 @@ pub mod operators;
 pub mod pose_converter;
 pub mod prelude;
 pub mod robot;
+pub mod state;
 pub mod tracker;
 pub mod trajectory_generators;
 pub mod trajectory_managers;

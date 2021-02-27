@@ -7,7 +7,8 @@ use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
 use super::{
-    compute_shortest_path, BoundedNode, BoundedPathNode, GoalSizeUpperBound, Graph, RouteNode,
+    compute_shortest_path, BoundedNode, BoundedPathNode, CommanderState, GoalSizeUpperBound, Graph,
+    RouteNode,
 };
 use crate::operators::InitialCommander;
 
@@ -104,25 +105,19 @@ pub struct ReturnCommanderConfig<Node> {
     pub start: Node,
 }
 
-/// A state for [ReturnCommander](ReturnCommander).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ReturnCommanderState<Node> {
-    pub current: Node,
-}
-
 impl<'a, Resource, Config, State, Node, Maze> From<(Resource, &'a Config, &'a State)>
     for ReturnCommander<Node, Maze>
 where
     Node: 'a + Clone,
     Maze: From<(Resource, &'a Config, &'a State)>,
     &'a Config: Into<ReturnCommanderConfig<Node>>,
-    &'a State: Into<ReturnCommanderState<Node>>,
+    &'a State: Into<CommanderState<Node>>,
 {
     fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
         let maze = Maze::from((resource, config, state));
         let config = config.into();
         let state = state.into();
-        Self::new(state.current, &[config.start], maze)
+        Self::new(state.current_node, &[config.start], maze)
     }
 }
 

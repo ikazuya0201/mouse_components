@@ -66,7 +66,7 @@ pub struct EstimatorConfig {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EstimatorState {
-    state: RobotState,
+    pub state: RobotState,
 }
 
 impl<'a, LE, RE, I, Config, State, M> From<((LE, RE, I), &'a Config, &'a State)>
