@@ -3,8 +3,8 @@ use core::marker::PhantomData;
 use heapless::Vec;
 use uom::si::f32::Length;
 
+use crate::tracker::RobotState;
 use crate::types::data::Pose;
-use crate::tracker::State;
 use crate::utils::{math::Math, sample::Sample};
 use crate::wall_detector::ObstacleDetector as IObstacleDetector;
 
@@ -39,7 +39,7 @@ impl<D, M> ObstacleDetector<D, M> {
     }
 }
 
-impl<D, M> IObstacleDetector<State> for ObstacleDetector<D, M>
+impl<D, M> IObstacleDetector<RobotState> for ObstacleDetector<D, M>
 where
     M: Math,
     D: DistanceSensor,
@@ -47,7 +47,7 @@ where
     type Obstacle = Obstacle;
     type Obstacles = Vec<Obstacle, SensorSizeUpperBound>;
 
-    fn detect(&mut self, state: &State) -> Self::Obstacles {
+    fn detect(&mut self, state: &RobotState) -> Self::Obstacles {
         let mut obstacles = Vec::new();
         let (sin_th, cos_th) = M::sincos(state.theta.x);
         for distance_sensor in &mut self.distance_sensors {
@@ -107,7 +107,7 @@ mod tests {
                 Pose {
                     x: Length::new::<meter>(0.015),
                     y: Length::new::<meter>(0.015),
-                    theta: Angle::new::<degree>(0.0),
+                    theta: Angle::new::<degree>(-90.0),
                 },
                 Some(Sample {
                     mean: Length::new::<meter>(0.03),
@@ -118,7 +118,7 @@ mod tests {
                 Pose {
                     x: Length::new::<meter>(-0.015),
                     y: Length::new::<meter>(0.015),
-                    theta: Angle::new::<degree>(180.0),
+                    theta: Angle::new::<degree>(90.0),
                 },
                 None,
             ),
@@ -126,7 +126,7 @@ mod tests {
                 Pose {
                     x: Length::new::<meter>(0.0),
                     y: Length::new::<meter>(0.025),
-                    theta: Angle::new::<degree>(90.0),
+                    theta: Angle::new::<degree>(0.0),
                 },
                 Some(Sample {
                     mean: Length::new::<meter>(0.02),
@@ -136,21 +136,35 @@ mod tests {
         ];
         let expected = vec![
             Pose {
-                x: Length::new::<meter>(0.015),
-                y: Length::new::<meter>(-0.015),
+                x: Length::new::<meter>(0.06),
+                y: Length::new::<meter>(0.06),
                 theta: Angle::new::<degree>(0.0),
             },
             Pose {
-                x: Length::new::<meter>(0.025),
-                y: Length::new::<meter>(0.0),
+                x: Length::new::<meter>(0.045),
+                y: Length::new::<meter>(0.07),
                 theta: Angle::new::<degree>(90.0),
             },
         ];
 
         use crate::prelude::*;
+        use crate::types::data::{AngleState, LengthState};
 
         let mut detector = ObstacleDetector::<_, MathFake>::new(sensors);
-        let obstacles = detector.detect(&Default::default());
+        let obstacles = detector.detect(&RobotState {
+            x: LengthState {
+                x: Length::new::<meter>(0.045),
+                ..Default::default()
+            },
+            y: LengthState {
+                x: Length::new::<meter>(0.045),
+                ..Default::default()
+            },
+            theta: AngleState {
+                x: Angle::new::<degree>(90.0),
+                ..Default::default()
+            },
+        });
         for (obstacle, expected) in obstacles.into_iter().zip(expected.into_iter()) {
             assert_relative_eq!(obstacle.source.x.get::<meter>(), expected.x.get::<meter>());
             assert_relative_eq!(obstacle.source.y.get::<meter>(), expected.y.get::<meter>());

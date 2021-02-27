@@ -45,7 +45,7 @@ pub mod types {
 
         pub use nodes::{AbsoluteDirection, Pattern, RelativeDirection};
         pub use obstacle_detector::Obstacle;
-        pub use tracker::{AngleState, LengthState, State};
+        pub use tracker::{AngleState, LengthState, RobotState};
         pub use trajectory_generators::Pose;
         pub use trajectory_generators::{
             AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection,
@@ -99,7 +99,7 @@ pub mod defaults {
                 pose_converter::PoseConverter<Size, Math>,
                 Math,
             >,
-            types::data::State,
+            types::data::RobotState,
         >,
     >;
 
@@ -139,7 +139,7 @@ pub mod defaults {
                 pose_converter::PoseConverter<Size, Math>,
                 Math,
             >,
-            types::data::State,
+            types::data::RobotState,
         >,
     >;
 

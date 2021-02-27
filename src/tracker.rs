@@ -17,7 +17,7 @@ use super::robot::Tracker as ITracker;
 use super::trajectory_generators::{AngleTarget, MoveTarget, Target};
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
 use crate::utils::math::{LibmMath, Math};
-pub use state::{AngleState, LengthState, State};
+pub use state::{AngleState, LengthState, RobotState};
 
 pub trait Motor {
     fn apply(&mut self, electric_potential: ElectricPotential);
@@ -118,11 +118,11 @@ impl<LM, RM, M, TC, RC> core::fmt::Debug for Tracker<LM, RM, M, TC, RC> {
 /// Error on [Tracker](Tracker).
 #[derive(Clone, PartialEq, Debug)]
 pub struct FailSafeError {
-    state: State,
+    state: RobotState,
     target: MoveTarget,
 }
 
-impl<LM, RM, M, TC, RC> ITracker<State, Target> for Tracker<LM, RM, M, TC, RC>
+impl<LM, RM, M, TC, RC> ITracker<RobotState, Target> for Tracker<LM, RM, M, TC, RC>
 where
     LM: Motor,
     RM: Motor,
@@ -132,7 +132,7 @@ where
 {
     type Error = FailSafeError;
 
-    fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error> {
+    fn track(&mut self, state: &RobotState, target: &Target) -> Result<(), Self::Error> {
         let (left, right) = match target {
             Target::Moving(target) => self.track_move(state, target)?,
             Target::Spin(target) => self.track_spin(state, target),
@@ -171,7 +171,7 @@ where
         xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
     }
 
-    fn fail_safe(&mut self, state: &State, target: &MoveTarget) -> Result<(), FailSafeError> {
+    fn fail_safe(&mut self, state: &RobotState, target: &MoveTarget) -> Result<(), FailSafeError> {
         let x_diff = state.x.x - target.x.x;
         let y_diff = state.y.x - target.y.x;
 
@@ -188,7 +188,7 @@ where
 
     fn track_move(
         &mut self,
-        state: &State,
+        state: &RobotState,
         target: &MoveTarget,
     ) -> Result<(ElectricPotential, ElectricPotential), FailSafeError> {
         self.fail_safe(state, target)?;
@@ -255,7 +255,7 @@ where
 
     fn track_spin(
         &mut self,
-        state: &State,
+        state: &RobotState,
         target: &AngleTarget,
     ) -> (ElectricPotential, ElectricPotential) {
         let (sin_th, cos_th) = M::sincos(state.theta.x);

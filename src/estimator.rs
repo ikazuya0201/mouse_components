@@ -10,7 +10,7 @@ use uom::si::{
 };
 
 use crate::robot::StateEstimator;
-use crate::tracker::State;
+use crate::tracker::RobotState;
 use crate::utils::math::{LibmMath, Math};
 use crate::wall_detector::CorrectInfo;
 
@@ -40,8 +40,8 @@ pub struct Estimator<LE, RE, I, M> {
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
-    initial_state: State,
-    state: State,
+    initial_state: RobotState,
+    state: RobotState,
     weight: f32,
     _phantom: PhantomData<fn() -> M>,
 }
@@ -66,7 +66,7 @@ pub struct EstimatorConfig {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EstimatorState {
-    state: State,
+    state: RobotState,
 }
 
 impl<'a, LE, RE, I, Config, State, M> From<((LE, RE, I), &'a Config, &'a State)>
@@ -117,9 +117,9 @@ where
     <I as IMU>::Error: core::fmt::Debug,
     M: Math,
 {
-    type State = State;
+    type State = RobotState;
 
-    fn state(&self) -> &State {
+    fn state(&self) -> &RobotState {
         &self.state
     }
 
@@ -219,7 +219,7 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M = LibmMath> {
     imu: Option<Imu>,
     period: Option<Time>,
     cut_off_frequency: Option<Frequency>,
-    initial_state: Option<State>,
+    initial_state: Option<RobotState>,
     wheel_interval: Option<Length>,
     correction_weight: Option<f32>,
     _math: PhantomData<fn() -> M>,
@@ -283,7 +283,7 @@ impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncod
         self
     }
 
-    pub fn initial_state(mut self, initial_state: State) -> Self {
+    pub fn initial_state(mut self, initial_state: RobotState) -> Self {
         self.initial_state = Some(initial_state);
         self
     }
@@ -398,15 +398,15 @@ mod tests {
     where
         T: Iterator<Item = Target>,
     {
-        fn step(&self) -> Result<State, FinishError> {
+        fn step(&self) -> Result<RobotState, FinishError> {
             self.inner.borrow_mut().step()
         }
     }
 
     struct AgentSimulatorInner<T> {
         trajectory: T,
-        current: State,
-        prev: State,
+        current: RobotState,
+        prev: RobotState,
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -416,10 +416,10 @@ mod tests {
     where
         T: Iterator<Item = Target>,
     {
-        fn step(&mut self) -> Result<State, FinishError> {
+        fn step(&mut self) -> Result<RobotState, FinishError> {
             if let Some(target) = self.trajectory.next() {
                 let state = match target {
-                    Target::Moving(target) => State {
+                    Target::Moving(target) => RobotState {
                         x: LengthState {
                             x: target.x.x,
                             v: target.x.v,
@@ -436,7 +436,7 @@ mod tests {
                             a: target.theta.a,
                         },
                     },
-                    Target::Spin(target) => State {
+                    Target::Spin(target) => RobotState {
                         x: Default::default(),
                         y: Default::default(),
                         theta: AngleState {

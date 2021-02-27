@@ -1,7 +1,7 @@
 use uom::si::f32::{Acceleration, Angle, AngularAcceleration, AngularVelocity, Length, Velocity};
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct State {
+pub struct RobotState {
     pub x: LengthState,
     pub y: LengthState,
     pub theta: AngleState,
@@ -132,7 +132,7 @@ mod tests {
         }
     }
 
-    impl AbsDiffEq for State {
+    impl AbsDiffEq for RobotState {
         type Epsilon = f32;
 
         fn default_epsilon() -> Self::Epsilon {
@@ -146,7 +146,7 @@ mod tests {
         }
     }
 
-    impl RelativeEq for State {
+    impl RelativeEq for RobotState {
         fn default_max_relative() -> Self::Epsilon {
             Self::default_epsilon()
         }
