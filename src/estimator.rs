@@ -11,6 +11,7 @@ use uom::si::{
 
 use crate::robot::StateEstimator;
 use crate::tracker::RobotState;
+use crate::utils::builder::{ok_or, BuilderResult};
 use crate::utils::math::{LibmMath, Math};
 use crate::wall_detector::CorrectInfo;
 
@@ -228,7 +229,7 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M = LibmMath> {
 impl<LeftEncoder: Encoder, RightEncoder, Imu, M>
     EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M>
 {
-    pub fn left_encoder(mut self, left_encoder: LeftEncoder) -> Self {
+    pub fn left_encoder(&mut self, left_encoder: LeftEncoder) -> &mut Self {
         self.left_encoder = Some(left_encoder);
         self
     }
@@ -237,14 +238,14 @@ impl<LeftEncoder: Encoder, RightEncoder, Imu, M>
 impl<LeftEncoder, RightEncoder: Encoder, Imu, M>
     EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M>
 {
-    pub fn right_encoder(mut self, right_encoder: RightEncoder) -> Self {
+    pub fn right_encoder(&mut self, right_encoder: RightEncoder) -> &mut Self {
         self.right_encoder = Some(right_encoder);
         self
     }
 }
 
 impl<LeftEncoder, RightEncoder, Imu: IMU, M> EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M> {
-    pub fn imu(mut self, imu: Imu) -> Self {
+    pub fn imu(&mut self, imu: Imu) -> &mut Self {
         self.imu = Some(imu);
         self
     }
@@ -273,64 +274,55 @@ impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncod
         }
     }
 
-    pub fn period(mut self, period: Time) -> Self {
+    pub fn period(&mut self, period: Time) -> &mut Self {
         self.period = Some(period);
         self
     }
 
-    pub fn cut_off_frequency(mut self, cut_off_frequency: Frequency) -> Self {
+    pub fn cut_off_frequency(&mut self, cut_off_frequency: Frequency) -> &mut Self {
         self.cut_off_frequency = Some(cut_off_frequency);
         self
     }
 
-    pub fn initial_state(mut self, initial_state: RobotState) -> Self {
+    pub fn initial_state(&mut self, initial_state: RobotState) -> &mut Self {
         self.initial_state = Some(initial_state);
         self
     }
 
-    pub fn wheel_interval(mut self, wheel_interval: Length) -> Self {
+    pub fn wheel_interval(&mut self, wheel_interval: Length) -> &mut Self {
         self.wheel_interval = Some(wheel_interval);
         self
     }
 
-    pub fn correction_weight(mut self, weight: f32) -> Self {
+    pub fn correction_weight(&mut self, weight: f32) -> &mut Self {
         self.correction_weight = Some(weight);
         self
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BuildError {
-    field_name: &'static str,
-}
-
-fn ok_or<T>(value: Option<T>, field_name: &'static str) -> Result<T, BuildError> {
-    value.ok_or(BuildError { field_name })
-}
-
 impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU, M: Math>
     EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M>
 {
-    pub fn build(self) -> Result<Estimator<LeftEncoder, RightEncoder, Imu, M>, BuildError> {
+    pub fn build(&mut self) -> BuilderResult<Estimator<LeftEncoder, RightEncoder, Imu, M>> {
         let period = ok_or(self.period, "period")?;
         let cut_off_frequency = ok_or(self.cut_off_frequency, "cut_off_frequency")?;
         let alpha =
             1.0 / (2.0 * core::f32::consts::PI * (period * cut_off_frequency).get::<ratio>() + 1.0);
 
-        let initial_state = self.initial_state.unwrap_or(Default::default());
+        let initial_state = self.initial_state.take().unwrap_or(Default::default());
         Ok(Estimator {
             period,
             alpha,
             trans_velocity: Default::default(),
             angular_velocity: Default::default(),
-            left_encoder: ok_or(self.left_encoder, "left_encoder")?,
-            right_encoder: ok_or(self.right_encoder, "right_encoder")?,
-            imu: ok_or(self.imu, "imu")?,
+            left_encoder: ok_or(self.left_encoder.take(), "left_encoder")?,
+            right_encoder: ok_or(self.right_encoder.take(), "right_encoder")?,
+            imu: ok_or(self.imu.take(), "imu")?,
             bias: Default::default(),
-            wheel_interval: self.wheel_interval,
+            wheel_interval: self.wheel_interval.take(),
             initial_state: initial_state.clone(),
             state: initial_state,
-            weight: self.correction_weight.unwrap_or(0.0),
+            weight: self.correction_weight.take().unwrap_or(0.0),
             _phantom: PhantomData,
         })
     }
