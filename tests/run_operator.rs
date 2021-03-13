@@ -9,7 +9,7 @@ use components::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
     controllers::{RotationControllerBuilder, TranslationControllerBuilder},
-    defaults,
+    defaults::types::RunCommander,
     estimator::EstimatorBuilder,
     mazes::CheckedMaze,
     nodes::{RunNode, SearchNode},
@@ -242,7 +242,7 @@ fn test_run_operator() {
             RunNode::<Size>::new(2, 0, South).unwrap(),
             RunNode::<Size>::new(2, 0, West).unwrap(),
         ];
-        defaults::RunCommander::new(start, &goals, maze)
+        RunCommander::new(start, &goals, maze)
     };
 
     let operator = TrackingOperator::new(agent, commander);
