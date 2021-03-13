@@ -4,7 +4,7 @@ use components::{
     agents::SearchAgent,
     command_converter::CommandConverter,
     controllers::{RotationControllerBuilder, TranslationControllerBuilder},
-    defaults,
+    defaults::types::SearchCommander,
     estimator::EstimatorBuilder,
     mazes::Maze,
     nodes::{RunNode, SearchNode},
@@ -231,7 +231,7 @@ macro_rules! impl_search_operator_test {
                 let create_commander = |wall_storage| {
                     let maze: Maze<_, _, _, SearchNode<Size>> = Maze::new(wall_storage, cost);
                     let start = RunNode::<Size>::new(0, 0, North).unwrap();
-                    defaults::SearchCommander::new(
+                    SearchCommander::new(
                         start.clone(),
                         &goals,
                         start.into(),

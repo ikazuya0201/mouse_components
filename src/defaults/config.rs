@@ -288,7 +288,7 @@ impl_into! {
 /// };
 /// use components::nodes::RunNode;
 /// use components::types::data::{AbsoluteDirection, Pattern, SearchKind};
-/// use components::config::ConfigBuilder;
+/// use components::defaults::config::ConfigBuilder;
 ///
 /// use AbsoluteDirection::*;
 ///

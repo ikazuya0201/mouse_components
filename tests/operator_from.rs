@@ -1,4 +1,6 @@
-use components::defaults::{ReturnOperator, ReturnSetupOperator, RunOperator, SearchOperator};
+use components::defaults::types::{
+    ReturnOperator, ReturnSetupOperator, RunOperator, SearchOperator,
+};
 
 macro_rules! impl_operator_from_test {
     ($name: ident: { $operator: ident, $wall_manager: expr, }) => {
@@ -15,10 +17,10 @@ macro_rules! impl_operator_from_test {
         #[test]
         fn $name() {
             use components::{
-                config::{Config, ConfigBuilder},
+                defaults::config::{Config, ConfigBuilder},
+                defaults::state::State,
                 nodes::RunNode,
                 resource::ResourceBuilder,
-                state::State,
                 types::data::{
                     AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState,
                     SearchKind,

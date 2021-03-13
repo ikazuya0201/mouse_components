@@ -1,7 +1,7 @@
 extern crate components;
 
 use components::{
-    defaults::SearchCommander,
+    defaults::types::SearchCommander,
     mazes::Maze,
     nodes::{RunNode, SearchNode},
     types::data::{AbsoluteDirection, Pattern, SearchKind, Wall},
