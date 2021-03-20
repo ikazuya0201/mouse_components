@@ -1,9 +1,9 @@
 extern crate components;
 
 use components::{
-    defaults::types::SearchCommander,
+    commanders::SearchCommander,
     mazes::Maze,
-    nodes::{RunNode, SearchNode},
+    nodes::{Node, RunNode, SearchNode},
     types::data::{AbsoluteDirection, Pattern, SearchKind, Wall},
     utils::probability::Probability,
     wall_manager::WallManager,
@@ -72,10 +72,11 @@ fn test_compute_shortest_path_u4() {
         }
 
         let maze = Maze::<_, _, _, SearchNode<Size>>::new(&wall_manager, cost);
-        let commander = SearchCommander::new(
-            start.clone(),
+        let current: Node<Size> = start.clone().into();
+        let commander = SearchCommander::<_, _, SearchNode<Size>, _, _>::new(
+            start,
             &goals,
-            start.into(),
+            current,
             SearchKind::Init,
             SearchKind::Final,
             maze,

@@ -8,8 +8,8 @@ use core::f32::consts::PI;
 use components::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
+    commanders::RunCommander,
     controllers::{RotationControllerBuilder, TranslationControllerBuilder},
-    defaults::types::RunCommander,
     estimator::EstimatorBuilder,
     mazes::CheckedMaze,
     nodes::{RunNode, SearchNode},
