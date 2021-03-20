@@ -64,6 +64,11 @@ impl<'a, Manager, Detector, Converter, Math> WallDetector<'a, Manager, Detector,
             _math: PhantomData,
         }
     }
+
+    pub fn release(self) -> Detector {
+        let Self { detector, .. } = self;
+        detector
+    }
 }
 
 type ObstacleSizeUpperBound = typenum::consts::U6;
