@@ -62,6 +62,16 @@ impl<Estimator, Tracker, Detector, State> Robot<Estimator, Tracker, Detector, St
             _state: PhantomData,
         }
     }
+
+    pub fn release(self) -> (Estimator, Tracker, Detector) {
+        let Self {
+            estimator,
+            tracker,
+            detector,
+            ..
+        } = self;
+        (estimator, tracker, detector)
+    }
 }
 
 impl<Estimator, TrackerType, Detector, Target, State> IRobot<Target>
