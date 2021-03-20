@@ -63,6 +63,17 @@ pub struct Tracker<
     _phantom: PhantomData<fn() -> M>,
 }
 
+impl<LM, RM, M, TC, RC> Tracker<LM, RM, M, TC, RC> {
+    pub fn release(self) -> (LM, RM) {
+        let Self {
+            left_motor,
+            right_motor,
+            ..
+        } = self;
+        (left_motor, right_motor)
+    }
+}
+
 impl<LM, RM, M, TC, RC> core::fmt::Debug for Tracker<LM, RM, M, TC, RC> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "Tracker{{ xi:{:?} }}", self.xi)
