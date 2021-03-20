@@ -88,6 +88,11 @@ where
             maze,
         }
     }
+
+    pub fn release(self) -> (Node, Maze) {
+        let Self { current, maze, .. } = self;
+        (current.into_inner(), maze)
+    }
 }
 
 impl<Node, RunNode, SearchNode, Route, Maze> core::fmt::Debug

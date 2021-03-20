@@ -2,6 +2,7 @@ use core::cmp::Reverse;
 
 use heapless::ArrayLength;
 use num::{Bounded, Saturating};
+use spin::Mutex;
 use typenum::Unsigned;
 
 use super::{compute_shortest_path, BoundedNode, BoundedPathNode, Graph};
@@ -11,7 +12,7 @@ use crate::operators::InitialCommander;
 ///
 /// This produces a setup command for returning to start position.
 pub struct ReturnSetupCommander<Node, Maze> {
-    current: Node,
+    current: Mutex<Node>,
     start: Node,
     maze: Maze,
 }
@@ -19,10 +20,15 @@ pub struct ReturnSetupCommander<Node, Maze> {
 impl<Node, Maze> ReturnSetupCommander<Node, Maze> {
     pub fn new(current: Node, start: Node, maze: Maze) -> Self {
         Self {
-            current,
+            current: Mutex::new(current),
             start,
             maze,
         }
+    }
+
+    pub fn release(self) -> (Node, Maze) {
+        let Self { current, maze, .. } = self;
+        (current.into_inner(), maze)
     }
 }
 
@@ -56,8 +62,10 @@ where
     type Commands = Option<Self::Command>;
 
     fn initial_commands(&self) -> Result<Self::Commands, Self::Error> {
-        for (node, kind) in self.current.rotation_nodes() {
+        let mut current = self.current.lock();
+        for (node, kind) in current.rotation_nodes() {
             if let Some(_) = compute_shortest_path(&node, &[self.start.clone()], &self.maze) {
+                *current = node;
                 return Ok(Some(kind));
             }
         }

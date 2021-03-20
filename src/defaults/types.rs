@@ -150,17 +150,6 @@ type RunCommander<'a, Size> = commanders::RunCommander<
     >,
 >;
 
-type ReturnCommander<'a, Size> = commanders::ReturnCommander<
-    nodes::RunNode<Size>,
-    mazes::CheckedMaze<
-        'a,
-        wall_manager::WallManager<Size>,
-        types::data::Pattern,
-        u16,
-        nodes::SearchNode<Size>,
-    >,
->;
-
 type ReturnSetupCommander<'a, Size> = commanders::ReturnSetupCommander<
     nodes::RunNode<Size>,
     mazes::CheckedMaze<
@@ -249,7 +238,7 @@ pub struct ReturnOperator<
     Size,
 >(
     operators::TrackingOperator<
-        ReturnCommander<'a, Size>,
+        RunCommander<'a, Size>,
         RunAgent<
             'a,
             LeftEncoder,
