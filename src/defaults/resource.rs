@@ -13,25 +13,17 @@ pub struct Resource<
     DistanceSensors,
     WallManager,
 > {
-    left_encoder: LeftEncoder,
-    right_encoder: RightEncoder,
-    imu: Imu,
-    left_motor: LeftMotor,
-    right_motor: RightMotor,
-    distance_sensors: DistanceSensors,
+    left_encoder: Option<LeftEncoder>,
+    right_encoder: Option<RightEncoder>,
+    imu: Option<Imu>,
+    left_motor: Option<LeftMotor>,
+    right_motor: Option<RightMotor>,
+    distance_sensors: Option<DistanceSensors>,
     wall_manager: &'a WallManager,
 }
 
 impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors, WallManager>
-    Into<(
-        &'a WallManager,
-        (
-            (LeftEncoder, RightEncoder, Imu),
-            (LeftMotor, RightMotor),
-            (&'a WallManager, DistanceSensors),
-        ),
-    )>
-    for Resource<
+    Resource<
         'a,
         LeftEncoder,
         RightEncoder,
@@ -42,33 +34,32 @@ impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors,
         WallManager,
     >
 {
-    fn into(
-        self,
-    ) -> (
-        &'a WallManager,
-        (
-            (LeftEncoder, RightEncoder, Imu),
-            (LeftMotor, RightMotor),
-            (&'a WallManager, DistanceSensors),
-        ),
-    ) {
-        let Resource {
-            left_encoder,
-            right_encoder,
-            imu,
-            left_motor,
-            right_motor,
-            distance_sensors,
-            wall_manager,
-        } = self;
-        (
-            wall_manager,
-            (
-                (left_encoder, right_encoder, imu),
-                (left_motor, right_motor),
-                (wall_manager, distance_sensors),
-            ),
-        )
+    pub fn take_left_encoder(&mut self) -> Option<LeftEncoder> {
+        self.left_encoder.take()
+    }
+
+    pub fn take_right_encoder(&mut self) -> Option<RightEncoder> {
+        self.right_encoder.take()
+    }
+
+    pub fn take_left_motor(&mut self) -> Option<LeftMotor> {
+        self.left_motor.take()
+    }
+
+    pub fn take_right_motor(&mut self) -> Option<RightMotor> {
+        self.right_motor.take()
+    }
+
+    pub fn take_imu(&mut self) -> Option<Imu> {
+        self.imu.take()
+    }
+
+    pub fn take_distance_sensors(&mut self) -> Option<DistanceSensors> {
+        self.distance_sensors.take()
+    }
+
+    pub fn wall_manager(&self) -> &WallManager {
+        self.wall_manager
     }
 }
 
@@ -139,19 +130,14 @@ impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors,
             WallManager,
         >,
     > {
-        macro_rules! get {
-            ($field_name: ident) => {{
-                ok_or(self.$field_name.take(), core::stringify!($field_name))?
-            }};
-        }
         Ok(Resource {
-            left_encoder: get!(left_encoder),
-            right_encoder: get!(right_encoder),
-            left_motor: get!(left_motor),
-            right_motor: get!(right_motor),
-            imu: get!(imu),
-            distance_sensors: get!(distance_sensors),
-            wall_manager: get!(wall_manager),
+            left_encoder: self.left_encoder.take(),
+            right_encoder: self.right_encoder.take(),
+            left_motor: self.left_motor.take(),
+            right_motor: self.right_motor.take(),
+            imu: self.imu.take(),
+            distance_sensors: self.distance_sensors.take(),
+            wall_manager: ok_or(self.wall_manager.take(), "wall_manager")?,
         })
     }
 
