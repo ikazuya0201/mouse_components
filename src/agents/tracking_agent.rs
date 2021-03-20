@@ -24,6 +24,11 @@ impl<Manager, Robot> TrackingAgent<Manager, Robot> {
             robot: Mutex::new(robot),
         }
     }
+
+    pub fn release(self) -> (Manager, Robot) {
+        let Self { manager, robot } = self;
+        (manager, robot.into_inner())
+    }
 }
 
 impl<Command, Manager, Robot> TrackingInitializer<Command> for TrackingAgent<Manager, Robot>

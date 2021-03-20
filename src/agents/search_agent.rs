@@ -30,6 +30,11 @@ impl<Manager, Robot> SearchAgent<Manager, Robot> {
             robot: Mutex::new(robot),
         }
     }
+
+    pub fn release(self) -> (Manager, Robot) {
+        let Self { manager, robot } = self;
+        (manager, robot.into_inner())
+    }
 }
 
 /// Error on [SearchAgent](SearchAgent).
