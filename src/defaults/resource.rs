@@ -1,6 +1,14 @@
 //! Default implementation of resource and its builder.
 
+use core::ops::Mul;
+
+use generic_array::ArrayLength;
+use spin::Mutex;
+use typenum::consts::U2;
+
 use crate::utils::builder::{ok_or, BuilderResult};
+use crate::utils::probability::Probability;
+use crate::wall_manager::WallManager;
 
 /// An resource type for initialization of operators.
 pub struct Resource<
@@ -11,28 +19,27 @@ pub struct Resource<
     LeftMotor,
     RightMotor,
     DistanceSensors,
-    WallManager,
-> {
+    Size,
+> where
+    Size: Mul<Size>,
+    Size::Output: Mul<U2>,
+    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
+{
     left_encoder: Option<LeftEncoder>,
     right_encoder: Option<RightEncoder>,
     imu: Option<Imu>,
     left_motor: Option<LeftMotor>,
     right_motor: Option<RightMotor>,
     distance_sensors: Option<DistanceSensors>,
-    wall_manager: &'a WallManager,
+    wall_manager: &'a WallManager<Size>,
 }
 
-impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors, WallManager>
-    Resource<
-        'a,
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensors,
-        WallManager,
-    >
+impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors, Size>
+    Resource<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors, Size>
+where
+    Size: Mul<Size>,
+    Size::Output: Mul<U2>,
+    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     pub fn take_left_encoder(&mut self) -> Option<LeftEncoder> {
         self.left_encoder.take()
@@ -58,7 +65,7 @@ impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors,
         self.distance_sensors.take()
     }
 
-    pub fn wall_manager(&self) -> &WallManager {
+    pub fn wall_manager(&self) -> &WallManager<Size> {
         self.wall_manager
     }
 }
@@ -72,15 +79,19 @@ pub struct ResourceBuilder<
     LeftMotor,
     RightMotor,
     DistanceSensors,
-    WallManager,
-> {
+    Size,
+> where
+    Size: Mul<Size>,
+    Size::Output: Mul<U2>,
+    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
+{
     left_encoder: Option<LeftEncoder>,
     right_encoder: Option<RightEncoder>,
     imu: Option<Imu>,
     left_motor: Option<LeftMotor>,
     right_motor: Option<RightMotor>,
     distance_sensors: Option<DistanceSensors>,
-    wall_manager: Option<&'a WallManager>,
+    wall_manager: Option<&'a WallManager<Size>>,
 }
 
 macro_rules! impl_setter {
@@ -92,7 +103,7 @@ macro_rules! impl_setter {
     };
 }
 
-impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors, WallManager>
+impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors, Size>
     ResourceBuilder<
         'a,
         LeftEncoder,
@@ -101,8 +112,12 @@ impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors,
         LeftMotor,
         RightMotor,
         DistanceSensors,
-        WallManager,
+        Size,
     >
+where
+    Size: Mul<Size>,
+    Size::Output: Mul<U2>,
+    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     pub fn new() -> Self {
         Self {
@@ -119,16 +134,7 @@ impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors,
     pub fn build(
         &mut self,
     ) -> BuilderResult<
-        Resource<
-            'a,
-            LeftEncoder,
-            RightEncoder,
-            Imu,
-            LeftMotor,
-            RightMotor,
-            DistanceSensors,
-            WallManager,
-        >,
+        Resource<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors, Size>,
     > {
         Ok(Resource {
             left_encoder: self.left_encoder.take(),
@@ -147,5 +153,5 @@ impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensors,
     impl_setter!(left_motor: LeftMotor);
     impl_setter!(right_motor: RightMotor);
     impl_setter!(distance_sensors: DistanceSensors);
-    impl_setter!(wall_manager: &'a WallManager);
+    impl_setter!(wall_manager: &'a WallManager<Size>);
 }

@@ -1,15 +1,16 @@
 use crate::impl_with_getter;
+use crate::nodes::Node;
 use crate::tracker::RobotState;
 
 impl_with_getter! {
-    pub struct State<Node> {
-        current_node: Node,
+    pub struct State<Size> {
+        current_node: Node<Size>,
         robot_state: RobotState,
     }
 }
 
-impl<Node> State<Node> {
-    pub fn new(current_node: Node, robot_state: RobotState) -> Self {
+impl<Size> State<Size> {
+    pub fn new(current_node: Node<Size>, robot_state: RobotState) -> Self {
         Self {
             current_node,
             robot_state,
