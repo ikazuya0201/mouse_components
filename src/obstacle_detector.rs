@@ -21,7 +21,7 @@ pub struct Obstacle {
     pub distance: Sample<Length>,
 }
 
-type SensorSizeUpperBound = typenum::consts::U6;
+pub type SensorSizeUpperBound = typenum::consts::U6;
 
 //NOTE: the number of sensors is upper-bounded.
 pub struct ObstacleDetector<D, M> {
