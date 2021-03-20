@@ -5,20 +5,22 @@ use uom::si::f32::{
 };
 
 use crate::impl_with_getter;
+use crate::nodes::RunNode;
 use crate::trajectory_generators::{SlalomDirection, SlalomKind, SlalomParameters};
+use crate::types::data::{Pattern, SearchKind};
 use crate::utils::builder::{ok_or, BuilderResult};
 
 impl_with_getter! {
     /// An implementation of config.
     #[derive(Debug, Clone, Copy, PartialEq)]
-    pub struct Config<'a, Node, Route, Pattern, Cost> {
+    pub struct Config<'a, Size> {
         square_width: Length,
         front_offset: Length,
-        start: Node,
-        return_goal: Node,
-        goals: &'a [Node],
-        search_initial_route: Route,
-        search_final_route: Route,
+        start: RunNode<Size>,
+        return_goal: RunNode<Size>,
+        goals: &'a [RunNode<Size>],
+        search_initial_route: SearchKind,
+        search_final_route: SearchKind,
         translational_kp: f32,
         translational_ki: f32,
         translational_kd: f32,
@@ -33,7 +35,7 @@ impl_with_getter! {
         estimator_correction_weight: f32,
         wheel_interval: Option<Length>,
         estimator_translational_velocity_alpha: f32,
-        cost_fn: fn(Pattern) -> Cost,
+        cost_fn: fn(Pattern) -> u16,
         wall_width: Length,
         ignore_radius_from_pillar: Length,
         ignore_length_from_wall: Length,
@@ -136,14 +138,14 @@ impl_with_getter! {
 ///     .unwrap();
 /// ```
 
-pub struct ConfigBuilder<'a, Node, Route, Pattern, Cost> {
+pub struct ConfigBuilder<'a, Size> {
     square_width: Option<Length>,
     front_offset: Option<Length>,
-    start: Option<Node>,
-    return_goal: Option<Node>,
-    goals: Option<&'a [Node]>,
-    search_initial_route: Option<Route>,
-    search_final_route: Option<Route>,
+    start: Option<RunNode<Size>>,
+    return_goal: Option<RunNode<Size>>,
+    goals: Option<&'a [RunNode<Size>]>,
+    search_initial_route: Option<SearchKind>,
+    search_final_route: Option<SearchKind>,
     translational_kp: Option<f32>,
     translational_ki: Option<f32>,
     translational_kd: Option<f32>,
@@ -158,7 +160,7 @@ pub struct ConfigBuilder<'a, Node, Route, Pattern, Cost> {
     estimator_correction_weight: Option<f32>,
     wheel_interval: Option<Length>,
     estimator_translational_velocity_alpha: Option<f32>,
-    cost_fn: Option<fn(Pattern) -> Cost>,
+    cost_fn: Option<fn(Pattern) -> u16>,
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
     ignore_length_from_wall: Option<Length>,
@@ -207,7 +209,7 @@ macro_rules! impl_setter {
     };
 }
 
-impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cost> {
+impl<'a, Size> ConfigBuilder<'a, Size> {
     impl_setter!(
         /// **Optional**,
         /// Default: 90 \[mm\] (half size).
@@ -225,27 +227,27 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
     impl_setter!(
         /// **Required**,
         /// Sets the start node for search.
-        start: Node
+        start: RunNode<Size>
     );
     impl_setter!(
         /// **Required**,
         /// Sets a goal for return to start.
-        return_goal: Node
+        return_goal: RunNode<Size>
     );
     impl_setter!(
         /// **Required**,
         /// Sets the goal nodes for search.
-        goals: &'a [Node]
+        goals: &'a [RunNode<Size>]
     );
     impl_setter!(
         /// **Required**,
         /// Sets a route for initial trajectory.
-        search_initial_route: Route
+        search_initial_route: SearchKind
     );
     impl_setter!(
         /// **Required**,
         /// Sets a route for final trajectory.
-        search_final_route: Route
+        search_final_route: SearchKind
     );
     impl_setter!(
         /// **Required**,
@@ -342,7 +344,7 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
     impl_setter!(
         /// **Required**,
         /// Sets the cost function for search.
-        cost_fn: fn(Pattern) -> Cost
+        cost_fn: fn(Pattern) -> u16
     );
     impl_setter!(
         /// **Optional**,
@@ -542,7 +544,7 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
     /// Builds [Config](Config).
     ///
     /// This method can be failed when required parameters are not given.
-    pub fn build(&mut self) -> BuilderResult<Config<'a, Node, Route, Pattern, Cost>> {
+    pub fn build(&mut self) -> BuilderResult<Config<'a, Size>> {
         macro_rules! get {
             ($field_name: ident) => {{
                 ok_or(self.$field_name.take(), core::stringify!($field_name))?
