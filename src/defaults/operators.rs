@@ -1,16 +1,17 @@
-use core::ops::Mul;
+mod return_operator;
+mod return_setup_operator;
+mod run_operator;
+mod search_operator;
 
-use generic_array::ArrayLength;
-use spin::Mutex;
-use typenum::consts::*;
-
-use crate::trajectory_generators::{RunTrajectory, ShiftTrajectory};
-use crate::utils::probability::Probability;
 use crate::{
     agents, command_converter, commanders, controllers, estimator, mazes, nodes, obstacle_detector,
-    operators, pose_converter, robot, tracker, traits, trajectory_generators, trajectory_managers,
-    types, wall_detector, wall_manager,
+    pose_converter, robot, tracker, trajectory_generators, trajectory_managers, types,
+    wall_detector, wall_manager,
 };
+pub use return_operator::ReturnOperator;
+pub use return_setup_operator::ReturnSetupOperator;
+pub use run_operator::RunOperator;
+pub use search_operator::SearchOperator;
 
 type RunAgent<
     'a,
@@ -160,133 +161,3 @@ type ReturnSetupCommander<'a, Size> = commanders::ReturnSetupCommander<
         nodes::SearchNode<Size>,
     >,
 >;
-
-pub struct SearchOperator<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Math,
-    Size,
->(
-    operators::SearchOperator<
-        SearchCommander<'a, Size>,
-        SearchAgent<
-            'a,
-            LeftEncoder,
-            RightEncoder,
-            Imu,
-            LeftMotor,
-            RightMotor,
-            DistanceSensor,
-            Size,
-            Math,
-        >,
-    >,
-)
-where
-    Size: Mul<Size>,
-    Size::Output: Mul<U2>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-    Math: crate::utils::math::Math;
-
-pub struct RunOperator<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Math,
-    Size,
->(
-    operators::TrackingOperator<
-        RunCommander<'a, Size>,
-        RunAgent<
-            'a,
-            LeftEncoder,
-            RightEncoder,
-            Imu,
-            LeftMotor,
-            RightMotor,
-            DistanceSensor,
-            Size,
-            Math,
-            <nodes::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
-        >,
-    >,
-)
-where
-    Size: Mul<Size>,
-    Size::Output: Mul<U2> + ArrayLength<ShiftTrajectory<RunTrajectory<Math>, Math>>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-    Math: crate::utils::math::Math;
-
-pub struct ReturnOperator<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Math,
-    Size,
->(
-    operators::TrackingOperator<
-        RunCommander<'a, Size>,
-        RunAgent<
-            'a,
-            LeftEncoder,
-            RightEncoder,
-            Imu,
-            LeftMotor,
-            RightMotor,
-            DistanceSensor,
-            Size,
-            Math,
-            <nodes::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
-        >,
-    >,
-)
-where
-    Size: Mul<Size>,
-    Size::Output: Mul<U2> + ArrayLength<ShiftTrajectory<RunTrajectory<Math>, Math>>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-    Math: crate::utils::math::Math;
-
-pub struct ReturnSetupOperator<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Math,
-    Size,
->(
-    operators::TrackingOperator<
-        ReturnSetupCommander<'a, Size>,
-        ReturnSetupAgent<
-            'a,
-            LeftEncoder,
-            RightEncoder,
-            Imu,
-            LeftMotor,
-            RightMotor,
-            DistanceSensor,
-            Size,
-            Math,
-        >,
-    >,
-)
-where
-    Size: Mul<Size>,
-    Size::Output: Mul<U2>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-    Math: crate::utils::math::Math;
