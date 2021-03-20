@@ -41,7 +41,6 @@ pub struct Estimator<LE, RE, I, M> {
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
-    initial_state: RobotState,
     state: RobotState,
     weight: f32,
     _phantom: PhantomData<fn() -> M>,
@@ -58,11 +57,15 @@ impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
 }
 
 impl<LE, RE, I, M> Estimator<LE, RE, I, M> {
-    pub fn init(&mut self) {
-        self.state = self.initial_state.clone();
-        self.trans_velocity = Default::default();
-        self.angular_velocity = Default::default();
-        self.bias = Default::default();
+    pub fn release(self) -> (LE, RE, I, RobotState) {
+        let Self {
+            left_encoder,
+            right_encoder,
+            imu,
+            state,
+            ..
+        } = self;
+        (left_encoder, right_encoder, imu, state)
     }
 }
 
@@ -267,7 +270,6 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU, M: Math>
         let alpha =
             1.0 / (2.0 * core::f32::consts::PI * (period * cut_off_frequency).get::<ratio>() + 1.0);
 
-        let initial_state = self.initial_state.take().unwrap_or(Default::default());
         Ok(Estimator {
             period,
             alpha,
@@ -278,8 +280,7 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU, M: Math>
             imu: ok_or(self.imu.take(), "imu")?,
             bias: Default::default(),
             wheel_interval: self.wheel_interval.take(),
-            initial_state: initial_state.clone(),
-            state: initial_state,
+            state: self.initial_state.take().unwrap_or(Default::default()),
             weight: self.correction_weight.take().unwrap_or(0.0),
             _phantom: PhantomData,
         })
