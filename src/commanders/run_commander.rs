@@ -7,8 +7,7 @@ use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
 use super::{
-    compute_shortest_path, BoundedNode, BoundedPathNode, CommanderState, GoalSizeUpperBound, Graph,
-    RouteNode,
+    compute_shortest_path, BoundedNode, BoundedPathNode, GoalSizeUpperBound, Graph, RouteNode,
 };
 use crate::operators::InitialCommander;
 
@@ -29,27 +28,6 @@ where
             goals: goals.into_iter().cloned().collect(),
             maze,
         }
-    }
-}
-
-/// A config for initializing [RunCommander](RunCommander).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RunCommanderConfig<'a, Node> {
-    pub start: Node,
-    pub goals: &'a [Node],
-}
-
-impl<'a, Resource, Config, State, Node, Maze> From<(Resource, &'a Config, &'a State)>
-    for RunCommander<Node, Maze>
-where
-    Node: 'a + Clone,
-    Maze: From<(Resource, &'a Config, &'a State)>,
-    &'a Config: Into<RunCommanderConfig<'a, Node>>,
-{
-    fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
-        let maze = Maze::from((resource, config, state));
-        let config = config.into();
-        Self::new(config.start, config.goals, maze)
     }
 }
 
@@ -96,28 +74,6 @@ impl<Node, Maze> core::ops::Deref for ReturnCommander<Node, Maze> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-/// A config for [ReturnCommander](ReturnCommander).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ReturnCommanderConfig<Node> {
-    pub start: Node,
-}
-
-impl<'a, Resource, Config, State, Node, Maze> From<(Resource, &'a Config, &'a State)>
-    for ReturnCommander<Node, Maze>
-where
-    Node: 'a + Clone,
-    Maze: From<(Resource, &'a Config, &'a State)>,
-    &'a Config: Into<ReturnCommanderConfig<Node>>,
-    &'a State: Into<CommanderState<Node>>,
-{
-    fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
-        let maze = Maze::from((resource, config, state));
-        let config = config.into();
-        let state = state.into();
-        Self::new(state.current_node, &[config.start], maze)
     }
 }
 

@@ -66,22 +66,6 @@ impl<'a, Manager, Detector, Converter, Math> WallDetector<'a, Manager, Detector,
     }
 }
 
-impl<'a, Manager, Detector, Converter, Math, Resource, Config, State>
-    From<((&'a Manager, Resource), &'a Config, &'a State)>
-    for WallDetector<'a, Manager, Detector, Converter, Math>
-where
-    Converter: From<(&'a Config, &'a State)>,
-    Detector: From<(Resource, &'a Config, &'a State)>,
-{
-    fn from(
-        ((manager, resource), config, state): ((&'a Manager, Resource), &'a Config, &'a State),
-    ) -> Self {
-        let converter = Converter::from((config, state));
-        let detector = Detector::from((resource, config, state));
-        Self::new(manager, detector, converter)
-    }
-}
-
 type ObstacleSizeUpperBound = typenum::consts::U6;
 
 impl<'a, Manager, Detector, Converter, Math, State> IWallDetector<State>

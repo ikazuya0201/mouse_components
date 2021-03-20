@@ -57,48 +57,6 @@ impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct EstimatorConfig {
-    pub period: Time,
-    pub weight: f32,
-    pub wheel_interval: Option<Length>,
-    pub alpha: f32,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct EstimatorState {
-    pub state: RobotState,
-}
-
-impl<'a, LE, RE, I, Config, State, M> From<((LE, RE, I), &'a Config, &'a State)>
-    for Estimator<LE, RE, I, M>
-where
-    &'a Config: Into<EstimatorConfig>,
-    &'a State: Into<EstimatorState>,
-{
-    fn from(
-        ((left_encoder, right_encoder, imu), config, state): ((LE, RE, I), &'a Config, &'a State),
-    ) -> Self {
-        let config = config.into();
-        let state = state.into();
-        Self {
-            period: config.period,
-            alpha: config.alpha,
-            trans_velocity: Velocity::default(),
-            angular_velocity: AngularVelocity::default(),
-            bias: AngularVelocity::default(),
-            wheel_interval: config.wheel_interval,
-            left_encoder,
-            right_encoder,
-            imu,
-            initial_state: state.state.clone(),
-            state: state.state,
-            weight: config.weight,
-            _phantom: PhantomData,
-        }
-    }
-}
-
 impl<LE, RE, I, M> Estimator<LE, RE, I, M> {
     pub fn init(&mut self) {
         self.state = self.initial_state.clone();
@@ -521,59 +479,6 @@ mod tests {
             .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))
             .build()
             .unwrap()
-    }
-
-    #[test]
-    fn test_from() {
-        pub struct EncoderType;
-        pub struct ImuType;
-
-        impl Encoder for EncoderType {
-            type Error = ();
-
-            fn get_relative_distance(&mut self) -> Result<Length, nb::Error<Self::Error>> {
-                unreachable!()
-            }
-        }
-
-        impl IMU for ImuType {
-            type Error = ();
-
-            fn get_translational_acceleration(
-                &mut self,
-            ) -> Result<Acceleration, nb::Error<Self::Error>> {
-                unreachable!()
-            }
-
-            fn get_angular_velocity(&mut self) -> Result<AngularVelocity, nb::Error<Self::Error>> {
-                unreachable!()
-            }
-        }
-
-        let config = EstimatorConfig {
-            period: Time::default(),
-            alpha: 0.5,
-            weight: 0.0,
-            wheel_interval: None,
-        };
-
-        let state = EstimatorState {
-            state: Default::default(),
-        };
-
-        impl<'a> From<&'a EstimatorConfig> for EstimatorConfig {
-            fn from(value: &'a EstimatorConfig) -> Self {
-                (*value).clone()
-            }
-        }
-
-        impl<'a> From<&'a EstimatorState> for EstimatorState {
-            fn from(value: &'a EstimatorState) -> Self {
-                (*value).clone()
-            }
-        }
-
-        Estimator::<_, _, _, ()>::from(((EncoderType, EncoderType, ImuType), &config, &state));
     }
 
     macro_rules! impl_estimator_test {

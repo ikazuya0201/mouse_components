@@ -60,20 +60,6 @@ where
     }
 }
 
-impl<'a, Config, State, Command, Generator, Converter> From<(&'a Config, &'a State)>
-    for TrajectoryManager<Command, Generator, Converter>
-where
-    Generator: InitialTrajectoryGenerator<Converter::Output> + From<(&'a Config, &'a State)>,
-    Converter: CommandConverter<Command> + From<(&'a Config, &'a State)>,
-    Generator::Trajectories: Default,
-{
-    fn from((config, state): (&'a Config, &'a State)) -> Self {
-        let generator = Generator::from((config, state));
-        let converter = Converter::from((config, state));
-        Self::new(generator, converter)
-    }
-}
-
 impl<Command, Generator, Converter> TrackingInitializer<Command>
     for TrajectoryManager<Command, Generator, Converter>
 where

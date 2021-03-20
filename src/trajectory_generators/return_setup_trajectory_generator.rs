@@ -34,30 +34,6 @@ impl<M> ReturnSetupTrajectoryGenerator<M> {
     }
 }
 
-/// A config for [ReturnSetupTrajectoryGenerator](ReturnSetupTrajectoryGenerator).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ReturnSetupTrajectoryGeneratorConfig {
-    pub max_angular_velocity: AngularVelocity,
-    pub max_angular_acceleration: AngularAcceleration,
-    pub max_angular_jerk: AngularJerk,
-    pub period: Time,
-}
-
-impl<'a, Config, State, M> From<(&'a Config, &'a State)> for ReturnSetupTrajectoryGenerator<M>
-where
-    &'a Config: Into<ReturnSetupTrajectoryGeneratorConfig>,
-{
-    fn from((config, _): (&'a Config, &'a State)) -> Self {
-        let config = config.into();
-        Self::new(
-            config.max_angular_velocity,
-            config.max_angular_acceleration,
-            config.max_angular_jerk,
-            config.period,
-        )
-    }
-}
-
 impl<M: Math> InitialTrajectoryGenerator<RotationKind> for ReturnSetupTrajectoryGenerator<M> {
     type Target = Target;
     type Trajectory = SpinTrajectory;
