@@ -245,7 +245,7 @@ fn test_run_operator() {
         RunCommander::new(start, &goals, maze)
     };
 
-    let operator = TrackingOperator::new(agent, commander);
+    let operator = TrackingOperator::new(commander, agent);
     while operator.run().is_err() {
         stepper.step();
         assert!(!operator.tick().is_err());

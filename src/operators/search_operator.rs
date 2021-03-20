@@ -52,6 +52,11 @@ where
             .unwrap_or_else(|_| unreachable!());
         Self { commander, agent }
     }
+
+    pub fn release(self) -> (Commander, Agent) {
+        let Self { commander, agent } = self;
+        (commander, agent)
+    }
 }
 
 #[derive(Debug)]
