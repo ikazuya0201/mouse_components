@@ -37,6 +37,13 @@ impl<D, M> ObstacleDetector<D, M> {
             _math: PhantomData,
         }
     }
+
+    pub fn release(self) -> Vec<D, SensorSizeUpperBound> {
+        let Self {
+            distance_sensors, ..
+        } = self;
+        distance_sensors
+    }
 }
 
 impl<D, M> IObstacleDetector<RobotState> for ObstacleDetector<D, M>
