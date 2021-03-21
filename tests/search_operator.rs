@@ -3,11 +3,11 @@ use core::f32::consts::PI;
 use components::{
     agents::SearchAgent,
     command_converter::CommandConverter,
+    commanders::SearchCommander,
     controllers::{RotationControllerBuilder, TranslationControllerBuilder},
-    defaults::types::SearchCommander,
     estimator::EstimatorBuilder,
     mazes::Maze,
-    nodes::{RunNode, SearchNode},
+    nodes::{Node, RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::SearchOperator,
     pose_converter::PoseConverter,
@@ -231,10 +231,11 @@ macro_rules! impl_search_operator_test {
                 let create_commander = |wall_storage| {
                     let maze: Maze<_, _, _, SearchNode<Size>> = Maze::new(wall_storage, cost);
                     let start = RunNode::<Size>::new(0, 0, North).unwrap();
+                    let current: Node<Size> = start.clone().into();
                     SearchCommander::new(
-                        start.clone(),
+                        start,
                         &goals,
-                        start.into(),
+                        current,
                         SearchKind::Init,
                         SearchKind::Final,
                         maze,

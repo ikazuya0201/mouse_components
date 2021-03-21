@@ -24,19 +24,10 @@ impl<Manager, Robot> TrackingAgent<Manager, Robot> {
             robot: Mutex::new(robot),
         }
     }
-}
 
-impl<'a, Resource, Config, State, Manager, Robot> From<(Resource, &'a Config, &'a State)>
-    for TrackingAgent<Manager, Robot>
-where
-    Manager: From<(&'a Config, &'a State)>,
-    Robot: From<(Resource, &'a Config, &'a State)>,
-{
-    fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
-        Self::new(
-            Manager::from((config, state)),
-            Robot::from((resource, config, state)),
-        )
+    pub fn release(self) -> (Manager, Robot) {
+        let Self { manager, robot } = self;
+        (manager, robot.into_inner())
     }
 }
 

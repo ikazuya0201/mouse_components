@@ -1,10 +1,19 @@
+mod return_operator;
+mod return_setup_operator;
+mod run_operator;
+mod search_operator;
+
 use crate::{
     agents, command_converter, commanders, controllers, estimator, mazes, nodes, obstacle_detector,
-    operators, pose_converter, robot, tracker, traits, trajectory_generators, trajectory_managers,
-    types, wall_detector, wall_manager,
+    pose_converter, robot, tracker, trajectory_generators, trajectory_managers, types,
+    wall_detector, wall_manager,
 };
+pub use return_operator::ReturnOperator;
+pub use return_setup_operator::ReturnSetupOperator;
+pub use run_operator::RunOperator;
+pub use search_operator::SearchOperator;
 
-pub type RunAgent<
+type RunAgent<
     'a,
     LeftEncoder,
     RightEncoder,
@@ -41,7 +50,7 @@ pub type RunAgent<
     >,
 >;
 
-pub type ReturnSetupAgent<
+type ReturnSetupAgent<
     'a,
     LeftEncoder,
     RightEncoder,
@@ -77,7 +86,7 @@ pub type ReturnSetupAgent<
     >,
 >;
 
-pub type SearchAgent<
+type SearchAgent<
         'a,
         LeftEncoder,
         RightEncoder,
@@ -117,7 +126,7 @@ pub type SearchAgent<
         >,
     >;
 
-pub type SearchCommander<'a, Size> = commanders::SearchCommander<
+type SearchCommander<'a, Size> = commanders::SearchCommander<
     nodes::Node<Size>,
     nodes::RunNode<Size>,
     nodes::SearchNode<Size>,
@@ -131,32 +140,7 @@ pub type SearchCommander<'a, Size> = commanders::SearchCommander<
     >,
 >;
 
-pub type SearchOperator<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Math,
-    Size,
-> = operators::SearchOperator<
-    SearchCommander<'a, Size>,
-    SearchAgent<
-        'a,
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensor,
-        Size,
-        Math,
-    >,
->;
-
-pub type RunCommander<'a, Size> = commanders::RunCommander<
+type RunCommander<'a, Size> = commanders::RunCommander<
     nodes::RunNode<Size>,
     mazes::CheckedMaze<
         'a,
@@ -167,7 +151,7 @@ pub type RunCommander<'a, Size> = commanders::RunCommander<
     >,
 >;
 
-pub type ReturnCommander<'a, Size> = commanders::ReturnCommander<
+type ReturnSetupCommander<'a, Size> = commanders::ReturnSetupCommander<
     nodes::RunNode<Size>,
     mazes::CheckedMaze<
         'a,
@@ -175,93 +159,5 @@ pub type ReturnCommander<'a, Size> = commanders::ReturnCommander<
         types::data::Pattern,
         u16,
         nodes::SearchNode<Size>,
-    >,
->;
-
-pub type ReturnSetupCommander<'a, Size> = commanders::ReturnSetupCommander<
-    nodes::RunNode<Size>,
-    mazes::CheckedMaze<
-        'a,
-        wall_manager::WallManager<Size>,
-        types::data::Pattern,
-        u16,
-        nodes::SearchNode<Size>,
-    >,
->;
-
-pub type RunOperator<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Math,
-    Size,
-> = operators::TrackingOperator<
-    RunCommander<'a, Size>,
-    RunAgent<
-        'a,
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensor,
-        Size,
-        Math,
-        <nodes::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
-    >,
->;
-
-pub type ReturnOperator<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Math,
-    Size,
-> = operators::TrackingOperator<
-    ReturnCommander<'a, Size>,
-    RunAgent<
-        'a,
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensor,
-        Size,
-        Math,
-        <nodes::RunNode<Size> as traits::BoundedPathNode>::PathUpperBound,
-    >,
->;
-
-pub type ReturnSetupOperator<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Math,
-    Size,
-> = operators::TrackingOperator<
-    ReturnSetupCommander<'a, Size>,
-    ReturnSetupAgent<
-        'a,
-        LeftEncoder,
-        RightEncoder,
-        Imu,
-        LeftMotor,
-        RightMotor,
-        DistanceSensor,
-        Size,
-        Math,
     >,
 >;

@@ -16,11 +16,11 @@ pub mod obstacle_detector;
 pub mod operators;
 pub mod pose_converter;
 pub mod prelude;
-pub mod resource;
 pub mod robot;
 pub mod tracker;
 pub mod trajectory_generators;
 pub mod trajectory_managers;
+#[macro_use]
 pub mod utils;
 pub mod wall_detector;
 pub mod wall_manager;

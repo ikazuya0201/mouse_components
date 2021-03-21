@@ -4,55 +4,23 @@ use uom::si::f32::{
     Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time, Velocity,
 };
 
-use crate::command_converter::CommandConverterConfig;
-use crate::commanders::{
-    ReturnCommanderConfig, ReturnSetupCommanderConfig, RunCommanderConfig, SearchCommanderConfig,
-};
-use crate::controllers::{RotationControllerConfig, TranslationControllerConfig};
-use crate::estimator::EstimatorConfig;
-use crate::mazes::MazeConfig;
-use crate::pose_converter::PoseConverterConfig;
-use crate::tracker::TrackerConfig;
-use crate::trajectory_generators::{
-    ReturnSetupTrajectoryGeneratorConfig, RunTrajectoryGeneratorConfig,
-    SearchTrajectoryGeneratorConfig,
-};
+use crate::impl_with_getter;
+use crate::nodes::RunNode;
 use crate::trajectory_generators::{SlalomDirection, SlalomKind, SlalomParameters};
+use crate::types::data::{Pattern, SearchKind};
 use crate::utils::builder::{ok_or, BuilderResult};
-
-macro_rules! impl_with_getter {
-    (
-        $(#[$meta:meta])*
-        pub struct $name: ident <$lt: lifetime, $($param: ident),*> {
-            $($field_name: ident: $type: ty,)*
-        }
-    ) => {
-        $(#[$meta])*
-        pub struct $name<$lt, $($param),*> {
-            $($field_name: $type),*
-        }
-
-        impl<$lt, $($param),*> $name<$lt, $($param),*> {
-            $(
-                pub fn $field_name(&self) -> &$type {
-                    &self.$field_name
-                }
-            )*
-        }
-    };
-}
 
 impl_with_getter! {
     /// An implementation of config.
     #[derive(Debug, Clone, Copy, PartialEq)]
-    pub struct Config<'a, Node, Route, Pattern, Cost> {
+    pub struct Config<'a, Size> {
         square_width: Length,
         front_offset: Length,
-        start: Node,
-        return_goal: Node,
-        goals: &'a [Node],
-        search_initial_route: Route,
-        search_final_route: Route,
+        start: RunNode<Size>,
+        return_goal: RunNode<Size>,
+        goals: &'a [RunNode<Size>],
+        search_initial_route: SearchKind,
+        search_final_route: SearchKind,
         translational_kp: f32,
         translational_ki: f32,
         translational_kd: f32,
@@ -67,7 +35,7 @@ impl_with_getter! {
         estimator_correction_weight: f32,
         wheel_interval: Option<Length>,
         estimator_translational_velocity_alpha: f32,
-        cost_fn: fn(Pattern) -> Cost,
+        cost_fn: fn(Pattern) -> u16,
         wall_width: Length,
         ignore_radius_from_pillar: Length,
         ignore_length_from_wall: Length,
@@ -91,183 +59,6 @@ impl_with_getter! {
         spin_angular_velocity: AngularVelocity,
         spin_angular_acceleration: AngularAcceleration,
         spin_angular_jerk: AngularJerk,
-    }
-}
-
-macro_rules! impl_into {
-    ($into: ident { $($into_field: ident: $from_field: ident,)* }) => {
-        impl<'a, Node, Route, Pattern, Cost> Into<$into>
-            for &'a Config<'a, Node, Route, Pattern, Cost>
-        {
-            fn into(self) -> $into {
-                $into {
-                    $($into_field: self.$from_field.clone(),)+
-                }
-            }
-        }
-    };
-
-    ($into: ident < $($param: ident),* > { $($into_field: ident: $from_field: ident,)* }) => {
-        impl<'a, Node, Route, Pattern, Cost> Into<$into<$($param),*>>
-            for &'a Config<'a, Node, Route, Pattern, Cost>
-        where $($param: Clone),*
-        {
-            fn into(self) -> $into<$($param),*> {
-                $into {
-                    $($into_field: self.$from_field.clone(),)+
-                }
-            }
-        }
-    };
-
-    ($into: ident < $lt: lifetime, $($param: ident),* > { $($into_field: ident: $from_field: ident,)* }) => {
-        impl<'a, Node, Route, Pattern, Cost> Into<$into<$lt, $($param),*>>
-            for &'a Config<'a, Node, Route, Pattern, Cost>
-        where $($param: Clone),*
-        {
-            fn into(self) -> $into<$lt, $($param),*> {
-                $into {
-                    $($into_field: self.$from_field.clone(),)+
-                }
-            }
-        }
-    };
-}
-
-impl_into! {
-    CommandConverterConfig {
-        square_width: square_width,
-        front_offset: front_offset,
-    }
-}
-
-impl_into! {
-    ReturnSetupCommanderConfig<Node> {
-        start: return_goal,
-    }
-}
-
-impl_into! {
-    RunCommanderConfig<'a, Node> {
-        start: start,
-        goals: goals,
-    }
-}
-
-impl_into! {
-    ReturnCommanderConfig<Node> {
-        start: return_goal,
-    }
-}
-
-impl_into! {
-    SearchCommanderConfig<'a, Node, Route> {
-        start: start,
-        goals: goals,
-        initial_route: search_initial_route,
-        final_route: search_final_route,
-    }
-}
-
-impl_into! {
-    RotationControllerConfig {
-        kp: rotational_kp,
-        ki: rotational_ki,
-        kd: rotational_kd,
-        period: period,
-        model_gain: rotational_model_gain,
-        model_time_constant: rotational_model_time_constant,
-    }
-}
-
-impl_into! {
-    TranslationControllerConfig {
-        kp: translational_kp,
-        ki: translational_ki,
-        kd: translational_kd,
-        period: period,
-        model_gain: translational_model_gain,
-        model_time_constant: translational_model_time_constant,
-    }
-}
-
-impl_into! {
-    EstimatorConfig {
-        period: period,
-        weight: estimator_correction_weight,
-        wheel_interval: wheel_interval,
-        alpha: estimator_translational_velocity_alpha,
-    }
-}
-
-impl_into! {
-    MazeConfig<Pattern, Cost> {
-        cost_fn: cost_fn,
-    }
-}
-
-impl_into! {
-    PoseConverterConfig {
-        square_width: square_width,
-        wall_width: wall_width,
-        ignore_radius_from_pillar: ignore_radius_from_pillar,
-        ignore_length_from_wall: ignore_length_from_wall,
-    }
-}
-
-impl_into! {
-    TrackerConfig {
-        kx: kx,
-        kdx: kdx,
-        ky: ky,
-        kdy: kdy,
-        fail_safe_distance: fail_safe_distance,
-        valid_control_lower_bound: valid_control_lower_bound,
-        low_b: low_b,
-        low_zeta: low_zeta,
-        period: period,
-    }
-}
-
-impl_into! {
-    ReturnSetupTrajectoryGeneratorConfig {
-        max_angular_velocity: spin_angular_velocity,
-        max_angular_acceleration: spin_angular_acceleration,
-        max_angular_jerk: spin_angular_jerk,
-        period: period,
-    }
-}
-
-impl_into! {
-    SearchTrajectoryGeneratorConfig {
-        angular_velocity_ref: slalom_angular_velocity_ref,
-        angular_acceleration_ref: slalom_angular_acceleration_ref,
-        angular_jerk_ref: slalom_angular_jerk_ref,
-        slalom_parameters_map: slalom_parameters_map,
-        max_velocity: max_velocity,
-        max_acceleration: max_acceleration,
-        max_jerk: max_jerk,
-        period: period,
-        search_velocity: search_velocity,
-        front_offset: front_offset,
-        square_width: square_width,
-        spin_angular_velocity: spin_angular_velocity,
-        spin_angular_acceleration: spin_angular_acceleration,
-        spin_angular_jerk: spin_angular_jerk,
-    }
-}
-
-impl_into! {
-    RunTrajectoryGeneratorConfig {
-        run_slalom_velocity: run_slalom_velocity,
-        max_velocity: max_velocity,
-        max_acceleration: max_acceleration,
-        max_jerk: max_jerk,
-        angular_velocity_ref: slalom_angular_velocity_ref,
-        angular_acceleration_ref: slalom_angular_acceleration_ref,
-        angular_jerk_ref: slalom_angular_jerk_ref,
-        slalom_parameters_map: slalom_parameters_map,
-        period: period,
     }
 }
 
@@ -347,14 +138,14 @@ impl_into! {
 ///     .unwrap();
 /// ```
 
-pub struct ConfigBuilder<'a, Node, Route, Pattern, Cost> {
+pub struct ConfigBuilder<'a, Size> {
     square_width: Option<Length>,
     front_offset: Option<Length>,
-    start: Option<Node>,
-    return_goal: Option<Node>,
-    goals: Option<&'a [Node]>,
-    search_initial_route: Option<Route>,
-    search_final_route: Option<Route>,
+    start: Option<RunNode<Size>>,
+    return_goal: Option<RunNode<Size>>,
+    goals: Option<&'a [RunNode<Size>]>,
+    search_initial_route: Option<SearchKind>,
+    search_final_route: Option<SearchKind>,
     translational_kp: Option<f32>,
     translational_ki: Option<f32>,
     translational_kd: Option<f32>,
@@ -369,7 +160,7 @@ pub struct ConfigBuilder<'a, Node, Route, Pattern, Cost> {
     estimator_correction_weight: Option<f32>,
     wheel_interval: Option<Length>,
     estimator_translational_velocity_alpha: Option<f32>,
-    cost_fn: Option<fn(Pattern) -> Cost>,
+    cost_fn: Option<fn(Pattern) -> u16>,
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
     ignore_length_from_wall: Option<Length>,
@@ -418,7 +209,7 @@ macro_rules! impl_setter {
     };
 }
 
-impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cost> {
+impl<'a, Size> ConfigBuilder<'a, Size> {
     impl_setter!(
         /// **Optional**,
         /// Default: 90 \[mm\] (half size).
@@ -436,27 +227,27 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
     impl_setter!(
         /// **Required**,
         /// Sets the start node for search.
-        start: Node
+        start: RunNode<Size>
     );
     impl_setter!(
         /// **Required**,
         /// Sets a goal for return to start.
-        return_goal: Node
+        return_goal: RunNode<Size>
     );
     impl_setter!(
         /// **Required**,
         /// Sets the goal nodes for search.
-        goals: &'a [Node]
+        goals: &'a [RunNode<Size>]
     );
     impl_setter!(
         /// **Required**,
         /// Sets a route for initial trajectory.
-        search_initial_route: Route
+        search_initial_route: SearchKind
     );
     impl_setter!(
         /// **Required**,
         /// Sets a route for final trajectory.
-        search_final_route: Route
+        search_final_route: SearchKind
     );
     impl_setter!(
         /// **Required**,
@@ -553,7 +344,7 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
     impl_setter!(
         /// **Required**,
         /// Sets the cost function for search.
-        cost_fn: fn(Pattern) -> Cost
+        cost_fn: fn(Pattern) -> u16
     );
     impl_setter!(
         /// **Optional**,
@@ -753,7 +544,7 @@ impl<'a, Node, Route, Pattern, Cost> ConfigBuilder<'a, Node, Route, Pattern, Cos
     /// Builds [Config](Config).
     ///
     /// This method can be failed when required parameters are not given.
-    pub fn build(&mut self) -> BuilderResult<Config<'a, Node, Route, Pattern, Cost>> {
+    pub fn build(&mut self) -> BuilderResult<Config<'a, Size>> {
         macro_rules! get {
             ($field_name: ident) => {{
                 ok_or(self.$field_name.take(), core::stringify!($field_name))?

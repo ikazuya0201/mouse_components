@@ -10,15 +10,12 @@ mod trajectory;
 
 pub use return_setup_trajectory_generator::{
     ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryGeneratorBuilder,
-    ReturnSetupTrajectoryGeneratorConfig,
 };
 pub use run_trajectory_generator::{
     RunKind, RunTrajectory, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
-    RunTrajectoryGeneratorConfig,
 };
 pub use search_trajectory_generator::{
     SearchKind, SearchTrajectory, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
-    SearchTrajectoryGeneratorConfig,
 };
 pub use slalom_generator::{
     slalom_parameters_map, slalom_parameters_map2, SlalomDirection, SlalomKind, SlalomParameters,

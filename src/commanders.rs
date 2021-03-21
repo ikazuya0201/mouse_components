@@ -13,21 +13,9 @@ use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
 use crate::utils::{forced_vec::ForcedVec, itertools::repeat_n};
-pub use return_setup_commander::{
-    ReturnSetupCommander, ReturnSetupCommanderConfig, ReturnSetupCommanderError, RotationNode,
-};
-pub use run_commander::{
-    ReturnCommander, ReturnCommanderConfig, RunCommander, RunCommanderConfig, RunCommanderError,
-};
-pub use search_commander::{
-    GraphConverter, NextNode, NodeChecker, SearchCommander, SearchCommanderConfig,
-};
-
-/// A state for initializing commanders in [commanders](crate::commanders).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct CommanderState<Node> {
-    pub current_node: Node,
-}
+pub use return_setup_commander::{ReturnSetupCommander, ReturnSetupCommanderError, RotationNode};
+pub use run_commander::{RunCommander, RunCommanderError};
+pub use search_commander::{GraphConverter, NextNode, NodeChecker, SearchCommander};
 
 /// A trait that behaves like a directed graph which has weighted edges.
 pub trait Graph<Node> {

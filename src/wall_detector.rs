@@ -64,21 +64,10 @@ impl<'a, Manager, Detector, Converter, Math> WallDetector<'a, Manager, Detector,
             _math: PhantomData,
         }
     }
-}
 
-impl<'a, Manager, Detector, Converter, Math, Resource, Config, State>
-    From<((&'a Manager, Resource), &'a Config, &'a State)>
-    for WallDetector<'a, Manager, Detector, Converter, Math>
-where
-    Converter: From<(&'a Config, &'a State)>,
-    Detector: From<(Resource, &'a Config, &'a State)>,
-{
-    fn from(
-        ((manager, resource), config, state): ((&'a Manager, Resource), &'a Config, &'a State),
-    ) -> Self {
-        let converter = Converter::from((config, state));
-        let detector = Detector::from((resource, config, state));
-        Self::new(manager, detector, converter)
+    pub fn release(self) -> Detector {
+        let Self { detector, .. } = self;
+        detector
     }
 }
 

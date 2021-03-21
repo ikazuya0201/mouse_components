@@ -1,4 +1,3 @@
-use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::administrator::{Operator, OperatorError};
@@ -12,27 +11,7 @@ use crate::administrator::{Operator, OperatorError};
 pub struct TrackingOperator<Commander, Agent> {
     is_completed: AtomicBool,
     agent: Agent,
-    _commander: PhantomData<fn() -> Commander>,
-}
-
-impl<'a, CResource, AResource, State, Config, Commander, Agent>
-    From<((CResource, AResource), &'a State, &'a Config)> for TrackingOperator<Commander, Agent>
-where
-    Commander: From<(CResource, &'a State, &'a Config)>,
-    Agent: From<(AResource, &'a State, &'a Config)>,
-    Agent: TrackingInitializer<Commander::Command>,
-    Commander: InitialCommander,
-    Agent::Error: core::fmt::Debug,
-    Commander::Error: core::fmt::Debug,
-{
-    fn from(
-        ((commander, agent), state, config): ((CResource, AResource), &'a State, &'a Config),
-    ) -> Self {
-        Self::new(
-            Agent::from((agent, state, config)),
-            Commander::from((commander, state, config)),
-        )
-    }
+    commander: Commander,
 }
 
 /// A trait that generates initial commands.
@@ -69,7 +48,7 @@ pub trait TrackingAgent {
 }
 
 impl<Commander, Agent> TrackingOperator<Commander, Agent> {
-    pub fn new(agent: Agent, commander: Commander) -> Self
+    pub fn new(commander: Commander, agent: Agent) -> Self
     where
         Agent: TrackingInitializer<Commander::Command>,
         Commander: InitialCommander,
@@ -85,8 +64,15 @@ impl<Commander, Agent> TrackingOperator<Commander, Agent> {
         Self {
             agent,
             is_completed: AtomicBool::new(false),
-            _commander: PhantomData,
+            commander,
         }
+    }
+
+    pub fn release(self) -> (Commander, Agent) {
+        let Self {
+            commander, agent, ..
+        } = self;
+        (commander, agent)
     }
 }
 
@@ -170,11 +156,11 @@ mod tests {
         }
 
         let operator = TrackingOperator::new(
+            Commander,
             Agent {
                 command: RefCell::new(None),
                 state: RefCell::new(0),
             },
-            Commander,
         );
 
         assert_eq!(operator.agent.command, RefCell::new(Some(1)));

@@ -2,16 +2,17 @@ use core::cmp::Reverse;
 
 use heapless::ArrayLength;
 use num::{Bounded, Saturating};
+use spin::Mutex;
 use typenum::Unsigned;
 
-use super::{compute_shortest_path, BoundedNode, BoundedPathNode, CommanderState, Graph};
+use super::{compute_shortest_path, BoundedNode, BoundedPathNode, Graph};
 use crate::operators::InitialCommander;
 
 /// An implementation of [InitialCommander](crate::operators::InitialCommander).
 ///
 /// This produces a setup command for returning to start position.
 pub struct ReturnSetupCommander<Node, Maze> {
-    current: Node,
+    current: Mutex<Node>,
     start: Node,
     maze: Maze,
 }
@@ -19,31 +20,15 @@ pub struct ReturnSetupCommander<Node, Maze> {
 impl<Node, Maze> ReturnSetupCommander<Node, Maze> {
     pub fn new(current: Node, start: Node, maze: Maze) -> Self {
         Self {
-            current,
+            current: Mutex::new(current),
             start,
             maze,
         }
     }
-}
 
-/// A config for initializing [ReturnSetupCommander](ReturnSetupCommander).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ReturnSetupCommanderConfig<Node> {
-    pub start: Node,
-}
-
-impl<'a, Resource, Config, State, Node, Maze> From<(Resource, &'a Config, &'a State)>
-    for ReturnSetupCommander<Node, Maze>
-where
-    Maze: From<(Resource, &'a Config, &'a State)>,
-    &'a Config: Into<ReturnSetupCommanderConfig<Node>>,
-    &'a State: Into<CommanderState<Node>>,
-{
-    fn from((resource, config, state): (Resource, &'a Config, &'a State)) -> Self {
-        let maze = Maze::from((resource, config, state));
-        let config = config.into();
-        let state = state.into();
-        Self::new(state.current_node, config.start, maze)
+    pub fn release(self) -> (Node, Maze) {
+        let Self { current, maze, .. } = self;
+        (current.into_inner(), maze)
     }
 }
 
@@ -77,8 +62,10 @@ where
     type Commands = Option<Self::Command>;
 
     fn initial_commands(&self) -> Result<Self::Commands, Self::Error> {
-        for (node, kind) in self.current.rotation_nodes() {
+        let mut current = self.current.lock();
+        for (node, kind) in current.rotation_nodes() {
             if let Some(_) = compute_shortest_path(&node, &[self.start.clone()], &self.maze) {
+                *current = node;
                 return Ok(Some(kind));
             }
         }

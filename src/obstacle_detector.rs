@@ -21,7 +21,7 @@ pub struct Obstacle {
     pub distance: Sample<Length>,
 }
 
-type SensorSizeUpperBound = typenum::consts::U6;
+pub type SensorSizeUpperBound = typenum::consts::U6;
 
 //NOTE: the number of sensors is upper-bounded.
 pub struct ObstacleDetector<D, M> {
@@ -37,15 +37,12 @@ impl<D, M> ObstacleDetector<D, M> {
             _math: PhantomData,
         }
     }
-}
 
-impl<'a, D, M, Resource, Config, State> From<(Resource, &'a Config, &'a State)>
-    for ObstacleDetector<D, M>
-where
-    Resource: IntoIterator<Item = D>,
-{
-    fn from((resource, _, _): (Resource, &'a Config, &'a State)) -> Self {
-        Self::new(resource)
+    pub fn release(self) -> Vec<D, SensorSizeUpperBound> {
+        let Self {
+            distance_sensors, ..
+        } = self;
+        distance_sensors
     }
 }
 

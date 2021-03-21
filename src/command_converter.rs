@@ -24,23 +24,6 @@ impl CommandConverter {
     }
 }
 
-/// A config for [CommandConverter](CommandConverter).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct CommandConverterConfig {
-    pub square_width: Length,
-    pub front_offset: Length,
-}
-
-impl<'a, Config, State> From<(&'a Config, &'a State)> for CommandConverter
-where
-    &'a Config: Into<CommandConverterConfig>,
-{
-    fn from((config, _): (&'a Config, &'a State)) -> Self {
-        let config = config.into();
-        Self::new(config.square_width, config.front_offset)
-    }
-}
-
 impl CommandConverter {
     const DEFAULT_SQUARE_WIDTH: Length = Length {
         dimension: PhantomData,
@@ -119,12 +102,6 @@ where
 }
 
 pub struct ThroughCommandConverter;
-
-impl<'a, Config, State> From<(&'a Config, &'a State)> for ThroughCommandConverter {
-    fn from((_, _): (&'a Config, &'a State)) -> Self {
-        Self
-    }
-}
 
 impl<K: Clone> ICommandConverter<K> for ThroughCommandConverter {
     type Output = K;
