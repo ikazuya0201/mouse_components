@@ -7,6 +7,7 @@ use typenum::{consts::*, PowerOfTwo, Unsigned};
 use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
 
+use crate::impl_setter;
 use crate::types::data::Pose;
 use crate::utils::{math::Math, total::Total};
 use crate::wall_detector::{PoseConverter as IPoseConverter, WallInfo};
@@ -28,22 +29,22 @@ pub struct PoseConverter<N, M> {
     _math: PhantomData<fn() -> M>,
 }
 
-pub const DEFAULT_SQUARE_WIDTH: Length = Length {
+pub(crate) const DEFAULT_SQUARE_WIDTH: Length = Length {
     dimension: PhantomData,
     units: PhantomData,
     value: 0.09,
 };
-pub const DEFAULT_WALL_WIDTH: Length = Length {
+pub(crate) const DEFAULT_WALL_WIDTH: Length = Length {
     dimension: PhantomData,
     units: PhantomData,
     value: 0.006,
 };
-pub const DEFAULT_IGNORE_RADIUS: Length = Length {
+pub(crate) const DEFAULT_IGNORE_RADIUS: Length = Length {
     dimension: PhantomData,
     units: PhantomData,
     value: 0.01,
 };
-pub const DEFAULT_IGNORE_LENGTH: Length = Length {
+pub(crate) const DEFAULT_IGNORE_LENGTH: Length = Length {
     value: 0.008,
     dimension: PhantomData,
     units: PhantomData,
@@ -61,7 +62,7 @@ impl<N, M> Default for PoseConverter<N, M> {
 }
 
 impl<N, M> PoseConverter<N, M> {
-    pub fn new(
+    fn new(
         square_width: Length,
         wall_width: Length,
         ignore_radius_from_pillar: Length,
@@ -303,6 +304,69 @@ where
             existing_distance,
             not_existing_distance,
         })
+    }
+}
+
+pub struct PoseConverterBuilder {
+    square_width: Option<Length>,
+    wall_width: Option<Length>,
+    ignore_radius_from_pillar: Option<Length>,
+    ignore_length_from_wall: Option<Length>,
+}
+
+impl PoseConverterBuilder {
+    pub fn new() -> Self {
+        Self {
+            square_width: None,
+            wall_width: None,
+            ignore_radius_from_pillar: None,
+            ignore_length_from_wall: None,
+        }
+    }
+
+    impl_setter! {
+        /// **Optional**,
+        /// Sets the width of a square of a maze.
+        ///
+        /// Default: 90 [mm]
+        square_width: Length
+    }
+
+    impl_setter! {
+        /// **Optional**,
+        /// Sets the width of a wall of a maze.
+        ///
+        /// Default: 6 [mm]
+        wall_width: Length
+    }
+
+    impl_setter! {
+        /// **Optional**,
+        /// Sets a radius. If the position of a distance sensor is near than this radius, the
+        /// result of the sensor will be ignored.
+        ///
+        /// Default: 10 [mm]
+        ignore_radius_from_pillar: Length
+    }
+
+    impl_setter! {
+        /// **Optional**,
+        /// Sets a length. If the position of a distance sensor is near than this length, the
+        /// result of the sensor will be ignored.
+        ///
+        /// Default: 8 [mm]
+        ignore_length_from_wall: Length
+    }
+
+    pub fn build<N, M>(&mut self) -> PoseConverter<N, M> {
+        PoseConverter::<N, M>::new(
+            self.square_width.unwrap_or(DEFAULT_SQUARE_WIDTH),
+            self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
+            self.ignore_radius_from_pillar
+                .unwrap_or(DEFAULT_IGNORE_RADIUS),
+            self.ignore_length_from_wall
+                .unwrap_or(DEFAULT_IGNORE_LENGTH),
+        )
     }
 }
 
