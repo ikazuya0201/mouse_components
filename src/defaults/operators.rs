@@ -5,8 +5,7 @@ mod search_operator;
 
 use crate::{
     agents, command_converter, commanders, controllers, estimator, mazes, nodes, obstacle_detector,
-    pose_converter, robot, tracker, trajectory_generators, trajectory_managers, types,
-    wall_detector, wall_manager,
+    robot, tracker, trajectory_generators, trajectory_managers, types, wall_detector, wall_manager,
 };
 pub use return_operator::ReturnOperator;
 pub use return_setup_operator::ReturnSetupOperator;
@@ -43,8 +42,8 @@ type RunAgent<
             'a,
             wall_manager::WallManager<Size>,
             obstacle_detector::ObstacleDetector<DistanceSensor, Math>,
-            pose_converter::PoseConverter<Size, Math>,
             Math,
+            Size,
         >,
         types::data::RobotState,
     >,
@@ -79,8 +78,8 @@ type ReturnSetupAgent<
             'a,
             wall_manager::WallManager<Size>,
             obstacle_detector::ObstacleDetector<DistanceSensor, Math>,
-            pose_converter::PoseConverter<Size, Math>,
             Math,
+            Size,
         >,
         types::data::RobotState,
     >,
@@ -119,8 +118,8 @@ type SearchAgent<
                 'a,
                 wall_manager::WallManager<Size>,
                 obstacle_detector::ObstacleDetector<DistanceSensor, Math>,
-                pose_converter::PoseConverter<Size, Math>,
                 Math,
+                Size,
             >,
             types::data::RobotState,
         >,
