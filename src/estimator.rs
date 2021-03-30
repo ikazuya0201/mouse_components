@@ -28,75 +28,56 @@ pub trait Encoder {
     fn get_relative_distance(&mut self) -> nb::Result<Length, Self::Error>;
 }
 
-/// An implementation of [StateEstimator](crate::robot::StateEstimator).
-///
-/// This should be created by [EstimatorBuilder](EstimatorBuilder).
-pub struct Estimator<LE, RE, I, M> {
+pub struct EstimatorInner<M> {
     period: Time,
     alpha: f32,
     trans_velocity: Velocity,
     angular_velocity: AngularVelocity,
     bias: AngularVelocity,
     wheel_interval: Option<Length>,
-    left_encoder: LE,
-    right_encoder: RE,
-    imu: I,
     state: RobotState,
     weight: f32,
     _phantom: PhantomData<fn() -> M>,
 }
 
-impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        writeln!(
-            f,
-            "Estimator {{ state:{:?}, trans_velocity:{:?}, angular_velocity:{:?}, bias:{:?} }}",
-            self.state, self.trans_velocity, self.angular_velocity, self.bias,
-        )
+impl<M> EstimatorInner<M> {
+    pub fn new(
+        period: Time,
+        alpha: f32,
+        wheel_interval: Option<Length>,
+        correction_weight: f32,
+        initial_state: RobotState,
+    ) -> Self {
+        Self {
+            period,
+            alpha,
+            wheel_interval,
+            weight: correction_weight,
+            trans_velocity: Default::default(),
+            angular_velocity: Default::default(),
+            bias: Default::default(),
+            state: initial_state,
+            _phantom: PhantomData,
+        }
     }
 }
 
-impl<LE, RE, I, M> Estimator<LE, RE, I, M> {
-    pub fn release(self) -> (LE, RE, I, RobotState) {
-        let Self {
-            left_encoder,
-            right_encoder,
-            imu,
-            state,
-            ..
-        } = self;
-        (left_encoder, right_encoder, imu, state)
-    }
-}
-
-impl<LE, RE, I, M> StateEstimator<CorrectInfo> for Estimator<LE, RE, I, M>
+impl<M> EstimatorInner<M>
 where
-    LE: Encoder,
-    RE: Encoder,
-    I: IMU,
-    <LE as Encoder>::Error: core::fmt::Debug,
-    <RE as Encoder>::Error: core::fmt::Debug,
-    <I as IMU>::Error: core::fmt::Debug,
     M: Math,
 {
-    type State = RobotState;
-
-    fn state(&self) -> &RobotState {
-        &self.state
-    }
-
-    fn estimate(&mut self) {
+    pub fn estimate(
+        &mut self,
+        left_distance: Length,
+        right_distance: Length,
+        translational_acceleration: Acceleration,
+        angular_velocity: AngularVelocity,
+    ) {
         //velocity estimation
-        let left_distance = block!(self.left_encoder.get_relative_distance()).unwrap();
-        let right_distance = block!(self.right_encoder.get_relative_distance()).unwrap();
-
         let average_left_velocity = left_distance / self.period;
         let average_right_velocity = right_distance / self.period;
 
         let average_trans_velocity = (average_left_velocity + average_right_velocity) / 2.0;
-
-        let trans_acceleration = block!(self.imu.get_translational_acceleration()).unwrap();
-        let imu_angular_velocity = block!(self.imu.get_angular_velocity()).unwrap();
 
         let angular_velocity = if let Some(wheel_interval) = self.wheel_interval {
             let average_angular_velocity = AngularVelocity::from(
@@ -104,15 +85,16 @@ where
             );
 
             self.bias = self.alpha * self.bias
-                + (1.0 - self.alpha) * (imu_angular_velocity - average_angular_velocity);
+                + (1.0 - self.alpha) * (angular_velocity - average_angular_velocity);
 
-            imu_angular_velocity - self.bias
+            angular_velocity - self.bias
         } else {
-            imu_angular_velocity
+            angular_velocity
         };
 
         //complementary filter
-        let trans_velocity = self.alpha * (self.trans_velocity + trans_acceleration * self.period)
+        let trans_velocity = self.alpha
+            * (self.trans_velocity + translational_acceleration * self.period)
             + (1.0 - self.alpha) * average_trans_velocity;
         //------
 
@@ -130,8 +112,8 @@ where
         let (sin_th, cos_th) = M::sincos(self.state.theta.x);
         self.state.x.v = trans_velocity * cos_th;
         self.state.y.v = trans_velocity * sin_th;
-        self.state.x.a = trans_acceleration * cos_th;
-        self.state.y.a = trans_acceleration * sin_th;
+        self.state.x.a = translational_acceleration * cos_th;
+        self.state.y.a = translational_acceleration * sin_th;
 
         self.state.theta.v = angular_velocity;
         self.state.theta.a =
@@ -151,6 +133,80 @@ where
         }
         self.state.x.x -= self.weight * sum_x;
         self.state.y.x -= self.weight * sum_y;
+    }
+}
+
+/// An implementation of [StateEstimator](crate::robot::StateEstimator).
+///
+/// This should be created by [EstimatorBuilder](EstimatorBuilder).
+pub struct Estimator<LE, RE, I, M> {
+    inner: EstimatorInner<M>,
+    left_encoder: LE,
+    right_encoder: RE,
+    imu: I,
+}
+
+impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(
+            f,
+            "Estimator {{ state:{:?}, trans_velocity:{:?}, angular_velocity:{:?}, bias:{:?} }}",
+            self.inner.state,
+            self.inner.trans_velocity,
+            self.inner.angular_velocity,
+            self.inner.bias,
+        )
+    }
+}
+
+impl<LE, RE, I, M> Estimator<LE, RE, I, M> {
+    pub fn release(self) -> (LE, RE, I, RobotState) {
+        let Self {
+            left_encoder,
+            right_encoder,
+            imu,
+            inner,
+            ..
+        } = self;
+        let EstimatorInner { state, .. } = inner;
+        (left_encoder, right_encoder, imu, state)
+    }
+}
+
+impl<LE, RE, I, M> StateEstimator<CorrectInfo> for Estimator<LE, RE, I, M>
+where
+    LE: Encoder,
+    RE: Encoder,
+    I: IMU,
+    <LE as Encoder>::Error: core::fmt::Debug,
+    <RE as Encoder>::Error: core::fmt::Debug,
+    <I as IMU>::Error: core::fmt::Debug,
+    M: Math,
+{
+    type State = RobotState;
+
+    fn state(&self) -> &RobotState {
+        &self.inner.state
+    }
+
+    fn estimate(&mut self) {
+        //velocity estimation
+        let left_distance = block!(self.left_encoder.get_relative_distance()).unwrap();
+        let right_distance = block!(self.right_encoder.get_relative_distance()).unwrap();
+
+        let trans_acceleration = block!(self.imu.get_translational_acceleration()).unwrap();
+        let imu_angular_velocity = block!(self.imu.get_angular_velocity()).unwrap();
+
+        self.inner.estimate(
+            left_distance,
+            right_distance,
+            trans_acceleration,
+            imu_angular_velocity,
+        )
+    }
+
+    fn correct_state<Infos: IntoIterator<Item = CorrectInfo>>(&mut self, infos: Infos) {
+        self.inner.correct_state(infos)
     }
 }
 
@@ -271,18 +327,20 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU, M: Math>
             1.0 / (2.0 * core::f32::consts::PI * (period * cut_off_frequency).get::<ratio>() + 1.0);
 
         Ok(Estimator {
-            period,
-            alpha,
-            trans_velocity: Default::default(),
-            angular_velocity: Default::default(),
+            inner: EstimatorInner {
+                period,
+                alpha,
+                trans_velocity: Default::default(),
+                angular_velocity: Default::default(),
+                bias: Default::default(),
+                wheel_interval: self.wheel_interval.take(),
+                state: self.initial_state.take().unwrap_or(Default::default()),
+                weight: self.correction_weight.take().unwrap_or(0.0),
+                _phantom: PhantomData,
+            },
             left_encoder: ok_or(self.left_encoder.take(), "left_encoder")?,
             right_encoder: ok_or(self.right_encoder.take(), "right_encoder")?,
             imu: ok_or(self.imu.take(), "imu")?,
-            bias: Default::default(),
-            wheel_interval: self.wheel_interval.take(),
-            state: self.initial_state.take().unwrap_or(Default::default()),
-            weight: self.correction_weight.take().unwrap_or(0.0),
-            _phantom: PhantomData,
         })
     }
 }
