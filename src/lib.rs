@@ -14,7 +14,6 @@ pub mod mazes;
 pub mod nodes;
 pub mod obstacle_detector;
 pub mod operators;
-pub mod pose_converter;
 pub mod prelude;
 pub mod robot;
 pub mod tracker;

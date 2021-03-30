@@ -15,7 +15,6 @@ use components::{
     nodes::{RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
-    pose_converter::PoseConverter,
     prelude::*,
     robot::Robot,
     tracker::TrackerBuilder,
@@ -23,7 +22,7 @@ use components::{
     trajectory_managers::TrackingTrajectoryManager,
     types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState},
     utils::probability::Probability,
-    wall_detector::WallDetector,
+    wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
 };
 use typenum::consts::*;
@@ -204,12 +203,11 @@ fn test_run_operator() {
 
             let wall_detector = {
                 let obstacle_detector = ObstacleDetector::<_, MathFake>::new(distance_sensors);
-                let pose_converter = PoseConverter::<Size, MathFake>::default();
-                WallDetector::<_, _, _, MathFake>::new(
-                    &wall_storage,
-                    obstacle_detector,
-                    pose_converter,
-                )
+                WallDetectorBuilder::new()
+                    .wall_manager(&wall_storage)
+                    .obstacle_detector(obstacle_detector)
+                    .build::<MathFake, _>()
+                    .unwrap()
             };
             Robot::new(estimator, tracker, wall_detector)
         };

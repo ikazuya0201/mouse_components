@@ -10,7 +10,6 @@ use components::{
     nodes::{Node, RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::SearchOperator,
-    pose_converter::PoseConverter,
     robot::Robot,
     tracker::TrackerBuilder,
     trajectory_generators::{
@@ -22,7 +21,7 @@ use components::{
         SlalomDirection, SlalomKind, SlalomParameters,
     },
     utils::probability::Probability,
-    wall_detector::WallDetector,
+    wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
 };
 use typenum::consts::*;
@@ -185,12 +184,11 @@ macro_rules! impl_search_operator_test {
                         let wall_detector = {
                             let obstacle_detector =
                                 ObstacleDetector::<_, MathFake>::new(distance_sensors);
-                            let pose_converter = PoseConverter::<Size, MathFake>::default();
-                            WallDetector::<_, _, _, MathFake>::new(
-                                &wall_manager,
-                                obstacle_detector,
-                                pose_converter,
-                            )
+                            WallDetectorBuilder::new()
+                                .wall_manager(&wall_manager)
+                                .obstacle_detector(obstacle_detector)
+                                .build::<MathFake, Size>()
+                                .unwrap()
                         };
                         Robot::new(estimator, tracker, wall_detector)
                     };

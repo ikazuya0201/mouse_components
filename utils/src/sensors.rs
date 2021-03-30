@@ -5,13 +5,13 @@ use core::convert::Infallible;
 use core::ops::Mul;
 
 use components::{
-    pose_converter::{ConversionError, PoseConverter},
     prelude::*,
     sensors::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
     },
     types::data::{Pose, RobotState},
     utils::{probability::Probability, sample::Sample},
+    wall_detector::{ConversionError, PoseConverter},
     wall_manager::WallManager,
 };
 use generic_array::ArrayLength;
@@ -319,7 +319,7 @@ where
     inner: Rc<RefCell<AgentSimulatorInner>>,
     pose: Pose,
     wall_storage: Rc<WallManager<N>>,
-    pose_converter: PoseConverter<N, MathFake>,
+    pose_converter: PoseConverter<MathFake, N>,
 }
 
 impl<N> IDistanceSensor for DistanceSensor<N>

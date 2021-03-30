@@ -529,12 +529,12 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
             }};
         }
 
-        use crate::pose_converter::{
-            DEFAULT_IGNORE_LENGTH, DEFAULT_IGNORE_RADIUS, DEFAULT_SQUARE_WIDTH, DEFAULT_WALL_WIDTH,
-        };
         use crate::trajectory_generators::{
             slalom_parameters_map2, DEFAULT_ANGULAR_ACCELERATION_REF, DEFAULT_ANGULAR_JERK_REF,
             DEFAULT_ANGULAR_VELOCITY_REF,
+        };
+        use crate::wall_detector::{
+            DEFAULT_IGNORE_LENGTH, DEFAULT_IGNORE_RADIUS, DEFAULT_SQUARE_WIDTH, DEFAULT_WALL_WIDTH,
         };
 
         Ok(Config {
