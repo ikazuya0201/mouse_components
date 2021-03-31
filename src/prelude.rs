@@ -19,8 +19,7 @@ pub use crate::commanders::RouteNode as _components_commander_RouteNode;
 pub use crate::robot::StateEstimator as _components_robot_StateEstimator;
 pub use crate::robot::Tracker as _components_robot_Tracker;
 
-pub use crate::tracker::RotationalController as _components_tracker_RotationController;
-pub use crate::tracker::TranslationalController as _components_tracker_TranslationController;
+pub use crate::tracker::Controller as _components_tracker_Controller;
 
 pub use crate::sensors::DistanceSensor as _components_sensors_DistanceSensor;
 pub use crate::sensors::Encoder as _components_sensors_Encoder;

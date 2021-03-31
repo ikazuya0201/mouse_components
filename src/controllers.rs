@@ -9,7 +9,7 @@ use uom::si::{
 };
 
 use crate::impl_setter;
-use crate::tracker;
+use crate::tracker::Controller as IController;
 use crate::utils::builder::{ok_or, BuilderResult};
 
 struct Controller<T>
@@ -107,7 +107,7 @@ macro_rules! impl_controller {
             }
         }
 
-        impl tracker::$controller for $controller {
+        impl IController<$dt, $ddt> for $controller {
             fn calculate(&mut self, r: $dt, dr: $ddt, y: $dt, dy: $ddt) -> ElectricPotential {
                 self.0.calculate(r.into(), dr.into(), y.into(), dy.into())
             }
@@ -181,8 +181,6 @@ mod tests {
     use super::*;
     use typenum::consts::*;
     use uom::si::{time::second, Quantity, ISQ, SI};
-
-    use crate::prelude::*;
 
     fn build_translation_controller() -> TranslationalController {
         TranslationalControllerBuilder::new()
