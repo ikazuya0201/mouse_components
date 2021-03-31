@@ -1,18 +1,17 @@
 use core::marker::PhantomData;
 
-use heapless::Vec;
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
 use super::spin_generator::{SpinGenerator, SpinTrajectory};
 use super::Target;
 use crate::nodes::RotationKind;
-use crate::trajectory_managers::InitialTrajectoryGenerator;
+use crate::trajectory_managers::TrackingTrajectoryGenerator;
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
 use crate::utils::math::{LibmMath, Math};
 
 /// An implementation of
-/// [InitialTrajectoryGenerator](crate::trajectory_managers::InitialTrajectoryGenerator).
+/// [TrackingTrajectoryGenerator](crate::trajectory_managers::TrackingTrajectoryGenerator).
 pub struct ReturnSetupTrajectoryGenerator<M> {
     spin_generator: SpinGenerator<M>,
 }
@@ -34,31 +33,20 @@ impl<M> ReturnSetupTrajectoryGenerator<M> {
     }
 }
 
-impl<M: Math> InitialTrajectoryGenerator<RotationKind> for ReturnSetupTrajectoryGenerator<M> {
+impl<M: Math> TrackingTrajectoryGenerator<RotationKind> for ReturnSetupTrajectoryGenerator<M> {
     type Target = Target;
     type Trajectory = SpinTrajectory;
-    type Trajectories = Vec<Self::Trajectory, typenum::consts::U1>;
 
-    fn generate<Commands: IntoIterator<Item = RotationKind>>(
-        &self,
-        commands: Commands,
-    ) -> Self::Trajectories {
-        commands
-            .into_iter()
-            .next()
-            .map(|command| {
-                use RotationKind::*;
+    fn generate(&self, command: &RotationKind) -> Self::Trajectory {
+        use RotationKind::*;
 
-                let theta = match command {
-                    Front => Default::default(),
-                    Right => Angle::new::<degree>(-90.0),
-                    Left => Angle::new::<degree>(90.0),
-                    Back => Angle::new::<degree>(180.0),
-                };
-                self.spin_generator.generate(Default::default(), theta)
-            })
-            .into_iter()
-            .collect()
+        let theta = match command {
+            Front => Default::default(),
+            Right => Angle::new::<degree>(-90.0),
+            Left => Angle::new::<degree>(90.0),
+            Back => Angle::new::<degree>(180.0),
+        };
+        self.spin_generator.generate(Default::default(), theta)
     }
 }
 

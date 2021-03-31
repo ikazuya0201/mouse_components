@@ -1,8 +1,5 @@
 extern crate alloc;
 
-#[macro_use]
-extern crate typenum;
-
 use core::f32::consts::PI;
 
 use components::{
@@ -64,7 +61,6 @@ fn cost(pattern: Pattern) -> u16 {
 #[test]
 fn test_run_operator() {
     type Size = U4;
-    type MaxPathLength = op!(Size * Size);
 
     let start_state = RobotState {
         x: LengthState {
@@ -226,7 +222,7 @@ fn test_run_operator() {
                 ))
                 .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
                 .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
-                .build::<MaxPathLength>()
+                .build()
                 .expect("Should never panic");
             TrackingTrajectoryManager::new(trajectory_generator, CommandConverter::default())
         };
@@ -248,6 +244,6 @@ fn test_run_operator() {
     let operator = TrackingOperator::new(commander, agent);
     while operator.run().is_err() {
         stepper.step();
-        assert!(!operator.tick().is_err());
+        operator.tick().expect("Should never panic");
     }
 }

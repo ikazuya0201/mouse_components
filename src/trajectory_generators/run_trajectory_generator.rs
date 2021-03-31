@@ -1,13 +1,13 @@
 use core::marker::PhantomData;
 
-use heapless::{ArrayLength, Vec};
+use spin::Mutex;
 
 use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParameters};
 use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
-use crate::trajectory_managers::InitialTrajectoryGenerator;
+use crate::trajectory_managers::TrackingTrajectoryGenerator;
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
 use crate::utils::math::{LibmMath, Math};
 use uom::si::{
@@ -25,14 +25,14 @@ pub enum RunKind {
     Slalom(SlalomKind, SlalomDirection),
 }
 
-pub struct RunTrajectoryGenerator<M, MaxLength> {
+pub struct RunTrajectoryGenerator<M> {
+    current_velocity: Mutex<Velocity>,
     run_slalom_velocity: Velocity,
     straight_generator: StraightTrajectoryGenerator<M>,
     slalom_generator: SlalomGenerator<M>,
-    _max_length: PhantomData<fn() -> MaxLength>,
 }
 
-impl<M: Math, MaxLength> RunTrajectoryGenerator<M, MaxLength> {
+impl<M: Math> RunTrajectoryGenerator<M> {
     fn new(
         run_slalom_velocity: Velocity,
         max_velocity: Velocity,
@@ -54,10 +54,10 @@ impl<M: Math, MaxLength> RunTrajectoryGenerator<M, MaxLength> {
             slalom_parameters_map,
         );
         Self {
+            current_velocity: Mutex::new(Default::default()),
             run_slalom_velocity,
             straight_generator,
             slalom_generator,
-            _max_length: PhantomData,
         }
     }
 }
@@ -66,31 +66,21 @@ impl<M: Math, MaxLength> RunTrajectoryGenerator<M, MaxLength> {
 //because trajectory does not accelerate in slalom.
 //Then, we assume that the initial command is straight.
 //TODO: To deal with arbitrary initial commands
-impl<M, MaxLength> InitialTrajectoryGenerator<(Pose, RunKind)>
-    for RunTrajectoryGenerator<M, MaxLength>
+//TODO: Specify start and end of trajectories by `RunKind`.
+//TODO: Hold current velocity as a state.
+impl<M> TrackingTrajectoryGenerator<(Pose, RunKind)> for RunTrajectoryGenerator<M>
 where
     M: Math,
-    MaxLength: ArrayLength<ShiftTrajectory<RunTrajectory<M>, M>>,
 {
     type Target = Target;
     type Trajectory = ShiftTrajectory<RunTrajectory<M>, M>;
-    type Trajectories = Vec<Self::Trajectory, MaxLength>;
 
-    fn generate<Commands: IntoIterator<Item = (Pose, RunKind)>>(
-        &self,
-        commands: Commands,
-    ) -> Self::Trajectories {
-        let mut current_velocity = Default::default();
-        let mut trajectories = Vec::new();
-        for (pose, kind) in commands {
-            let (trajectory, next_velocity) =
-                self.generate_run_trajectory_and_terminal_velocity(&pose, &kind, &current_velocity);
-            current_velocity = next_velocity;
-            trajectories.push(trajectory).unwrap_or_else(|_| {
-                unreachable!("The length of trajectories should be properly upper-bounded.")
-            });
-        }
-        trajectories
+    fn generate(&self, (pose, kind): &(Pose, RunKind)) -> Self::Trajectory {
+        let mut current_velocity = self.current_velocity.lock();
+        let (trajectory, terminal_velocity) =
+            self.generate_run_trajectory_and_terminal_velocity(&pose, &kind, &current_velocity);
+        *current_velocity = terminal_velocity;
+        trajectory
     }
 }
 
@@ -113,7 +103,7 @@ where
     }
 }
 
-impl<M, MaxLength> RunTrajectoryGenerator<M, MaxLength>
+impl<M> RunTrajectoryGenerator<M>
 where
     M: Math,
 {
@@ -194,13 +184,11 @@ impl<M> RunTrajectoryGeneratorBuilder<M> {
         }
     }
 
-    pub fn build<MaxLength>(
-        self,
-    ) -> Result<RunTrajectoryGenerator<M, MaxLength>, RequiredFieldEmptyError>
+    pub fn build(self) -> Result<RunTrajectoryGenerator<M>, RequiredFieldEmptyError>
     where
         M: Math,
     {
-        Ok(RunTrajectoryGenerator::<M, MaxLength>::new(
+        Ok(RunTrajectoryGenerator::<M>::new(
             ok_or(self.run_slalom_velocity, "run_slalom_velocity")?,
             ok_or(self.max_velocity, "max_velocity")?,
             ok_or(self.max_acceleration, "max_acceleration")?,

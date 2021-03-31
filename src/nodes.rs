@@ -6,7 +6,7 @@ use core::ops::Mul;
 use heapless::{ArrayLength, Vec};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use crate::commanders::{BoundedNode, BoundedPathNode, NextNode, RotationNode, RouteNode};
+use crate::commanders::{BoundedNode, NextNode, RotationNode, RouteNode};
 use crate::mazes::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
@@ -537,13 +537,6 @@ where
     N::Output: Mul<U16>,
 {
     type UpperBound = <N::Output as Mul<U16>>::Output;
-}
-
-impl<N> BoundedPathNode for RunNode<N>
-where
-    N: Mul<N>,
-{
-    type PathUpperBound = N::Output;
 }
 
 impl<N> core::fmt::Debug for RunNode<N> {

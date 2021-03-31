@@ -1,100 +1,109 @@
-use core::sync::atomic::{AtomicUsize, Ordering};
-
+use heapless::{consts::*, spsc::Queue};
 use spin::Mutex;
 
 use crate::agents::TrackingTrajectoryManager;
-use crate::operators::TrackingInitializer;
 use crate::trajectory_managers::CommandConverter;
 
-/// A trait that generates trajectory for tracking.
-pub trait InitialTrajectoryGenerator<Command> {
+/// A trait that generates trajectory for search.
+pub trait TrackingTrajectoryGenerator<Command> {
     type Target;
     type Trajectory: Iterator<Item = Self::Target>;
-    type Trajectories: core::ops::DerefMut<Target = [Self::Trajectory]>;
 
-    fn generate<Commands: IntoIterator<Item = Command>>(
-        &self,
-        commands: Commands,
-    ) -> Self::Trajectories;
+    fn generate(&self, command: &Command) -> Self::Trajectory;
 }
 
-/// An implementation of [TrackingTrajectoryManager](crate::agents::TrackingTrajectoryManager).
-pub struct TrajectoryManager<Command, Generator, Converter>
-where
-    Generator: InitialTrajectoryGenerator<Converter::Output>,
-    Converter: CommandConverter<Command>,
-{
+type QueueLength = U3;
+
+/// An implementation of [TrackingTrajectoryManager](crate::agents::TrackingTrajectoryManager) required
+/// by [TrackingAgent](crate::agents::TrackingAgent).
+#[derive(Debug)]
+pub struct TrajectoryManager<Generator, Converter, Target, Trajectory> {
     generator: Generator,
     converter: Converter,
-    trajectories: Mutex<Generator::Trajectories>,
-    iter: AtomicUsize,
+    trajectories: Mutex<Queue<Trajectory, QueueLength>>,
+    last_target: Mutex<Option<Target>>,
 }
 
-impl<Command, Generator, Converter> core::fmt::Debug
-    for TrajectoryManager<Command, Generator, Converter>
-where
-    Generator: InitialTrajectoryGenerator<Converter::Output>,
-    Converter: CommandConverter<Command>,
-{
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("TrackingTrajectoryManager")
-            .field("trajectories.len()", &self.trajectories.lock().len())
-            .field("iter", &self.iter)
-            .finish()
-    }
-}
-
-impl<Command, Generator, Converter> TrajectoryManager<Command, Generator, Converter>
-where
-    Generator: InitialTrajectoryGenerator<Converter::Output>,
-    Converter: CommandConverter<Command>,
-    Generator::Trajectories: Default,
+impl<Generator, Converter, Target, Trajectory>
+    TrajectoryManager<Generator, Converter, Target, Trajectory>
 {
     pub fn new(generator: Generator, converter: Converter) -> Self {
         Self {
             generator,
             converter,
-            trajectories: Mutex::new(Default::default()),
-            iter: AtomicUsize::new(0),
+            trajectories: Mutex::new(Queue::new()),
+            last_target: Mutex::new(None),
         }
     }
 }
 
-impl<Command, Generator, Converter> TrackingInitializer<Command>
-    for TrajectoryManager<Command, Generator, Converter>
-where
-    Generator: InitialTrajectoryGenerator<Converter::Output>,
-    Converter: CommandConverter<Command>,
-{
-    type Error = core::convert::Infallible;
-
-    fn initialize<Commands: IntoIterator<Item = Command>>(
-        &self,
-        commands: Commands,
-    ) -> Result<(), Self::Error> {
-        let commands = commands.into_iter().map(|com| self.converter.convert(&com));
-        *self.trajectories.lock() = self.generator.generate(commands);
-        Ok(())
-    }
+/// Error on [TrajectoryManager](TrajectoryManager).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TrajectoryManagerError {
+    FullQueue,
 }
 
-impl<Command, Generator, Converter> TrackingTrajectoryManager
-    for TrajectoryManager<Command, Generator, Converter>
+impl<Generator, Converter, Command> TrackingTrajectoryManager<Command>
+    for TrajectoryManager<Generator, Converter, Generator::Target, Generator::Trajectory>
 where
-    Generator: InitialTrajectoryGenerator<Converter::Output>,
+    Generator: TrackingTrajectoryGenerator<Converter::Output>,
+    Generator::Target: Clone,
     Converter: CommandConverter<Command>,
 {
+    type Error = TrajectoryManagerError;
     type Target = Generator::Target;
 
-    fn next(&self) -> Option<Self::Target> {
+    fn set_command(&self, command: &Command) -> Result<(), Self::Error> {
+        use typenum::Unsigned;
+
+        //blocking
         let mut trajectories = self.trajectories.lock();
-        while self.iter.load(Ordering::Acquire) < trajectories.len() {
-            if let Some(target) = trajectories[self.iter.load(Ordering::Acquire)].next() {
-                return Some(target);
-            } else {
-                self.iter.fetch_add(1, Ordering::AcqRel);
-            }
+
+        if trajectories.len() == QueueLength::USIZE {
+            Err(TrajectoryManagerError::FullQueue)
+        } else {
+            let command = self.converter.convert(command);
+            let trajectory = self.generator.generate(&command);
+            trajectories
+                .enqueue(trajectory)
+                .unwrap_or_else(|_| unreachable!("Should never exceed the length of queue."));
+            Ok(())
         }
-        None
+    }
+
+    fn next(&self) -> Self::Target {
+        let target = if let Some(mut trajectories) = self.trajectories.try_lock() {
+            loop {
+                if let Some(trajectory) = trajectories.iter_mut().next() {
+                    if let Some(target) = trajectory.next() {
+                        break Some(target);
+                    }
+                } else {
+                    break None;
+                }
+                trajectories.dequeue();
+            }
+        } else {
+            None
+        };
+
+        if let Some(target) = target {
+            *self.last_target.lock() = Some(target.clone());
+            target
+        } else if let Some(target) = self.last_target.lock().clone() {
+            target
+        } else {
+            unimplemented!()
+        }
+    }
+
+    fn is_empty(&self) -> Option<bool> {
+        Some(self.trajectories.try_lock()?.is_empty())
+    }
+
+    fn is_full(&self) -> Option<bool> {
+        use typenum::Unsigned;
+
+        Some(self.trajectories.try_lock()?.len() == QueueLength::USIZE)
     }
 }

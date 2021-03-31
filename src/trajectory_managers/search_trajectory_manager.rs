@@ -3,7 +3,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use heapless::{consts::*, spsc::Queue};
 use spin::Mutex;
 
-use crate::agents::SearchTrajectoryManager;
+use crate::agents::TrackingTrajectoryManager;
 use crate::trajectory_managers::CommandConverter;
 
 /// A trait that generates trajectory for search.
@@ -17,8 +17,8 @@ pub trait SearchTrajectoryGenerator<Command> {
 
 type QueueLength = U3;
 
-/// An implementation of [SearchTrajectoryManager](crate::agents::SearchTrajectoryManager) required
-/// by [SearchAgent](crate::agents::SearchAgent).
+/// An implementation of [TrackingTrajectoryManager](crate::agents::TrackingTrajectoryManager) required
+/// by [TrackingAgent](crate::agents::TrackingAgent).
 #[derive(Debug)]
 pub struct TrajectoryManager<Generator, Converter, Target, Trajectory> {
     generator: Generator,
@@ -53,7 +53,7 @@ pub enum TrajectoryManagerError {
     FullQueue,
 }
 
-impl<Generator, Converter, Command> SearchTrajectoryManager<Command>
+impl<Generator, Converter, Command> TrackingTrajectoryManager<Command>
     for TrajectoryManager<Generator, Converter, Generator::Target, Generator::Trajectory>
 where
     Generator: SearchTrajectoryGenerator<Converter::Output>,

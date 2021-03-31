@@ -18,7 +18,7 @@ pub struct SearchOperator<
     Math,
     Size,
 >(
-    crate::operators::SearchOperator<
+    crate::operators::TrackingOperator<
         SearchCommander<'a, Size>,
         SearchAgent<
             'a,
