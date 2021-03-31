@@ -23,11 +23,6 @@ pub trait Graph<Node> {
     fn predecessors(&self, node: &Node) -> Self::Edges;
 }
 
-/// A trait that has a type level upper bound for any paths on a given node type.
-pub trait BoundedPathNode {
-    type PathUpperBound;
-}
-
 /// A trait that has a type level upper bound for the number of the given node type.
 pub trait BoundedNode {
     type UpperBound;
@@ -66,14 +61,15 @@ impl<Cost: Ord, Node> Ord for CostNode<Cost, Node> {
     }
 }
 
+pub type PathUpperBound = U1024; // Fixed upper bound of path length to 32x32.
+
 fn compute_shortest_path<Node, Maze>(
     start: &Node,
     goals: &[Node],
     maze: &Maze,
-) -> Option<Vec<Node, Node::PathUpperBound>>
+) -> Option<Vec<Node, PathUpperBound>>
 where
-    Node: BoundedPathNode + BoundedNode + Clone + Into<usize> + PartialEq,
-    Node::PathUpperBound: ArrayLength<Node>,
+    Node: BoundedNode + Clone + Into<usize> + PartialEq,
     Node::UpperBound: Unsigned
         + ArrayLength<Maze::Cost>
         + ArrayLength<CostNode<Maze::Cost, Node>>
@@ -236,10 +232,6 @@ mod tests {
 
         impl BoundedNode for RunNode {
             type UpperBound = U10;
-        }
-
-        impl BoundedPathNode for RunNode {
-            type PathUpperBound = U10;
         }
 
         let solver = SearchCommander::<Node, RunNode, SearchNode, _, _>::new(

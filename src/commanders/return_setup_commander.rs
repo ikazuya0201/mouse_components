@@ -3,7 +3,7 @@ use num::{Bounded, Saturating};
 use spin::Mutex;
 use typenum::Unsigned;
 
-use super::{compute_shortest_path, BoundedNode, BoundedPathNode, CostNode, Graph};
+use super::{compute_shortest_path, BoundedNode, CostNode, Graph};
 use crate::operators::InitialCommander;
 
 /// An implementation of [InitialCommander](crate::operators::InitialCommander).
@@ -45,8 +45,7 @@ pub trait RotationNode: Sized {
 
 impl<Node, Maze> InitialCommander for ReturnSetupCommander<Node, Maze>
 where
-    Node: BoundedPathNode + BoundedNode + Clone + Into<usize> + PartialEq + RotationNode,
-    Node::PathUpperBound: ArrayLength<Node>,
+    Node: BoundedNode + Clone + Into<usize> + PartialEq + RotationNode,
     Node::UpperBound: Unsigned
         + ArrayLength<Maze::Cost>
         + ArrayLength<Option<Node>>

@@ -8,7 +8,7 @@ use spin::Mutex;
 use typenum::Unsigned;
 
 use super::{
-    compute_shortest_path, BoundedNode, BoundedPathNode, CostNode, GoalSizeUpperBound, Graph,
+    compute_shortest_path, BoundedNode, CostNode, GoalSizeUpperBound, Graph, PathUpperBound,
     RouteNode,
 };
 use crate::operators::{SearchCommander as ISearchCommander, SearchCommanderError};
@@ -122,8 +122,7 @@ where
         + ArrayLength<CostNode<Cost, Maze::SearchNode>>
         + ArrayLength<CostNode<Cost, RunNode>>
         + Unsigned,
-    RunNode::PathUpperBound: ArrayLength<RunNode>,
-    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
+    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + TryFrom<Node>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
@@ -217,8 +216,7 @@ where
         + ArrayLength<CostNode<Cost, RunNode>>
         + ArrayLength<CostNode<Cost, Maze::SearchNode>>
         + Unsigned,
-    RunNode::PathUpperBound: ArrayLength<RunNode>,
-    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode + BoundedPathNode,
+    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
@@ -277,8 +275,7 @@ where
 
 impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, SearchNode, Route, Maze>
 where
-    RunNode: BoundedPathNode + BoundedNode + Clone + Into<usize> + PartialEq,
-    RunNode::PathUpperBound: ArrayLength<RunNode>,
+    RunNode: BoundedNode + Clone + Into<usize> + PartialEq,
     RunNode::UpperBound: Unsigned
         + ArrayLength<Maze::Cost>
         + ArrayLength<Option<RunNode>>
@@ -287,7 +284,7 @@ where
     Maze: Graph<RunNode>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
-    pub fn compute_shortest_path(&self) -> Option<Vec<RunNode, RunNode::PathUpperBound>> {
+    pub fn compute_shortest_path(&self) -> Option<Vec<RunNode, PathUpperBound>> {
         compute_shortest_path(&self.start, &self.goals, &self.maze)
     }
 }

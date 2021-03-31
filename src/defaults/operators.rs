@@ -22,11 +22,10 @@ type RunAgent<
     DistanceSensor,
     Size,
     Math,
-    MaxPathLength,
 > = agents::TrackingAgent<
     trajectory_managers::TrackingTrajectoryManager<
         (nodes::RunNode<Size>, types::data::RunKind),
-        trajectory_generators::RunTrajectoryGenerator<Math, MaxPathLength>,
+        trajectory_generators::RunTrajectoryGenerator<Math>,
         command_converter::CommandConverter,
     >,
     robot::Robot<

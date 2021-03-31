@@ -9,7 +9,6 @@ pub use crate::operators::TrackingAgent as _components_operators_TrackingAgent;
 pub use crate::operators::TrackingInitializer as _components_operators_TrackingInitializer;
 
 pub use crate::commanders::BoundedNode as _components_commander_BoundedNode;
-pub use crate::commanders::BoundedPathNode as _components_commander_BoundedPathNode;
 pub use crate::commanders::Graph as _components_commander_Graph;
 pub use crate::commanders::NextNode as _components_commander_NextNode;
 pub use crate::commanders::NodeChecker as _components_commander_NodeChecker;

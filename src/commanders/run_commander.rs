@@ -6,10 +6,7 @@ use num::{Bounded, Saturating};
 use spin::Mutex;
 use typenum::Unsigned;
 
-use super::{
-    compute_shortest_path, BoundedNode, BoundedPathNode, CostNode, GoalSizeUpperBound, Graph,
-    RouteNode,
-};
+use super::{compute_shortest_path, BoundedNode, CostNode, GoalSizeUpperBound, Graph, RouteNode};
 use crate::operators::InitialCommander;
 
 /// An implementation of [InitialCommander](crate::operators::InitialCommander).
@@ -55,8 +52,7 @@ where
         + ArrayLength<CostNode<Maze::Cost, Node>>
         + ArrayLength<(Node, Node::Route)>
         + Unsigned,
-    Node::PathUpperBound: ArrayLength<Node>,
-    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode + BoundedPathNode,
+    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode,
     Node: From<Node>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,

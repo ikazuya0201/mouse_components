@@ -7,9 +7,7 @@ use typenum::consts::*;
 use super::{RunAgent, RunCommander};
 use crate::utils::probability::Probability;
 use crate::{
-    nodes::RunNode,
     operators::TrackingOperator,
-    traits::BoundedPathNode,
     trajectory_generators::{RunTrajectory, ShiftTrajectory},
 };
 
@@ -36,7 +34,6 @@ pub struct ReturnOperator<
             DistanceSensor,
             Size,
             Math,
-            <RunNode<Size> as BoundedPathNode>::PathUpperBound,
         >,
     >,
 )
