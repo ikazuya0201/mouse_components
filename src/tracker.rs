@@ -277,7 +277,7 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         }
     }
 
-    pub fn kx(mut self, kx: f32) -> Self {
+    pub fn kx(&mut self, kx: f32) -> &mut Self {
         self.kx = Some(GainType {
             value: kx,
             dimension: PhantomData,
@@ -286,12 +286,12 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn kdx(mut self, kdx: f32) -> Self {
+    pub fn kdx(&mut self, kdx: f32) -> &mut Self {
         self.kdx = Some(Frequency::new::<hertz>(kdx));
         self
     }
 
-    pub fn ky(mut self, ky: f32) -> Self {
+    pub fn ky(&mut self, ky: f32) -> &mut Self {
         self.ky = Some(GainType {
             value: ky,
             dimension: PhantomData,
@@ -300,17 +300,17 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn kdy(mut self, kdy: f32) -> Self {
+    pub fn kdy(&mut self, kdy: f32) -> &mut Self {
         self.kdy = Some(Frequency::new::<hertz>(kdy));
         self
     }
 
-    pub fn valid_control_lower_bound(mut self, xi_threshold: Velocity) -> Self {
+    pub fn valid_control_lower_bound(&mut self, xi_threshold: Velocity) -> &mut Self {
         self.xi_threshold = Some(xi_threshold);
         self
     }
 
-    pub fn translation_controller(mut self, translation_controller: TC) -> Self
+    pub fn translation_controller(&mut self, translation_controller: TC) -> &mut Self
     where
         TC: TranslationController,
     {
@@ -318,7 +318,7 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn rotation_controller(mut self, rotation_controller: RC) -> Self
+    pub fn rotation_controller(&mut self, rotation_controller: RC) -> &mut Self
     where
         RC: RotationController,
     {
@@ -326,7 +326,7 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn left_motor(mut self, left_motor: LM) -> Self
+    pub fn left_motor(&mut self, left_motor: LM) -> &mut Self
     where
         LM: Motor,
     {
@@ -334,7 +334,7 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn right_motor(mut self, right_motor: RM) -> Self
+    pub fn right_motor(&mut self, right_motor: RM) -> &mut Self
     where
         RM: Motor,
     {
@@ -342,27 +342,27 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn period(mut self, period: Time) -> Self {
+    pub fn period(&mut self, period: Time) -> &mut Self {
         self.period = Some(period);
         self
     }
 
-    pub fn initial_velocity(mut self, xi: Velocity) -> Self {
+    pub fn initial_velocity(&mut self, xi: Velocity) -> &mut Self {
         self.xi = Some(xi);
         self
     }
 
-    pub fn fail_safe_distance(mut self, fail_safe_distance: Length) -> Self {
+    pub fn fail_safe_distance(&mut self, fail_safe_distance: Length) -> &mut Self {
         self.fail_safe_distance = Some(fail_safe_distance);
         self
     }
 
-    pub fn low_zeta(mut self, zeta: f32) -> Self {
+    pub fn low_zeta(&mut self, zeta: f32) -> &mut Self {
         self.zeta = Some(zeta);
         self
     }
 
-    pub fn low_b(mut self, b: f32) -> Self {
+    pub fn low_b(&mut self, b: f32) -> &mut Self {
         self.b = Some(BType {
             value: b,
             ..Default::default()
@@ -370,17 +370,20 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn build(self) -> Result<Tracker<LM, RM, M, TC, RC>, RequiredFieldEmptyError> {
+    pub fn build(&mut self) -> Result<Tracker<LM, RM, M, TC, RC>, RequiredFieldEmptyError> {
         Ok(Tracker {
             kx: ok_or(self.kx, "kx")?,
             kdx: ok_or(self.kdx, "kdx")?,
             ky: ok_or(self.ky, "ky")?,
             kdy: ok_or(self.kdy, "kdy")?,
             xi_threshold: ok_or(self.xi_threshold, "xi_threshold")?,
-            translation_controller: ok_or(self.translation_controller, "translation_controller")?,
-            rotation_controller: ok_or(self.rotation_controller, "rotation_controller")?,
-            left_motor: ok_or(self.left_motor, "left_motor")?,
-            right_motor: ok_or(self.right_motor, "right_motor")?,
+            translation_controller: ok_or(
+                self.translation_controller.take(),
+                "translation_controller",
+            )?,
+            rotation_controller: ok_or(self.rotation_controller.take(), "rotation_controller")?,
+            left_motor: ok_or(self.left_motor.take(), "left_motor")?,
+            right_motor: ok_or(self.right_motor.take(), "right_motor")?,
             period: ok_or(self.period, "period")?,
             xi: self.xi.expect("Should never None"),
             fail_safe_distance: ok_or(self.fail_safe_distance, "fail_safe_distance")?,
