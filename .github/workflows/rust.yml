@@ -34,3 +34,5 @@ jobs:
       run: cargo test --target=x86_64-unknown-linux-gnu --verbose -- --ignored
     - name: DocTest
       run: cargo test --target=x86_64-unknown-linux-gnu --verbose --doc
+    - name: Doc
+      run: cargo doc --target=x86_64-unknown-linux-gnu --verbose

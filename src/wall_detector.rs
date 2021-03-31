@@ -483,7 +483,7 @@ impl<'a, Manager, Detector> WallDetectorBuilder<'a, Manager, Detector> {
         /// **Optional**,
         /// Sets the width of a square of a maze.
         ///
-        /// Default: 90 [mm]
+        /// Default: 90 \[mm\]
         square_width: Length
     }
 
@@ -491,7 +491,7 @@ impl<'a, Manager, Detector> WallDetectorBuilder<'a, Manager, Detector> {
         /// **Optional**,
         /// Sets the width of a wall of a maze.
         ///
-        /// Default: 6 [mm]
+        /// Default: 6 \[mm\]
         wall_width: Length
     }
 
@@ -500,7 +500,7 @@ impl<'a, Manager, Detector> WallDetectorBuilder<'a, Manager, Detector> {
         /// Sets a radius. If the position of a distance sensor is near than this radius, the
         /// result of the sensor will be ignored.
         ///
-        /// Default: 10 [mm]
+        /// Default: 10 \[mm\]
         ignore_radius_from_pillar: Length
     }
 
@@ -509,7 +509,7 @@ impl<'a, Manager, Detector> WallDetectorBuilder<'a, Manager, Detector> {
         /// Sets a length. If the position of a distance sensor is near than this length, the
         /// result of the sensor will be ignored.
         ///
-        /// Default: 8 [mm]
+        /// Default: 8 \[mm\]
         ignore_length_from_wall: Length
     }
 

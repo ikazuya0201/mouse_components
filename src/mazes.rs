@@ -65,7 +65,7 @@ pub trait WallFinderNode: WallSpaceNode {
 }
 
 /// An implementation of [Graph](crate::commanders::Graph),
-/// [GraphConverter](crate::commanders::GraphConverter) and
+/// [UncheckedNodeFinder](crate::commanders::UncheckedNodeFinder) and
 /// [NodeChecker](crate::commanders::NodeChecker) required by
 /// [SearchCommander](crate::commanders::SearchCommander).
 pub struct Maze<'a, Manager, Pattern, Cost, SearchNode> {
