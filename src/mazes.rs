@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 use heapless::{ArrayLength, Vec};
 
-use crate::commanders::{BoundedNode, Graph, GraphConverter, NodeChecker};
+use crate::commanders::{BoundedNode, Graph, NodeChecker, UncheckedNodeFinder};
 use crate::utils::forced_vec::ForcedVec;
 
 macro_rules! block {
@@ -179,7 +179,7 @@ where
     }
 }
 
-impl<'a, Node, Manager, Pattern, Cost, SearchNode> GraphConverter<Node>
+impl<'a, Node, Manager, Pattern, Cost, SearchNode> UncheckedNodeFinder<Node>
     for Maze<'a, Manager, Pattern, Cost, SearchNode>
 where
     Node: WallFinderNode,
@@ -191,7 +191,7 @@ where
     type SearchNode = SearchNode;
     type SearchNodes = Vec<Self::SearchNode, SearchNode::UpperBound>;
 
-    fn convert_to_checker_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
+    fn find_unchecked_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
         &self,
         path: Nodes,
     ) -> Self::SearchNodes {
@@ -431,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    fn test_graph_converter() {
+    fn test_unchecked_node_finder() {
         use std::vec::Vec;
 
         #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -497,7 +497,7 @@ mod tests {
             .into_iter()
             .map(|e| SearchNode(e))
             .collect::<Vec<_>>();
-        assert_eq!(maze.convert_to_checker_nodes(path), expected.as_slice());
+        assert_eq!(maze.find_unchecked_nodes(path), expected.as_slice());
     }
 
     #[test]

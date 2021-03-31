@@ -30,7 +30,7 @@ pub mod traits {
     pub use crate::utils::math::Math;
     pub use administrator::{Operator, OperatorStore, Selector};
     pub use commanders::{
-        BoundedNode, BoundedPathNode, Graph, GraphConverter, NextNode, NodeChecker, RouteNode,
+        BoundedNode, BoundedPathNode, Graph, NextNode, NodeChecker, RouteNode, UncheckedNodeFinder,
     };
     pub use mazes::{GraphNode, WallChecker, WallFinderNode, WallSpaceNode};
     pub use operators::{InitialCommander, TrackingAgent, TrackingInitializer};
