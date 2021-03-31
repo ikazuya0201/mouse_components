@@ -11,10 +11,10 @@ pub use crate::operators::TrackingInitializer as _components_operators_TrackingI
 pub use crate::commanders::BoundedNode as _components_commander_BoundedNode;
 pub use crate::commanders::BoundedPathNode as _components_commander_BoundedPathNode;
 pub use crate::commanders::Graph as _components_commander_Graph;
-pub use crate::commanders::GraphConverter as _components_commander_GraphConverter;
 pub use crate::commanders::NextNode as _components_commander_NextNode;
 pub use crate::commanders::NodeChecker as _components_commander_NodeChecker;
 pub use crate::commanders::RouteNode as _components_commander_RouteNode;
+pub use crate::commanders::UncheckedNodeFinder as _components_commander_GraphConverter;
 
 pub use crate::robot::StateEstimator as _components_robot_StateEstimator;
 pub use crate::robot::Tracker as _components_robot_Tracker;

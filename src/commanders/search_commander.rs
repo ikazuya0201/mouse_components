@@ -15,13 +15,13 @@ use crate::operators::{SearchCommander as ISearchCommander, SearchCommanderError
 use crate::utils::itertools::repeat_n;
 
 /// A trait that converts a given path to nodes which are on the path.
-pub trait GraphConverter<Node> {
+pub trait UncheckedNodeFinder<Node> {
     type SearchNode;
     type SearchNodes: IntoIterator<Item = Self::SearchNode>;
 
     ///checker nodes are search nodes on which agent can check
     ///if walls on the given path exist.
-    fn convert_to_checker_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
+    fn find_unchecked_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
         &self,
         path: Nodes,
     ) -> Self::SearchNodes;
@@ -127,9 +127,9 @@ where
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + TryFrom<Node>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
-        + Graph<<Maze as GraphConverter<RunNode>>::SearchNode, Cost = Cost>
-        + GraphConverter<RunNode>
-        + NodeChecker<<Maze as GraphConverter<RunNode>>::SearchNode>,
+        + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
+        + UncheckedNodeFinder<RunNode>
+        + NodeChecker<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode>,
     Node: From<Maze::SearchNode> + Clone + NextNode<<Maze::SearchNode as RouteNode>::Route>,
     <Maze::SearchNode as RouteNode>::Route: Clone,
     <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
@@ -222,8 +222,8 @@ where
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
-        + Graph<<Maze as GraphConverter<RunNode>>::SearchNode, Cost = Cost>
-        + GraphConverter<RunNode>,
+        + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
+        + UncheckedNodeFinder<RunNode>,
     CostNode<Cost, Maze::SearchNode>: core::fmt::Debug,
 {
     fn next_node_candidates(
@@ -231,7 +231,7 @@ where
         current: &Maze::SearchNode,
     ) -> Option<Vec<Maze::SearchNode, U4>> {
         let shortest_path = compute_shortest_path(&self.start, &self.goals, &self.maze)?;
-        let checker_nodes = self.maze.convert_to_checker_nodes(shortest_path);
+        let checker_nodes = self.maze.find_unchecked_nodes(shortest_path);
 
         let candidates = self
             .maze
