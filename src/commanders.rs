@@ -4,11 +4,8 @@ mod return_setup_commander;
 mod run_commander;
 mod search_commander;
 
-use core::cmp::Reverse;
-
 use generic_array::{ArrayLength, GenericArray};
-use heap::BinaryHeap;
-use heapless::{consts::*, Vec};
+use heapless::{binary_heap::Min, consts::*, BinaryHeap, Vec};
 use num::{Bounded, Saturating};
 use typenum::Unsigned;
 
@@ -46,6 +43,29 @@ pub trait RouteNode {
 
 type GoalSizeUpperBound = U8;
 
+#[derive(Debug)]
+pub struct CostNode<Cost, Node>(Cost, Node);
+
+impl<Cost: PartialEq, Node> PartialEq for CostNode<Cost, Node> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<Cost: Eq, Node> Eq for CostNode<Cost, Node> {}
+
+impl<Cost: PartialOrd, Node> PartialOrd for CostNode<Cost, Node> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<Cost: Ord, Node> Ord for CostNode<Cost, Node> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
 fn compute_shortest_path<Node, Maze>(
     start: &Node,
     goals: &[Node],
@@ -56,9 +76,8 @@ where
     Node::PathUpperBound: ArrayLength<Node>,
     Node::UpperBound: Unsigned
         + ArrayLength<Maze::Cost>
-        + ArrayLength<Option<Node>>
-        + ArrayLength<(Node, Reverse<Maze::Cost>)>
-        + ArrayLength<Option<usize>>,
+        + ArrayLength<CostNode<Maze::Cost, Node>>
+        + ArrayLength<Option<Node>>,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
@@ -72,8 +91,8 @@ where
     let mut prev = repeat_n(None, <Node::UpperBound as Unsigned>::USIZE)
         .collect::<GenericArray<Option<Node>, Node::UpperBound>>();
 
-    let mut heap = BinaryHeap::<Node, Reverse<Maze::Cost>, Node::UpperBound>::new();
-    heap.push(start.clone(), Reverse(Maze::Cost::min_value()))
+    let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node>, Node::UpperBound, Min>::new();
+    heap.push(CostNode(Maze::Cost::min_value(), start.clone()))
         .unwrap_or_else(|_| {
             unreachable!("The length of binary heap should never exceed the upper bound")
         });
@@ -95,7 +114,7 @@ where
         Some(path.into())
     };
 
-    while let Some((node, Reverse(cost))) = heap.pop() {
+    while let Some(CostNode(cost, node)) = heap.pop() {
         for goal in goals.iter() {
             if &node == goal {
                 return construct_path(goal.clone(), prev);
@@ -105,7 +124,7 @@ where
             let next_cost = cost.saturating_add(edge_cost);
             if next_cost < dists[next.clone().into()] {
                 dists[next.clone().into()] = next_cost;
-                heap.push_or_update(next.clone(), Reverse(next_cost))
+                heap.push(CostNode(next_cost, next.clone()))
                     .unwrap_or_else(|_| {
                         unreachable!(
                             "The length of binary heap should never exceed the upper bound"
