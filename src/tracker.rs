@@ -26,25 +26,17 @@ pub trait Motor {
 type GainType = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 type BType = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 
-macro_rules! controller_trait {
-    ($name: ident: $t: ty, $dt: ty) => {
-        pub trait $name {
-            fn init(&mut self);
-            fn calculate(&mut self, r: $t, dr: $dt, y: $t, dy: $dt) -> ElectricPotential;
-        }
-    };
+pub trait Controller<T, U> {
+    fn calculate(&mut self, r: T, dr: U, y: T, dy: U) -> ElectricPotential;
 }
-
-controller_trait!(TranslationController: Velocity, Acceleration);
-controller_trait!(RotationController: AngularVelocity, AngularAcceleration);
 
 /// An implementation of [Tracker](crate::robot::Tracker).
 pub struct Tracker<
     LM,
     RM,
     M,
-    TC = crate::controllers::TranslationController,
-    RC = crate::controllers::RotationController,
+    TC = crate::controllers::TranslationalController,
+    RC = crate::controllers::RotationalController,
 > {
     kx: GainType,
     kdx: Frequency,
@@ -91,8 +83,8 @@ impl<LM, RM, M, TC, RC> ITracker<RobotState, Target> for Tracker<LM, RM, M, TC, 
 where
     LM: Motor,
     RM: Motor,
-    TC: TranslationController,
-    RC: RotationController,
+    TC: Controller<Velocity, Acceleration>,
+    RC: Controller<AngularVelocity, AngularAcceleration>,
     M: Math,
 {
     type Error = FailSafeError;
@@ -112,8 +104,8 @@ impl<LM, RM, M, TC, RC> Tracker<LM, RM, M, TC, RC>
 where
     LM: Motor,
     RM: Motor,
-    TC: TranslationController,
-    RC: RotationController,
+    TC: Controller<Velocity, Acceleration>,
+    RC: Controller<AngularVelocity, AngularAcceleration>,
     M: Math,
 {
     pub fn stop(&mut self)
@@ -123,11 +115,6 @@ where
     {
         self.left_motor.apply(Default::default());
         self.right_motor.apply(Default::default());
-    }
-
-    pub fn init(&mut self) {
-        self.translation_controller.init();
-        self.rotation_controller.init();
     }
 
     fn sinc(x: f32) -> f32 {
@@ -277,7 +264,7 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         }
     }
 
-    pub fn kx(mut self, kx: f32) -> Self {
+    pub fn kx(&mut self, kx: f32) -> &mut Self {
         self.kx = Some(GainType {
             value: kx,
             dimension: PhantomData,
@@ -286,12 +273,12 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn kdx(mut self, kdx: f32) -> Self {
+    pub fn kdx(&mut self, kdx: f32) -> &mut Self {
         self.kdx = Some(Frequency::new::<hertz>(kdx));
         self
     }
 
-    pub fn ky(mut self, ky: f32) -> Self {
+    pub fn ky(&mut self, ky: f32) -> &mut Self {
         self.ky = Some(GainType {
             value: ky,
             dimension: PhantomData,
@@ -300,33 +287,33 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn kdy(mut self, kdy: f32) -> Self {
+    pub fn kdy(&mut self, kdy: f32) -> &mut Self {
         self.kdy = Some(Frequency::new::<hertz>(kdy));
         self
     }
 
-    pub fn valid_control_lower_bound(mut self, xi_threshold: Velocity) -> Self {
+    pub fn valid_control_lower_bound(&mut self, xi_threshold: Velocity) -> &mut Self {
         self.xi_threshold = Some(xi_threshold);
         self
     }
 
-    pub fn translation_controller(mut self, translation_controller: TC) -> Self
+    pub fn translation_controller(&mut self, translation_controller: TC) -> &mut Self
     where
-        TC: TranslationController,
+        TC: Controller<Velocity, Acceleration>,
     {
         self.translation_controller = Some(translation_controller);
         self
     }
 
-    pub fn rotation_controller(mut self, rotation_controller: RC) -> Self
+    pub fn rotation_controller(&mut self, rotation_controller: RC) -> &mut Self
     where
-        RC: RotationController,
+        RC: Controller<AngularVelocity, AngularAcceleration>,
     {
         self.rotation_controller = Some(rotation_controller);
         self
     }
 
-    pub fn left_motor(mut self, left_motor: LM) -> Self
+    pub fn left_motor(&mut self, left_motor: LM) -> &mut Self
     where
         LM: Motor,
     {
@@ -334,7 +321,7 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn right_motor(mut self, right_motor: RM) -> Self
+    pub fn right_motor(&mut self, right_motor: RM) -> &mut Self
     where
         RM: Motor,
     {
@@ -342,27 +329,27 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn period(mut self, period: Time) -> Self {
+    pub fn period(&mut self, period: Time) -> &mut Self {
         self.period = Some(period);
         self
     }
 
-    pub fn initial_velocity(mut self, xi: Velocity) -> Self {
+    pub fn initial_velocity(&mut self, xi: Velocity) -> &mut Self {
         self.xi = Some(xi);
         self
     }
 
-    pub fn fail_safe_distance(mut self, fail_safe_distance: Length) -> Self {
+    pub fn fail_safe_distance(&mut self, fail_safe_distance: Length) -> &mut Self {
         self.fail_safe_distance = Some(fail_safe_distance);
         self
     }
 
-    pub fn low_zeta(mut self, zeta: f32) -> Self {
+    pub fn low_zeta(&mut self, zeta: f32) -> &mut Self {
         self.zeta = Some(zeta);
         self
     }
 
-    pub fn low_b(mut self, b: f32) -> Self {
+    pub fn low_b(&mut self, b: f32) -> &mut Self {
         self.b = Some(BType {
             value: b,
             ..Default::default()
@@ -370,17 +357,20 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn build(self) -> Result<Tracker<LM, RM, M, TC, RC>, RequiredFieldEmptyError> {
+    pub fn build(&mut self) -> Result<Tracker<LM, RM, M, TC, RC>, RequiredFieldEmptyError> {
         Ok(Tracker {
             kx: ok_or(self.kx, "kx")?,
             kdx: ok_or(self.kdx, "kdx")?,
             ky: ok_or(self.ky, "ky")?,
             kdy: ok_or(self.kdy, "kdy")?,
             xi_threshold: ok_or(self.xi_threshold, "xi_threshold")?,
-            translation_controller: ok_or(self.translation_controller, "translation_controller")?,
-            rotation_controller: ok_or(self.rotation_controller, "rotation_controller")?,
-            left_motor: ok_or(self.left_motor, "left_motor")?,
-            right_motor: ok_or(self.right_motor, "right_motor")?,
+            translation_controller: ok_or(
+                self.translation_controller.take(),
+                "translation_controller",
+            )?,
+            rotation_controller: ok_or(self.rotation_controller.take(), "rotation_controller")?,
+            left_motor: ok_or(self.left_motor.take(), "left_motor")?,
+            right_motor: ok_or(self.right_motor.take(), "right_motor")?,
             period: ok_or(self.period, "period")?,
             xi: self.xi.expect("Should never None"),
             fail_safe_distance: ok_or(self.fail_safe_distance, "fail_safe_distance")?,
@@ -410,39 +400,15 @@ mod tests {
         fn apply(&mut self, _voltage: ElectricPotential) {}
     }
 
-    macro_rules! impl_controller {
-        ($name: ident, $trait: ident: $t: ty, $dt: ty) => {
-            struct $name {}
+    struct IController;
 
-            impl $name {
-                fn new() -> Self {
-                    Self {}
-                }
-            }
-
-            impl $trait for $name {
-                fn init(&mut self) {}
-
-                fn calculate(&mut self, _r: $t, _dr: $dt, _y: $t, _dy: $dt) -> ElectricPotential {
-                    ElectricPotential::new::<volt>(1.0)
-                }
-            }
-        };
+    impl<T, U> Controller<T, U> for IController {
+        fn calculate(&mut self, _: T, _: U, _: T, _: U) -> ElectricPotential {
+            ElectricPotential::new::<volt>(1.0)
+        }
     }
 
-    impl_controller!(
-        ITranslationController,
-        TranslationController: Velocity,
-        Acceleration
-    );
-    impl_controller!(
-        IRotationController,
-        RotationController: AngularVelocity,
-        AngularAcceleration
-    );
-
-    fn build_tracker(
-    ) -> Tracker<IMotor, IMotor, LibmMath, ITranslationController, IRotationController> {
+    fn build_tracker() -> Tracker<IMotor, IMotor, LibmMath, IController, IController> {
         TrackerBuilder::default()
             .kx(1.0)
             .kdx(1.0)
@@ -453,8 +419,8 @@ mod tests {
             .right_motor(IMotor)
             .left_motor(IMotor)
             .period(Time::new::<second>(0.001))
-            .translation_controller(ITranslationController::new())
-            .rotation_controller(IRotationController::new())
+            .translation_controller(IController)
+            .rotation_controller(IController)
             .low_zeta(1.0)
             .low_b(1e-3)
             .fail_safe_distance(Length::new::<meter>(0.02))

@@ -35,8 +35,8 @@ type RunAgent<
             LeftMotor,
             RightMotor,
             Math,
-            controllers::TranslationController,
-            controllers::RotationController,
+            controllers::TranslationalController,
+            controllers::RotationalController,
         >,
         wall_detector::WallDetector<
             'a,
@@ -71,8 +71,8 @@ type ReturnSetupAgent<
             LeftMotor,
             RightMotor,
             Math,
-            controllers::TranslationController,
-            controllers::RotationController,
+            controllers::TranslationalController,
+            controllers::RotationalController,
         >,
         wall_detector::WallDetector<
             'a,
@@ -111,8 +111,8 @@ type SearchAgent<
                 LeftMotor,
                 RightMotor,
                 Math,
-                controllers::TranslationController,
-                controllers::RotationController,
+                controllers::TranslationalController,
+                controllers::RotationalController,
             >,
             wall_detector::WallDetector<
                 'a,

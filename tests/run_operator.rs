@@ -9,7 +9,7 @@ use components::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
     commanders::RunCommander,
-    controllers::{RotationControllerBuilder, TranslationControllerBuilder},
+    controllers::{RotationalControllerBuilder, TranslationalControllerBuilder},
     estimator::EstimatorBuilder,
     mazes::CheckedMaze,
     nodes::{RunNode, SearchNode},
@@ -165,23 +165,25 @@ fn test_run_operator() {
             };
 
             let tracker = {
-                let trans_controller = TranslationControllerBuilder::new()
+                let trans_controller = TranslationalControllerBuilder::new()
                     .kp(0.9)
                     .ki(0.05)
                     .kd(0.01)
                     .period(period)
                     .model_gain(trans_model_gain)
                     .model_time_constant(trans_model_time_constant)
-                    .build();
+                    .build()
+                    .unwrap();
 
-                let rot_controller = RotationControllerBuilder::new()
+                let rot_controller = RotationalControllerBuilder::new()
                     .kp(0.2)
                     .ki(0.2)
                     .kd(0.0)
                     .period(period)
                     .model_gain(rot_model_gain)
                     .model_time_constant(rot_model_time_constant)
-                    .build();
+                    .build()
+                    .unwrap();
 
                 TrackerBuilder::default()
                     .right_motor(right_motor)
