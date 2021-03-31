@@ -34,7 +34,7 @@ pub mod traits {
         BoundedNode, Graph, NextNode, NodeChecker, RouteNode, UncheckedNodeFinder,
     };
     pub use mazes::{GraphNode, WallChecker, WallFinderNode, WallSpaceNode};
-    pub use operators::{InitialCommander, TrackingAgent, TrackingInitializer};
+    pub use operators::{TrackingAgent, TrackingCommander};
     pub use tracker::Controller;
     pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};
 }

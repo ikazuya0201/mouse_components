@@ -5,7 +5,7 @@ pub use search_trajectory_manager::{
     SearchTrajectoryGenerator, TrajectoryManager as SearchTrajectoryManager,
 };
 pub use tracking_trajectory_manager::{
-    InitialTrajectoryGenerator, TrajectoryManager as TrackingTrajectoryManager,
+    TrackingTrajectoryGenerator, TrajectoryManager as TrackingTrajectoryManager,
 };
 
 pub trait CommandConverter<Command> {

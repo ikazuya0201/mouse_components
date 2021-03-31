@@ -1,14 +1,13 @@
 use core::marker::PhantomData;
 
-use heapless::Vec;
+use spin::Mutex;
 
 use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParameters};
 use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
-use crate::commanders::PathUpperBound;
-use crate::trajectory_managers::InitialTrajectoryGenerator;
+use crate::trajectory_managers::TrackingTrajectoryGenerator;
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
 use crate::utils::math::{LibmMath, Math};
 use uom::si::{
@@ -27,6 +26,7 @@ pub enum RunKind {
 }
 
 pub struct RunTrajectoryGenerator<M> {
+    current_velocity: Mutex<Velocity>,
     run_slalom_velocity: Velocity,
     straight_generator: StraightTrajectoryGenerator<M>,
     slalom_generator: SlalomGenerator<M>,
@@ -54,6 +54,7 @@ impl<M: Math> RunTrajectoryGenerator<M> {
             slalom_parameters_map,
         );
         Self {
+            current_velocity: Mutex::new(Default::default()),
             run_slalom_velocity,
             straight_generator,
             slalom_generator,
@@ -65,29 +66,21 @@ impl<M: Math> RunTrajectoryGenerator<M> {
 //because trajectory does not accelerate in slalom.
 //Then, we assume that the initial command is straight.
 //TODO: To deal with arbitrary initial commands
-impl<M> InitialTrajectoryGenerator<(Pose, RunKind)> for RunTrajectoryGenerator<M>
+//TODO: Specify start and end of trajectories by `RunKind`.
+//TODO: Hold current velocity as a state.
+impl<M> TrackingTrajectoryGenerator<(Pose, RunKind)> for RunTrajectoryGenerator<M>
 where
     M: Math,
 {
     type Target = Target;
     type Trajectory = ShiftTrajectory<RunTrajectory<M>, M>;
-    type Trajectories = Vec<Self::Trajectory, PathUpperBound>;
 
-    fn generate<Commands: IntoIterator<Item = (Pose, RunKind)>>(
-        &self,
-        commands: Commands,
-    ) -> Self::Trajectories {
-        let mut current_velocity = Default::default();
-        let mut trajectories = Vec::new();
-        for (pose, kind) in commands {
-            let (trajectory, next_velocity) =
-                self.generate_run_trajectory_and_terminal_velocity(&pose, &kind, &current_velocity);
-            current_velocity = next_velocity;
-            trajectories.push(trajectory).unwrap_or_else(|_| {
-                unreachable!("The length of trajectories should be properly upper-bounded.")
-            });
-        }
-        trajectories
+    fn generate(&self, (pose, kind): &(Pose, RunKind)) -> Self::Trajectory {
+        let mut current_velocity = self.current_velocity.lock();
+        let (trajectory, terminal_velocity) =
+            self.generate_run_trajectory_and_terminal_velocity(&pose, &kind, &current_velocity);
+        *current_velocity = terminal_velocity;
+        trajectory
     }
 }
 

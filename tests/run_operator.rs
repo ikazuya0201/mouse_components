@@ -244,6 +244,6 @@ fn test_run_operator() {
     let operator = TrackingOperator::new(commander, agent);
     while operator.run().is_err() {
         stepper.step();
-        assert!(!operator.tick().is_err());
+        operator.tick().expect("Should never panic");
     }
 }

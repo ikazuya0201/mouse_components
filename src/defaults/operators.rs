@@ -26,6 +26,7 @@ type RunAgent<
     trajectory_managers::TrackingTrajectoryManager<
         (nodes::RunNode<Size>, types::data::RunKind),
         trajectory_generators::RunTrajectoryGenerator<Math>,
+        types::data::Target,
         command_converter::CommandConverter,
     >,
     robot::Robot<
@@ -62,6 +63,7 @@ type ReturnSetupAgent<
     trajectory_managers::TrackingTrajectoryManager<
         types::data::RotationKind,
         trajectory_generators::ReturnSetupTrajectoryGenerator<Math>,
+        types::data::Target,
         command_converter::ThroughCommandConverter,
     >,
     robot::Robot<
@@ -94,7 +96,7 @@ type SearchAgent<
         DistanceSensor,
         Size,
         Math,
-    > = agents::SearchAgent<
+    > = agents::TrackingAgent<
         trajectory_managers::SearchTrajectoryManager<
             trajectory_generators::SearchTrajectoryGenerator<Math>,
             command_converter::CommandConverter,

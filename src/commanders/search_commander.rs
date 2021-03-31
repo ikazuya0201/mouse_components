@@ -11,7 +11,7 @@ use super::{
     compute_shortest_path, BoundedNode, CostNode, GoalSizeUpperBound, Graph, PathUpperBound,
     RouteNode,
 };
-use crate::operators::{SearchCommander as ISearchCommander, SearchCommanderError};
+use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::utils::itertools::repeat_n;
 
 /// A trait that converts a given path to nodes which are on the path.
@@ -51,8 +51,8 @@ enum State {
 
 type CandidateSizeUpperBound = U4;
 
-/// An implementation of [SearchCommander](crate::operators::SearchCommander) required by
-/// [SearchOperator](crate::operators::SearchOperator).
+/// An implementation of [TrackingCommander](crate::operators::TrackingCommander) required by
+/// [TrackingOperator](crate::operators::TrackingOperator).
 pub struct SearchCommander<Node, RunNode, SearchNode, Route, Maze> {
     start: RunNode,
     goals: Vec<RunNode, GoalSizeUpperBound>,
@@ -106,7 +106,7 @@ where
     }
 }
 
-impl<Node, RunNode, Cost, Maze> ISearchCommander
+impl<Node, RunNode, Cost, Maze> TrackingCommander
     for SearchCommander<
         Node,
         RunNode,
@@ -139,7 +139,7 @@ where
 
     //must return the current pose and next kind
     //TODO: write test
-    fn next_command(&self) -> Result<Self::Command, SearchCommanderError<Self::Error>> {
+    fn next_command(&self) -> Result<Self::Command, TrackingCommanderError<Self::Error>> {
         let mut state = self.state.lock();
         match *state {
             State::Initial => {
@@ -151,7 +151,7 @@ where
                 *state = State::Solving;
                 Ok((next, self.initial_route.clone()))
             }
-            State::Final => Err(SearchCommanderError::SearchFinish),
+            State::Final => Err(TrackingCommanderError::TrackingFinish),
             State::Solving => {
                 let mut current = self.current.lock();
                 if let Some(candidates) = self.next_node_candidates(
@@ -162,7 +162,7 @@ where
                 ) {
                     *self.candidates.lock() = candidates;
                     *state = State::Waiting;
-                    Err(SearchCommanderError::Waiting)
+                    Err(TrackingCommanderError::Waiting)
                 } else {
                     let tmp = current.clone();
                     *current = current
@@ -176,13 +176,13 @@ where
                 let mut next = None;
                 let mut candidates = self.candidates.lock();
                 if candidates.is_empty() {
-                    return Err(SearchCommanderError::Waiting);
+                    return Err(TrackingCommanderError::Waiting);
                 }
                 for &node in candidates.iter() {
                     let is_available = self
                         .maze
                         .is_available(&node)
-                        .ok_or(SearchCommanderError::Waiting)?;
+                        .ok_or(TrackingCommanderError::Waiting)?;
                     if is_available {
                         next = Some(node);
                         break;

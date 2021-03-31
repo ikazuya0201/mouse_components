@@ -1,17 +1,23 @@
 use spin::Mutex;
 
-use crate::agents::Robot as IRobot;
-use crate::operators::{TrackingAgent as ITrackingAgent, TrackingAgentError, TrackingInitializer};
+use crate::agents::Robot;
+use crate::operators::TrackingAgent as ITrackingAgent;
 
-/// A trait that produces tracking target.
-pub trait TrajectoryManager {
+/// A trait that manages trajectories.
+pub trait TrajectoryManager<Command> {
+    type Error;
     type Target;
 
-    fn next(&self) -> Option<Self::Target>;
+    fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
+
+    fn next(&self) -> Self::Target;
+
+    fn is_empty(&self) -> Option<bool>;
+    fn is_full(&self) -> Option<bool>;
 }
 
-/// An implementation of [TrackingAgent](crate::operators::TrackingAgent).
-#[derive(Debug)]
+/// An implementation of [TrackingAgent](crate::operators::TrackingAgent) required by
+/// [TrackingOperator](crate::operators::TrackingOperator).
 pub struct TrackingAgent<Manager, Robot> {
     manager: Manager,
     robot: Mutex<Robot>,
@@ -31,32 +37,39 @@ impl<Manager, Robot> TrackingAgent<Manager, Robot> {
     }
 }
 
-impl<Command, Manager, Robot> TrackingInitializer<Command> for TrackingAgent<Manager, Robot>
-where
-    Manager: TrackingInitializer<Command>,
-{
-    type Error = Manager::Error;
-
-    fn initialize<Commands: IntoIterator<Item = Command>>(
-        &self,
-        commands: Commands,
-    ) -> Result<(), Self::Error> {
-        self.manager.initialize(commands)
-    }
+/// Error on [TrackingAgent](TrackingAgent).
+#[derive(Debug)]
+pub enum TrackingAgentError<T, U> {
+    Robot(T),
+    Manager(U),
 }
 
-impl<Manager, Robot> ITrackingAgent for TrackingAgent<Manager, Robot>
+impl<Manager, RobotType, Command> ITrackingAgent<Command> for TrackingAgent<Manager, RobotType>
 where
-    Manager: TrajectoryManager,
-    Robot: IRobot<Manager::Target>,
+    RobotType: Robot<Manager::Target>,
+    Manager: TrajectoryManager<Command>,
 {
-    type Error = Robot::Error;
+    type Error = TrackingAgentError<RobotType::Error, Manager::Error>;
 
-    fn track_next(&self) -> Result<(), TrackingAgentError<Self::Error>> {
-        let target = self.manager.next().ok_or(TrackingAgentError::Completed)?;
+    fn update(&self) -> Result<(), Self::Error> {
+        let target = self.manager.next();
         self.robot
             .lock()
             .track_and_update(&target)
-            .map_err(|err| TrackingAgentError::Other(err))
+            .map_err(|err| TrackingAgentError::Robot(err))
+    }
+
+    fn set_command(&self, command: &Command) -> Result<(), Self::Error> {
+        self.manager
+            .set_command(command)
+            .map_err(|err| TrackingAgentError::Manager(err))
+    }
+
+    fn is_full(&self) -> Option<bool> {
+        self.manager.is_full()
+    }
+
+    fn is_empty(&self) -> Option<bool> {
+        self.manager.is_empty()
     }
 }

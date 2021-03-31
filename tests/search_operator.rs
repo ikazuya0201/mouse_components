@@ -1,7 +1,7 @@
 use core::f32::consts::PI;
 
 use components::{
-    agents::SearchAgent,
+    agents::TrackingAgent,
     command_converter::CommandConverter,
     commanders::SearchCommander,
     controllers::{RotationalControllerBuilder, TranslationalControllerBuilder},
@@ -9,7 +9,7 @@ use components::{
     mazes::Maze,
     nodes::{Node, RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
-    operators::SearchOperator,
+    operators::TrackingOperator,
     robot::Robot,
     tracker::TrackerBuilder,
     trajectory_generators::{
@@ -223,7 +223,7 @@ macro_rules! impl_search_operator_test {
                         CommandConverter::new(Length::new::<millimeter>(90.0), front_offset),
                     );
 
-                    SearchAgent::new(trajectory_manager, robot)
+                    TrackingAgent::new(trajectory_manager, robot)
                 };
 
                 use AbsoluteDirection::*;
@@ -245,7 +245,7 @@ macro_rules! impl_search_operator_test {
                 let commander = create_commander(&wall_manager);
                 let expected_commander = create_commander(&expected_wall_manager);
 
-                let operator = SearchOperator::new(commander, agent);
+                let operator = TrackingOperator::new(commander, agent);
                 while operator.run().is_err() {
                     stepper.step();
                     operator.tick().expect("Fail safe should never invoke");

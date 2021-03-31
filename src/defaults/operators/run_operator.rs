@@ -38,7 +38,7 @@ pub struct RunOperator<
     >,
 )
 where
-    Size: Mul<Size>,
+    Size: Mul<Size> + Clone,
     Size::Output: Mul<U2> + ArrayLength<ShiftTrajectory<RunTrajectory<Math>, Math>>,
     <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
     Math: crate::utils::math::Math;

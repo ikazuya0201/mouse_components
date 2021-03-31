@@ -1,50 +1,26 @@
 use core::fmt::Debug;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use generic_array::ArrayLength;
 use heapless::Vec;
 use num::{Bounded, Saturating};
-use spin::Mutex;
 use typenum::Unsigned;
 
-use super::{compute_shortest_path, BoundedNode, CostNode, GoalSizeUpperBound, Graph, RouteNode};
-use crate::operators::InitialCommander;
+use super::{compute_shortest_path, BoundedNode, CostNode, Graph, PathUpperBound, RouteNode};
+use crate::operators::{TrackingCommander, TrackingCommanderError};
 
-/// An implementation of [InitialCommander](crate::operators::InitialCommander).
-pub struct RunCommander<Node, Maze> {
-    start: Node,
-    goals: Vec<Node, GoalSizeUpperBound>,
-    current: Mutex<Node>,
+/// An implementation of [TrackingCommander](crate::operators::TrackingCommander).
+pub struct RunCommander<Node, Maze>
+where
+    Node: RouteNode,
+{
+    current: Node,
     maze: Maze,
+    path: Vec<Node, PathUpperBound>,
+    iter: AtomicUsize,
 }
 
 impl<Node, Maze> RunCommander<Node, Maze>
-where
-    Node: Clone,
-{
-    pub fn new(start: Node, goals: &[Node], maze: Maze) -> Self {
-        Self {
-            start: start.clone(),
-            goals: goals.into_iter().cloned().collect(),
-            current: Mutex::new(start),
-            maze,
-        }
-    }
-
-    pub fn release(self) -> (Node, Maze) {
-        let Self { current, maze, .. } = self;
-        (current.into_inner(), maze)
-    }
-}
-
-/// Error on [RunCommander](RunCommander).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum RunCommanderError {
-    UnreachableError,
-    ConversionError,
-}
-
-//TODO: write test
-impl<Node, Maze> InitialCommander for RunCommander<Node, Maze>
 where
     Node::UpperBound: ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
@@ -57,29 +33,49 @@ where
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
 {
+    pub fn new(start: Node, goals: &[Node], maze: Maze) -> Self {
+        let path = compute_shortest_path(&start, &goals, &maze).unwrap_or_else(|| unimplemented!());
+
+        Self {
+            current: path.last().unwrap_or_else(|| unimplemented!()).clone(),
+            maze,
+            path,
+            iter: AtomicUsize::new(0),
+        }
+    }
+
+    pub fn release(self) -> (Node, Maze) {
+        let Self { current, maze, .. } = self;
+        (current, maze)
+    }
+}
+
+/// Error on [RunCommander](RunCommander).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RunCommanderError {
+    UnreachableError,
+    ConversionError,
+}
+
+//TODO: write test
+impl<Node, Maze> TrackingCommander for RunCommander<Node, Maze>
+where
+    Node: RouteNode + Clone,
+{
     type Error = RunCommanderError;
     type Command = (Node, Node::Route);
-    type Commands = Vec<Self::Command, Node::UpperBound>;
 
-    fn initial_commands(&self) -> Result<Self::Commands, Self::Error> {
-        let path = compute_shortest_path(&self.start, &self.goals, &self.maze)
-            .ok_or(RunCommanderError::UnreachableError)?;
-
-        let mut commands = Vec::new();
-        if path.len() == 0 {
-            return Ok(commands);
+    fn next_command(&self) -> Result<Self::Command, TrackingCommanderError<Self::Error>> {
+        let iter = self.iter.load(Ordering::Acquire);
+        if iter + 1 >= self.path.len() {
+            return Err(TrackingCommanderError::TrackingFinish);
         }
-        *self.current.lock() = path.last().unwrap().clone();
-        for i in 0..path.len() - 1 {
-            commands
-                .push((
-                    Node::from(path[i]),
-                    path[i]
-                        .route(&path[i + 1])
-                        .map_err(|_| RunCommanderError::ConversionError)?,
-                ))
-                .unwrap_or_else(|_| unreachable!());
-        }
-        Ok(commands)
+        self.iter.fetch_add(1, Ordering::AcqRel);
+        Ok((
+            self.path[iter].clone(),
+            self.path[iter]
+                .route(&self.path[iter + 1])
+                .map_err(|_| TrackingCommanderError::Other(RunCommanderError::ConversionError))?,
+        ))
     }
 }
