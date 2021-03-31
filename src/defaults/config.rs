@@ -336,7 +336,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
         /// Default: 10 \[mm\].
         ///
         /// Sets the range for ignoring the sensor value.
-        /// [PoseConverter](crate::pose_converter::PoseConverter) ignores the sensor value in the
+        /// Ignores the sensor value in the
         /// a given radius from pillar.
         ignore_radius_from_pillar: Length
     );
@@ -345,7 +345,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
         /// Default: 8 \[mm\].
         ///
         /// Sets the distance for ignoring the sensor value.
-        /// [PoseConverter](crate::pose_converter::PoseConverter) ignores the sensor value in the
+        /// Ignores the sensor value in the
         /// given distance from walls.
         ignore_length_from_wall: Length
     );
