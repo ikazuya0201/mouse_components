@@ -1,11 +1,9 @@
-use core::cmp::Reverse;
-
 use heapless::ArrayLength;
 use num::{Bounded, Saturating};
 use spin::Mutex;
 use typenum::Unsigned;
 
-use super::{compute_shortest_path, BoundedNode, BoundedPathNode, Graph};
+use super::{compute_shortest_path, BoundedNode, BoundedPathNode, CostNode, Graph};
 use crate::operators::InitialCommander;
 
 /// An implementation of [InitialCommander](crate::operators::InitialCommander).
@@ -52,7 +50,7 @@ where
     Node::UpperBound: Unsigned
         + ArrayLength<Maze::Cost>
         + ArrayLength<Option<Node>>
-        + ArrayLength<(Node, Reverse<Maze::Cost>)>
+        + ArrayLength<CostNode<Maze::Cost, Node>>
         + ArrayLength<Option<usize>>,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,

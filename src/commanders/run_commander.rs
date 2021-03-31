@@ -1,4 +1,3 @@
-use core::cmp::Reverse;
 use core::fmt::Debug;
 
 use generic_array::ArrayLength;
@@ -8,7 +7,8 @@ use spin::Mutex;
 use typenum::Unsigned;
 
 use super::{
-    compute_shortest_path, BoundedNode, BoundedPathNode, GoalSizeUpperBound, Graph, RouteNode,
+    compute_shortest_path, BoundedNode, BoundedPathNode, CostNode, GoalSizeUpperBound, Graph,
+    RouteNode,
 };
 use crate::operators::InitialCommander;
 
@@ -52,8 +52,7 @@ where
     Node::UpperBound: ArrayLength<Option<Node>>
         + ArrayLength<Option<usize>>
         + ArrayLength<Maze::Cost>
-        + ArrayLength<Reverse<Maze::Cost>>
-        + ArrayLength<(Node, Reverse<Maze::Cost>)>
+        + ArrayLength<CostNode<Maze::Cost, Node>>
         + ArrayLength<(Node, Node::Route)>
         + Unsigned,
     Node::PathUpperBound: ArrayLength<Node>,

@@ -27,10 +27,6 @@ features = ["f32", "autoconvert", "si"]
 version = "0.2"
 default-features = false
 
-[dependencies.heap]
-version = "0.1.1"
-git = "https://github.com/ikazuya0201/heap"
-
 [dev-dependencies]
 approx = "0.3.2"
 proptest = "0.10.1"
