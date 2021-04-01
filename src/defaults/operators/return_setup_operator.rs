@@ -29,8 +29,8 @@ pub struct ReturnSetupOperator<
             LeftMotor,
             RightMotor,
             DistanceSensor,
-            Size,
             Math,
+            Size,
         >,
     >,
 )

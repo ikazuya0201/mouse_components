@@ -32,8 +32,8 @@ pub struct RunOperator<
             LeftMotor,
             RightMotor,
             DistanceSensor,
-            Size,
             Math,
+            Size,
         >,
     >,
 )

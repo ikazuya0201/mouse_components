@@ -138,7 +138,7 @@ macro_rules! impl_search_operator_test {
                                 .period(period)
                                 .cut_off_frequency(Frequency::new::<hertz>(50.0))
                                 .initial_state(start_state)
-                                .wheel_interval(wheel_interval)
+                                .wheel_interval(Some(wheel_interval))
                                 .correction_weight(0.1)
                                 .build()
                                 .unwrap()

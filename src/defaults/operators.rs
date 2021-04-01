@@ -1,3 +1,4 @@
+pub mod initialize;
 mod return_operator;
 mod return_setup_operator;
 mod run_operator;
@@ -12,23 +13,7 @@ pub use return_setup_operator::ReturnSetupOperator;
 pub use run_operator::RunOperator;
 pub use search_operator::SearchOperator;
 
-type RunAgent<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Size,
-    Math,
-> = agents::TrackingAgent<
-    trajectory_managers::TrackingTrajectoryManager<
-        (nodes::RunNode<Size>, types::data::RunKind),
-        trajectory_generators::RunTrajectoryGenerator<Math>,
-        types::data::Target,
-        command_converter::CommandConverter,
-    >,
+type Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size> =
     robot::Robot<
         estimator::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
         tracker::Tracker<
@@ -46,7 +31,26 @@ type RunAgent<
             Size,
         >,
         types::data::RobotState,
+    >;
+
+type RunAgent<
+    'a,
+    LeftEncoder,
+    RightEncoder,
+    Imu,
+    LeftMotor,
+    RightMotor,
+    DistanceSensor,
+    Math,
+    Size,
+> = agents::TrackingAgent<
+    trajectory_managers::TrackingTrajectoryManager<
+        (nodes::RunNode<Size>, types::data::RunKind),
+        trajectory_generators::RunTrajectoryGenerator<Math>,
+        types::data::Target,
+        command_converter::CommandConverter,
     >,
+    Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>,
 >;
 
 type ReturnSetupAgent<
@@ -57,8 +61,8 @@ type ReturnSetupAgent<
     LeftMotor,
     RightMotor,
     DistanceSensor,
-    Size,
     Math,
+    Size,
 > = agents::TrackingAgent<
     trajectory_managers::TrackingTrajectoryManager<
         types::data::RotationKind,
@@ -66,24 +70,7 @@ type ReturnSetupAgent<
         types::data::Target,
         command_converter::ThroughCommandConverter,
     >,
-    robot::Robot<
-        estimator::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-        tracker::Tracker<
-            LeftMotor,
-            RightMotor,
-            Math,
-            controllers::TranslationalController,
-            controllers::RotationalController,
-        >,
-        wall_detector::WallDetector<
-            'a,
-            wall_manager::WallManager<Size>,
-            obstacle_detector::ObstacleDetector<DistanceSensor, Math>,
-            Math,
-            Size,
-        >,
-        types::data::RobotState,
-    >,
+    Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>,
 >;
 
 type SearchAgent<
@@ -94,8 +81,8 @@ type SearchAgent<
         LeftMotor,
         RightMotor,
         DistanceSensor,
-        Size,
         Math,
+        Size,
     > = agents::TrackingAgent<
         trajectory_managers::SearchTrajectoryManager<
             trajectory_generators::SearchTrajectoryGenerator<Math>,
@@ -106,24 +93,7 @@ type SearchAgent<
                 types::data::SearchKind,
             )>>::Trajectory,
         >,
-        robot::Robot<
-            estimator::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-            tracker::Tracker<
-                LeftMotor,
-                RightMotor,
-                Math,
-                controllers::TranslationalController,
-                controllers::RotationalController,
-            >,
-            wall_detector::WallDetector<
-                'a,
-                wall_manager::WallManager<Size>,
-                obstacle_detector::ObstacleDetector<DistanceSensor, Math>,
-                Math,
-                Size,
-            >,
-            types::data::RobotState,
-        >,
+        Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>,
     >;
 
 type SearchCommander<'a, Size> = commanders::SearchCommander<

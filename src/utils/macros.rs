@@ -44,3 +44,10 @@ macro_rules! impl_setter {
         );
     };
 }
+
+#[macro_export]
+macro_rules! get_or_err {
+    ($self: ident . $field_name: ident) => {{
+        crate::utils::builder::ok_or($self.$field_name.take(), core::stringify!($field_name))?
+    }};
+}

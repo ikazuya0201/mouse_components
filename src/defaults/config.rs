@@ -1,7 +1,8 @@
 //! An implementation of config.
 
 use uom::si::f32::{
-    Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time, Velocity,
+    Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Frequency, Jerk, Length, Time,
+    Velocity,
 };
 
 use crate::impl_setter;
@@ -35,7 +36,7 @@ impl_with_getter! {
         rotational_model_time_constant: Time,
         estimator_correction_weight: f32,
         wheel_interval: Option<Length>,
-        estimator_translational_velocity_alpha: f32,
+        estimator_cut_off_frequency: Frequency,
         cost_fn: fn(Pattern) -> u16,
         wall_width: Length,
         ignore_radius_from_pillar: Length,
@@ -70,13 +71,13 @@ impl_with_getter! {
 /// use typenum::*;
 /// use uom::si::f32::{
 ///     Length, Velocity, Acceleration, Jerk, AngularVelocity, AngularAcceleration, AngularJerk,
-///     Time,
+///     Time, Frequency,
 /// };
 /// use uom::si::{
 ///     acceleration::meter_per_second_squared,
 ///     angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
 ///     angular_velocity::degree_per_second, jerk::meter_per_second_cubed, length::meter,
-///     time::second, velocity::meter_per_second,
+///     time::second, velocity::meter_per_second, frequency::hertz,
 /// };
 /// use components::nodes::RunNode;
 /// use components::types::data::{AbsoluteDirection, Pattern, SearchKind};
@@ -104,7 +105,7 @@ impl_with_getter! {
 ///     .search_initial_route(SearchKind::Init)
 ///     .search_final_route(SearchKind::Final)
 ///     .cost_fn(cost)
-///     .estimator_translational_velocity_alpha(0.1)
+///     .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
 ///     .period(Time::new::<second>(0.001))
 ///     .estimator_correction_weight(0.1)
 ///     .translational_kp(0.9)
@@ -160,7 +161,7 @@ pub struct ConfigBuilder<'a, Size> {
     rotational_model_time_constant: Option<Time>,
     estimator_correction_weight: Option<f32>,
     wheel_interval: Option<Length>,
-    estimator_translational_velocity_alpha: Option<f32>,
+    estimator_cut_off_frequency: Option<Frequency>,
     cost_fn: Option<fn(Pattern) -> u16>,
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
@@ -316,8 +317,8 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
     );
     impl_setter!(
         /// **Required**,
-        /// Sets the alpha for low pass filter of translational velocity.
-        estimator_translational_velocity_alpha: f32
+        /// Sets a cut off frequency for low pass filter of translational velocity.
+        estimator_cut_off_frequency: Frequency
     );
     impl_setter!(
         /// **Required**,
@@ -491,7 +492,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
             rotational_model_time_constant: None,
             estimator_correction_weight: None,
             wheel_interval: None,
-            estimator_translational_velocity_alpha: None,
+            estimator_cut_off_frequency: None,
             cost_fn: None,
             wall_width: None,
             ignore_radius_from_pillar: None,
@@ -560,7 +561,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
                 .estimator_correction_weight
                 .unwrap_or(Default::default()),
             wheel_interval: self.wheel_interval,
-            estimator_translational_velocity_alpha: get!(estimator_translational_velocity_alpha),
+            estimator_cut_off_frequency: get!(estimator_cut_off_frequency),
             cost_fn: get!(cost_fn),
             wall_width: self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
             ignore_radius_from_pillar: self
@@ -609,8 +610,8 @@ mod tests {
         use uom::si::{
             acceleration::meter_per_second_squared,
             angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
-            angular_velocity::degree_per_second, jerk::meter_per_second_cubed, length::meter,
-            time::second, velocity::meter_per_second,
+            angular_velocity::degree_per_second, frequency::hertz, jerk::meter_per_second_cubed,
+            length::meter, time::second, velocity::meter_per_second,
         };
 
         use crate::nodes::RunNode;
@@ -638,7 +639,7 @@ mod tests {
             .search_initial_route(SearchKind::Init)
             .search_final_route(SearchKind::Final)
             .cost_fn(cost)
-            .estimator_translational_velocity_alpha(0.1)
+            .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
             .period(Time::new::<second>(0.001))
             .estimator_correction_weight(0.1)
             .translational_kp(0.9)

@@ -306,8 +306,8 @@ impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncod
         self
     }
 
-    pub fn wheel_interval(&mut self, wheel_interval: Length) -> &mut Self {
-        self.wheel_interval = Some(wheel_interval);
+    pub fn wheel_interval(&mut self, wheel_interval: Option<Length>) -> &mut Self {
+        self.wheel_interval = wheel_interval;
         self
     }
 
@@ -556,7 +556,7 @@ mod tests {
                     .imu(imu)
                     .period(PERIOD)
                     .cut_off_frequency(Frequency::new::<hertz>(50.0))
-                    .wheel_interval(wheel_interval)
+                    .wheel_interval(Some(wheel_interval))
                     .build()
                     .unwrap();
 

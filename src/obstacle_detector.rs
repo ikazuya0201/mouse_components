@@ -1,6 +1,5 @@
 use core::marker::PhantomData;
 
-use heapless::Vec;
 use uom::si::f32::Length;
 
 use crate::tracker::RobotState;
@@ -23,9 +22,11 @@ pub struct Obstacle {
 
 pub type SensorSizeUpperBound = typenum::consts::U6;
 
+pub type Vec<T, N = SensorSizeUpperBound> = heapless::Vec<T, N>;
+
 //NOTE: the number of sensors is upper-bounded.
 pub struct ObstacleDetector<D, M> {
-    distance_sensors: Vec<D, SensorSizeUpperBound>,
+    distance_sensors: Vec<D>,
     _math: PhantomData<fn() -> M>,
 }
 
@@ -38,7 +39,7 @@ impl<D, M> ObstacleDetector<D, M> {
         }
     }
 
-    pub fn release(self) -> Vec<D, SensorSizeUpperBound> {
+    pub fn release(self) -> Vec<D> {
         let Self {
             distance_sensors, ..
         } = self;
@@ -52,7 +53,7 @@ where
     D: DistanceSensor,
 {
     type Obstacle = Obstacle;
-    type Obstacles = Vec<Obstacle, SensorSizeUpperBound>;
+    type Obstacles = Vec<Obstacle>;
 
     fn detect(&mut self, state: &RobotState) -> Self::Obstacles {
         let mut obstacles = Vec::new();
