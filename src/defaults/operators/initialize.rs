@@ -2,26 +2,28 @@ use core::ops::Mul;
 
 use generic_array::ArrayLength;
 use spin::Mutex;
-use typenum::consts::*;
+use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use super::{Robot, SearchAgent, SearchCommander};
+use super::{Robot, RunAgent, RunCommander, SearchAgent, SearchCommander};
 use crate::command_converter::CommandConverter;
+use crate::commanders::CostNode;
 use crate::controllers::{RotationalControllerBuilder, TranslationalControllerBuilder};
 use crate::defaults::{config::Config, resource::Resource, state::State};
 use crate::estimator::{Estimator, EstimatorBuilder};
-use crate::mazes::Maze;
+use crate::mazes::{CheckedMaze, Maze, WallNode};
+use crate::nodes::{Pattern, RunNode};
 use crate::obstacle_detector::ObstacleDetector;
 use crate::obstacle_detector::Vec;
 use crate::sensors::{Encoder, Motor, IMU};
 use crate::tracker::{Tracker, TrackerBuilder};
 use crate::trajectory_generators::{
-    RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder, SearchTrajectoryGenerator,
+    RunKind, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder, SearchTrajectoryGenerator,
     SearchTrajectoryGeneratorBuilder,
 };
-use crate::trajectory_managers::SearchTrajectoryManager;
+use crate::trajectory_managers::{SearchTrajectoryManager, TrackingTrajectoryManager};
 use crate::utils::probability::Probability;
 use crate::wall_detector::{WallDetector, WallDetectorBuilder};
-use crate::wall_manager::WallManager;
+use crate::wall_manager::{Wall, WallManager};
 
 pub fn init_estimator<'a, LeftEncoder, RightEncoder, Imu, Math, Size>(
     config: &'a Config<'a, Size>,
@@ -227,6 +229,37 @@ where
     )
 }
 
+pub fn init_run_commander<'a, Size>(
+    config: &Config<'a, Size>,
+    state: &State<Size>,
+    wall_manager: &'a WallManager<Size>,
+) -> RunCommander<'a, Size>
+where
+    Size: Mul<Size> + Mul<U2> + Mul<U4> + Clone + PartialEq + PowerOfTwo + Unsigned,
+    <Size as Mul<Size>>::Output: Mul<U2> + Mul<U16>,
+    <Size as Mul<U4>>::Output: ArrayLength<(RunNode<Size>, u16)>
+        + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
+    <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
+    <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<(RunNode<Size>, RunKind)>
+        + ArrayLength<CostNode<u16, RunNode<Size>>>
+        + ArrayLength<Option<usize>>
+        + ArrayLength<u16>
+        + ArrayLength<Option<RunNode<Size>>>,
+{
+    use core::convert::TryInto;
+
+    let maze = CheckedMaze::new(wall_manager, *config.cost_fn());
+    RunCommander::new(
+        state
+            .current_node()
+            .clone()
+            .try_into()
+            .expect("Should never panic"),
+        config.goals(),
+        maze,
+    )
+}
+
 pub fn init_search_agent<
     'a,
     LeftEncoder,
@@ -269,4 +302,38 @@ where
     let trajectory_manager =
         SearchTrajectoryManager::new(init_search_trajectory_generator(config), command_converter);
     SearchAgent::new(trajectory_manager, robot)
+}
+
+pub fn init_run_agent<
+    'a,
+    LeftEncoder,
+    RightEncoder,
+    Imu,
+    LeftMotor,
+    RightMotor,
+    DistanceSensor,
+    Math,
+    Size,
+>(
+    config: &'a Config<'a, Size>,
+    state: &State<Size>,
+    resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
+    wall_manager: &'a WallManager<Size>,
+) -> RunAgent<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>
+where
+    Math: crate::utils::math::Math,
+    LeftEncoder: Encoder,
+    RightEncoder: Encoder,
+    Imu: IMU,
+    LeftMotor: Motor,
+    RightMotor: Motor,
+    Size: Mul<Size>,
+    Size::Output: Mul<U2>,
+    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
+{
+    let robot = init_robot(config, state, resource, wall_manager);
+    let command_converter = CommandConverter::new(*config.square_width(), *config.front_offset());
+    let trajectory_manager =
+        TrackingTrajectoryManager::new(init_run_trajectory_generator(config), command_converter);
+    RunAgent::new(trajectory_manager, robot)
 }

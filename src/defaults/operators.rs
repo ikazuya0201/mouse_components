@@ -45,10 +45,10 @@ type RunAgent<
     Size,
 > = agents::TrackingAgent<
     trajectory_managers::TrackingTrajectoryManager<
-        (nodes::RunNode<Size>, types::data::RunKind),
         trajectory_generators::RunTrajectoryGenerator<Math>,
-        types::data::Target,
         command_converter::CommandConverter,
+        types::data::Target,
+        trajectory_generators::ShiftTrajectory<trajectory_generators::RunTrajectory<Math>, Math>,
     >,
     Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>,
 >;
