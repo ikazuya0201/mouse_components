@@ -240,6 +240,16 @@ where
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct SearchNode<N>(Node<N>);
 
+impl<N> SearchNode<N> {
+    pub fn inner(&self) -> &Node<N> {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> Node<N> {
+        self.0
+    }
+}
+
 impl<N> From<SearchNode<N>> for Node<N> {
     fn from(value: SearchNode<N>) -> Self {
         value.0
@@ -299,19 +309,19 @@ where
     fn into(self) -> usize {
         use AbsoluteDirection::*;
 
-        let direction = if self.x() & 1 == 0 {
-            if self.y() & 1 == 0 {
+        let direction = if self.0.x() & 1 == 0 {
+            if self.0.y() & 1 == 0 {
                 unreachable!()
             } else {
-                match self.direction() {
+                match self.0.direction() {
                     North => 0,
                     South => 1,
                     _ => unreachable!(),
                 }
             }
         } else {
-            if self.y() & 1 == 0 {
-                match self.direction() {
+            if self.0.y() & 1 == 0 {
+                match self.0.direction() {
                     East => 0,
                     West => 1,
                     _ => unreachable!(),
@@ -320,8 +330,8 @@ where
                 unreachable!()
             }
         };
-        *self.x() as usize
-            | ((*self.y() as usize) << Self::y_offset())
+        *self.0.x() as usize
+            | ((*self.0.y() as usize) << Self::y_offset())
             | (direction << Self::direction_offset())
     }
 }
@@ -330,19 +340,11 @@ impl<N> From<SearchNode<N>> for Wall<N> {
     fn from(value: SearchNode<N>) -> Self {
         unsafe {
             Wall::new_unchecked(
-                *value.x() as u16 / 2,
-                *value.y() as u16 / 2,
-                value.x() & 1 == 0,
+                *value.0.x() as u16 / 2,
+                *value.0.y() as u16 / 2,
+                value.0.x() & 1 == 0,
             )
         }
-    }
-}
-
-impl<N> core::ops::Deref for SearchNode<N> {
-    type Target = Node<N>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
@@ -525,6 +527,16 @@ impl<N: Clone> RouteNode for RunNode<N> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct RunNode<N>(Node<N>);
 
+impl<N> RunNode<N> {
+    pub fn inner(&self) -> &Node<N> {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> Node<N> {
+        self.0
+    }
+}
+
 impl<N> From<RunNode<N>> for Node<N> {
     fn from(value: RunNode<N>) -> Self {
         value.0
@@ -552,16 +564,16 @@ where
     fn into(self) -> usize {
         use AbsoluteDirection::*;
 
-        let direction = if (self.x ^ self.y) & 1 == 1 {
-            match self.direction {
+        let direction = if (self.0.x ^ self.0.y) & 1 == 1 {
+            match self.0.direction {
                 NorthEast => 0,
                 SouthEast => 1,
                 SouthWest => 2,
                 NorthWest => 3,
                 _ => unreachable!(),
             }
-        } else if (self.x | self.y) & 1 == 0 {
-            match self.direction {
+        } else if (self.0.x | self.0.y) & 1 == 0 {
+            match self.0.direction {
                 North => 0,
                 East => 1,
                 South => 2,
@@ -572,8 +584,8 @@ where
             unreachable!()
         };
 
-        self.x as usize
-            | ((self.y as usize) << Self::y_offset())
+        self.0.x as usize
+            | ((self.0.y as usize) << Self::y_offset())
             | (direction << Self::direction_offset())
     }
 }
@@ -616,14 +628,6 @@ impl<N> RunNode<N> {
         } else {
             false
         }
-    }
-}
-
-impl<N> core::ops::Deref for RunNode<N> {
-    type Target = Node<N>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
@@ -891,7 +895,7 @@ where
         use RelativeDirection::*;
 
         let mut walls = ForcedVec::new();
-        match (self.0.location(), self.direction()) {
+        match (self.0.location(), self.0.direction()) {
             (Cell, _) => {
                 let mut add = |x: i16, y: i16| {
                     if let Ok(wall) = self.0.relative_wall(x, y, North) {
