@@ -36,7 +36,7 @@ pub trait RouteNode {
     fn route(&self, to: &Self) -> Result<Self::Route, Self::Error>;
 }
 
-type GoalSizeUpperBound = U8;
+pub type GoalSizeUpperBound = U8;
 
 #[derive(Debug)]
 pub struct CostNode<Cost, Node>(Cost, Node);

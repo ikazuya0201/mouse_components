@@ -29,7 +29,7 @@ use crate::wall_detector::{WallDetector, WallDetectorBuilder};
 use crate::wall_manager::{Wall, WallManager};
 
 pub fn init_estimator<'a, LeftEncoder, RightEncoder, Imu, Math, Size>(
-    config: &'a Config<'a, Size>,
+    config: &Config<Size>,
     state: &State<Size>,
     left_encoder: LeftEncoder,
     right_encoder: RightEncoder,
@@ -55,7 +55,7 @@ where
 }
 
 pub fn init_tracker<'a, LeftMotor, RightMotor, Math, Size>(
-    config: &'a Config<'a, Size>,
+    config: &Config<Size>,
     left_motor: LeftMotor,
     right_motor: RightMotor,
 ) -> Tracker<LeftMotor, RightMotor, Math>
@@ -103,7 +103,7 @@ where
 }
 
 pub fn init_wall_detector<'a, DistanceSensor, Math, Size>(
-    config: &Config<'a, Size>,
+    config: &Config<Size>,
     distance_sensors: Vec<DistanceSensor>,
     wall_manager: &'a WallManager<Size>,
 ) -> WallDetector<'a, WallManager<Size>, ObstacleDetector<DistanceSensor, Math>, Math, Size>
@@ -136,7 +136,7 @@ pub fn init_robot<
     Math,
     Size,
 >(
-    config: &'a Config<'a, Size>,
+    config: &Config<Size>,
     state: &State<Size>,
     resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
     wall_manager: &'a WallManager<Size>,
@@ -168,7 +168,7 @@ where
 }
 
 pub fn init_search_trajectory_generator<'a, Math, Size>(
-    config: &Config<'a, Size>,
+    config: &Config<Size>,
 ) -> SearchTrajectoryGenerator<Math>
 where
     Math: crate::utils::math::Math,
@@ -192,7 +192,7 @@ where
 }
 
 pub fn init_run_trajectory_generator<'a, Math, Size>(
-    config: &Config<'a, Size>,
+    config: &Config<Size>,
 ) -> RunTrajectoryGenerator<Math>
 where
     Math: crate::utils::math::Math,
@@ -212,7 +212,7 @@ where
 }
 
 pub fn init_return_setup_trajectory_generator<'a, Math, Size>(
-    config: &Config<'a, Size>,
+    config: &Config<Size>,
 ) -> ReturnSetupTrajectoryGenerator<Math> {
     ReturnSetupTrajectoryGenerator::new(
         *config.spin_angular_velocity(),
@@ -223,7 +223,7 @@ pub fn init_return_setup_trajectory_generator<'a, Math, Size>(
 }
 
 pub fn init_search_commander<'a, Size>(
-    config: &Config<'a, Size>,
+    config: &Config<Size>,
     state: &State<Size>,
     wall_manager: &'a WallManager<Size>,
 ) -> SearchCommander<'a, Size>
@@ -244,7 +244,7 @@ where
 }
 
 pub fn init_run_commander<'a, Size>(
-    config: &Config<'a, Size>,
+    config: &Config<Size>,
     state: &State<Size>,
     wall_manager: &'a WallManager<Size>,
 ) -> RunCommander<'a, Size>
@@ -275,7 +275,7 @@ where
 }
 
 pub fn init_return_commander<'a, Size>(
-    config: &Config<'a, Size>,
+    config: &Config<Size>,
     state: &State<Size>,
     wall_manager: &'a WallManager<Size>,
 ) -> RunCommander<'a, Size>
@@ -306,7 +306,7 @@ where
 }
 
 pub fn init_return_setup_commander<'a, Size>(
-    config: &Config<'a, Size>,
+    config: &Config<Size>,
     state: &State<Size>,
     wall_manager: &'a WallManager<Size>,
 ) -> ReturnSetupCommander<'a, Size>
@@ -347,7 +347,7 @@ pub fn init_search_agent<
     Math,
     Size,
 >(
-    config: &'a Config<'a, Size>,
+    config: &Config<Size>,
     state: &State<Size>,
     resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
     wall_manager: &'a WallManager<Size>,
@@ -391,7 +391,7 @@ pub fn init_run_agent<
     Math,
     Size,
 >(
-    config: &'a Config<'a, Size>,
+    config: &Config<Size>,
     state: &State<Size>,
     resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
     wall_manager: &'a WallManager<Size>,
@@ -425,7 +425,7 @@ pub fn init_return_setup_agent<
     Math,
     Size,
 >(
-    config: &'a Config<'a, Size>,
+    config: &Config<Size>,
     state: &State<Size>,
     resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
     wall_manager: &'a WallManager<Size>,

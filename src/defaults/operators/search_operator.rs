@@ -89,7 +89,7 @@ where
     RightEncoder::Error: Debug,
 {
     pub fn new(
-        config: &'a Config<'a, Size>,
+        config: &Config<Size>,
         state: &State<Size>,
         resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
         wall_manager: &'a WallManager<Size>,
@@ -124,5 +124,43 @@ where
             .expect("Should never panic");
         let state = State::new(current_node, robot_state);
         (state, resource)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_and_release() {
+        use super::super::mocks::{DistanceSensorMock, EncoderMock, ImuMock, MotorMock};
+        use crate::defaults::config::generate_default_config;
+        use crate::nodes::{AbsoluteDirection, RunNode};
+        use crate::utils::math::MathFake;
+        use crate::utils::probability::Probability;
+        use crate::wall_manager::WallManager;
+
+        let config = generate_default_config();
+        let resource = ResourceBuilder::new()
+            .left_encoder(EncoderMock)
+            .right_encoder(EncoderMock)
+            .imu(ImuMock)
+            .left_motor(MotorMock)
+            .right_motor(MotorMock)
+            .distance_sensors(core::array::IntoIter::new([DistanceSensorMock]).collect())
+            .build()
+            .unwrap();
+        let state = State::new(
+            RunNode::new(0, 0, AbsoluteDirection::North).unwrap().into(),
+            Default::default(),
+        );
+        let wall_manager = WallManager::new(Probability::new(0.1).unwrap());
+        let operator = SearchOperator::<_, _, _, _, _, _, MathFake, _>::new(
+            &config,
+            &state,
+            resource,
+            &wall_manager,
+        );
+        let (_, _) = operator.release();
     }
 }

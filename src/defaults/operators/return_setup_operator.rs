@@ -92,7 +92,7 @@ where
     RightEncoder::Error: Debug,
 {
     pub fn new(
-        config: &'a Config<'a, Size>,
+        config: &Config<Size>,
         state: &State<Size>,
         resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
         wall_manager: &'a WallManager<Size>,

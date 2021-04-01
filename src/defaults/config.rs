@@ -1,10 +1,12 @@
 //! An implementation of config.
 
+use heapless::Vec;
 use uom::si::f32::{
     Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Frequency, Jerk, Length, Time,
     Velocity,
 };
 
+use crate::commanders::GoalSizeUpperBound;
 use crate::impl_setter;
 use crate::impl_with_getter;
 use crate::nodes::RunNode;
@@ -14,13 +16,13 @@ use crate::utils::builder::{ok_or, BuilderResult};
 
 impl_with_getter! {
     /// An implementation of config.
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    pub struct Config<'a, Size> {
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Config<Size> {
         square_width: Length,
         front_offset: Length,
         start: RunNode<Size>,
         return_goal: RunNode<Size>,
-        goals: &'a [RunNode<Size>],
+        goals: Vec<RunNode<Size>,GoalSizeUpperBound>,
         search_initial_route: SearchKind,
         search_final_route: SearchKind,
         translational_kp: f32,
@@ -101,7 +103,7 @@ impl_with_getter! {
 /// let config = ConfigBuilder::new()
 ///     .start(start)
 ///     .return_goal(return_goal)
-///     .goals(&goals)
+///     .goals(goals.into_iter().collect())
 ///     .search_initial_route(SearchKind::Init)
 ///     .search_final_route(SearchKind::Final)
 ///     .cost_fn(cost)
@@ -140,12 +142,12 @@ impl_with_getter! {
 ///     .unwrap();
 /// ```
 
-pub struct ConfigBuilder<'a, Size> {
+pub struct ConfigBuilder<Size> {
     square_width: Option<Length>,
     front_offset: Option<Length>,
     start: Option<RunNode<Size>>,
     return_goal: Option<RunNode<Size>>,
-    goals: Option<&'a [RunNode<Size>]>,
+    goals: Option<Vec<RunNode<Size>, GoalSizeUpperBound>>,
     search_initial_route: Option<SearchKind>,
     search_final_route: Option<SearchKind>,
     translational_kp: Option<f32>,
@@ -188,7 +190,7 @@ pub struct ConfigBuilder<'a, Size> {
     spin_angular_jerk: Option<AngularJerk>,
 }
 
-impl<'a, Size> ConfigBuilder<'a, Size> {
+impl<Size> ConfigBuilder<Size> {
     impl_setter!(
         /// **Optional**,
         /// Default: 90 \[mm\] (half size).
@@ -216,7 +218,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
     impl_setter!(
         /// **Required**,
         /// Sets the goal nodes for search.
-        goals: &'a [RunNode<Size>]
+        goals: Vec<RunNode<Size>, GoalSizeUpperBound>
     );
     impl_setter!(
         /// **Required**,
@@ -523,7 +525,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
     /// Builds [Config](Config).
     ///
     /// This method can be failed when required parameters are not given.
-    pub fn build(&mut self) -> BuilderResult<Config<'a, Size>> {
+    pub fn build(&mut self) -> BuilderResult<Config<Size>> {
         macro_rules! get {
             ($field_name: ident) => {{
                 ok_or(self.$field_name.take(), core::stringify!($field_name))?
@@ -601,12 +603,15 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
 }
 
 #[cfg(test)]
+pub use tests::generate_default_config;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_builder() {
-        use typenum::*;
+    type Size = typenum::consts::U4;
+
+    pub fn generate_default_config() -> Config<Size> {
         use uom::si::{
             acceleration::meter_per_second_squared,
             angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
@@ -614,12 +619,9 @@ mod tests {
             length::meter, time::second, velocity::meter_per_second,
         };
 
-        use crate::nodes::RunNode;
-        use crate::types::data::{AbsoluteDirection, Pattern, SearchKind};
+        use crate::types::data::AbsoluteDirection;
 
         use AbsoluteDirection::*;
-
-        type Size = U4;
 
         let start = RunNode::<Size>::new(0, 0, North).unwrap();
         let return_goal = RunNode::<Size>::new(0, 0, South).unwrap();
@@ -632,10 +634,10 @@ mod tests {
             unreachable!()
         }
 
-        let _ = ConfigBuilder::new()
+        ConfigBuilder::new()
             .start(start)
             .return_goal(return_goal)
-            .goals(&goals)
+            .goals(goals.into_iter().collect())
             .search_initial_route(SearchKind::Init)
             .search_final_route(SearchKind::Final)
             .cost_fn(cost)
@@ -671,6 +673,11 @@ mod tests {
             .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
             .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
             .build()
-            .unwrap();
+            .unwrap()
+    }
+
+    #[test]
+    fn test_builder() {
+        generate_default_config();
     }
 }
