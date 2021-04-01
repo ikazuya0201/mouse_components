@@ -13,6 +13,7 @@ mod mocks {
 
     use uom::si::f32::{Acceleration, AngularVelocity, ElectricPotential, Length};
 
+    use crate::defaults::resource::{Resource, ResourceBuilder};
     use crate::sensors::{DistanceSensor, Encoder, Motor, IMU};
     use crate::types::data::Pose;
     use crate::utils::sample::Sample;
@@ -61,5 +62,18 @@ mod mocks {
         fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {
             unimplemented!()
         }
+    }
+
+    pub fn default_resource(
+    ) -> Resource<EncoderMock, EncoderMock, ImuMock, MotorMock, MotorMock, DistanceSensorMock> {
+        ResourceBuilder::new()
+            .left_encoder(EncoderMock)
+            .right_encoder(EncoderMock)
+            .imu(ImuMock)
+            .left_motor(MotorMock)
+            .right_motor(MotorMock)
+            .distance_sensors(core::array::IntoIter::new([DistanceSensorMock]).collect())
+            .build()
+            .unwrap()
     }
 }

@@ -133,23 +133,15 @@ mod tests {
 
     #[test]
     fn test_new_and_release() {
-        use super::super::mocks::{DistanceSensorMock, EncoderMock, ImuMock, MotorMock};
-        use crate::defaults::config::generate_default_config;
+        use super::super::mocks::default_resource;
+        use crate::defaults::config::default_config;
         use crate::nodes::{AbsoluteDirection, RunNode};
         use crate::utils::math::MathFake;
         use crate::utils::probability::Probability;
         use crate::wall_manager::WallManager;
 
-        let config = generate_default_config();
-        let resource = ResourceBuilder::new()
-            .left_encoder(EncoderMock)
-            .right_encoder(EncoderMock)
-            .imu(ImuMock)
-            .left_motor(MotorMock)
-            .right_motor(MotorMock)
-            .distance_sensors(core::array::IntoIter::new([DistanceSensorMock]).collect())
-            .build()
-            .unwrap();
+        let config = default_config();
+        let resource = default_resource();
         let state = State::new(
             RunNode::new(0, 0, AbsoluteDirection::North).unwrap().into(),
             Default::default(),

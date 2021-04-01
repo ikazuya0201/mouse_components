@@ -129,3 +129,36 @@ where
         (state, resource)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_and_release() {
+        use super::super::mocks::default_resource;
+        use crate::defaults::config::default_config;
+        use crate::nodes::{AbsoluteDirection, RunNode};
+        use crate::utils::math::MathFake;
+        use crate::utils::probability::Probability;
+        use crate::wall_manager::WallManager;
+
+        let config = default_config();
+        let resource = default_resource();
+        let state = State::new(
+            RunNode::new(2, 0, AbsoluteDirection::West).unwrap().into(),
+            Default::default(),
+        );
+        let wall_manager = WallManager::with_str(
+            Probability::new(0.1).unwrap(),
+            include_str!("../../../mazes/maze1.dat"),
+        );
+        let operator = ReturnSetupOperator::<_, _, _, _, _, _, MathFake, _>::new(
+            &config,
+            &state,
+            resource,
+            &wall_manager,
+        );
+        let (_, _) = operator.release();
+    }
+}

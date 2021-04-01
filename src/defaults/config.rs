@@ -603,7 +603,7 @@ impl<Size> ConfigBuilder<Size> {
 }
 
 #[cfg(test)]
-pub use tests::generate_default_config;
+pub use tests::default_config;
 
 #[cfg(test)]
 mod tests {
@@ -611,7 +611,7 @@ mod tests {
 
     type Size = typenum::consts::U4;
 
-    pub fn generate_default_config() -> Config<Size> {
+    pub fn default_config() -> Config<Size> {
         use uom::si::{
             acceleration::meter_per_second_squared,
             angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
@@ -690,6 +690,6 @@ mod tests {
 
     #[test]
     fn test_builder() {
-        generate_default_config();
+        default_config();
     }
 }
