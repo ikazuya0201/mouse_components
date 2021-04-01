@@ -6,8 +6,8 @@ use spin::Mutex;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use super::initialize::{init_return_commander, init_run_agent, init_run_commander};
-use super::{RunAgent, RunCommander};
 use crate::commanders::CostNode;
+use crate::defaults::aliases::{RunAgent, RunCommander};
 use crate::defaults::{
     config::Config,
     resource::{Resource, ResourceBuilder},

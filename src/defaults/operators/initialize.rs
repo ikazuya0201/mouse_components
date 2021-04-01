@@ -4,10 +4,10 @@ use generic_array::ArrayLength;
 use spin::Mutex;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use super::{Robot, RunAgent, RunCommander, SearchAgent, SearchCommander};
 use crate::command_converter::CommandConverter;
 use crate::commanders::CostNode;
 use crate::controllers::{RotationalControllerBuilder, TranslationalControllerBuilder};
+use crate::defaults::aliases::{Robot, RunAgent, RunCommander, SearchAgent, SearchCommander};
 use crate::defaults::{config::Config, resource::Resource, state::State};
 use crate::estimator::{Estimator, EstimatorBuilder};
 use crate::mazes::{CheckedMaze, Maze, WallNode};

@@ -4,7 +4,7 @@ use generic_array::ArrayLength;
 use spin::Mutex;
 use typenum::consts::*;
 
-use super::{ReturnSetupAgent, ReturnSetupCommander};
+use crate::defaults::aliases::{ReturnSetupAgent, ReturnSetupCommander};
 use crate::operators::TrackingOperator;
 use crate::utils::probability::Probability;
 

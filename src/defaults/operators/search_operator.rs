@@ -6,8 +6,8 @@ use spin::Mutex;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use super::initialize::{init_search_agent, init_search_commander};
-use super::{SearchAgent, SearchCommander};
 use crate::commanders::CostNode;
+use crate::defaults::aliases::{SearchAgent, SearchCommander};
 use crate::defaults::{
     config::Config,
     resource::{Resource, ResourceBuilder},
