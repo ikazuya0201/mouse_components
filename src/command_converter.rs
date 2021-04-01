@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, Length};
 
-use crate::nodes::Node;
+use crate::nodes::{Node, RunNode, SearchNode};
 use crate::trajectory_managers::CommandConverter as ICommandConverter;
 use crate::types::data::{AbsoluteDirection, Pose};
 
@@ -87,15 +87,23 @@ impl<N, K: Clone> ICommandConverter<(Node<N>, K)> for CommandConverter {
     }
 }
 
-impl<N, INode, K: Clone> ICommandConverter<(INode, K)> for CommandConverter
-where
-    INode: core::ops::Deref<Target = Node<N>>,
-{
+impl<N, K: Clone> ICommandConverter<(SearchNode<N>, K)> for CommandConverter {
     type Output = (Pose, K);
 
-    fn convert(&self, (node, kind): &(INode, K)) -> Self::Output {
+    fn convert(&self, (node, kind): &(SearchNode<N>, K)) -> Self::Output {
         (
-            _convert(node.deref(), self.square_width_half, self.front_offset),
+            _convert(node.inner(), self.square_width_half, self.front_offset),
+            kind.clone(),
+        )
+    }
+}
+
+impl<N, K: Clone> ICommandConverter<(RunNode<N>, K)> for CommandConverter {
+    type Output = (Pose, K);
+
+    fn convert(&self, (node, kind): &(RunNode<N>, K)) -> Self::Output {
+        (
+            _convert(node.inner(), self.square_width_half, self.front_offset),
             kind.clone(),
         )
     }
