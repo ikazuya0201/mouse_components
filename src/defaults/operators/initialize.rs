@@ -260,6 +260,37 @@ where
     )
 }
 
+pub fn init_return_commander<'a, Size>(
+    config: &Config<'a, Size>,
+    state: &State<Size>,
+    wall_manager: &'a WallManager<Size>,
+) -> RunCommander<'a, Size>
+where
+    Size: Mul<Size> + Mul<U2> + Mul<U4> + Clone + PartialEq + PowerOfTwo + Unsigned,
+    <Size as Mul<Size>>::Output: Mul<U2> + Mul<U16>,
+    <Size as Mul<U4>>::Output: ArrayLength<(RunNode<Size>, u16)>
+        + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
+    <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
+    <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<(RunNode<Size>, RunKind)>
+        + ArrayLength<CostNode<u16, RunNode<Size>>>
+        + ArrayLength<Option<usize>>
+        + ArrayLength<u16>
+        + ArrayLength<Option<RunNode<Size>>>,
+{
+    use core::convert::TryInto;
+
+    let maze = CheckedMaze::new(wall_manager, *config.cost_fn());
+    RunCommander::new(
+        state
+            .current_node()
+            .clone()
+            .try_into()
+            .expect("Should never panic"),
+        &[config.return_goal().clone()],
+        maze,
+    )
+}
+
 pub fn init_search_agent<
     'a,
     LeftEncoder,

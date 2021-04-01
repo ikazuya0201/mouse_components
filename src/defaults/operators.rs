@@ -1,5 +1,4 @@
 pub mod initialize;
-mod return_operator;
 mod return_setup_operator;
 mod run_operator;
 mod search_operator;
@@ -8,9 +7,8 @@ use crate::{
     agents, command_converter, commanders, controllers, estimator, mazes, nodes, obstacle_detector,
     robot, tracker, trajectory_generators, trajectory_managers, types, wall_detector, wall_manager,
 };
-pub use return_operator::ReturnOperator;
 pub use return_setup_operator::ReturnSetupOperator;
-pub use run_operator::RunOperator;
+pub use run_operator::{ReturnOperator, RunOperator};
 pub use search_operator::SearchOperator;
 
 type Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size> =
