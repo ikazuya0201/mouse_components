@@ -4,10 +4,13 @@ use generic_array::ArrayLength;
 use spin::Mutex;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use crate::command_converter::CommandConverter;
+use crate::command_converter::{CommandConverter, ThroughCommandConverter};
 use crate::commanders::CostNode;
 use crate::controllers::{RotationalControllerBuilder, TranslationalControllerBuilder};
-use crate::defaults::aliases::{Robot, RunAgent, RunCommander, SearchAgent, SearchCommander};
+use crate::defaults::aliases::{
+    ReturnSetupAgent, ReturnSetupCommander, Robot, RunAgent, RunCommander, SearchAgent,
+    SearchCommander,
+};
 use crate::defaults::{config::Config, resource::Resource, state::State};
 use crate::estimator::{Estimator, EstimatorBuilder};
 use crate::mazes::{CheckedMaze, Maze, WallNode};
@@ -17,8 +20,8 @@ use crate::obstacle_detector::Vec;
 use crate::sensors::{Encoder, Motor, IMU};
 use crate::tracker::{Tracker, TrackerBuilder};
 use crate::trajectory_generators::{
-    RunKind, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder, SearchTrajectoryGenerator,
-    SearchTrajectoryGeneratorBuilder,
+    ReturnSetupTrajectoryGenerator, RunKind, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
+    SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
 };
 use crate::trajectory_managers::{SearchTrajectoryManager, TrackingTrajectoryManager};
 use crate::utils::probability::Probability;
@@ -208,6 +211,17 @@ where
         .expect("Should never panic")
 }
 
+pub fn init_return_setup_trajectory_generator<'a, Math, Size>(
+    config: &Config<'a, Size>,
+) -> ReturnSetupTrajectoryGenerator<Math> {
+    ReturnSetupTrajectoryGenerator::new(
+        *config.spin_angular_velocity(),
+        *config.spin_angular_acceleration(),
+        *config.spin_angular_jerk(),
+        *config.period(),
+    )
+}
+
 pub fn init_search_commander<'a, Size>(
     config: &Config<'a, Size>,
     state: &State<Size>,
@@ -291,6 +305,37 @@ where
     )
 }
 
+pub fn init_return_setup_commander<'a, Size>(
+    config: &Config<'a, Size>,
+    state: &State<Size>,
+    wall_manager: &'a WallManager<Size>,
+) -> ReturnSetupCommander<'a, Size>
+where
+    Size: Mul<Size> + Mul<U2> + Mul<U4> + Clone + PartialEq + PowerOfTwo + Unsigned,
+    <Size as Mul<Size>>::Output: Mul<U2> + Mul<U16>,
+    <Size as Mul<U4>>::Output: ArrayLength<(RunNode<Size>, u16)>
+        + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
+    <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
+    <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<(RunNode<Size>, RunKind)>
+        + ArrayLength<CostNode<u16, RunNode<Size>>>
+        + ArrayLength<Option<usize>>
+        + ArrayLength<u16>
+        + ArrayLength<Option<RunNode<Size>>>,
+{
+    use core::convert::TryInto;
+
+    let maze = CheckedMaze::new(wall_manager, *config.cost_fn());
+    ReturnSetupCommander::new(
+        state
+            .current_node()
+            .clone()
+            .try_into()
+            .expect("Should never panic"),
+        config.return_goal().clone(),
+        maze,
+    )
+}
+
 pub fn init_search_agent<
     'a,
     LeftEncoder,
@@ -367,4 +412,49 @@ where
     let trajectory_manager =
         TrackingTrajectoryManager::new(init_run_trajectory_generator(config), command_converter);
     RunAgent::new(trajectory_manager, robot)
+}
+
+pub fn init_return_setup_agent<
+    'a,
+    LeftEncoder,
+    RightEncoder,
+    Imu,
+    LeftMotor,
+    RightMotor,
+    DistanceSensor,
+    Math,
+    Size,
+>(
+    config: &'a Config<'a, Size>,
+    state: &State<Size>,
+    resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
+    wall_manager: &'a WallManager<Size>,
+) -> ReturnSetupAgent<
+    'a,
+    LeftEncoder,
+    RightEncoder,
+    Imu,
+    LeftMotor,
+    RightMotor,
+    DistanceSensor,
+    Math,
+    Size,
+>
+where
+    Math: crate::utils::math::Math,
+    LeftEncoder: Encoder,
+    RightEncoder: Encoder,
+    Imu: IMU,
+    LeftMotor: Motor,
+    RightMotor: Motor,
+    Size: Mul<Size>,
+    Size::Output: Mul<U2>,
+    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
+{
+    let robot = init_robot(config, state, resource, wall_manager);
+    let trajectory_manager = TrackingTrajectoryManager::new(
+        init_return_setup_trajectory_generator(config),
+        ThroughCommandConverter,
+    );
+    ReturnSetupAgent::new(trajectory_manager, robot)
 }

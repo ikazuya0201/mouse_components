@@ -64,10 +64,10 @@ pub type ReturnSetupAgent<
     Size,
 > = agents::TrackingAgent<
     trajectory_managers::TrackingTrajectoryManager<
-        types::data::RotationKind,
         trajectory_generators::ReturnSetupTrajectoryGenerator<Math>,
-        types::data::Target,
         command_converter::ThroughCommandConverter,
+        types::data::Target,
+        trajectory_generators::SpinTrajectory,
     >,
     Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>,
 >;
