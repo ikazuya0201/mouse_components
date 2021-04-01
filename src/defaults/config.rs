@@ -630,8 +630,20 @@ mod tests {
             RunNode::<Size>::new(2, 0, West).unwrap(),
         ];
 
-        fn cost(_pattern: Pattern) -> u16 {
-            unreachable!()
+        fn cost(pattern: Pattern) -> u16 {
+            use Pattern::*;
+
+            match pattern {
+                Straight(x) => 10 * x,
+                StraightDiagonal(x) => 7 * x,
+                Search90 => 8,
+                FastRun45 => 12,
+                FastRun90 => 15,
+                FastRun135 => 20,
+                FastRun180 => 25,
+                FastRunDiagonal90 => 15,
+                SpinBack => 15,
+            }
         }
 
         ConfigBuilder::new()

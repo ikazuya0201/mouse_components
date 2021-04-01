@@ -136,3 +136,54 @@ macro_rules! impl_run_operator {
 
 impl_run_operator!(RunOperator: init_run_commander);
 impl_run_operator!(ReturnOperator: init_return_commander);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! impl_test_new_and_release {
+        ($test: ident: $operator: ident, $current_node: expr) => {
+            #[test]
+            fn $test() {
+                use super::super::mocks::{DistanceSensorMock, EncoderMock, ImuMock, MotorMock};
+                use crate::defaults::config::generate_default_config;
+                use crate::nodes::{AbsoluteDirection, RunNode};
+                use crate::utils::math::MathFake;
+                use crate::utils::probability::Probability;
+                use crate::wall_manager::WallManager;
+
+                let config = generate_default_config();
+                let resource = ResourceBuilder::new()
+                    .left_encoder(EncoderMock)
+                    .right_encoder(EncoderMock)
+                    .imu(ImuMock)
+                    .left_motor(MotorMock)
+                    .right_motor(MotorMock)
+                    .distance_sensors(core::array::IntoIter::new([DistanceSensorMock]).collect())
+                    .build()
+                    .unwrap();
+                let state = State::new($current_node, Default::default());
+                let wall_manager = WallManager::with_str(
+                    Probability::new(0.1).unwrap(),
+                    include_str!("../../../mazes/maze1.dat"),
+                );
+                let operator = $operator::<_, _, _, _, _, _, MathFake, _>::new(
+                    &config,
+                    &state,
+                    resource,
+                    &wall_manager,
+                );
+                let (_, _) = operator.release();
+            }
+        };
+    }
+
+    impl_test_new_and_release!(
+        test_run_operator_new_and_release: RunOperator,
+        RunNode::new(0, 0, AbsoluteDirection::North).unwrap().into()
+    );
+    impl_test_new_and_release!(
+        test_return_operator_new_and_release: ReturnOperator,
+        RunNode::new(2, 0, AbsoluteDirection::North).unwrap().into()
+    );
+}
