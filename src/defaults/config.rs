@@ -1,9 +1,12 @@
 //! An implementation of config.
 
+use heapless::Vec;
 use uom::si::f32::{
-    Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time, Velocity,
+    Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Frequency, Jerk, Length, Time,
+    Velocity,
 };
 
+use crate::commanders::GoalSizeUpperBound;
 use crate::impl_setter;
 use crate::impl_with_getter;
 use crate::nodes::RunNode;
@@ -13,13 +16,13 @@ use crate::utils::builder::{ok_or, BuilderResult};
 
 impl_with_getter! {
     /// An implementation of config.
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    pub struct Config<'a, Size> {
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Config<Size> {
         square_width: Length,
         front_offset: Length,
         start: RunNode<Size>,
         return_goal: RunNode<Size>,
-        goals: &'a [RunNode<Size>],
+        goals: Vec<RunNode<Size>,GoalSizeUpperBound>,
         search_initial_route: SearchKind,
         search_final_route: SearchKind,
         translational_kp: f32,
@@ -35,7 +38,7 @@ impl_with_getter! {
         rotational_model_time_constant: Time,
         estimator_correction_weight: f32,
         wheel_interval: Option<Length>,
-        estimator_translational_velocity_alpha: f32,
+        estimator_cut_off_frequency: Frequency,
         cost_fn: fn(Pattern) -> u16,
         wall_width: Length,
         ignore_radius_from_pillar: Length,
@@ -70,13 +73,13 @@ impl_with_getter! {
 /// use typenum::*;
 /// use uom::si::f32::{
 ///     Length, Velocity, Acceleration, Jerk, AngularVelocity, AngularAcceleration, AngularJerk,
-///     Time,
+///     Time, Frequency,
 /// };
 /// use uom::si::{
 ///     acceleration::meter_per_second_squared,
 ///     angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
 ///     angular_velocity::degree_per_second, jerk::meter_per_second_cubed, length::meter,
-///     time::second, velocity::meter_per_second,
+///     time::second, velocity::meter_per_second, frequency::hertz,
 /// };
 /// use components::nodes::RunNode;
 /// use components::types::data::{AbsoluteDirection, Pattern, SearchKind};
@@ -100,11 +103,11 @@ impl_with_getter! {
 /// let config = ConfigBuilder::new()
 ///     .start(start)
 ///     .return_goal(return_goal)
-///     .goals(&goals)
+///     .goals(goals.into_iter().collect())
 ///     .search_initial_route(SearchKind::Init)
 ///     .search_final_route(SearchKind::Final)
 ///     .cost_fn(cost)
-///     .estimator_translational_velocity_alpha(0.1)
+///     .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
 ///     .period(Time::new::<second>(0.001))
 ///     .estimator_correction_weight(0.1)
 ///     .translational_kp(0.9)
@@ -139,12 +142,12 @@ impl_with_getter! {
 ///     .unwrap();
 /// ```
 
-pub struct ConfigBuilder<'a, Size> {
+pub struct ConfigBuilder<Size> {
     square_width: Option<Length>,
     front_offset: Option<Length>,
     start: Option<RunNode<Size>>,
     return_goal: Option<RunNode<Size>>,
-    goals: Option<&'a [RunNode<Size>]>,
+    goals: Option<Vec<RunNode<Size>, GoalSizeUpperBound>>,
     search_initial_route: Option<SearchKind>,
     search_final_route: Option<SearchKind>,
     translational_kp: Option<f32>,
@@ -160,7 +163,7 @@ pub struct ConfigBuilder<'a, Size> {
     rotational_model_time_constant: Option<Time>,
     estimator_correction_weight: Option<f32>,
     wheel_interval: Option<Length>,
-    estimator_translational_velocity_alpha: Option<f32>,
+    estimator_cut_off_frequency: Option<Frequency>,
     cost_fn: Option<fn(Pattern) -> u16>,
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
@@ -187,7 +190,7 @@ pub struct ConfigBuilder<'a, Size> {
     spin_angular_jerk: Option<AngularJerk>,
 }
 
-impl<'a, Size> ConfigBuilder<'a, Size> {
+impl<Size> ConfigBuilder<Size> {
     impl_setter!(
         /// **Optional**,
         /// Default: 90 \[mm\] (half size).
@@ -215,7 +218,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
     impl_setter!(
         /// **Required**,
         /// Sets the goal nodes for search.
-        goals: &'a [RunNode<Size>]
+        goals: Vec<RunNode<Size>, GoalSizeUpperBound>
     );
     impl_setter!(
         /// **Required**,
@@ -316,8 +319,8 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
     );
     impl_setter!(
         /// **Required**,
-        /// Sets the alpha for low pass filter of translational velocity.
-        estimator_translational_velocity_alpha: f32
+        /// Sets a cut off frequency for low pass filter of translational velocity.
+        estimator_cut_off_frequency: Frequency
     );
     impl_setter!(
         /// **Required**,
@@ -491,7 +494,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
             rotational_model_time_constant: None,
             estimator_correction_weight: None,
             wheel_interval: None,
-            estimator_translational_velocity_alpha: None,
+            estimator_cut_off_frequency: None,
             cost_fn: None,
             wall_width: None,
             ignore_radius_from_pillar: None,
@@ -522,7 +525,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
     /// Builds [Config](Config).
     ///
     /// This method can be failed when required parameters are not given.
-    pub fn build(&mut self) -> BuilderResult<Config<'a, Size>> {
+    pub fn build(&mut self) -> BuilderResult<Config<Size>> {
         macro_rules! get {
             ($field_name: ident) => {{
                 ok_or(self.$field_name.take(), core::stringify!($field_name))?
@@ -560,7 +563,7 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
                 .estimator_correction_weight
                 .unwrap_or(Default::default()),
             wheel_interval: self.wheel_interval,
-            estimator_translational_velocity_alpha: get!(estimator_translational_velocity_alpha),
+            estimator_cut_off_frequency: get!(estimator_cut_off_frequency),
             cost_fn: get!(cost_fn),
             wall_width: self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
             ignore_radius_from_pillar: self
@@ -600,25 +603,25 @@ impl<'a, Size> ConfigBuilder<'a, Size> {
 }
 
 #[cfg(test)]
+pub use tests::default_config;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_builder() {
-        use typenum::*;
+    type Size = typenum::consts::U4;
+
+    pub fn default_config() -> Config<Size> {
         use uom::si::{
             acceleration::meter_per_second_squared,
             angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
-            angular_velocity::degree_per_second, jerk::meter_per_second_cubed, length::meter,
-            time::second, velocity::meter_per_second,
+            angular_velocity::degree_per_second, frequency::hertz, jerk::meter_per_second_cubed,
+            length::meter, time::second, velocity::meter_per_second,
         };
 
-        use crate::nodes::RunNode;
-        use crate::types::data::{AbsoluteDirection, Pattern, SearchKind};
+        use crate::types::data::AbsoluteDirection;
 
         use AbsoluteDirection::*;
-
-        type Size = U4;
 
         let start = RunNode::<Size>::new(0, 0, North).unwrap();
         let return_goal = RunNode::<Size>::new(0, 0, South).unwrap();
@@ -627,18 +630,30 @@ mod tests {
             RunNode::<Size>::new(2, 0, West).unwrap(),
         ];
 
-        fn cost(_pattern: Pattern) -> u16 {
-            unreachable!()
+        fn cost(pattern: Pattern) -> u16 {
+            use Pattern::*;
+
+            match pattern {
+                Straight(x) => 10 * x,
+                StraightDiagonal(x) => 7 * x,
+                Search90 => 8,
+                FastRun45 => 12,
+                FastRun90 => 15,
+                FastRun135 => 20,
+                FastRun180 => 25,
+                FastRunDiagonal90 => 15,
+                SpinBack => 15,
+            }
         }
 
-        let _ = ConfigBuilder::new()
+        ConfigBuilder::new()
             .start(start)
             .return_goal(return_goal)
-            .goals(&goals)
+            .goals(goals.into_iter().collect())
             .search_initial_route(SearchKind::Init)
             .search_final_route(SearchKind::Final)
             .cost_fn(cost)
-            .estimator_translational_velocity_alpha(0.1)
+            .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
             .period(Time::new::<second>(0.001))
             .estimator_correction_weight(0.1)
             .translational_kp(0.9)
@@ -670,6 +685,11 @@ mod tests {
             .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
             .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
             .build()
-            .unwrap();
+            .unwrap()
+    }
+
+    #[test]
+    fn test_builder() {
+        default_config();
     }
 }

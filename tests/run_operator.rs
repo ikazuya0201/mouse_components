@@ -155,7 +155,7 @@ fn test_run_operator() {
                     .period(period)
                     .cut_off_frequency(Frequency::new::<hertz>(50.0))
                     .initial_state(start_state)
-                    .wheel_interval(wheel_interval)
+                    .wheel_interval(Some(wheel_interval))
                     .build()
                     .unwrap()
             };

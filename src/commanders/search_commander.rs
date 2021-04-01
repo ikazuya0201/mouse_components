@@ -118,7 +118,6 @@ where
     RunNode::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Option<RunNode>>
-        + ArrayLength<Option<usize>>
         + ArrayLength<CostNode<Cost, Maze::SearchNode>>
         + ArrayLength<CostNode<Cost, RunNode>>
         + Unsigned,
@@ -212,7 +211,6 @@ where
     RunNode::UpperBound: ArrayLength<Maze::SearchNode>
         + ArrayLength<Cost>
         + ArrayLength<Option<RunNode>>
-        + ArrayLength<Option<usize>>
         + ArrayLength<CostNode<Cost, RunNode>>
         + ArrayLength<CostNode<Cost, Maze::SearchNode>>
         + Unsigned,
@@ -279,8 +277,7 @@ where
     RunNode::UpperBound: Unsigned
         + ArrayLength<Maze::Cost>
         + ArrayLength<Option<RunNode>>
-        + ArrayLength<CostNode<Maze::Cost, RunNode>>
-        + ArrayLength<Option<usize>>,
+        + ArrayLength<CostNode<Maze::Cost, RunNode>>,
     Maze: Graph<RunNode>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
