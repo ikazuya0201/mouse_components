@@ -1,6 +1,7 @@
 use crate::{
     agents, command_converter, commanders, controllers, estimator, mazes, nodes, obstacle_detector,
-    robot, tracker, trajectory_generators, trajectory_managers, types, wall_detector, wall_manager,
+    pattern_converters, robot, tracker, trajectory_generators, trajectory_managers, types,
+    wall_detector, wall_manager,
 };
 
 pub type Robot<
@@ -106,8 +107,7 @@ pub type SearchCommander<'a, Size> = commanders::SearchCommander<
     mazes::Maze<
         'a,
         wall_manager::WallManager<Size>,
-        types::data::Pattern,
-        u16,
+        pattern_converters::LinearPatternConverter<u16>,
         nodes::SearchNode<Size>,
     >,
 >;
@@ -117,8 +117,7 @@ pub type RunCommander<'a, Size> = commanders::RunCommander<
     mazes::CheckedMaze<
         'a,
         wall_manager::WallManager<Size>,
-        types::data::Pattern,
-        u16,
+        pattern_converters::LinearPatternConverter<u16>,
         nodes::SearchNode<Size>,
     >,
 >;
@@ -128,8 +127,7 @@ pub type ReturnSetupCommander<'a, Size> = commanders::ReturnSetupCommander<
     mazes::CheckedMaze<
         'a,
         wall_manager::WallManager<Size>,
-        types::data::Pattern,
-        u16,
+        pattern_converters::LinearPatternConverter<u16>,
         nodes::SearchNode<Size>,
     >,
 >;

@@ -10,7 +10,8 @@ use crate::commanders::GoalSizeUpperBound;
 use crate::impl_setter;
 use crate::impl_with_getter;
 use crate::nodes::RunNode;
-use crate::types::data::{Pattern, SearchKind};
+use crate::pattern_converters::LinearPatternConverter;
+use crate::types::data::SearchKind;
 use crate::utils::builder::{ok_or, BuilderResult};
 
 impl_with_getter! {
@@ -38,7 +39,7 @@ impl_with_getter! {
         estimator_correction_weight: f32,
         wheel_interval: Option<Length>,
         estimator_cut_off_frequency: Frequency,
-        cost_fn: fn(Pattern) -> u16,
+        pattern_converter: LinearPatternConverter<u16>,
         wall_width: Length,
         ignore_radius_from_pillar: Length,
         ignore_length_from_wall: Length,
@@ -79,6 +80,7 @@ impl_with_getter! {
 /// use components::nodes::RunNode;
 /// use components::types::data::{AbsoluteDirection, Pattern, SearchKind};
 /// use components::defaults::config::ConfigBuilder;
+/// use components::pattern_converters::LinearPatternConverter;
 ///
 /// use AbsoluteDirection::*;
 ///
@@ -91,17 +93,13 @@ impl_with_getter! {
 ///     RunNode::<Size>::new(2, 0, West).unwrap(),
 /// ];
 ///
-/// fn cost(_pattern: Pattern) -> u16 {
-///     unreachable!()
-/// }
-///
 /// let config = ConfigBuilder::new()
 ///     .start(start)
 ///     .return_goal(return_goal)
 ///     .goals(goals.into_iter().collect())
 ///     .search_initial_route(SearchKind::Init)
 ///     .search_final_route(SearchKind::Final)
-///     .cost_fn(cost)
+///     .pattern_converter(LinearPatternConverter::default())
 ///     .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
 ///     .period(Time::new::<second>(0.001))
 ///     .estimator_correction_weight(0.1)
@@ -159,7 +157,7 @@ pub struct ConfigBuilder<Size> {
     estimator_correction_weight: Option<f32>,
     wheel_interval: Option<Length>,
     estimator_cut_off_frequency: Option<Frequency>,
-    cost_fn: Option<fn(Pattern) -> u16>,
+    pattern_converter: Option<LinearPatternConverter<u16>>,
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
     ignore_length_from_wall: Option<Length>,
@@ -315,8 +313,8 @@ impl<Size> ConfigBuilder<Size> {
     );
     impl_setter!(
         /// **Required**,
-        /// Sets the cost function for search.
-        cost_fn: fn(Pattern) -> u16
+        /// Sets a pattern converter.
+        pattern_converter: LinearPatternConverter<u16>
     );
     impl_setter!(
         /// **Optional**,
@@ -454,7 +452,7 @@ impl<Size> ConfigBuilder<Size> {
             estimator_correction_weight: None,
             wheel_interval: None,
             estimator_cut_off_frequency: None,
-            cost_fn: None,
+            pattern_converter: None,
             wall_width: None,
             ignore_radius_from_pillar: None,
             ignore_length_from_wall: None,
@@ -515,7 +513,7 @@ impl<Size> ConfigBuilder<Size> {
                 .unwrap_or(Default::default()),
             wheel_interval: self.wheel_interval,
             estimator_cut_off_frequency: get!(estimator_cut_off_frequency),
-            cost_fn: get!(cost_fn),
+            pattern_converter: self.pattern_converter.take().unwrap_or(Default::default()),
             wall_width: self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
             ignore_radius_from_pillar: self
                 .ignore_radius_from_pillar
@@ -571,29 +569,13 @@ mod tests {
             RunNode::<Size>::new(2, 0, West).unwrap(),
         ];
 
-        fn cost(pattern: Pattern) -> u16 {
-            use Pattern::*;
-
-            match pattern {
-                Straight(x) => 10 * x,
-                StraightDiagonal(x) => 7 * x,
-                Search90 => 8,
-                FastRun45 => 12,
-                FastRun90 => 15,
-                FastRun135 => 20,
-                FastRun180 => 25,
-                FastRunDiagonal90 => 15,
-                SpinBack => 15,
-            }
-        }
-
         ConfigBuilder::new()
             .start(start)
             .return_goal(return_goal)
             .goals(goals.into_iter().collect())
             .search_initial_route(SearchKind::Init)
             .search_final_route(SearchKind::Final)
-            .cost_fn(cost)
+            .pattern_converter(LinearPatternConverter::default())
             .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
             .period(Time::new::<second>(0.001))
             .estimator_correction_weight(0.1)

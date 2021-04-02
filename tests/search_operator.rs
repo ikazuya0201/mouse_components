@@ -8,15 +8,14 @@ use components::{
     nodes::{Node, RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
+    pattern_converters::LinearPatternConverter,
     robot::Robot,
     tracker::TrackerBuilder,
     trajectory_generators::{
         SearchTrajectoryGeneratorBuilder, SlalomParametersGeneratorWithFrontOffset,
     },
     trajectory_managers::SearchTrajectoryManager,
-    types::data::{
-        AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState, SearchKind,
-    },
+    types::data::{AbsoluteDirection, AngleState, LengthState, Pose, RobotState, SearchKind},
     utils::probability::Probability,
     wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
@@ -40,22 +39,6 @@ use uom::si::{
 };
 use utils::math::MathFake;
 use utils::sensors::AgentSimulator;
-
-fn cost(pattern: Pattern) -> u16 {
-    use Pattern::*;
-
-    match pattern {
-        Straight(x) => 10 * x,
-        StraightDiagonal(x) => 7 * x,
-        Search90 => 8,
-        FastRun45 => 12,
-        FastRun90 => 15,
-        FastRun135 => 20,
-        FastRun180 => 25,
-        FastRunDiagonal90 => 15,
-        SpinBack => 15,
-    }
-}
 
 macro_rules! impl_search_operator_test {
     ($name: ident: $size: ty, $input_str: expr, $goals: expr,) => {
@@ -219,7 +202,8 @@ macro_rules! impl_search_operator_test {
                 use AbsoluteDirection::*;
 
                 let create_commander = |wall_storage| {
-                    let maze: Maze<_, _, _, SearchNode<Size>> = Maze::new(wall_storage, cost);
+                    let maze: Maze<_, _, SearchNode<Size>> =
+                        Maze::new(wall_storage, LinearPatternConverter::default());
                     let start = RunNode::<Size>::new(0, 0, North).unwrap();
                     let current: Node<Size> = start.clone().into();
                     SearchCommander::new(

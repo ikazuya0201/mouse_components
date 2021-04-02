@@ -4,27 +4,12 @@ use components::{
     commanders::SearchCommander,
     mazes::Maze,
     nodes::{Node, RunNode, SearchNode},
-    types::data::{AbsoluteDirection, Pattern, SearchKind, Wall},
+    pattern_converters::LinearPatternConverter,
+    types::data::{AbsoluteDirection, SearchKind, Wall},
     utils::probability::Probability,
     wall_manager::WallManager,
 };
 use typenum::consts::*;
-
-fn cost(pattern: Pattern) -> u16 {
-    use Pattern::*;
-
-    match pattern {
-        Straight(x) => 10 * x,
-        StraightDiagonal(x) => 7 * x,
-        Search90 => 8,
-        FastRun45 => 12,
-        FastRun90 => 15,
-        FastRun135 => 20,
-        FastRun180 => 25,
-        FastRunDiagonal90 => 15,
-        SpinBack => 15,
-    }
-}
 
 #[test]
 fn test_compute_shortest_path_u4() {
@@ -71,7 +56,8 @@ fn test_compute_shortest_path_u4() {
             wall_manager.update(&wall, &Probability::one());
         }
 
-        let maze = Maze::<_, _, _, SearchNode<Size>>::new(&wall_manager, cost);
+        let maze =
+            Maze::<_, _, SearchNode<Size>>::new(&wall_manager, LinearPatternConverter::default());
         let current: Node<Size> = start.clone().into();
         let commander = SearchCommander::<_, _, SearchNode<Size>, _, _>::new(
             start,
