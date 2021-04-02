@@ -1,6 +1,8 @@
 //! An implementation of config.
 
 use heapless::Vec;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use uom::si::f32::{
     Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Frequency, Jerk, Length, Time,
     Velocity,
@@ -16,6 +18,7 @@ use crate::utils::builder::{ok_or, BuilderResult};
 
 impl_with_getter! {
     /// An implementation of config.
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Debug, Clone, PartialEq)]
     pub struct Config<Size> {
         square_width: Length,
