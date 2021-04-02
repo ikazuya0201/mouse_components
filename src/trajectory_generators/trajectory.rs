@@ -1,5 +1,7 @@
 use core::marker::PhantomData;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use uom::si::f32::{
     Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
     Velocity,
@@ -8,6 +10,7 @@ use uom::si::f32::{
 use crate::traits::Math;
 use crate::types::data::Pose;
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Target {
     Moving(MoveTarget),
@@ -36,6 +39,7 @@ impl Target {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MoveTarget {
     pub x: LengthTarget,
@@ -43,6 +47,7 @@ pub struct MoveTarget {
     pub theta: AngleTarget,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct LengthTarget {
     pub x: Length,
@@ -51,6 +56,7 @@ pub struct LengthTarget {
     pub j: Jerk,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct AngleTarget {
     pub x: Angle,

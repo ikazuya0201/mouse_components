@@ -8,6 +8,10 @@ mod spin_generator;
 mod straight_generator;
 mod trajectory;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+use uom::si::f32::{Angle, Length};
+
 pub use return_setup_trajectory_generator::{
     ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryGeneratorBuilder,
 };
@@ -23,8 +27,8 @@ pub use slalom_generator::{
 };
 pub use spin_generator::SpinTrajectory;
 pub use trajectory::{AngleTarget, LengthTarget, MoveTarget, ShiftTrajectory, Target};
-use uom::si::f32::{Angle, Length};
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Pose {
     pub x: Length,
