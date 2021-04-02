@@ -107,7 +107,13 @@ where
     {
         let straight_generator =
             StraightTrajectoryGenerator::<M>::new(max_velocity, max_acceleration, max_jerk, period);
-        let slalom_generator = SlalomGenerator::new(period, parameters_generator);
+        let slalom_generator = SlalomGenerator::new(
+            period,
+            parameters_generator,
+            max_velocity,
+            max_acceleration,
+            max_jerk,
+        );
         let spin_generator = SpinGenerator::<M>::new(
             spin_angular_velocity,
             spin_angular_acceleration,
@@ -136,12 +142,12 @@ where
                 period,
                 Time::new::<second>(1.5),
             ));
-        let right_trajectory = slalom_generator.generate_slalom(
+        let right_trajectory = slalom_generator.generate_constant_slalom(
             SlalomKind::Search90,
             SlalomDirection::Right,
             search_velocity,
         );
-        let left_trajectory = slalom_generator.generate_slalom(
+        let left_trajectory = slalom_generator.generate_constant_slalom(
             SlalomKind::Search90,
             SlalomDirection::Left,
             search_velocity,

@@ -42,7 +42,8 @@ macro_rules! impl_calculator_generator {
             where
                 M: Math,
             {
-                //NOTO: v_start and v_end should not be negative
+                #[inline]
+                #[allow(unused)]
                 pub fn generate(
                     &self,
                     x_start: $t,
@@ -50,6 +51,19 @@ macro_rules! impl_calculator_generator {
                     v_start: $dt,
                     v_end: $dt,
                 ) -> (OverallCalculator, Time) {
+                    let (calculator, t_end, _) =
+                        self.generate_with_terminal_velocity(x_start, distance, v_start, v_end);
+                    (calculator, t_end)
+                }
+
+                //NOTO: v_start and v_end should not be negative
+                pub fn generate_with_terminal_velocity(
+                    &self,
+                    x_start: $t,
+                    distance: $t,
+                    v_start: $dt,
+                    v_end: $dt,
+                ) -> (OverallCalculator, Time, $dt) {
                     let (distance, sign) = if distance.get::<$tunit>() < 0.0 {
                         (-distance, -1.0f32)
                     } else {
@@ -113,6 +127,7 @@ macro_rules! impl_calculator_generator {
                             sign,
                         },
                         t3,
+                        v_reach,
                     )
                 }
 
@@ -408,20 +423,34 @@ where
     M: Math,
 {
     //NOTO: v_start and v_end should not be negative
+    #[inline]
     pub fn generate(
         &self,
         distance: Length,
         v_start: Velocity,
         v_end: Velocity,
     ) -> StraightTrajectory {
-        let (trajectory_fn, t_end) =
-            self.function_generator
-                .generate(Default::default(), distance, v_start, v_end);
+        let (trajectory, _) = self.generate_with_terminal_velocity(distance, v_start, v_end);
+        trajectory
+    }
 
-        StraightTrajectory::new(
-            StraightTrajectoryCalculator::Accel(trajectory_fn),
-            t_end,
-            self.period,
+    pub fn generate_with_terminal_velocity(
+        &self,
+        distance: Length,
+        v_start: Velocity,
+        v_end: Velocity,
+    ) -> (StraightTrajectory, Velocity) {
+        let (trajectory_fn, t_end, terminal_velocity) = self
+            .function_generator
+            .generate_with_terminal_velocity(Default::default(), distance, v_start, v_end);
+
+        (
+            StraightTrajectory::new(
+                StraightTrajectoryCalculator::Accel(trajectory_fn),
+                t_end,
+                self.period,
+            ),
+            terminal_velocity,
         )
     }
 
