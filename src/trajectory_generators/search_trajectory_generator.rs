@@ -136,12 +136,12 @@ where
                 period,
                 Time::new::<second>(1.5),
             ));
-        let right_trajectory = slalom_generator.generate_slalom(
+        let right_trajectory = slalom_generator.generate_constant_slalom(
             SlalomKind::Search90,
             SlalomDirection::Right,
             search_velocity,
         );
-        let left_trajectory = slalom_generator.generate_slalom(
+        let left_trajectory = slalom_generator.generate_constant_slalom(
             SlalomKind::Search90,
             SlalomDirection::Left,
             search_velocity,

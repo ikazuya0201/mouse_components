@@ -85,7 +85,7 @@ where
     M: Math,
     Generator: SlalomParametersGenerator,
 {
-    pub fn generate_slalom(
+    pub fn generate_constant_slalom(
         &self,
         kind: SlalomKind,
         dir: SlalomDirection,
@@ -478,7 +478,7 @@ mod tests {
             );
             let v_target = Velocity::new::<meter_per_second>(0.5);
 
-            let trajectory = generator.generate_slalom(
+            let trajectory = generator.generate_constant_slalom(
                 kind,
                 dir,
                 v_target,

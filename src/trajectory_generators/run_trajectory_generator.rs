@@ -138,7 +138,7 @@ where
             RunKind::Slalom(kind, dir) => (
                 RunTrajectory::Slalom(
                     self.slalom_generator
-                        .generate_slalom(*kind, *dir, *velocity),
+                        .generate_constant_slalom(*kind, *dir, *velocity),
                 ),
                 *velocity,
             ),
