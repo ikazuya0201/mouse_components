@@ -134,8 +134,8 @@ where
                     } else {
                         not_exist_val
                     };
-                    let exist_val = Math::expf(exist_val - min) * existence;
-                    let not_exist_val = Math::expf(not_exist_val - min) * existence.reverse();
+                    let exist_val = libm::expf(exist_val - min) * existence;
+                    let not_exist_val = libm::expf(not_exist_val - min) * existence.reverse();
 
                     let existence = if exist_val.is_infinite() {
                         Probability::one()
@@ -242,7 +242,7 @@ where
     M: Math,
 {
     fn is_near_pillar(&self, pose: &Pose) -> bool {
-        let rot = M::rem_euclidf(pose.theta.get::<revolution>(), 1.0);
+        let rot = crate::utils::math::rem_euclidf(pose.theta.get::<revolution>(), 1.0);
         let pillars = if rot < 0.125 || rot > 0.875 {
             [
                 (self.square_width, Length::default()),
@@ -351,7 +351,7 @@ where
             return create_error();
         }
 
-        let rot = M::rem_euclidf(pose.theta.get::<revolution>(), 1.0);
+        let rot = crate::utils::math::rem_euclidf(pose.theta.get::<revolution>(), 1.0);
 
         let axes = if rot < 0.25 {
             [

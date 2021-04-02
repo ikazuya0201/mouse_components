@@ -210,9 +210,9 @@ where
         .expect("Should never panic")
 }
 
-pub fn init_return_setup_trajectory_generator<'a, Math, Size>(
+pub fn init_return_setup_trajectory_generator<'a, Size>(
     config: &Config<Size>,
-) -> ReturnSetupTrajectoryGenerator<Math> {
+) -> ReturnSetupTrajectoryGenerator {
     ReturnSetupTrajectoryGenerator::new(
         *config.spin_angular_velocity(),
         *config.spin_angular_acceleration(),

@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
@@ -8,22 +6,21 @@ use super::Target;
 use crate::nodes::RotationKind;
 use crate::trajectory_managers::TrackingTrajectoryGenerator;
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
-use crate::utils::math::{LibmMath, Math};
 
 /// An implementation of
 /// [TrackingTrajectoryGenerator](crate::trajectory_managers::TrackingTrajectoryGenerator).
-pub struct ReturnSetupTrajectoryGenerator<M> {
-    spin_generator: SpinGenerator<M>,
+pub struct ReturnSetupTrajectoryGenerator {
+    spin_generator: SpinGenerator,
 }
 
-impl<M> ReturnSetupTrajectoryGenerator<M> {
+impl ReturnSetupTrajectoryGenerator {
     pub fn new(
         max_angular_velocity: AngularVelocity,
         max_angular_acceleration: AngularAcceleration,
         max_angular_jerk: AngularJerk,
         period: Time,
     ) -> Self {
-        let spin_generator = SpinGenerator::<M>::new(
+        let spin_generator = SpinGenerator::new(
             max_angular_velocity,
             max_angular_acceleration,
             max_angular_jerk,
@@ -33,7 +30,7 @@ impl<M> ReturnSetupTrajectoryGenerator<M> {
     }
 }
 
-impl<M: Math> TrackingTrajectoryGenerator<RotationKind> for ReturnSetupTrajectoryGenerator<M> {
+impl TrackingTrajectoryGenerator<RotationKind> for ReturnSetupTrajectoryGenerator {
     type Target = Target;
     type Trajectory = SpinTrajectory;
 
@@ -51,28 +48,26 @@ impl<M: Math> TrackingTrajectoryGenerator<RotationKind> for ReturnSetupTrajector
 }
 
 /// A builder for [ReturnSetupTrajectoryGenerator](ReturnSetupTrajectoryGenerator).
-pub struct ReturnSetupTrajectoryGeneratorBuilder<M = LibmMath> {
+pub struct ReturnSetupTrajectoryGeneratorBuilder {
     max_angular_velocity: Option<AngularVelocity>,
     max_angular_acceleration: Option<AngularAcceleration>,
     max_angular_jerk: Option<AngularJerk>,
     period: Option<Time>,
-    _math: PhantomData<fn() -> M>,
 }
 
-impl Default for ReturnSetupTrajectoryGeneratorBuilder<LibmMath> {
+impl Default for ReturnSetupTrajectoryGeneratorBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<M> ReturnSetupTrajectoryGeneratorBuilder<M> {
+impl ReturnSetupTrajectoryGeneratorBuilder {
     pub fn new() -> Self {
         Self {
             max_angular_velocity: None,
             max_angular_acceleration: None,
             max_angular_jerk: None,
             period: None,
-            _math: PhantomData,
         }
     }
 
@@ -99,7 +94,7 @@ impl<M> ReturnSetupTrajectoryGeneratorBuilder<M> {
         self
     }
 
-    pub fn build(self) -> Result<ReturnSetupTrajectoryGenerator<M>, RequiredFieldEmptyError> {
+    pub fn build(self) -> Result<ReturnSetupTrajectoryGenerator, RequiredFieldEmptyError> {
         Ok(ReturnSetupTrajectoryGenerator::new(
             ok_or(self.max_angular_velocity, "max_angular_velocity")?,
             ok_or(self.max_angular_acceleration, "max_angular_acceleration")?,

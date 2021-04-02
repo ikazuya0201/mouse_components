@@ -129,7 +129,7 @@ where
         let x_diff = state.x.x - target.x.x;
         let y_diff = state.y.x - target.y.x;
 
-        let distance = M::sqrt(x_diff * x_diff + y_diff * y_diff);
+        let distance = crate::utils::math::sqrt(x_diff * x_diff + y_diff * y_diff);
         if distance >= self.fail_safe_distance {
             Err(FailSafeError {
                 state: state.clone(),
@@ -176,7 +176,8 @@ where
             let theta_d = {
                 let theta_d = target.theta.x - state.theta.x;
                 Angle::new::<radian>(
-                    M::rem_euclidf(theta_d.value, core::f32::consts::TAU) - core::f32::consts::PI,
+                    crate::utils::math::rem_euclidf(theta_d.value, core::f32::consts::TAU)
+                        - core::f32::consts::PI,
                 )
             };
             let cos_th_d = M::cos(theta_d);
@@ -186,7 +187,9 @@ where
             let vr = target.x.v * cos_th_r + target.y.v * sin_th_r;
             let wr = target.theta.v;
 
-            let k1 = 2.0 * self.zeta * AngularVelocity::from(M::sqrt(wr * wr + self.b * vr * vr));
+            let k1 = 2.0
+                * self.zeta
+                * AngularVelocity::from(crate::utils::math::sqrt(wr * wr + self.b * vr * vr));
             let k2 = self.b;
             let k3 = k1;
 

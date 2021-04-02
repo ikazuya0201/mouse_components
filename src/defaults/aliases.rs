@@ -68,7 +68,7 @@ pub type ReturnSetupAgent<
     Size,
 > = agents::TrackingAgent<
     trajectory_managers::TrackingTrajectoryManager<
-        trajectory_generators::ReturnSetupTrajectoryGenerator<Math>,
+        trajectory_generators::ReturnSetupTrajectoryGenerator,
         command_converter::ThroughCommandConverter,
         types::data::Target,
         trajectory_generators::SpinTrajectory,
