@@ -1,3 +1,4 @@
+use core::f32::consts::PI;
 use core::iter::Chain;
 use core::marker::PhantomData;
 
@@ -16,6 +17,7 @@ use super::trajectory::{LengthTarget, MoveTarget, ShiftTrajectory, Target};
 use crate::traits::Math;
 use crate::types::data::Pose;
 
+/// An enum for specifying the direction of slaloms.
 #[cfg_attr(test, derive(Arbitrary))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SlalomDirection {
@@ -23,6 +25,7 @@ pub enum SlalomDirection {
     Left,
 }
 
+/// An enum for specifying types of slaloms.
 #[cfg_attr(test, derive(Arbitrary))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SlalomKind {
@@ -36,6 +39,8 @@ pub enum SlalomKind {
     FastRunDiagonal90,
 }
 
+/// Parameters for slalom.
+#[derive(Clone, PartialEq, Debug)]
 pub struct SlalomParameters {
     pub l_start: Length,
     pub l_end: Length,
@@ -43,31 +48,30 @@ pub struct SlalomParameters {
     pub y_curve_end: Length,
     pub theta: Angle,
     pub v_ref: Velocity,
+    pub dtheta: AngularVelocity,
+    pub ddtheta: AngularAcceleration,
+    pub dddtheta: AngularJerk,
 }
 
-pub struct SlalomGenerator<M> {
-    dtheta: AngularVelocity,
-    ddtheta: AngularAcceleration,
-    dddtheta: AngularJerk,
+/// A trait that generates parameters for slalom.
+pub trait SlalomParametersGenerator {
+    fn generate(&self, kind: SlalomKind, direction: SlalomDirection) -> SlalomParameters;
+}
+
+pub struct SlalomGenerator<M, Generator> {
     period: Time,
-    parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+    parameters_generator: Generator,
     _phantom: PhantomData<fn() -> M>,
 }
 
-impl<M> SlalomGenerator<M> {
-    pub fn new(
-        dtheta: AngularVelocity,
-        ddtheta: AngularAcceleration,
-        dddtheta: AngularJerk,
-        period: Time,
-        parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-    ) -> Self {
+impl<M, Generator> SlalomGenerator<M, Generator> {
+    pub fn new(period: Time, parameters_generator: Generator) -> Self
+    where
+        Generator: SlalomParametersGenerator,
+    {
         Self {
-            dtheta,
-            ddtheta,
-            dddtheta,
             period,
-            parameters_map,
+            parameters_generator,
             _phantom: PhantomData,
         }
     }
@@ -76,9 +80,10 @@ impl<M> SlalomGenerator<M> {
 pub type SlalomTrajectory<M> =
     Chain<Chain<StraightTrajectory, CurveTrajectory<M>>, ShiftTrajectory<StraightTrajectory, M>>;
 
-impl<M> SlalomGenerator<M>
+impl<M, Generator> SlalomGenerator<M, Generator>
 where
     M: Math,
+    Generator: SlalomParametersGenerator,
 {
     pub fn generate_slalom(
         &self,
@@ -86,7 +91,7 @@ where
         dir: SlalomDirection,
         v: Velocity,
     ) -> SlalomTrajectory<M> {
-        let params = (self.parameters_map)(kind, dir);
+        let params = self.parameters_generator.generate(kind, dir);
         let straight1 =
             StraightTrajectoryGenerator::<M>::generate_constant(params.l_start, v, self.period);
         let curve = self.generate_curve(
@@ -96,6 +101,9 @@ where
             params.theta,
             v,
             params.v_ref,
+            params.dtheta,
+            params.ddtheta,
+            params.dddtheta,
         );
         let straight2 = ShiftTrajectory::new(
             Pose {
@@ -108,6 +116,7 @@ where
         straight1.chain(curve).chain(straight2)
     }
 
+    #[inline]
     fn generate_curve(
         &self,
         x: Length,
@@ -116,12 +125,15 @@ where
         theta_distance: Angle,
         v: Velocity,
         v_ref: Velocity,
+        dtheta: AngularVelocity,
+        ddtheta: AngularAcceleration,
+        dddtheta: AngularJerk,
     ) -> CurveTrajectory<M> {
         let k = (v / v_ref).get::<ratio>();
         let angle_generator = AngleStraightCalculatorGenerator::<M>::new(
-            k * self.dtheta,
-            k * k * self.ddtheta,
-            k * k * k * self.dddtheta,
+            k * dtheta,
+            k * k * ddtheta,
+            k * k * k * dddtheta,
         );
         let (angle_fn, t_end) = angle_generator.generate(
             theta,
@@ -267,6 +279,24 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
     }
 }
 
+pub const DEFAULT_DTHETA: AngularVelocity = AngularVelocity {
+    value: 3.0 * PI,
+    dimension: PhantomData,
+    units: PhantomData,
+};
+
+pub const DEFAULT_DDTHETA: AngularAcceleration = AngularAcceleration {
+    value: 36.0 * PI,
+    dimension: PhantomData,
+    units: PhantomData,
+};
+
+pub const DEFAULT_DDDTHETA: AngularJerk = AngularJerk {
+    value: 1200.0 * PI,
+    dimension: PhantomData,
+    units: PhantomData,
+};
+
 fn into_parameters(
     l_start: f32,
     l_end: f32,
@@ -290,46 +320,100 @@ fn into_parameters(
         y_curve_end: Length::new::<millimeter>(y_curve_end),
         v_ref: Velocity::new::<millimeter_per_second>(v_ref),
         theta: Angle::new::<degree>(theta),
+        dtheta: DEFAULT_DTHETA,
+        ddtheta: DEFAULT_DDTHETA,
+        dddtheta: DEFAULT_DDDTHETA,
     }
 }
 
-pub const DEFAULT_ANGULAR_VELOCITY_REF: AngularVelocity = AngularVelocity {
-    value: 9.424778,
-    dimension: PhantomData,
-    units: PhantomData,
-};
+pub struct DefaultSlalomParametersGenerator;
 
-pub const DEFAULT_ANGULAR_ACCELERATION_REF: AngularAcceleration = AngularAcceleration {
-    value: 113.097336,
-    dimension: PhantomData,
-    units: PhantomData,
-};
+impl SlalomParametersGenerator for DefaultSlalomParametersGenerator {
+    fn generate(&self, kind: SlalomKind, direction: SlalomDirection) -> SlalomParameters {
+        use SlalomKind::*;
 
-pub const DEFAULT_ANGULAR_JERK_REF: AngularJerk = AngularJerk {
-    value: 3769.9114,
-    dimension: PhantomData,
-    units: PhantomData,
-};
-
-pub fn slalom_parameters_map(kind: SlalomKind, dir: SlalomDirection) -> SlalomParameters {
-    use SlalomKind::*;
-
-    match kind {
-        Search90 => into_parameters(5.000001, 5.0, 45.0, 40.0, 241.59, 90.0, dir),
-        FastRun45 => into_parameters(2.57365, 21.2132, 75.0, 30.0, 411.636, 45.0, dir),
-        FastRun45Rev => into_parameters(21.2132, 2.57365, 93.63957, 29.99996, 411.636, 45.0, dir),
-        FastRun90 => into_parameters(20.0, 20.0, 90.0, 70.0, 422.783, 90.0, dir),
-        FastRun135 => into_parameters(21.8627, 14.1421, 55.0, 80.0, 353.609, 135.0, dir),
-        FastRun135Rev => into_parameters(14.1421, 21.8627, 47.27907, 80.00015, 353.609, 135.0, dir),
-        FastRun180 => into_parameters(24.0, 24.0, 24.0, 90.0, 412.228, 180.0, dir),
-        FastRunDiagonal90 => into_parameters(15.6396, 15.6396, 63.6396, 48.0, 289.908, 90.0, dir),
+        match kind {
+            Search90 => into_parameters(5.000001, 5.0, 45.0, 40.0, 241.59, 90.0, direction),
+            FastRun45 => into_parameters(2.57365, 21.2132, 75.0, 30.0, 411.636, 45.0, direction),
+            FastRun45Rev => into_parameters(
+                21.2132, 2.57365, 93.63957, 29.99996, 411.636, 45.0, direction,
+            ),
+            FastRun90 => into_parameters(20.0, 20.0, 90.0, 70.0, 422.783, 90.0, direction),
+            FastRun135 => into_parameters(21.8627, 14.1421, 55.0, 80.0, 353.609, 135.0, direction),
+            FastRun135Rev => into_parameters(
+                14.1421, 21.8627, 47.27907, 80.00015, 353.609, 135.0, direction,
+            ),
+            FastRun180 => into_parameters(24.0, 24.0, 24.0, 90.0, 412.228, 180.0, direction),
+            FastRunDiagonal90 => {
+                into_parameters(15.6396, 15.6396, 63.6396, 48.0, 289.908, 90.0, direction)
+            }
+        }
     }
 }
 
-pub fn slalom_parameters_map2(kind: SlalomKind, dir: SlalomDirection) -> SlalomParameters {
-    match kind {
-        SlalomKind::Search90 => into_parameters(0.0, 20.0, 35.0, 35.0, 211.39, 90.0, dir),
-        _ => slalom_parameters_map(kind, dir),
+pub struct SlalomParametersGeneratorWithFrontOffset {
+    search90_param_right: SlalomParameters,
+    search90_param_left: SlalomParameters,
+}
+
+impl SlalomParametersGeneratorWithFrontOffset {
+    pub fn new(front_offset: Length) -> Self {
+        let x = front_offset.get::<uom::si::length::millimeter>();
+        let gen_params = |l_start: f32,
+                          l_end: f32,
+                          x_curve_end: f32,
+                          y_curve_end: f32,
+                          v_ref: f32,
+                          theta: f32| {
+            (
+                into_parameters(
+                    l_start,
+                    l_end,
+                    x_curve_end,
+                    y_curve_end,
+                    v_ref,
+                    theta,
+                    SlalomDirection::Right,
+                ),
+                into_parameters(
+                    l_start,
+                    l_end,
+                    x_curve_end,
+                    y_curve_end,
+                    v_ref,
+                    theta,
+                    SlalomDirection::Left,
+                ),
+            )
+        };
+        let search90_params = if x <= 5.0 {
+            gen_params(5.000001 - x, 5.0 + x, 45.0 - x, 40.0, 241.59, 90.0)
+        } else {
+            gen_params(
+                0.0,
+                x + x,
+                45.0 - x,
+                45.0 - x,
+                (45.0 - x) * 241.59 / 40.0,
+                90.0,
+            )
+        };
+        Self {
+            search90_param_right: search90_params.0,
+            search90_param_left: search90_params.1,
+        }
+    }
+}
+
+impl SlalomParametersGenerator for SlalomParametersGeneratorWithFrontOffset {
+    fn generate(&self, kind: SlalomKind, direction: SlalomDirection) -> SlalomParameters {
+        match kind {
+            SlalomKind::Search90 => match direction {
+                SlalomDirection::Left => self.search90_param_left.clone(),
+                SlalomDirection::Right => self.search90_param_right.clone(),
+            },
+            _ => DefaultSlalomParametersGenerator.generate(kind, direction),
+        }
     }
 }
 
@@ -340,9 +424,9 @@ mod tests {
     use proptest::prelude::*;
     use uom::si::{
         angle::{degree, radian},
-        angular_acceleration::{degree_per_second_squared, radian_per_second_squared},
-        angular_jerk::{degree_per_second_cubed, radian_per_second_cubed},
-        angular_velocity::{degree_per_second, radian_per_second},
+        angular_acceleration::radian_per_second_squared,
+        angular_jerk::radian_per_second_cubed,
+        angular_velocity::radian_per_second,
         length::meter,
         time::second,
         velocity::meter_per_second,
@@ -368,8 +452,7 @@ mod tests {
         let v_ref = Velocity::new::<meter_per_second>(v_ref);
         let period = Time::new::<second>(period);
 
-        let generator =
-            SlalomGenerator::new(dtheta, ddtheta, dddtheta, period, slalom_parameters_map);
+        let generator = SlalomGenerator::new(period, DefaultSlalomParametersGenerator);
         let v_target = Velocity::new::<meter_per_second>(v_target);
         generator.generate_curve(
             Length::new::<meter>(x),
@@ -378,6 +461,9 @@ mod tests {
             Angle::new::<degree>(theta_dist),
             v_target,
             v_ref,
+            dtheta,
+            ddtheta,
+            dddtheta,
         )
     }
 
@@ -386,12 +472,9 @@ mod tests {
         fn test_slalom_generator(kind: SlalomKind, dir: SlalomDirection) {
             use approx::assert_relative_eq;
 
-            let generator = SlalomGenerator::<MathFake>::new(
-                AngularVelocity::new::<degree_per_second>(540.0),
-                AngularAcceleration::new::<degree_per_second_squared>(6480.0),
-                AngularJerk::new::<degree_per_second_cubed>(216000.0),
+            let generator = SlalomGenerator::<MathFake, DefaultSlalomParametersGenerator>::new(
                 Time::new::<second>(0.001),
-                slalom_parameters_map,
+                DefaultSlalomParametersGenerator,
             );
             let v_target = Velocity::new::<meter_per_second>(0.5);
 

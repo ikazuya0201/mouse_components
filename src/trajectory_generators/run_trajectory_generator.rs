@@ -1,23 +1,22 @@
 use core::marker::PhantomData;
 
 use spin::Mutex;
+use uom::si::{
+    f32::{Acceleration, Jerk, Length, Time, Velocity},
+    length::meter,
+};
 
-use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParameters};
+use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParametersGenerator};
 use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
 use crate::trajectory_managers::TrackingTrajectoryGenerator;
-use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
+use crate::utils::builder::BuilderResult;
 use crate::utils::math::{LibmMath, Math};
-use uom::si::{
-    f32::{
-        Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
-        Velocity,
-    },
-    length::meter,
-};
+use crate::{get_or_err, impl_setter};
 
+/// An enum for specifying a kind of trajectory of fast run.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RunKind {
     Straight(u16),
@@ -25,34 +24,30 @@ pub enum RunKind {
     Slalom(SlalomKind, SlalomDirection),
 }
 
-pub struct RunTrajectoryGenerator<M> {
+/// A trajectory generator for fast run.
+pub struct RunTrajectoryGenerator<M, Generator> {
     current_velocity: Mutex<Velocity>,
     run_slalom_velocity: Velocity,
     straight_generator: StraightTrajectoryGenerator<M>,
-    slalom_generator: SlalomGenerator<M>,
+    slalom_generator: SlalomGenerator<M, Generator>,
 }
 
-impl<M: Math> RunTrajectoryGenerator<M> {
+impl<M, Generator> RunTrajectoryGenerator<M, Generator>
+where
+    M: Math,
+    Generator: SlalomParametersGenerator,
+{
     fn new(
         run_slalom_velocity: Velocity,
         max_velocity: Velocity,
         max_acceleration: Acceleration,
         max_jerk: Jerk,
-        angular_velocity_ref: AngularVelocity,
-        angular_acceleration_ref: AngularAcceleration,
-        angular_jerk_ref: AngularJerk,
-        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+        generator: Generator,
         period: Time,
     ) -> Self {
         let straight_generator =
             StraightTrajectoryGenerator::<M>::new(max_velocity, max_acceleration, max_jerk, period);
-        let slalom_generator = SlalomGenerator::new(
-            angular_velocity_ref,
-            angular_acceleration_ref,
-            angular_jerk_ref,
-            period,
-            slalom_parameters_map,
-        );
+        let slalom_generator = SlalomGenerator::new(period, generator);
         Self {
             current_velocity: Mutex::new(Default::default()),
             run_slalom_velocity,
@@ -68,9 +63,11 @@ impl<M: Math> RunTrajectoryGenerator<M> {
 //TODO: To deal with arbitrary initial commands
 //TODO: Specify start and end of trajectories by `RunKind`.
 //TODO: Hold current velocity as a state.
-impl<M> TrackingTrajectoryGenerator<(Pose, RunKind)> for RunTrajectoryGenerator<M>
+impl<M, Generator> TrackingTrajectoryGenerator<(Pose, RunKind)>
+    for RunTrajectoryGenerator<M, Generator>
 where
     M: Math,
+    Generator: SlalomParametersGenerator,
 {
     type Target = Target;
     type Trajectory = ShiftTrajectory<RunTrajectory<M>, M>;
@@ -103,9 +100,10 @@ where
     }
 }
 
-impl<M> RunTrajectoryGenerator<M>
+impl<M, Generator> RunTrajectoryGenerator<M, Generator>
 where
     M: Math,
+    Generator: SlalomParametersGenerator,
 {
     fn generate_run_trajectory_and_terminal_velocity(
         &self,
@@ -149,106 +147,54 @@ where
     }
 }
 
-pub struct RunTrajectoryGeneratorBuilder<M = LibmMath> {
+pub struct RunTrajectoryGeneratorBuilder<M, Generator> {
     run_slalom_velocity: Option<Velocity>,
     max_velocity: Option<Velocity>,
     max_acceleration: Option<Acceleration>,
     max_jerk: Option<Jerk>,
-    angular_velocity_ref: Option<AngularVelocity>,
-    angular_acceleration_ref: Option<AngularAcceleration>,
-    angular_jerk_ref: Option<AngularJerk>,
-    slalom_parameters_map: Option<fn(SlalomKind, SlalomDirection) -> SlalomParameters>,
+    parameters_generator: Option<Generator>,
     period: Option<Time>,
     _math: PhantomData<fn() -> M>,
 }
 
-impl Default for RunTrajectoryGeneratorBuilder<LibmMath> {
+impl<Generator> Default for RunTrajectoryGeneratorBuilder<LibmMath, Generator> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<M> RunTrajectoryGeneratorBuilder<M> {
+impl<M, Generator> RunTrajectoryGeneratorBuilder<M, Generator> {
     pub fn new() -> Self {
         Self {
             run_slalom_velocity: None,
             max_velocity: None,
             max_acceleration: None,
             max_jerk: None,
-            angular_velocity_ref: None,
-            angular_acceleration_ref: None,
-            angular_jerk_ref: None,
-            slalom_parameters_map: None,
+            parameters_generator: None,
             period: None,
             _math: PhantomData,
         }
     }
 
-    pub fn build(self) -> Result<RunTrajectoryGenerator<M>, RequiredFieldEmptyError>
+    pub fn build(&mut self) -> BuilderResult<RunTrajectoryGenerator<M, Generator>>
     where
         M: Math,
+        Generator: SlalomParametersGenerator,
     {
-        Ok(RunTrajectoryGenerator::<M>::new(
-            ok_or(self.run_slalom_velocity, "run_slalom_velocity")?,
-            ok_or(self.max_velocity, "max_velocity")?,
-            ok_or(self.max_acceleration, "max_acceleration")?,
-            ok_or(self.max_jerk, "max_jerk")?,
-            ok_or(self.angular_velocity_ref, "angular_velocity_ref")?,
-            ok_or(self.angular_acceleration_ref, "angular_acceleration_ref")?,
-            ok_or(self.angular_jerk_ref, "angular_jerk_ref")?,
-            ok_or(self.slalom_parameters_map, "slalom_parameters_map")?,
-            ok_or(self.period, "period")?,
+        Ok(RunTrajectoryGenerator::<M, Generator>::new(
+            get_or_err!(self.run_slalom_velocity),
+            get_or_err!(self.max_velocity),
+            get_or_err!(self.max_acceleration),
+            get_or_err!(self.max_jerk),
+            get_or_err!(self.parameters_generator),
+            get_or_err!(self.period),
         ))
     }
 
-    pub fn run_slalom_velocity(mut self, run_slalom_velocity: Velocity) -> Self {
-        self.run_slalom_velocity = Some(run_slalom_velocity);
-        self
-    }
-
-    pub fn max_velocity(mut self, max_velocity: Velocity) -> Self {
-        self.max_velocity = Some(max_velocity);
-        self
-    }
-
-    pub fn max_acceleration(mut self, max_acceleration: Acceleration) -> Self {
-        self.max_acceleration = Some(max_acceleration);
-        self
-    }
-
-    pub fn max_jerk(mut self, max_jerk: Jerk) -> Self {
-        self.max_jerk = Some(max_jerk);
-        self
-    }
-
-    pub fn period(mut self, period: Time) -> Self {
-        self.period = Some(period);
-        self
-    }
-
-    pub fn angular_velocity_ref(mut self, angular_velocity_ref: AngularVelocity) -> Self {
-        self.angular_velocity_ref = Some(angular_velocity_ref);
-        self
-    }
-
-    pub fn angular_acceleration_ref(
-        mut self,
-        angular_acceleration_ref: AngularAcceleration,
-    ) -> Self {
-        self.angular_acceleration_ref = Some(angular_acceleration_ref);
-        self
-    }
-
-    pub fn angular_jerk_ref(mut self, angular_jerk_ref: AngularJerk) -> Self {
-        self.angular_jerk_ref = Some(angular_jerk_ref);
-        self
-    }
-
-    pub fn slalom_parameters_map(
-        mut self,
-        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-    ) -> Self {
-        self.slalom_parameters_map = Some(slalom_parameters_map);
-        self
-    }
+    impl_setter!(run_slalom_velocity: Velocity);
+    impl_setter!(max_velocity: Velocity);
+    impl_setter!(max_acceleration: Acceleration);
+    impl_setter!(max_jerk: Jerk);
+    impl_setter!(period: Time);
+    impl_setter!(parameters_generator: Generator);
 }

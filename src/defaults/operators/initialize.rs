@@ -22,6 +22,7 @@ use crate::tracker::{Tracker, TrackerBuilder};
 use crate::trajectory_generators::{
     ReturnSetupTrajectoryGenerator, RunKind, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
     SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
+    SlalomParametersGeneratorWithFrontOffset,
 };
 use crate::trajectory_managers::{SearchTrajectoryManager, TrackingTrajectoryManager};
 use crate::utils::probability::Probability;
@@ -180,10 +181,9 @@ where
         .max_acceleration(*config.max_acceleration())
         .front_offset(*config.front_offset())
         .search_velocity(*config.search_velocity())
-        .angular_jerk_ref(*config.slalom_angular_jerk_ref())
-        .angular_velocity_ref(*config.slalom_angular_velocity_ref())
-        .angular_acceleration_ref(*config.slalom_angular_acceleration_ref())
-        .slalom_parameters_map(*config.slalom_parameters_map())
+        .parameters_generator(SlalomParametersGeneratorWithFrontOffset::new(
+            *config.front_offset(),
+        ))
         .spin_angular_jerk(*config.spin_angular_jerk())
         .spin_angular_velocity(*config.spin_angular_velocity())
         .spin_angular_acceleration(*config.spin_angular_acceleration())
@@ -193,16 +193,15 @@ where
 
 pub fn init_run_trajectory_generator<'a, Math, Size>(
     config: &Config<Size>,
-) -> RunTrajectoryGenerator<Math>
+) -> RunTrajectoryGenerator<Math, SlalomParametersGeneratorWithFrontOffset>
 where
     Math: crate::utils::math::Math,
 {
     RunTrajectoryGeneratorBuilder::new()
         .period(*config.period())
-        .slalom_parameters_map(*config.slalom_parameters_map())
-        .angular_acceleration_ref(*config.slalom_angular_acceleration_ref())
-        .angular_velocity_ref(*config.slalom_angular_velocity_ref())
-        .angular_jerk_ref(*config.slalom_angular_jerk_ref())
+        .parameters_generator(SlalomParametersGeneratorWithFrontOffset::new(
+            *config.front_offset(),
+        ))
         .max_acceleration(*config.max_acceleration())
         .max_velocity(*config.max_velocity())
         .max_jerk(*config.max_jerk())
