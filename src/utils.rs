@@ -1,3 +1,5 @@
+//! Utilities for this crate.
+
 pub(crate) mod builder;
 pub(crate) mod forced_vec;
 pub(crate) mod itertools;

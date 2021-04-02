@@ -1,3 +1,5 @@
+//! An implementation of [Tracker](crate::robot::Tracker).
+
 mod state;
 
 use core::marker::PhantomData;

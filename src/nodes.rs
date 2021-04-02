@@ -1,3 +1,5 @@
+//! Implementations of nodes.
+
 mod direction;
 
 use core::marker::PhantomData;
