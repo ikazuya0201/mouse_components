@@ -5,7 +5,10 @@ use core::marker::PhantomData;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 use uom::si::{
-    f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Length, Time, Velocity},
+    f32::{
+        Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
+        Velocity,
+    },
     ratio::ratio,
 };
 
@@ -61,18 +64,25 @@ pub trait SlalomParametersGenerator {
 pub struct SlalomGenerator<M, Generator> {
     period: Time,
     parameters_generator: Generator,
-    _phantom: PhantomData<fn() -> M>,
+    #[allow(unused)]
+    straight_generator: StraightTrajectoryGenerator<M>,
 }
 
 impl<M, Generator> SlalomGenerator<M, Generator> {
-    pub fn new(period: Time, parameters_generator: Generator) -> Self
+    pub fn new(
+        period: Time,
+        parameters_generator: Generator,
+        v_max: Velocity,
+        a_max: Acceleration,
+        j_max: Jerk,
+    ) -> Self
     where
         Generator: SlalomParametersGenerator,
     {
         Self {
             period,
             parameters_generator,
-            _phantom: PhantomData,
+            straight_generator: StraightTrajectoryGenerator::new(v_max, a_max, j_max, period),
         }
     }
 }
@@ -114,6 +124,47 @@ where
             StraightTrajectoryGenerator::<M>::generate_constant(params.l_end, v, self.period),
         );
         straight1.chain(curve).chain(straight2)
+    }
+
+    #[allow(unused)]
+    //TODO: Write test.
+    pub fn generate_slalom_with_terminal_velocity(
+        &self,
+        kind: SlalomKind,
+        dir: SlalomDirection,
+        v_start: Velocity,
+        v_end: Velocity,
+    ) -> (SlalomTrajectory<M>, Velocity) {
+        let params = self.parameters_generator.generate(kind, dir);
+        let (start_straight, middle_velocity) = self
+            .straight_generator
+            .generate_with_terminal_velocity(params.l_start, v_start, v_end);
+        let curve = self.generate_curve(
+            params.l_start,
+            Default::default(),
+            Default::default(),
+            params.theta,
+            middle_velocity,
+            params.v_ref,
+            params.dtheta,
+            params.ddtheta,
+            params.dddtheta,
+        );
+        let (end_straight, terminal_velocity) = self
+            .straight_generator
+            .generate_with_terminal_velocity(params.l_end, middle_velocity, v_end);
+        let end_straight = ShiftTrajectory::new(
+            Pose {
+                x: params.x_curve_end,
+                y: params.y_curve_end,
+                theta: params.theta,
+            },
+            end_straight,
+        );
+        (
+            start_straight.chain(curve).chain(end_straight),
+            terminal_velocity,
+        )
     }
 
     #[inline]
@@ -423,10 +474,12 @@ mod tests {
     use crate::utils::math::MathFake;
     use proptest::prelude::*;
     use uom::si::{
+        acceleration::meter_per_second_squared,
         angle::{degree, radian},
         angular_acceleration::radian_per_second_squared,
         angular_jerk::radian_per_second_cubed,
         angular_velocity::radian_per_second,
+        jerk::meter_per_second_cubed,
         length::meter,
         time::second,
         velocity::meter_per_second,
@@ -452,7 +505,13 @@ mod tests {
         let v_ref = Velocity::new::<meter_per_second>(v_ref);
         let period = Time::new::<second>(period);
 
-        let generator = SlalomGenerator::new(period, DefaultSlalomParametersGenerator);
+        let generator = SlalomGenerator::new(
+            period,
+            DefaultSlalomParametersGenerator,
+            Velocity::new::<meter_per_second>(1.0),
+            Acceleration::new::<meter_per_second_squared>(1.0),
+            Jerk::new::<meter_per_second_cubed>(1.0),
+        );
         let v_target = Velocity::new::<meter_per_second>(v_target);
         generator.generate_curve(
             Length::new::<meter>(x),
@@ -475,6 +534,9 @@ mod tests {
             let generator = SlalomGenerator::<MathFake, DefaultSlalomParametersGenerator>::new(
                 Time::new::<second>(0.001),
                 DefaultSlalomParametersGenerator,
+                Velocity::new::<meter_per_second>(1.0),
+                Acceleration::new::<meter_per_second_squared>(1.0),
+                Jerk::new::<meter_per_second_cubed>(1.0),
             );
             let v_target = Velocity::new::<meter_per_second>(0.5);
 
