@@ -1,7 +1,7 @@
 use core::iter::Chain;
 use core::marker::PhantomData;
 
-use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParameters};
+use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParametersGenerator};
 use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use super::spin_generator::{SpinGenerator, SpinTrajectory};
 use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
@@ -9,8 +9,9 @@ use super::trajectory::StopTrajectory;
 use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
 use crate::trajectory_managers::SearchTrajectoryGenerator as ISearchTrajectoryGenerator;
-use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
-use crate::utils::math::{LibmMath, Math};
+use crate::utils::builder::RequiredFieldEmptyError;
+use crate::utils::math::Math;
+use crate::{get_or_err, impl_setter};
 use uom::si::{
     angle::degree,
     f32::{
@@ -84,12 +85,12 @@ pub struct SearchTrajectoryGenerator<M> {
     back_trajectory: BackTrajectory<M>,
 }
 
-impl<M: Math> SearchTrajectoryGenerator<M> {
-    fn new(
-        angular_velocity_ref: AngularVelocity,
-        angular_acceleration_ref: AngularAcceleration,
-        angular_jerk_ref: AngularJerk,
-        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
+impl<M> SearchTrajectoryGenerator<M>
+where
+    M: Math,
+{
+    fn new<Generator>(
+        parameters_generator: Generator,
         max_velocity: Velocity,
         max_acceleration: Acceleration,
         max_jerk: Jerk,
@@ -100,16 +101,13 @@ impl<M: Math> SearchTrajectoryGenerator<M> {
         spin_angular_velocity: AngularVelocity,
         spin_angular_acceleration: AngularAcceleration,
         spin_angular_jerk: AngularJerk,
-    ) -> Self {
+    ) -> Self
+    where
+        Generator: SlalomParametersGenerator,
+    {
         let straight_generator =
             StraightTrajectoryGenerator::<M>::new(max_velocity, max_acceleration, max_jerk, period);
-        let slalom_generator = SlalomGenerator::new(
-            angular_velocity_ref,
-            angular_acceleration_ref,
-            angular_jerk_ref,
-            period,
-            slalom_parameters_map,
-        );
+        let slalom_generator = SlalomGenerator::new(period, parameters_generator);
         let spin_generator = SpinGenerator::<M>::new(
             spin_angular_velocity,
             spin_angular_acceleration,
@@ -259,11 +257,8 @@ where
     }
 }
 
-pub struct SearchTrajectoryGeneratorBuilder<M = LibmMath> {
-    angular_velocity_ref: Option<AngularVelocity>,
-    angular_acceleration_ref: Option<AngularAcceleration>,
-    angular_jerk_ref: Option<AngularJerk>,
-    slalom_parameters_map: Option<fn(SlalomKind, SlalomDirection) -> SlalomParameters>,
+pub struct SearchTrajectoryGeneratorBuilder<M, Generator> {
+    parameters_generator: Option<Generator>,
     max_velocity: Option<Velocity>,
     max_acceleration: Option<Acceleration>,
     max_jerk: Option<Jerk>,
@@ -277,13 +272,15 @@ pub struct SearchTrajectoryGeneratorBuilder<M = LibmMath> {
     _math: PhantomData<fn() -> M>,
 }
 
-impl Default for SearchTrajectoryGeneratorBuilder<LibmMath> {
+impl<Generator> Default
+    for SearchTrajectoryGeneratorBuilder<crate::utils::math::LibmMath, Generator>
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<M> SearchTrajectoryGeneratorBuilder<M> {
+impl<M, Generator> SearchTrajectoryGeneratorBuilder<M, Generator> {
     const DEFAULT_FRONT_OFFSET: Length = Length {
         dimension: PhantomData,
         units: PhantomData,
@@ -297,10 +294,7 @@ impl<M> SearchTrajectoryGeneratorBuilder<M> {
 
     pub fn new() -> Self {
         Self {
-            angular_velocity_ref: None,
-            angular_acceleration_ref: None,
-            angular_jerk_ref: None,
-            slalom_parameters_map: None,
+            parameters_generator: None,
             max_velocity: None,
             max_acceleration: None,
             max_jerk: None,
@@ -315,124 +309,50 @@ impl<M> SearchTrajectoryGeneratorBuilder<M> {
         }
     }
 
-    pub fn build(self) -> Result<SearchTrajectoryGenerator<M>, RequiredFieldEmptyError>
+    pub fn build(&mut self) -> Result<SearchTrajectoryGenerator<M>, RequiredFieldEmptyError>
     where
         M: Math,
+        Generator: SlalomParametersGenerator,
     {
-        Ok(SearchTrajectoryGenerator::<M>::new(
-            ok_or(self.angular_velocity_ref, "angular_velocity_ref")?,
-            ok_or(self.angular_acceleration_ref, "angular_acceleration_ref")?,
-            ok_or(self.angular_jerk_ref, "angular_jerk_ref")?,
-            ok_or(self.slalom_parameters_map, "slalom_parameters_map")?,
-            ok_or(self.max_velocity, "max_velocity")?,
-            ok_or(self.max_acceleration, "max_acceleration")?,
-            ok_or(self.max_jerk, "max_jerk")?,
-            ok_or(self.period, "period")?,
-            ok_or(self.search_velocity, "search_velocity")?,
+        Ok(SearchTrajectoryGenerator::new(
+            get_or_err!(self.parameters_generator),
+            get_or_err!(self.max_velocity),
+            get_or_err!(self.max_acceleration),
+            get_or_err!(self.max_jerk),
+            get_or_err!(self.period),
+            get_or_err!(self.search_velocity),
             self.front_offset.unwrap_or(Self::DEFAULT_FRONT_OFFSET),
             self.square_width.unwrap_or(Self::DEFAULT_SQUARE_WIDTH),
-            ok_or(self.spin_angular_velocity, "spin_angular_velocity")?,
-            ok_or(self.spin_angular_acceleration, "spin_angular_acceleration")?,
-            ok_or(self.spin_angular_jerk, "spin_angular_jerk")?,
+            get_or_err!(self.spin_angular_velocity),
+            get_or_err!(self.spin_angular_acceleration),
+            get_or_err!(self.spin_angular_jerk),
         ))
     }
 
-    pub fn angular_velocity_ref(mut self, angular_velocity_ref: AngularVelocity) -> Self {
-        self.angular_velocity_ref = Some(angular_velocity_ref);
-        self
-    }
-
-    pub fn angular_acceleration_ref(
-        mut self,
-        angular_acceleration_ref: AngularAcceleration,
-    ) -> Self {
-        self.angular_acceleration_ref = Some(angular_acceleration_ref);
-        self
-    }
-
-    pub fn angular_jerk_ref(mut self, angular_jerk_ref: AngularJerk) -> Self {
-        self.angular_jerk_ref = Some(angular_jerk_ref);
-        self
-    }
-
-    pub fn slalom_parameters_map(
-        mut self,
-        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-    ) -> Self {
-        self.slalom_parameters_map = Some(slalom_parameters_map);
-        self
-    }
-
-    pub fn max_velocity(mut self, max_velocity: Velocity) -> Self {
-        self.max_velocity = Some(max_velocity);
-        self
-    }
-
-    pub fn max_acceleration(mut self, max_acceleration: Acceleration) -> Self {
-        self.max_acceleration = Some(max_acceleration);
-        self
-    }
-
-    pub fn max_jerk(mut self, max_jerk: Jerk) -> Self {
-        self.max_jerk = Some(max_jerk);
-        self
-    }
-
-    pub fn period(mut self, period: Time) -> Self {
-        self.period = Some(period);
-        self
-    }
-
-    pub fn search_velocity(mut self, search_velocity: Velocity) -> Self {
-        self.search_velocity = Some(search_velocity);
-        self
-    }
-
-    pub fn front_offset(mut self, front_offset: Length) -> Self {
-        self.front_offset = Some(front_offset);
-        self
-    }
-
-    pub fn square_width(mut self, square_width: Length) -> Self {
-        self.square_width = Some(square_width);
-        self
-    }
-
-    pub fn spin_angular_velocity(mut self, spin_angular_velocity: AngularVelocity) -> Self {
-        self.spin_angular_velocity = Some(spin_angular_velocity);
-        self
-    }
-
-    pub fn spin_angular_acceleration(
-        mut self,
-        spin_angular_acceleration: AngularAcceleration,
-    ) -> Self {
-        self.spin_angular_acceleration = Some(spin_angular_acceleration);
-        self
-    }
-
-    pub fn spin_angular_jerk(mut self, spin_angular_jerk: AngularJerk) -> Self {
-        self.spin_angular_jerk = Some(spin_angular_jerk);
-        self
-    }
+    impl_setter!(parameters_generator: Generator);
+    impl_setter!(max_velocity: Velocity);
+    impl_setter!(max_acceleration: Acceleration);
+    impl_setter!(max_jerk: Jerk);
+    impl_setter!(period: Time);
+    impl_setter!(search_velocity: Velocity);
+    impl_setter!(front_offset: Length);
+    impl_setter!(square_width: Length);
+    impl_setter!(spin_angular_velocity: AngularVelocity);
+    impl_setter!(spin_angular_acceleration: AngularAcceleration);
+    impl_setter!(spin_angular_jerk: AngularJerk);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trajectory_generators::slalom_parameters_map;
+    use crate::trajectory_generators::DefaultSlalomParametersGenerator;
     use crate::utils::math::MathFake;
     use approx::assert_relative_eq;
     use uom::si::{
-        acceleration::meter_per_second_squared,
-        angle::radian,
-        angular_acceleration::{degree_per_second_squared, radian_per_second_squared},
-        angular_jerk::{degree_per_second_cubed, radian_per_second_cubed},
-        angular_velocity::{degree_per_second, radian_per_second},
-        jerk::meter_per_second_cubed,
-        length::meter,
-        time::second,
-        velocity::meter_per_second,
+        acceleration::meter_per_second_squared, angle::radian,
+        angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
+        angular_velocity::degree_per_second, jerk::meter_per_second_cubed, length::meter,
+        time::second, velocity::meter_per_second,
     };
 
     fn build_generator() -> SearchTrajectoryGenerator<MathFake> {
@@ -440,12 +360,7 @@ mod tests {
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
-            .angular_velocity_ref(AngularVelocity::new::<degree_per_second>(180.0))
-            .angular_acceleration_ref(AngularAcceleration::new::<degree_per_second_squared>(
-                1800.0,
-            ))
-            .angular_jerk_ref(AngularJerk::new::<degree_per_second_cubed>(18000.0))
-            .slalom_parameters_map(slalom_parameters_map)
+            .parameters_generator(DefaultSlalomParametersGenerator)
             .period(Time::new::<second>(0.001))
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
             .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
@@ -464,25 +379,21 @@ mod tests {
         ($name: ident: $value: expr) => {
             #[test]
             fn $name() {
-                use core::f32::consts::PI;
+                use crate::trajectory_generators::DefaultSlalomParametersGenerator;
+                use crate::utils::math::MathFake;
 
                 const EPSILON: f32 = 1e-3;
 
                 let period = Time::new::<second>(0.001);
                 let search_velocity = Velocity::new::<meter_per_second>(0.2);
 
-                let generator = SearchTrajectoryGeneratorBuilder::default()
+                let generator = SearchTrajectoryGeneratorBuilder::<MathFake, _>::new()
                     .period(period)
                     .max_velocity(Velocity::new::<meter_per_second>(2.0))
                     .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
                     .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
                     .search_velocity(search_velocity)
-                    .slalom_parameters_map(slalom_parameters_map)
-                    .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
-                    .angular_acceleration_ref(
-                        AngularAcceleration::new::<radian_per_second_squared>(36.0 * PI),
-                    )
-                    .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
+                    .parameters_generator(DefaultSlalomParametersGenerator)
                     .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
                     .spin_angular_acceleration(
                         AngularAcceleration::new::<degree_per_second_squared>(90.0),

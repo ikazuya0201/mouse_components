@@ -10,7 +10,6 @@ use crate::commanders::GoalSizeUpperBound;
 use crate::impl_setter;
 use crate::impl_with_getter;
 use crate::nodes::RunNode;
-use crate::trajectory_generators::{SlalomDirection, SlalomKind, SlalomParameters};
 use crate::types::data::{Pattern, SearchKind};
 use crate::utils::builder::{ok_or, BuilderResult};
 
@@ -55,10 +54,6 @@ impl_with_getter! {
         max_velocity: Velocity,
         max_acceleration: Acceleration,
         max_jerk: Jerk,
-        slalom_angular_velocity_ref: AngularVelocity,
-        slalom_angular_acceleration_ref: AngularAcceleration,
-        slalom_angular_jerk_ref: AngularJerk,
-        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
         search_velocity: Velocity,
         spin_angular_velocity: AngularVelocity,
         spin_angular_acceleration: AngularAcceleration,
@@ -180,10 +175,6 @@ pub struct ConfigBuilder<Size> {
     max_velocity: Option<Velocity>,
     max_acceleration: Option<Acceleration>,
     max_jerk: Option<Jerk>,
-    slalom_angular_velocity_ref: Option<AngularVelocity>,
-    slalom_angular_acceleration_ref: Option<AngularAcceleration>,
-    slalom_angular_jerk_ref: Option<AngularJerk>,
-    slalom_parameters_map: Option<fn(SlalomKind, SlalomDirection) -> SlalomParameters>,
     search_velocity: Option<Velocity>,
     spin_angular_velocity: Option<AngularVelocity>,
     spin_angular_acceleration: Option<AngularAcceleration>,
@@ -419,38 +410,6 @@ impl<Size> ConfigBuilder<Size> {
         max_jerk: Jerk
     );
     impl_setter!(
-        /// **Optional**,
-        /// Sets the base angular velocity for slalom.
-        ///
-        /// **Caution!**: This value should be constrained to slalom_parameters_map.
-        /// This value can be deprecated.
-        slalom_angular_velocity_ref: AngularVelocity
-    );
-    impl_setter!(
-        /// **Optional**,
-        /// Sets the base angular acceleration for slalom.
-        ///
-        /// **Caution!**: This value should be constrained to slalom_parameters_map.
-        /// This value can be deprecated.
-        slalom_angular_acceleration_ref: AngularAcceleration
-    );
-    impl_setter!(
-        /// **Optional**,
-        /// Sets the base angular jerk for slalom.
-        ///
-        /// **Caution!**: This value should be constrained to slalom_parameters_map.
-        /// This value can be deprecated.
-        slalom_angular_jerk_ref: AngularJerk
-    );
-    impl_setter!(
-        /// **Optional**,
-        /// Default:
-        /// [slalom_parameters_map2](crate::trajectory_generators::slalom_parameters_map2).
-        ///
-        /// Sets the parameters for slalom.
-        slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters
-    );
-    impl_setter!(
         /// **Required**,
         /// Sets the velocity for search.
         search_velocity: Velocity
@@ -511,10 +470,6 @@ impl<Size> ConfigBuilder<Size> {
             max_velocity: None,
             max_acceleration: None,
             max_jerk: None,
-            slalom_angular_velocity_ref: None,
-            slalom_angular_acceleration_ref: None,
-            slalom_angular_jerk_ref: None,
-            slalom_parameters_map: None,
             search_velocity: None,
             spin_angular_velocity: None,
             spin_angular_acceleration: None,
@@ -532,10 +487,6 @@ impl<Size> ConfigBuilder<Size> {
             }};
         }
 
-        use crate::trajectory_generators::{
-            slalom_parameters_map2, DEFAULT_ANGULAR_ACCELERATION_REF, DEFAULT_ANGULAR_JERK_REF,
-            DEFAULT_ANGULAR_VELOCITY_REF,
-        };
         use crate::wall_detector::{
             DEFAULT_IGNORE_LENGTH, DEFAULT_IGNORE_RADIUS, DEFAULT_SQUARE_WIDTH, DEFAULT_WALL_WIDTH,
         };
@@ -584,16 +535,6 @@ impl<Size> ConfigBuilder<Size> {
             max_velocity: get!(max_velocity),
             max_acceleration: get!(max_acceleration),
             max_jerk: get!(max_jerk),
-            slalom_angular_velocity_ref: self
-                .slalom_angular_velocity_ref
-                .unwrap_or(DEFAULT_ANGULAR_VELOCITY_REF),
-            slalom_angular_acceleration_ref: self
-                .slalom_angular_acceleration_ref
-                .unwrap_or(DEFAULT_ANGULAR_ACCELERATION_REF),
-            slalom_angular_jerk_ref: self
-                .slalom_angular_jerk_ref
-                .unwrap_or(DEFAULT_ANGULAR_JERK_REF),
-            slalom_parameters_map: self.slalom_parameters_map.unwrap_or(slalom_parameters_map2),
             search_velocity: get!(search_velocity),
             spin_angular_velocity: get!(spin_angular_velocity),
             spin_angular_acceleration: get!(spin_angular_acceleration),

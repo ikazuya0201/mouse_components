@@ -44,7 +44,10 @@ pub type RunAgent<
     Size,
 > = agents::TrackingAgent<
     trajectory_managers::TrackingTrajectoryManager<
-        trajectory_generators::RunTrajectoryGenerator<Math>,
+        trajectory_generators::RunTrajectoryGenerator<
+            Math,
+            trajectory_generators::SlalomParametersGeneratorWithFrontOffset,
+        >,
         command_converter::CommandConverter,
         types::data::Target,
         trajectory_generators::ShiftTrajectory<trajectory_generators::RunTrajectory<Math>, Math>,

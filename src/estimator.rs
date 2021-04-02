@@ -351,7 +351,8 @@ mod tests {
     use crate::{
         prelude::*,
         trajectory_generators::{
-            slalom_parameters_map, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
+            DefaultSlalomParametersGenerator, SearchTrajectoryGenerator,
+            SearchTrajectoryGeneratorBuilder,
         },
         types::data::{AngleState, LengthState, Pose, SearchKind, Target},
         utils::math::MathFake,
@@ -525,14 +526,9 @@ mod tests {
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
-            .angular_velocity_ref(AngularVelocity::new::<degree_per_second>(540.0))
-            .angular_acceleration_ref(AngularAcceleration::new::<degree_per_second_squared>(
-                6480.0,
-            ))
-            .angular_jerk_ref(AngularJerk::new::<degree_per_second_cubed>(216000.0))
-            .slalom_parameters_map(slalom_parameters_map)
             .period(PERIOD)
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
+            .parameters_generator(DefaultSlalomParametersGenerator)
             .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
             .spin_angular_acceleration(AngularAcceleration::new::<degree_per_second_squared>(90.0))
             .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))

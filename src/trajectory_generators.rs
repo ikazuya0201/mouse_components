@@ -18,8 +18,8 @@ pub use search_trajectory_generator::{
     SearchKind, SearchTrajectory, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
 };
 pub use slalom_generator::{
-    slalom_parameters_map, slalom_parameters_map2, SlalomDirection, SlalomKind, SlalomParameters,
-    DEFAULT_ANGULAR_ACCELERATION_REF, DEFAULT_ANGULAR_JERK_REF, DEFAULT_ANGULAR_VELOCITY_REF,
+    DefaultSlalomParametersGenerator, SlalomDirection, SlalomKind, SlalomParameters,
+    SlalomParametersGenerator, SlalomParametersGeneratorWithFrontOffset,
 };
 pub use spin_generator::SpinTrajectory;
 pub use trajectory::{AngleTarget, LengthTarget, MoveTarget, ShiftTrajectory, Target};

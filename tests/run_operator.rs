@@ -1,7 +1,5 @@
 extern crate alloc;
 
-use core::f32::consts::PI;
-
 use components::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
@@ -15,7 +13,7 @@ use components::{
     prelude::*,
     robot::Robot,
     tracker::TrackerBuilder,
-    trajectory_generators::{slalom_parameters_map, RunTrajectoryGeneratorBuilder},
+    trajectory_generators::{DefaultSlalomParametersGenerator, RunTrajectoryGeneratorBuilder},
     trajectory_managers::TrackingTrajectoryManager,
     types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState},
     utils::probability::Probability,
@@ -23,16 +21,10 @@ use components::{
     wall_manager::WallManager,
 };
 use typenum::consts::*;
-use uom::si::f32::{
-    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Frequency, Jerk,
-    Length, Time, Velocity,
-};
+use uom::si::f32::{Acceleration, Angle, Frequency, Jerk, Length, Time, Velocity};
 use uom::si::{
     acceleration::meter_per_second_squared,
     angle::degree,
-    angular_acceleration::radian_per_second_squared,
-    angular_jerk::radian_per_second_cubed,
-    angular_velocity::radian_per_second,
     frequency::hertz,
     jerk::meter_per_second_cubed,
     length::{meter, millimeter},
@@ -215,12 +207,7 @@ fn test_run_operator() {
                 .max_velocity(Velocity::new::<meter_per_second>(2.0))
                 .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
                 .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
-                .slalom_parameters_map(slalom_parameters_map)
-                .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
-                .angular_acceleration_ref(AngularAcceleration::new::<radian_per_second_squared>(
-                    36.0 * PI,
-                ))
-                .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
+                .parameters_generator(DefaultSlalomParametersGenerator)
                 .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
                 .build()
                 .expect("Should never panic");

@@ -1,5 +1,3 @@
-use core::f32::consts::PI;
-
 use components::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
@@ -13,12 +11,11 @@ use components::{
     robot::Robot,
     tracker::TrackerBuilder,
     trajectory_generators::{
-        slalom_parameters_map, slalom_parameters_map2, SearchTrajectoryGeneratorBuilder,
+        SearchTrajectoryGeneratorBuilder, SlalomParametersGeneratorWithFrontOffset,
     },
     trajectory_managers::SearchTrajectoryManager,
     types::data::{
         AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState, SearchKind,
-        SlalomDirection, SlalomKind, SlalomParameters,
     },
     utils::probability::Probability,
     wall_detector::WallDetectorBuilder,
@@ -32,9 +29,9 @@ use uom::si::f32::{
 use uom::si::{
     acceleration::meter_per_second_squared,
     angle::degree,
-    angular_acceleration::{degree_per_second_squared, radian_per_second_squared},
-    angular_jerk::{degree_per_second_cubed, radian_per_second_cubed},
-    angular_velocity::{degree_per_second, radian_per_second},
+    angular_acceleration::degree_per_second_squared,
+    angular_jerk::degree_per_second_cubed,
+    angular_velocity::degree_per_second,
     frequency::hertz,
     jerk::meter_per_second_cubed,
     length::{meter, millimeter},
@@ -67,11 +64,7 @@ macro_rules! impl_search_operator_test {
 
             type Size = $size;
 
-            fn _test_search_operator(
-                slalom_parameters_map: fn(SlalomKind, SlalomDirection) -> SlalomParameters,
-                front_offset: Length,
-                distance_sensors_poses: Vec<Pose>,
-            ) {
+            fn _test_search_operator(front_offset: Length, distance_sensors_poses: Vec<Pose>) {
                 use components::prelude::*;
 
                 let input_str = $input_str;
@@ -203,12 +196,9 @@ macro_rules! impl_search_operator_test {
                         .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
                         .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
                         .search_velocity(search_velocity)
-                        .slalom_parameters_map(slalom_parameters_map)
-                        .angular_velocity_ref(AngularVelocity::new::<radian_per_second>(3.0 * PI))
-                        .angular_acceleration_ref(AngularAcceleration::new::<
-                            radian_per_second_squared,
-                        >(36.0 * PI))
-                        .angular_jerk_ref(AngularJerk::new::<radian_per_second_cubed>(1200.0 * PI))
+                        .parameters_generator(SlalomParametersGeneratorWithFrontOffset::new(
+                            front_offset,
+                        ))
                         .front_offset(front_offset)
                         .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(180.0))
                         .spin_angular_acceleration(AngularAcceleration::new::<
@@ -261,7 +251,6 @@ macro_rules! impl_search_operator_test {
             #[test]
             fn test_search_operator() {
                 _test_search_operator(
-                    slalom_parameters_map,
                     Default::default(),
                     vec![
                         Pose {
@@ -297,7 +286,6 @@ macro_rules! impl_search_operator_test {
             #[test]
             fn test_search_operator_with_front_offset() {
                 _test_search_operator(
-                    slalom_parameters_map2,
                     Length::new::<millimeter>(10.0),
                     vec![
                         Pose {
