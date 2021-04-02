@@ -45,7 +45,7 @@ pub mod traits {
     #[doc(no_inline)]
     pub use tracker::Controller;
     #[doc(no_inline)]
-    pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};
+    pub use wall_detector::ObstacleDetector;
 }
 
 /// Types in this crate.
