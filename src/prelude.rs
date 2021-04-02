@@ -1,3 +1,10 @@
+//! Prelude of this crate.
+//!
+//! ### Example
+//! ```
+//! use components::prelude::*;
+//! ```
+
 pub use crate::administrator::Operator as _components_administrator_Operator;
 pub use crate::administrator::OperatorStore as _components_administrator_OperatorStore;
 pub use crate::administrator::Selector as _components_administrator_Selector;
@@ -34,4 +41,3 @@ pub use crate::trajectory_managers::SearchTrajectoryGenerator as _components_tra
 pub use crate::trajectory_managers::TrackingTrajectoryGenerator as _components_trajectory_managers_TrackingTrajectoryGenerator;
 
 pub use crate::wall_detector::ObstacleDetector as _components_wall_detector_ObstacleDetector;
-pub use crate::wall_detector::PoseConverter as _components_wall_detector_PoseConverter;
