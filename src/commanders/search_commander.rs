@@ -19,12 +19,8 @@ pub trait UncheckedNodeFinder<Node> {
     type SearchNode;
     type SearchNodes: IntoIterator<Item = Self::SearchNode>;
 
-    ///checker nodes are search nodes on which agent can check
-    ///if walls on the given path exist.
-    fn find_unchecked_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
-        &self,
-        path: Nodes,
-    ) -> Self::SearchNodes;
+    /// Finds search nodes which are on the given path.
+    fn find_unchecked_nodes(&self, path: &[Node]) -> Self::SearchNodes;
 }
 
 /// A trait that checks whether a given node can be visited or not.
@@ -227,7 +223,7 @@ where
         current: &Maze::SearchNode,
     ) -> Option<Vec<Maze::SearchNode, U4>> {
         let shortest_path = compute_shortest_path(&self.start, &self.goals, &self.maze)?;
-        let checker_nodes = self.maze.find_unchecked_nodes(shortest_path);
+        let checker_nodes = self.maze.find_unchecked_nodes(&shortest_path);
 
         let candidates = self
             .maze

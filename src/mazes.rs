@@ -199,10 +199,7 @@ where
     type SearchNode = SearchNode;
     type SearchNodes = Vec<Self::SearchNode, SearchNode::UpperBound>;
 
-    fn find_unchecked_nodes<Nodes: core::ops::Deref<Target = [Node]>>(
-        &self,
-        path: Nodes,
-    ) -> Self::SearchNodes {
+    fn find_unchecked_nodes(&self, path: &[Node]) -> Self::SearchNodes {
         let mut nodes = ForcedVec::new();
         for i in 0..path.len() - 1 {
             for wall in path[i].walls_between(&path[i + 1]) {
@@ -510,7 +507,7 @@ mod tests {
             .into_iter()
             .map(|e| SearchNode(e))
             .collect::<Vec<_>>();
-        assert_eq!(maze.find_unchecked_nodes(path), expected.as_slice());
+        assert_eq!(maze.find_unchecked_nodes(&path), expected.as_slice());
     }
 
     #[test]
