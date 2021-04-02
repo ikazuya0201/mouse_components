@@ -22,6 +22,7 @@ pub mod trajectory_generators;
 pub mod trajectory_managers;
 #[macro_use]
 pub mod utils;
+pub mod pattern_converters;
 pub mod wall_detector;
 pub mod wall_manager;
 

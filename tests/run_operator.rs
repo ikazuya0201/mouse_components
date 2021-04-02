@@ -10,12 +10,13 @@ use components::{
     nodes::{RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
+    pattern_converters::LinearPatternConverter,
     prelude::*,
     robot::Robot,
     tracker::TrackerBuilder,
     trajectory_generators::{DefaultSlalomParametersGenerator, RunTrajectoryGeneratorBuilder},
     trajectory_managers::TrackingTrajectoryManager,
-    types::data::{AbsoluteDirection, AngleState, LengthState, Pattern, Pose, RobotState},
+    types::data::{AbsoluteDirection, AngleState, LengthState, Pose, RobotState},
     utils::probability::Probability,
     wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
@@ -33,22 +34,6 @@ use uom::si::{
 };
 use utils::math::MathFake;
 use utils::sensors::AgentSimulator;
-
-fn cost(pattern: Pattern) -> u16 {
-    use Pattern::*;
-
-    match pattern {
-        Straight(x) => 10 * x,
-        StraightDiagonal(x) => 7 * x,
-        Search90 => 8,
-        FastRun45 => 12,
-        FastRun90 => 15,
-        FastRun135 => 20,
-        FastRun180 => 25,
-        FastRunDiagonal90 => 15,
-        SpinBack => 15,
-    }
-}
 
 #[test]
 fn test_run_operator() {
@@ -219,7 +204,10 @@ fn test_run_operator() {
     use AbsoluteDirection::*;
 
     let commander = {
-        let maze = CheckedMaze::<_, _, _, SearchNode<Size>>::new(&wall_storage, cost);
+        let maze = CheckedMaze::<_, _, SearchNode<Size>>::new(
+            &wall_storage,
+            LinearPatternConverter::default(),
+        );
         let start = RunNode::<Size>::new(0, 0, North).unwrap();
         let goals = vec![
             RunNode::<Size>::new(2, 0, South).unwrap(),

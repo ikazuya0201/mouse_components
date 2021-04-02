@@ -1,5 +1,7 @@
 use core::marker::PhantomData;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use spin::Mutex;
 use uom::si::{
     f32::{Acceleration, Jerk, Length, Time, Velocity},
@@ -17,6 +19,7 @@ use crate::utils::math::{LibmMath, Math};
 use crate::{get_or_err, impl_setter};
 
 /// An enum for specifying a kind of trajectory of fast run.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RunKind {
     Straight(u16),

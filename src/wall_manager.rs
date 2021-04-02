@@ -3,6 +3,8 @@ use core::marker::PhantomData;
 use core::ops::Mul;
 
 use generic_array::{ArrayLength, GenericArray};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use spin::Mutex;
 use typenum::{consts::U2, PowerOfTwo, Unsigned};
 
@@ -11,6 +13,7 @@ use crate::nodes::SearchNode;
 use crate::utils::{itertools::repeat_n, probability::Probability};
 use crate::wall_detector::WallProbabilityManager;
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Wall<N> {
     x: u16,

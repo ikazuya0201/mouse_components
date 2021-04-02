@@ -1,5 +1,8 @@
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use uom::si::f32::{Acceleration, Angle, AngularAcceleration, AngularVelocity, Length, Velocity};
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RobotState {
     pub x: LengthState,
@@ -7,6 +10,7 @@ pub struct RobotState {
     pub theta: AngleState,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LengthState {
     pub x: Length,
@@ -14,6 +18,7 @@ pub struct LengthState {
     pub a: Acceleration,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct AngleState {
     pub x: Angle,

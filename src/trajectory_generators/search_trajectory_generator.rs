@@ -1,6 +1,9 @@
 use core::iter::Chain;
 use core::marker::PhantomData;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParametersGenerator};
 use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use super::spin_generator::{SpinGenerator, SpinTrajectory};
@@ -20,6 +23,7 @@ use uom::si::{
     },
 };
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SearchKind {
     Init,

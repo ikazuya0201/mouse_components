@@ -4,6 +4,8 @@ use core::marker::PhantomData;
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use uom::si::{
     f32::{
         Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
@@ -22,6 +24,7 @@ use crate::types::data::Pose;
 
 /// An enum for specifying the direction of slaloms.
 #[cfg_attr(test, derive(Arbitrary))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SlalomDirection {
     Right,
@@ -30,6 +33,7 @@ pub enum SlalomDirection {
 
 /// An enum for specifying types of slaloms.
 #[cfg_attr(test, derive(Arbitrary))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SlalomKind {
     Search90,
@@ -43,6 +47,7 @@ pub enum SlalomKind {
 }
 
 /// Parameters for slalom.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, PartialEq, Debug)]
 pub struct SlalomParameters {
     pub l_start: Length,

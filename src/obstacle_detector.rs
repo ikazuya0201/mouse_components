@@ -1,5 +1,7 @@
 use core::marker::PhantomData;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use uom::si::f32::Length;
 
 use crate::tracker::RobotState;
@@ -14,6 +16,7 @@ pub trait DistanceSensor {
     fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error>;
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Obstacle {
     pub source: Pose,

@@ -231,7 +231,7 @@ where
     Size::Output: Mul<U2>,
     <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
-    let maze = Maze::new(wall_manager, *config.cost_fn());
+    let maze = Maze::new(wall_manager, config.pattern_converter().clone());
     SearchCommander::new(
         config.start().clone(),
         config.goals(),
@@ -261,7 +261,7 @@ where
 {
     use core::convert::TryInto;
 
-    let maze = CheckedMaze::new(wall_manager, *config.cost_fn());
+    let maze = CheckedMaze::new(wall_manager, config.pattern_converter().clone());
     RunCommander::new(
         state
             .current_node()
@@ -292,7 +292,7 @@ where
 {
     use core::convert::TryInto;
 
-    let maze = CheckedMaze::new(wall_manager, *config.cost_fn());
+    let maze = CheckedMaze::new(wall_manager, config.pattern_converter().clone());
     RunCommander::new(
         state
             .current_node()
@@ -323,7 +323,7 @@ where
 {
     use core::convert::TryInto;
 
-    let maze = CheckedMaze::new(wall_manager, *config.cost_fn());
+    let maze = CheckedMaze::new(wall_manager, config.pattern_converter().clone());
     ReturnSetupCommander::new(
         state
             .current_node()

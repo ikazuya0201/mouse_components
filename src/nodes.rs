@@ -4,6 +4,8 @@ use core::marker::PhantomData;
 use core::ops::Mul;
 
 use heapless::{ArrayLength, Vec};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use crate::commanders::{BoundedNode, NextNode, RotationNode, RouteNode};
@@ -13,6 +15,7 @@ use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Pattern {
     Straight(u16),
@@ -27,6 +30,7 @@ pub enum Pattern {
 }
 
 //TODO: Create new data type to reduce copy cost.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Node<N> {
     x: i16,
@@ -237,6 +241,7 @@ where
 }
 
 //TODO: Remove Copy
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct SearchNode<N>(Node<N>);
 
@@ -524,6 +529,7 @@ impl<N: Clone> RouteNode for RunNode<N> {
 }
 
 //TODO: Create new data type to reduce copy cost.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct RunNode<N>(Node<N>);
 
@@ -986,6 +992,7 @@ where
 }
 
 /// An enum that indicates kinds of rotation.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RotationKind {
     Front,
