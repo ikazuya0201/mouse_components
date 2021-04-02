@@ -69,8 +69,8 @@ pub trait SlalomParametersGenerator {
 pub struct SlalomGenerator<M, Generator> {
     period: Time,
     parameters_generator: Generator,
-    #[allow(unused)]
-    straight_generator: StraightTrajectoryGenerator<M>,
+    straight_generator: StraightTrajectoryGenerator,
+    _phantom: PhantomData<fn() -> M>,
 }
 
 impl<M, Generator> SlalomGenerator<M, Generator> {
@@ -88,6 +88,7 @@ impl<M, Generator> SlalomGenerator<M, Generator> {
             period,
             parameters_generator,
             straight_generator: StraightTrajectoryGenerator::new(v_max, a_max, j_max, period),
+            _phantom: PhantomData,
         }
     }
 }
@@ -108,7 +109,7 @@ where
     ) -> SlalomTrajectory<M> {
         let params = self.parameters_generator.generate(kind, dir);
         let straight1 =
-            StraightTrajectoryGenerator::<M>::generate_constant(params.l_start, v, self.period);
+            StraightTrajectoryGenerator::generate_constant(params.l_start, v, self.period);
         let curve = self.generate_curve(
             params.l_start,
             Default::default(),
@@ -126,7 +127,7 @@ where
                 y: params.y_curve_end,
                 theta: params.theta,
             },
-            StraightTrajectoryGenerator::<M>::generate_constant(params.l_end, v, self.period),
+            StraightTrajectoryGenerator::generate_constant(params.l_end, v, self.period),
         );
         straight1.chain(curve).chain(straight2)
     }
@@ -186,7 +187,7 @@ where
         dddtheta: AngularJerk,
     ) -> CurveTrajectory<M> {
         let k = (v / v_ref).get::<ratio>();
-        let angle_generator = AngleStraightCalculatorGenerator::<M>::new(
+        let angle_generator = AngleStraightCalculatorGenerator::new(
             k * dtheta,
             k * k * ddtheta,
             k * k * k * dddtheta,

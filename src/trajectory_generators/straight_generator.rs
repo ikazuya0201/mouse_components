@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use uom::si::{
     angle::radian,
     f32::{
@@ -11,21 +9,19 @@ use uom::si::{
 };
 
 use super::trajectory::{AngleTarget, LengthTarget, MoveTarget, Target};
-use crate::traits::Math;
 
 macro_rules! impl_calculator_generator {
     ($mod_name: ident, $t: ty, $dt: ty, $ddt: ty, $dddt: ty, $tunit: ty, $target: ident) => {
         mod $mod_name {
             use super::*;
 
-            pub struct StraightCalculatorGenerator<M> {
+            pub struct StraightCalculatorGenerator {
                 v_max: $dt,
                 a_max: $ddt,
                 j_max: $dddt,
-                _phantom: PhantomData<fn() -> M>,
             }
 
-            impl<M> StraightCalculatorGenerator<M> {
+            impl StraightCalculatorGenerator {
                 const LOOP_COUNT: u8 = 25;
 
                 pub fn new(v_max: $dt, a_max: $ddt, j_max: $dddt) -> Self {
@@ -33,15 +29,11 @@ macro_rules! impl_calculator_generator {
                         v_max,
                         a_max,
                         j_max,
-                        _phantom: PhantomData,
                     }
                 }
             }
 
-            impl<M> StraightCalculatorGenerator<M>
-            where
-                M: Math,
-            {
+            impl StraightCalculatorGenerator {
                 #[inline]
                 #[allow(unused)]
                 pub fn generate(
@@ -143,7 +135,7 @@ macro_rules! impl_calculator_generator {
                         let tm = (v_end - v_start).abs() / self.a_max - tc;
                         (tc, tc + tm, 2.0 * tc + tm)
                     } else {
-                        let td = M::sqrt((v_end - v_start).abs() / self.j_max);
+                        let td = crate::utils::math::sqrt((v_end - v_start).abs() / self.j_max);
                         (td, td, 2.0 * td)
                     };
 
@@ -178,7 +170,7 @@ macro_rules! impl_calculator_generator {
                     let t = if (v_end - v_start).abs() >= vd {
                         (v_end - v_start).abs() / self.a_max + tc
                     } else {
-                        2.0 * M::sqrt((v_end - v_start).abs() / self.j_max)
+                        2.0 * crate::utils::math::sqrt((v_end - v_start).abs() / self.j_max)
                     };
                     <$t>::from((v_start + v_end) * t / 2.0)
                 }
@@ -404,12 +396,12 @@ impl_calculator_generator!(
     AngleTarget
 );
 
-pub struct StraightTrajectoryGenerator<M> {
-    function_generator: LengthStraightCalculatorGenerator<M>,
+pub struct StraightTrajectoryGenerator {
+    function_generator: LengthStraightCalculatorGenerator,
     period: Time,
 }
 
-impl<M> StraightTrajectoryGenerator<M> {
+impl StraightTrajectoryGenerator {
     pub fn new(v_max: Velocity, a_max: Acceleration, j_max: Jerk, period: Time) -> Self {
         Self {
             function_generator: LengthStraightCalculatorGenerator::new(v_max, a_max, j_max),
@@ -418,10 +410,7 @@ impl<M> StraightTrajectoryGenerator<M> {
     }
 }
 
-impl<M> StraightTrajectoryGenerator<M>
-where
-    M: Math,
-{
+impl StraightTrajectoryGenerator {
     //NOTO: v_start and v_end should not be negative
     #[inline]
     pub fn generate(
@@ -455,11 +444,8 @@ where
     }
 
     pub fn generate_constant(distance: Length, v: Velocity, period: Time) -> StraightTrajectory {
-        let (trajectory_fn, t_end) = LengthStraightCalculatorGenerator::<M>::generate_constant(
-            Default::default(),
-            distance,
-            v,
-        );
+        let (trajectory_fn, t_end) =
+            LengthStraightCalculatorGenerator::generate_constant(Default::default(), distance, v);
 
         StraightTrajectory::new(
             StraightTrajectoryCalculator::Constant(trajectory_fn),
@@ -537,7 +523,6 @@ impl Iterator for StraightTrajectory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::math::MathFake;
     use uom::si::{
         acceleration::meter_per_second_squared, angle::radian,
         angular_acceleration::radian_per_second_squared, angular_jerk::radian_per_second_cubed,
@@ -579,7 +564,7 @@ mod tests {
                     let a_max = <$ddt>::new::<$ddtunit>(a_max);
                     let j_max = <$dddt>::new::<$dddtunit>(j_max);
                     let period = Time::new::<second>(period);
-                    let generator = $generator_name::<MathFake>::new(v_max, a_max, j_max);
+                    let generator = $generator_name::new(v_max, a_max, j_max);
                     let (trajectory_calculator, t_end) = generator.generate(
                         <$t>::new::<$tunit>(x_start),
                         <$t>::new::<$tunit>(distance),
@@ -670,7 +655,7 @@ mod tests {
             let v_max = Velocity::new::<meter_per_second>(v_max);
             let a_max = Acceleration::new::<meter_per_second_squared>(a_max);
             let j_max = Jerk::new::<meter_per_second_cubed>(j_max);
-            let generator = StraightTrajectoryGenerator::<MathFake>::new(v_max, a_max, j_max, period);
+            let generator = StraightTrajectoryGenerator::new(v_max, a_max, j_max, period);
             let mut trajectory = generator.generate(
                 Length::new::<meter>(distance),
                 Velocity::new::<meter_per_second>(v_start),

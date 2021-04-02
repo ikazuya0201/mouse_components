@@ -110,7 +110,7 @@ where
         Generator: SlalomParametersGenerator,
     {
         let straight_generator =
-            StraightTrajectoryGenerator::<M>::new(max_velocity, max_acceleration, max_jerk, period);
+            StraightTrajectoryGenerator::new(max_velocity, max_acceleration, max_jerk, period);
         let slalom_generator = SlalomGenerator::new(
             period,
             parameters_generator,
@@ -118,7 +118,7 @@ where
             max_acceleration,
             max_jerk,
         );
-        let spin_generator = SpinGenerator::<M>::new(
+        let spin_generator = SpinGenerator::new(
             spin_angular_velocity,
             spin_angular_acceleration,
             spin_angular_jerk,

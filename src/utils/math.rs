@@ -5,55 +5,11 @@ use uom::marker::Div;
 use uom::si::{angle::radian, f32::Angle, Dimension, Quantity, ISQ, SI};
 
 pub trait Math {
-    fn sqrtf(val: f32) -> f32;
     fn sinf(val: f32) -> f32;
     fn cosf(val: f32) -> f32;
-    fn expf(val: f32) -> f32;
-    fn atan2f(y: f32, x: f32) -> f32;
-    fn rem_euclidf(lhs: f32, rhs: f32) -> f32;
 
     fn sincosf(val: f32) -> (f32, f32) {
         (Self::sinf(val), Self::cosf(val))
-    }
-
-    fn sqrt<D>(
-        val: Quantity<D, SI<f32>, f32>,
-    ) -> Quantity<
-        ISQ<
-            PartialQuot<D::L, P2>,
-            PartialQuot<D::M, P2>,
-            PartialQuot<D::T, P2>,
-            PartialQuot<D::I, P2>,
-            PartialQuot<D::Th, P2>,
-            PartialQuot<D::N, P2>,
-            PartialQuot<D::J, P2>,
-        >,
-        SI<f32>,
-        f32,
-    >
-    where
-        D: Dimension + ?Sized,
-        D::L: PartialDiv<P2>,
-        <D::L as PartialDiv<P2>>::Output: Integer,
-        D::M: PartialDiv<P2>,
-        <D::M as PartialDiv<P2>>::Output: Integer,
-        D::T: PartialDiv<P2>,
-        <D::T as PartialDiv<P2>>::Output: Integer,
-        D::I: PartialDiv<P2>,
-        <D::I as PartialDiv<P2>>::Output: Integer,
-        D::Th: PartialDiv<P2>,
-        <D::Th as PartialDiv<P2>>::Output: Integer,
-        D::N: PartialDiv<P2>,
-        <D::N as PartialDiv<P2>>::Output: Integer,
-        D::J: PartialDiv<P2>,
-        <D::J as PartialDiv<P2>>::Output: Integer,
-        D::Kind: Div,
-    {
-        Quantity {
-            dimension: PhantomData,
-            units: PhantomData,
-            value: Self::sqrtf(val.value),
-        }
     }
 
     fn sin(angle: Angle) -> f32 {
@@ -69,35 +25,67 @@ pub trait Math {
     }
 }
 
+/// Calculates remainder of x divided by y.
+///
+/// The result is in the range of [0, y).
+pub fn rem_euclidf(x: f32, y: f32) -> f32 {
+    let rem = libm::remainderf(x, y);
+    if rem.is_sign_negative() {
+        y + rem
+    } else {
+        rem
+    }
+}
+
+pub fn sqrt<D>(
+    val: Quantity<D, SI<f32>, f32>,
+) -> Quantity<
+    ISQ<
+        PartialQuot<D::L, P2>,
+        PartialQuot<D::M, P2>,
+        PartialQuot<D::T, P2>,
+        PartialQuot<D::I, P2>,
+        PartialQuot<D::Th, P2>,
+        PartialQuot<D::N, P2>,
+        PartialQuot<D::J, P2>,
+    >,
+    SI<f32>,
+    f32,
+>
+where
+    D: Dimension + ?Sized,
+    D::L: PartialDiv<P2>,
+    <D::L as PartialDiv<P2>>::Output: Integer,
+    D::M: PartialDiv<P2>,
+    <D::M as PartialDiv<P2>>::Output: Integer,
+    D::T: PartialDiv<P2>,
+    <D::T as PartialDiv<P2>>::Output: Integer,
+    D::I: PartialDiv<P2>,
+    <D::I as PartialDiv<P2>>::Output: Integer,
+    D::Th: PartialDiv<P2>,
+    <D::Th as PartialDiv<P2>>::Output: Integer,
+    D::N: PartialDiv<P2>,
+    <D::N as PartialDiv<P2>>::Output: Integer,
+    D::J: PartialDiv<P2>,
+    <D::J as PartialDiv<P2>>::Output: Integer,
+    D::Kind: Div,
+{
+    Quantity {
+        dimension: PhantomData,
+        units: PhantomData,
+        value: libm::sqrtf(val.value),
+    }
+}
+
 pub struct LibmMath;
 
 impl Math for LibmMath {
-    fn sqrtf(val: f32) -> f32 {
-        libm::sqrtf(val)
-    }
-
     fn sinf(val: f32) -> f32 {
         libm::sinf(val)
     }
 
     fn cosf(val: f32) -> f32 {
         libm::cosf(val)
-    }
-
-    fn expf(val: f32) -> f32 {
-        libm::expf(val)
-    }
-
-    fn atan2f(y: f32, x: f32) -> f32 {
-        libm::atan2f(y, x)
-    }
-
-    fn rem_euclidf(lhs: f32, rhs: f32) -> f32 {
-        libm::remainderf(lhs, rhs)
-    }
-
-    fn sincosf(val: f32) -> (f32, f32) {
-        (Self::sinf(val), Self::cosf(val))
     }
 }
 
@@ -112,33 +100,12 @@ mod dummy {
     pub struct MathFake;
 
     impl Math for MathFake {
-        fn sqrtf(val: f32) -> f32 {
-            val.sqrt()
-        }
-
         fn sinf(val: f32) -> f32 {
             val.sin()
         }
 
         fn cosf(val: f32) -> f32 {
             val.cos()
-        }
-
-        fn expf(val: f32) -> f32 {
-            val.exp()
-        }
-
-        fn atan2f(y: f32, x: f32) -> f32 {
-            y.atan2(x)
-        }
-
-        fn rem_euclidf(lhs: f32, rhs: f32) -> f32 {
-            let val = lhs.rem_euclid(rhs);
-            if val.is_sign_positive() {
-                val
-            } else {
-                val + rhs
-            }
         }
     }
 }

@@ -31,7 +31,7 @@ pub enum RunKind {
 pub struct RunTrajectoryGenerator<M, Generator> {
     current_velocity: Mutex<Velocity>,
     run_slalom_velocity: Velocity,
-    straight_generator: StraightTrajectoryGenerator<M>,
+    straight_generator: StraightTrajectoryGenerator,
     slalom_generator: SlalomGenerator<M, Generator>,
 }
 
@@ -49,7 +49,7 @@ where
         period: Time,
     ) -> Self {
         let straight_generator =
-            StraightTrajectoryGenerator::<M>::new(max_velocity, max_acceleration, max_jerk, period);
+            StraightTrajectoryGenerator::new(max_velocity, max_acceleration, max_jerk, period);
         let slalom_generator =
             SlalomGenerator::new(period, generator, max_velocity, max_acceleration, max_jerk);
         Self {
