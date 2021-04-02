@@ -1,3 +1,5 @@
+//! An implementation of [StateEstimator](crate::robot::StateEstimator).
+
 use core::marker::PhantomData;
 
 use nb::block;

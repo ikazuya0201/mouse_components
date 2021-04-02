@@ -1,3 +1,5 @@
+//! Implementations of [CommandConverter](crate::trajectory_managers::CommandConverter).
+
 use core::marker::PhantomData;
 
 use uom::si::angle::degree;

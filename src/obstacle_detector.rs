@@ -1,3 +1,5 @@
+//! An implementation of [ObstacleDetector](crate::wall_detector::ObstacleDetector).
+
 use core::marker::PhantomData;
 
 #[cfg(feature = "serde")]

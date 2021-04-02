@@ -26,6 +26,7 @@ pub mod pattern_converters;
 pub mod wall_detector;
 pub mod wall_manager;
 
+/// Traits in this crate.
 pub mod traits {
     use super::*;
 
@@ -40,6 +41,7 @@ pub mod traits {
     pub use wall_detector::{CorrectInfo, ObstacleDetector, PoseConverter};
 }
 
+/// Types in this crate.
 pub mod types {
     use super::*;
     pub mod data {
@@ -57,6 +59,7 @@ pub mod types {
     }
 }
 
+/// Traits of sensors.
 pub mod sensors {
     use super::*;
 

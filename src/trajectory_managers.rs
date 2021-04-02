@@ -1,3 +1,5 @@
+//! Implementations of [TrackingTrajectoryManager](crate::agents::TrackingTrajectoryManager).
+
 mod search_trajectory_manager;
 mod tracking_trajectory_manager;
 

@@ -1,3 +1,5 @@
+//! Implementations of [Controller](crate::tracker::Controller) and their builders.
+
 use core::ops::{Add, Div, Mul, Sub};
 
 use uom::si::{

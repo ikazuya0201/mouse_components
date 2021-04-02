@@ -1,3 +1,6 @@
+//! An implementation of [WallChecker](crate::mazes::WallChecker) and
+//! [WallProbabilityManager](crate::wall_detector::WallProbabilityManager).
+
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Mul;
