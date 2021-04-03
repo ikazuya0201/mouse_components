@@ -409,25 +409,25 @@ where
                 if x_quo < 0 || y_quo < 0 {
                     return create_error();
                 }
-                Wall::new(x_quo as u16, y_quo as u16, false)
+                Wall::new(x_quo as u8, y_quo as u8, false)
             }
             Left => {
                 if x_quo < 1 || y_quo < 0 {
                     return create_error();
                 }
-                Wall::new((x_quo - 1) as u16, y_quo as u16, false)
+                Wall::new((x_quo - 1) as u8, y_quo as u8, false)
             }
             Top => {
                 if x_quo < 0 || y_quo < 0 {
                     return create_error();
                 }
-                Wall::new(x_quo as u16, y_quo as u16, true)
+                Wall::new(x_quo as u8, y_quo as u8, true)
             }
             Bottom => {
                 if x_quo < 0 || y_quo < 1 {
                     return create_error();
                 }
-                Wall::new(x_quo as u16, (y_quo - 1) as u16, true)
+                Wall::new(x_quo as u8, (y_quo - 1) as u8, true)
             }
         }?;
 

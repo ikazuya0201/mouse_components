@@ -19,8 +19,8 @@ use crate::wall_detector::WallProbabilityManager;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Wall<N> {
-    x: u16,
-    y: u16,
+    x: u8,
+    y: u8,
     top: bool,
     _maze_width: PhantomData<fn() -> N>,
 }
@@ -37,8 +37,8 @@ where
         } else {
             (1, 0, [East, West])
         };
-        let x = (self.x() * 2 + dx) as i16;
-        let y = (self.y() * 2 + dy) as i16;
+        let x = (self.x() * 2 + dx) as i8;
+        let y = (self.y() * 2 + dy) as i8;
         let new = |x, y, dir| {
             SearchNode::<N>::new(x, y, dir)
                 .unwrap_or_else(|err| unreachable!("Should never be error: {:?}", err))
@@ -49,17 +49,17 @@ where
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct OutOfBoundError {
-    x: u16,
-    y: u16,
+    x: u8,
+    y: u8,
     top: bool,
 }
 
 impl<N> Wall<N> {
-    pub fn x(&self) -> u16 {
+    pub fn x(&self) -> u8 {
         self.x
     }
 
-    pub fn y(&self) -> u16 {
+    pub fn y(&self) -> u8 {
         self.y
     }
 
@@ -72,7 +72,7 @@ impl<N> Wall<N> {
         1
     }
 
-    pub unsafe fn new_unchecked(x: u16, y: u16, top: bool) -> Self {
+    pub unsafe fn new_unchecked(x: u8, y: u8, top: bool) -> Self {
         Self {
             x,
             y,
@@ -95,11 +95,11 @@ impl<N: Unsigned + PowerOfTwo> Wall<N> {
     }
 
     #[inline]
-    fn max() -> u16 {
-        N::U16 - 1
+    fn max() -> u8 {
+        N::U8 - 1
     }
 
-    pub fn new(x: u16, y: u16, top: bool) -> Result<Self, OutOfBoundError> {
+    pub fn new(x: u8, y: u8, top: bool) -> Result<Self, OutOfBoundError> {
         if x <= Self::max() && y <= Self::max() {
             Ok(unsafe { Self::new_unchecked(x, y, top) })
         } else {
@@ -139,38 +139,38 @@ where
     <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let prob = |x: u16, y: u16, is_top: bool| -> Probability {
+        let prob = |x: u8, y: u8, is_top: bool| -> Probability {
             let wall = Wall::<N>::new(x, y, is_top).unwrap();
             self.walls[wall.to_index()].lock().clone()
         };
         writeln!(f, "")?;
-        for y in (0..N::U16).rev() {
+        for y in (0..N::U8).rev() {
             write!(f, " +--")?;
-            for x in 0..N::U16 - 1 {
+            for x in 0..N::U8 - 1 {
                 write!(f, "{:1.1}--+--", f32::from(prob(x, y, true)))?;
             }
-            writeln!(f, "{:1.1}--+", f32::from(prob(N::U16 - 1, y, true)))?;
+            writeln!(f, "{:1.1}--+", f32::from(prob(N::U8 - 1, y, true)))?;
 
             write!(f, " |  ")?;
-            for _ in 0..N::U16 {
+            for _ in 0..N::U8 {
                 write!(f, "     |  ")?;
             }
             writeln!(f, "")?;
 
             write!(f, "1.0 ")?;
-            for x in 0..N::U16 {
+            for x in 0..N::U8 {
                 write!(f, "    {:1.1} ", f32::from(prob(x, y, false)))?;
             }
             writeln!(f, "")?;
 
             write!(f, " |  ")?;
-            for _ in 0..N::U16 {
+            for _ in 0..N::U8 {
                 write!(f, "     |  ")?;
             }
             writeln!(f, "")?;
         }
         write!(f, " +--")?;
-        for _ in 0..N::U16 - 1 {
+        for _ in 0..N::U8 - 1 {
             write!(f, "1.0--+--")?;
         }
         writeln!(f, "1.0--+")?;
@@ -223,7 +223,7 @@ where
         self._update(0, 0, true, Probability::zero());
     }
 
-    fn _update(&self, x: u16, y: u16, top: bool, prob: Probability) {
+    fn _update(&self, x: u8, y: u8, top: bool, prob: Probability) {
         *self.walls[Wall::<N>::new(x, y, top)
             .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
             .to_index()]
@@ -273,10 +273,10 @@ where
             .enumerate()
             .take(2 * N::USIZE) //not consider bottom line
             .for_each(|(y, line)| {
-                let y = y as u16;
+                let y = y as u8;
                 line.chars().enumerate().skip(1).for_each(|(x, c)| {
                     //not consider left line
-                    let x = x as u16;
+                    let x = x as u8;
                     if y % 2 == 0 {
                         //check top walls
                         if x % 4 != 1 {
@@ -284,9 +284,9 @@ where
                         }
                         let x = x / 4;
                         if c == '-' {
-                            self._update(x, N::U16 - y / 2 - 1, true, Probability::one());
+                            self._update(x, N::U8 - y / 2 - 1, true, Probability::one());
                         } else {
-                            self._update(x, N::U16 - y / 2 - 1, true, Probability::zero());
+                            self._update(x, N::U8 - y / 2 - 1, true, Probability::zero());
                         }
                     } else {
                         //check right walls
@@ -295,9 +295,9 @@ where
                         }
                         let x = x / 4;
                         if c == '|' {
-                            self._update(x - 1, N::U16 - y / 2 - 1, false, Probability::one());
+                            self._update(x - 1, N::U8 - y / 2 - 1, false, Probability::one());
                         } else {
-                            self._update(x - 1, N::U16 - y / 2 - 1, false, Probability::zero());
+                            self._update(x - 1, N::U8 - y / 2 - 1, false, Probability::zero());
                         }
                     }
                 });
