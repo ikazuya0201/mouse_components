@@ -1,3 +1,4 @@
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_with_getter {
     (
@@ -21,6 +22,7 @@ macro_rules! impl_with_getter {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_setter {
     (
@@ -45,6 +47,7 @@ macro_rules! impl_setter {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! get_or_err {
     ($self: ident . $field_name: ident) => {{
