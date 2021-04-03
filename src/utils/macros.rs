@@ -59,6 +59,7 @@ macro_rules! get_or_err {
 #[macro_export]
 macro_rules! impl_with_builder {
     (
+        $(#[$builder_meta:meta])*
         $builder: ident:
         {
             $(#[$meta:meta])*
@@ -67,29 +68,52 @@ macro_rules! impl_with_builder {
             }
         }
     ) => {
+        impl_with_builder! {
+            $(#[$builder_meta])*
+            $builder:
+            {
+                $(#[$meta])*
+                pub struct $name<$($tt),*;> {
+                    $($field_name: $type,)*
+                }
+            }
+        }
+    };
+
+    (
+        $(#[$builder_meta:meta])*
+        $builder: ident:
+        {
+            $(#[$meta:meta])*
+            pub struct $name: ident <$($tt: tt),*; $(const $const: ident : usize),*> {
+                $($field_name: ident: $type: ty,)*
+            }
+        }
+    ) => {
         $(#[$meta])*
-        pub struct $name<$($tt),*> {
+        pub struct $name<$($tt),*, $(const $const: usize),*> {
             $($field_name: $type),*
         }
 
-        impl<$($tt),*> $name<$($tt),*> {
-            pub fn builder() -> $builder<$($tt),*> {
+        impl<$($tt),*, $(const $const: usize),*> $name<$($tt),*, $($const),*> {
+            pub fn builder() -> $builder<$($tt),*, $($const),*> {
                 $builder::new()
             }
         }
 
-        pub struct $builder<$($tt),*> {
+        $(#[$builder_meta])*
+        pub struct $builder<$($tt),*, $(const $const: usize),*> {
             $($field_name: Option<$type>),*
         }
 
-        impl<$($tt),*> $builder<$($tt),*> {
+        impl<$($tt),*, $(const $const: usize),*> $builder<$($tt),*, $($const),*> {
             pub fn new() -> Self {
                 Self {
                     $($field_name: None),*
                 }
             }
 
-            pub fn build(&mut self) -> crate::utils::builder::BuilderResult<$name<$($tt),*>> {
+            pub fn build(&mut self) -> crate::utils::builder::BuilderResult<$name<$($tt),*, $($const),*>> {
                 Ok(
                     $name {
                         $($field_name: get_or_err!(self.$field_name),)*
@@ -104,5 +128,5 @@ macro_rules! impl_with_builder {
                 }
             )*
         }
-    }
+    };
 }
