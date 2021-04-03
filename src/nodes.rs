@@ -20,8 +20,8 @@ pub use direction::{AbsoluteDirection, RelativeDirection};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Pattern {
-    Straight(u16),
-    StraightDiagonal(u16),
+    Straight(u8),
+    StraightDiagonal(u8),
     Search90,
     FastRun45,
     FastRun90,
@@ -772,7 +772,7 @@ where
         let _: Result<(), ()> = (|| {
             for dy in 1.. {
                 add_wall(&mut tmp, 0, 2 * dy - 1)?;
-                add_node(&mut tmp, 0, 2 * dy, Front, Straight(dy as u16))?;
+                add_node(&mut tmp, 0, 2 * dy, Front, Straight(dy as u8))?;
             }
             Ok(())
         })();
@@ -806,7 +806,7 @@ where
         let _: Result<(), ()> = (|| {
             for i in 1.. {
                 add_wall(&mut tmp, i, i)?;
-                add_node(&mut tmp, i, i, Front, StraightDiagonal(i as u16))?;
+                add_node(&mut tmp, i, i, Front, StraightDiagonal(i as u8))?;
             }
             Ok(())
         })();
@@ -840,7 +840,7 @@ where
         let _: Result<(), ()> = (|| {
             for i in 1.. {
                 add_wall(&mut tmp, i, i)?;
-                add_node(&mut tmp, i, i, Front, StraightDiagonal(i as u16))?;
+                add_node(&mut tmp, i, i, Front, StraightDiagonal(i as u8))?;
             }
             Ok(())
         })();

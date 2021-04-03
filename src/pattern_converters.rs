@@ -41,7 +41,7 @@ impl Default for LinearPatternConverter<u16> {
 
 impl<Cost> PatternConverter<Pattern> for LinearPatternConverter<Cost>
 where
-    u16: Into<Cost>,
+    u8: Into<Cost>,
     Cost: core::ops::Mul<Output = Cost> + Copy,
 {
     type Cost = Cost;
