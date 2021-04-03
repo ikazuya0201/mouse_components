@@ -19,6 +19,7 @@ pub use direction::{AbsoluteDirection, RelativeDirection};
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+/// An enum that represents the type of edges of several graphs.
 pub enum Pattern {
     Straight(u8),
     StraightDiagonal(u8),
@@ -34,6 +35,7 @@ pub enum Pattern {
 //TODO: Create new data type to reduce copy cost.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq)]
+/// A type that is the super set of [SearchNode] and [RunNode].
 pub struct Node<N> {
     x: i8,
     y: i8,
@@ -72,6 +74,7 @@ impl<N> core::fmt::Debug for Node<N> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+/// Error on [Node], [SearchNode] and [RunNode].
 pub struct NodeCreationError {
     x: i8,
     y: i8,
@@ -241,6 +244,7 @@ where
 //TODO: Remove Copy
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq)]
+/// A type that represents nodes (verteces) of a graph for search.
 pub struct SearchNode<N>(Node<N>);
 
 impl<N> SearchNode<N> {
@@ -266,6 +270,16 @@ impl<N> core::fmt::Debug for SearchNode<N> {
 }
 
 impl<N> SearchNode<N> {
+    /// Creates a new `SearchNode` from the given values.
+    ///
+    /// # Safety
+    ///
+    /// The position must be a bound of two squares (the evenness of the `x` and the `y` is different).
+    /// When the position is a vertical bound (the `x` is odd and the `y` is even), the `direction` must be
+    /// `East` or `West`.
+    /// Otherwise, the `direction` must be `North` or `South`.
+    #[inline]
+    #[must_use]
     pub unsafe fn new_unchecked(x: i8, y: i8, direction: AbsoluteDirection) -> Self {
         Self(Node::<N>::new_unchecked(x, y, direction))
     }
@@ -355,6 +369,7 @@ impl<N> SearchNode<N>
 where
     N: Unsigned,
 {
+    /// Creates a new `SearchNode` with a check of constraints.
     pub fn new(x: i8, y: i8, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use core::convert::TryInto;
         Node::<N>::new(x, y, direction)?.try_into()
@@ -452,6 +467,7 @@ where
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+/// Error on the implementation of [RouteNode] for node types.
 pub struct RouteError<T> {
     src: T,
     dst: T,
@@ -529,6 +545,7 @@ impl<N: Clone> RouteNode for RunNode<N> {
 //TODO: Create new data type to reduce copy cost.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq)]
+/// A type that represents nodes (verteces) of a graph for fast run.
 pub struct RunNode<N>(Node<N>);
 
 impl<N> RunNode<N> {
@@ -610,6 +627,17 @@ where
 }
 
 impl<N> RunNode<N> {
+    /// Creates a new `RunNode` from the given values.
+    ///
+    /// # Safety
+    ///
+    /// The position must not be a pillar (both the `x` and the `y` are odd).
+    /// When the position is a bound of two squares (the evenness of the `x` and the `y` is different), the
+    /// `direction` must be `NorthEast`, `SouthEast`, `SouthWest` or `NorthWest`.
+    /// When the position is the center of a square (both the `x` and the `y` are even), the
+    /// `direction` must be `North`, `East`, `South` or `West`.
+    #[inline]
+    #[must_use]
     pub unsafe fn new_unchecked(x: i8, y: i8, direction: AbsoluteDirection) -> Self {
         Self(Node::<N>::new_unchecked(x, y, direction))
     }
@@ -639,6 +667,7 @@ impl<N> RunNode<N>
 where
     N: Unsigned,
 {
+    /// Creates a new `RunNode` with a check of constraints.
     pub fn new(x: i8, y: i8, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use core::convert::TryInto;
         Node::<N>::new(x, y, direction)?.try_into()
