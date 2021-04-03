@@ -22,8 +22,8 @@ use crate::{get_or_err, impl_setter};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RunKind {
-    Straight(u16),
-    StraightDiagonal(u16),
+    Straight(u8),
+    StraightDiagonal(u8),
     Slalom(SlalomKind, SlalomDirection),
 }
 

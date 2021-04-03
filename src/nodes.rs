@@ -35,8 +35,8 @@ pub enum Pattern {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Node<N> {
-    x: i16,
-    y: i16,
+    x: i8,
+    y: i8,
     direction: AbsoluteDirection,
     _maze_width: PhantomData<fn() -> N>,
 }
@@ -73,18 +73,18 @@ impl<N> core::fmt::Debug for Node<N> {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct NodeCreationError {
-    x: i16,
-    y: i16,
+    x: i8,
+    y: i8,
     direction: AbsoluteDirection,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 struct RelativeWallError {
-    x: i16,
-    y: i16,
+    x: i8,
+    y: i8,
     direction: AbsoluteDirection,
-    dx: i16,
-    dy: i16,
+    dx: i8,
+    dy: i8,
     base_dir: AbsoluteDirection,
 }
 
@@ -97,7 +97,7 @@ enum Location {
 }
 
 impl<N> Node<N> {
-    unsafe fn new_unchecked(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
+    unsafe fn new_unchecked(x: i8, y: i8, direction: AbsoluteDirection) -> Self {
         Self {
             x,
             y,
@@ -106,11 +106,11 @@ impl<N> Node<N> {
         }
     }
 
-    pub fn x(&self) -> &i16 {
+    pub fn x(&self) -> &i8 {
         &self.x
     }
 
-    pub fn y(&self) -> &i16 {
+    pub fn y(&self) -> &i8 {
         &self.y
     }
 
@@ -134,11 +134,7 @@ impl<N> Node<N> {
         }
     }
 
-    fn difference(
-        &self,
-        other: &Self,
-        base_dir: AbsoluteDirection,
-    ) -> (i16, i16, RelativeDirection) {
+    fn difference(&self, other: &Self, base_dir: AbsoluteDirection) -> (i8, i8, RelativeDirection) {
         use RelativeDirection::*;
 
         let dx = other.x - self.x;
@@ -158,7 +154,7 @@ impl<N> Node<N>
 where
     N: Unsigned,
 {
-    fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
+    fn new(x: i8, y: i8, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         if x < 0 || y < 0 || x > Self::max() || y > Self::max() {
             Err(NodeCreationError { x, y, direction })
         } else {
@@ -166,14 +162,14 @@ where
         }
     }
 
-    fn max() -> i16 {
-        2 * N::I16 - 1
+    fn max() -> i8 {
+        2 * N::I8 - 1
     }
 
     fn relative(
         &self,
-        dx: i16,
-        dy: i16,
+        dx: i8,
+        dy: i8,
         ddir: RelativeDirection,
         base_dir: AbsoluteDirection,
     ) -> Result<Self, NodeCreationError> {
@@ -197,8 +193,8 @@ where
 {
     fn relative_wall(
         &self,
-        dx: i16,
-        dy: i16,
+        dx: i8,
+        dy: i8,
         base_dir: AbsoluteDirection,
     ) -> Result<Wall<N>, RelativeWallError> {
         use RelativeDirection::*;
@@ -226,8 +222,8 @@ where
             return Err(create_error());
         }
 
-        let x = x as u16;
-        let y = y as u16;
+        let x = x as u8;
+        let y = y as u8;
         if (x ^ y) & 1 == 0 {
             //not on a wall
             return Err(create_error());
@@ -270,12 +266,12 @@ impl<N> core::fmt::Debug for SearchNode<N> {
 }
 
 impl<N> SearchNode<N> {
-    pub unsafe fn new_unchecked(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
+    pub unsafe fn new_unchecked(x: i8, y: i8, direction: AbsoluteDirection) -> Self {
         Self(Node::<N>::new_unchecked(x, y, direction))
     }
 
     #[inline]
-    fn is_valid_direction(x: i16, y: i16, direction: AbsoluteDirection) -> bool {
+    fn is_valid_direction(x: i8, y: i8, direction: AbsoluteDirection) -> bool {
         use AbsoluteDirection::*;
 
         if (x ^ y) & 1 == 0 {
@@ -347,8 +343,8 @@ impl<N> From<SearchNode<N>> for Wall<N> {
     fn from(value: SearchNode<N>) -> Self {
         unsafe {
             Wall::new_unchecked(
-                *value.0.x() as u16 / 2,
-                *value.0.y() as u16 / 2,
+                *value.0.x() as u8 / 2,
+                *value.0.y() as u8 / 2,
                 value.0.x() & 1 == 0,
             )
         }
@@ -359,15 +355,15 @@ impl<N> SearchNode<N>
 where
     N: Unsigned,
 {
-    pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
+    pub fn new(x: i8, y: i8, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use core::convert::TryInto;
         Node::<N>::new(x, y, direction)?.try_into()
     }
 
     fn relative(
         &self,
-        dx: i16,
-        dy: i16,
+        dx: i8,
+        dy: i8,
         ddir: RelativeDirection,
         base_dir: AbsoluteDirection,
     ) -> Result<Self, NodeCreationError> {
@@ -385,7 +381,7 @@ where
         use RelativeDirection::*;
 
         let mut list = ForcedVec::new();
-        let mut update = |dx: i16, dy: i16, ddir: RelativeDirection, pattern: Pattern| {
+        let mut update = |dx: i8, dy: i8, ddir: RelativeDirection, pattern: Pattern| {
             use AbsoluteDirection::*;
             let (dx, dy) = if succs { (dx, dy) } else { (-dx, -dy) };
             if let Ok(wall) = self.0.relative_wall(dx, dy, North) {
@@ -512,7 +508,7 @@ impl<N: Clone> RouteNode for RunNode<N> {
                 (-2, 1, BackLeft) => Slalom(FastRun135, SLeft),
                 (2, 0, Back) => Slalom(FastRun180, SRight),
                 (-2, 0, Back) => Slalom(FastRun180, SLeft),
-                (0, x, Front) if x > 0 => Straight(x as u16 / 2),
+                (0, x, Front) if x > 0 => Straight(x as u8 / 2),
                 _ => return create_error(),
             },
             HorizontalBound | VerticalBound => match self.0.difference(&to.0, NorthEast) {
@@ -522,7 +518,7 @@ impl<N: Clone> RouteNode for RunNode<N> {
                 (1, 2, FrontLeft) => Slalom(FastRun45Rev, SLeft),
                 (0, 2, Left) => Slalom(FastRunDiagonal90, SLeft),
                 (-1, 2, BackLeft) => Slalom(FastRun135Rev, SLeft),
-                (x, y, Front) if x == y && x > 0 => StraightDiagonal(x as u16),
+                (x, y, Front) if x == y && x > 0 => StraightDiagonal(x as u8),
                 _ => return create_error(),
             },
             _ => unreachable!("Should never be on the pillar"),
@@ -614,12 +610,12 @@ where
 }
 
 impl<N> RunNode<N> {
-    pub unsafe fn new_unchecked(x: i16, y: i16, direction: AbsoluteDirection) -> Self {
+    pub unsafe fn new_unchecked(x: i8, y: i8, direction: AbsoluteDirection) -> Self {
         Self(Node::<N>::new_unchecked(x, y, direction))
     }
 
     #[inline]
-    fn is_valid_direction(x: i16, y: i16, direction: AbsoluteDirection) -> bool {
+    fn is_valid_direction(x: i8, y: i8, direction: AbsoluteDirection) -> bool {
         use AbsoluteDirection::*;
 
         if (x ^ y) & 1 == 1 {
@@ -643,15 +639,15 @@ impl<N> RunNode<N>
 where
     N: Unsigned,
 {
-    pub fn new(x: i16, y: i16, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
+    pub fn new(x: i8, y: i8, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use core::convert::TryInto;
         Node::<N>::new(x, y, direction)?.try_into()
     }
 
     fn relative(
         &self,
-        dx: i16,
-        dy: i16,
+        dx: i8,
+        dy: i8,
         ddir: RelativeDirection,
         base_dir: AbsoluteDirection,
     ) -> Result<Self, NodeCreationError> {
@@ -692,12 +688,12 @@ where
     ) -> impl 'a
            + Fn(
         &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
-        i16,
-        i16,
+        i8,
+        i8,
     ) -> Result<(), ()> {
         move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
-              dx: i16,
-              dy: i16| {
+              dx: i8,
+              dy: i8| {
             let (dx, dy) = if is_succ { (dx, dy) } else { (-dx, -dy) };
             let wall = self.0.relative_wall(dx, dy, base_dir).map_err(|_| ())?;
             list.push(WallNode::Wall(wall));
@@ -712,14 +708,14 @@ where
     ) -> impl 'a
            + Fn(
         &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
-        i16,
-        i16,
+        i8,
+        i8,
         RelativeDirection,
         Pattern,
     ) -> Result<(), ()> {
         move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
-              dx: i16,
-              dy: i16,
+              dx: i8,
+              dy: i8,
               ddir: RelativeDirection,
               pattern: Pattern| {
             let (dx, dy) = if is_succ { (dx, dy) } else { (-dx, -dy) };
@@ -905,7 +901,7 @@ where
         let mut walls = ForcedVec::new();
         match (self.0.location(), self.0.direction()) {
             (Cell, _) => {
-                let mut add = |x: i16, y: i16| {
+                let mut add = |x: i8, y: i8| {
                     if let Ok(wall) = self.0.relative_wall(x, y, North) {
                         walls.push(wall);
                     }
@@ -941,7 +937,7 @@ where
             | (HorizontalBound, SouthWest)
             | (VerticalBound, SouthEast)
             | (VerticalBound, NorthWest) => {
-                let mut add = |x: i16, y: i16| {
+                let mut add = |x: i8, y: i8| {
                     if let Ok(wall) = self.0.relative_wall(x, y, NorthEast) {
                         walls.push(wall);
                     }
@@ -966,7 +962,7 @@ where
             | (VerticalBound, SouthWest)
             | (HorizontalBound, SouthEast)
             | (HorizontalBound, NorthWest) => {
-                let mut add = |x: i16, y: i16| {
+                let mut add = |x: i8, y: i8| {
                     if let Ok(wall) = self.0.relative_wall(x, y, NorthEast) {
                         walls.push(wall);
                     }
