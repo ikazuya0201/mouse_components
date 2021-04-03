@@ -54,3 +54,79 @@ macro_rules! get_or_err {
         crate::utils::builder::ok_or($self.$field_name.take(), core::stringify!($field_name))?
     }};
 }
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! impl_with_builder {
+    (
+        $(#[$builder_meta:meta])*
+        $builder: ident:
+        {
+            $(#[$meta:meta])*
+            pub struct $name: ident <$($tt: tt),*> {
+                $($field_name: ident: $type: ty,)*
+            }
+        }
+    ) => {
+        impl_with_builder! {
+            $(#[$builder_meta])*
+            $builder:
+            {
+                $(#[$meta])*
+                pub struct $name<$($tt),*;> {
+                    $($field_name: $type,)*
+                }
+            }
+        }
+    };
+
+    (
+        $(#[$builder_meta:meta])*
+        $builder: ident:
+        {
+            $(#[$meta:meta])*
+            pub struct $name: ident <$($tt: tt),*; $(const $const: ident : usize),*> {
+                $($field_name: ident: $type: ty,)*
+            }
+        }
+    ) => {
+        $(#[$meta])*
+        pub struct $name<$($tt),*, $(const $const: usize),*> {
+            $($field_name: $type),*
+        }
+
+        impl<$($tt),*, $(const $const: usize),*> $name<$($tt),*, $($const),*> {
+            pub fn builder() -> $builder<$($tt),*, $($const),*> {
+                $builder::new()
+            }
+        }
+
+        $(#[$builder_meta])*
+        pub struct $builder<$($tt),*, $(const $const: usize),*> {
+            $($field_name: Option<$type>),*
+        }
+
+        impl<$($tt),*, $(const $const: usize),*> $builder<$($tt),*, $($const),*> {
+            pub fn new() -> Self {
+                Self {
+                    $($field_name: None),*
+                }
+            }
+
+            pub fn build(&mut self) -> crate::utils::builder::BuilderResult<$name<$($tt),*, $($const),*>> {
+                Ok(
+                    $name {
+                        $($field_name: get_or_err!(self.$field_name),)*
+                    }
+                )
+            }
+
+            $(
+                pub fn $field_name(&mut self, $field_name: $type) -> &mut Self {
+                    self.$field_name = Some($field_name);
+                    self
+                }
+            )*
+        }
+    };
+}
