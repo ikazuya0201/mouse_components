@@ -61,13 +61,22 @@ where
     }
 }
 
+/// A parameter type for [RunTrajectoryGenerator].
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, PartialEq)]
+pub struct RunTrajectoryParameters {
+    pub pose: Pose,
+    pub kind: RunKind,
+    pub should_stop: bool,
+}
+
 //NOTO: this code doesn't work if the initial command is slalom
 //because trajectory does not accelerate in slalom.
 //Then, we assume that the initial command is straight.
 //TODO: To deal with arbitrary initial commands
 //TODO: Specify start and end of trajectories by `RunKind`.
 //TODO: Hold current velocity as a state.
-impl<M, Generator> TrackingTrajectoryGenerator<(Pose, RunKind)>
+impl<M, Generator> TrackingTrajectoryGenerator<RunTrajectoryParameters>
     for RunTrajectoryGenerator<M, Generator>
 where
     M: Math,
@@ -76,13 +85,18 @@ where
     type Target = Target;
     type Trajectory = ShiftTrajectory<RunTrajectory<M>, M>;
 
-    fn generate(&self, (pose, kind): &(Pose, RunKind)) -> Self::Trajectory {
+    fn generate(&self, parameters: &RunTrajectoryParameters) -> Self::Trajectory {
         let mut current_velocity = self.current_velocity.lock();
+        let target_velocity = if parameters.should_stop {
+            Default::default()
+        } else {
+            self.run_slalom_velocity
+        };
         let (trajectory, terminal_velocity) = self.generate_run_trajectory_and_terminal_velocity(
-            *pose,
-            *kind,
+            parameters.pose,
+            parameters.kind,
             *current_velocity,
-            self.run_slalom_velocity,
+            target_velocity,
         );
         *current_velocity = terminal_velocity;
         trajectory

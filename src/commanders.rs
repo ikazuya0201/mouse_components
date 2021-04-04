@@ -11,7 +11,7 @@ use typenum::Unsigned;
 
 use crate::utils::{forced_vec::ForcedVec, itertools::repeat_n};
 pub use return_setup_commander::{ReturnSetupCommander, ReturnSetupCommanderError, RotationNode};
-pub use run_commander::{RunCommander, RunCommanderError};
+pub use run_commander::{RunCommand, RunCommander, RunCommanderError};
 pub use search_commander::{NextNode, NodeChecker, SearchCommander, UncheckedNodeFinder};
 
 /// A trait that behaves like a directed graph which has weighted edges.

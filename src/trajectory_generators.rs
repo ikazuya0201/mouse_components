@@ -17,6 +17,7 @@ pub use return_setup_trajectory_generator::{
 };
 pub use run_trajectory_generator::{
     RunKind, RunTrajectory, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
+    RunTrajectoryParameters,
 };
 pub use search_trajectory_generator::{
     SearchKind, SearchTrajectory, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
