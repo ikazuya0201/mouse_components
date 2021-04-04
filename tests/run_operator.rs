@@ -1,4 +1,7 @@
-extern crate alloc;
+extern crate std;
+
+#[cfg(feature = "log_test")]
+use std::io::Write;
 
 use components::{
     agents::TrackingAgent,
@@ -150,7 +153,7 @@ macro_rules! impl_run_operator_test {
                             .build()
                             .unwrap();
 
-                        TrackerBuilder::default()
+                        let tracker = TrackerBuilder::default()
                             .right_motor(right_motor)
                             .left_motor(left_motor)
                             .period(period)
@@ -165,7 +168,19 @@ macro_rules! impl_run_operator_test {
                             .low_b(1e-3)
                             .fail_safe_distance(Length::new::<meter>(0.05))
                             .build()
-                            .unwrap()
+                            .unwrap();
+
+                        #[cfg(not(feature = "log_test"))]
+                        {
+                            tracker
+                        }
+                        #[cfg(feature = "log_test")]
+                        {
+                            utils::logged_tracker::JsonLoggedTracker::new(
+                                std::io::stdout(),
+                                tracker,
+                            )
+                        }
                     };
 
                     let wall_detector = {
@@ -182,11 +197,11 @@ macro_rules! impl_run_operator_test {
                 let trajectory_manager = {
                     let trajectory_generator = RunTrajectoryGeneratorBuilder::default()
                         .period(period)
-                        .max_velocity(Velocity::new::<meter_per_second>(2.0))
-                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
-                        .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
+                        .max_velocity(Velocity::new::<meter_per_second>(0.5))
+                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(2.0))
+                        .max_jerk(Jerk::new::<meter_per_second_cubed>(4.0))
                         .parameters_generator(DefaultSlalomParametersGenerator)
-                        .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
+                        .run_slalom_velocity(Velocity::new::<meter_per_second>(0.5))
                         .build()
                         .expect("Should never panic");
                     TrackingTrajectoryManager::new(
@@ -213,11 +228,17 @@ macro_rules! impl_run_operator_test {
                 RunCommander::new(start, &goals, maze)
             };
 
+            #[cfg(feature = "log_test")]
+            write!(std::io::stdout(), "[").unwrap();
+
             let operator = TrackingOperator::new(commander, agent);
             while operator.run().is_err() {
                 stepper.step();
                 operator.tick().expect("Should never panic");
             }
+
+            #[cfg(feature = "log_test")]
+            write!(std::io::stdout(), "]").unwrap();
         }
     };
 }
