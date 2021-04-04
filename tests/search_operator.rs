@@ -1,3 +1,6 @@
+#[cfg(feature = "log_test")]
+use std::io::Write;
+
 use components::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
@@ -141,7 +144,7 @@ macro_rules! impl_search_operator_test {
                                 .build()
                                 .unwrap();
 
-                            TrackerBuilder::default()
+                            let tracker = TrackerBuilder::default()
                                 .right_motor(right_motor)
                                 .left_motor(left_motor)
                                 .period(period)
@@ -156,7 +159,19 @@ macro_rules! impl_search_operator_test {
                                 .low_b(1e-3)
                                 .fail_safe_distance(Length::new::<meter>(0.05))
                                 .build()
-                                .unwrap()
+                                .unwrap();
+
+                            #[cfg(not(feature = "log_test"))]
+                            {
+                                tracker
+                            }
+                            #[cfg(feature = "log_test")]
+                            {
+                                utils::logged_tracker::JsonLoggedTracker::new(
+                                    std::io::stdout(),
+                                    tracker,
+                                )
+                            }
                         };
 
                         let wall_detector = {
@@ -219,11 +234,15 @@ macro_rules! impl_search_operator_test {
                 let commander = create_commander(&wall_manager);
                 let expected_commander = create_commander(&expected_wall_manager);
 
+                #[cfg(feature = "log_test")]
+                write!(std::io::stdout(), "[").unwrap();
                 let operator = TrackingOperator::new(commander, agent);
                 while operator.run().is_err() {
                     stepper.step();
                     operator.tick().expect("Fail safe should never invoke");
                 }
+                #[cfg(feature = "log_test")]
+                write!(std::io::stdout(), "]").unwrap();
                 let commander = create_commander(&wall_manager);
                 assert_eq!(
                     commander.compute_shortest_path(),
