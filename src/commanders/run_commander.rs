@@ -4,6 +4,8 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use generic_array::ArrayLength;
 use heapless::Vec;
 use num::{Bounded, Saturating};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use typenum::Unsigned;
 
 use super::{compute_shortest_path, BoundedNode, CostNode, Graph, PathUpperBound, RouteNode};
@@ -57,13 +59,22 @@ pub enum RunCommanderError {
     ConversionError,
 }
 
+/// A command for fast run.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RunCommand<Node, Route> {
+    pub node: Node,
+    pub route: Route,
+    pub is_final: bool,
+}
+
 //TODO: write test
 impl<Node, Maze> TrackingCommander for RunCommander<Node, Maze>
 where
     Node: RouteNode + Clone,
 {
     type Error = RunCommanderError;
-    type Command = (Node, Node::Route);
+    type Command = RunCommand<Node, Node::Route>;
 
     fn next_command(&self) -> Result<Self::Command, TrackingCommanderError<Self::Error>> {
         let iter = self.iter.load(Ordering::Acquire);
@@ -71,11 +82,12 @@ where
             return Err(TrackingCommanderError::TrackingFinish);
         }
         self.iter.fetch_add(1, Ordering::AcqRel);
-        Ok((
-            self.path[iter].clone(),
-            self.path[iter]
+        Ok(RunCommand {
+            node: self.path[iter].clone(),
+            route: self.path[iter]
                 .route(&self.path[iter + 1])
                 .map_err(|_| TrackingCommanderError::Other(RunCommanderError::ConversionError))?,
-        ))
+            is_final: iter + 2 == self.path.len(),
+        })
     }
 }

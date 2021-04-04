@@ -5,7 +5,9 @@ use core::marker::PhantomData;
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, Length};
 
+use crate::commanders::RunCommand;
 use crate::nodes::{Node, RunNode, SearchNode};
+use crate::trajectory_generators::{RunKind, RunTrajectoryParameters};
 use crate::trajectory_managers::CommandConverter as ICommandConverter;
 use crate::types::data::{AbsoluteDirection, Pose};
 
@@ -108,6 +110,23 @@ impl<N, K: Clone> ICommandConverter<(RunNode<N>, K)> for CommandConverter {
             _convert(node.inner(), self.square_width_half, self.front_offset),
             kind.clone(),
         )
+    }
+}
+
+impl<N> ICommandConverter<RunCommand<RunNode<N>, RunKind>> for CommandConverter {
+    type Output = RunTrajectoryParameters;
+
+    fn convert(&self, command: &RunCommand<RunNode<N>, RunKind>) -> Self::Output {
+        let pose = _convert(
+            command.node.inner(),
+            self.square_width_half,
+            self.front_offset,
+        );
+        RunTrajectoryParameters {
+            pose,
+            kind: command.route,
+            should_stop: command.is_final,
+        }
     }
 }
 
