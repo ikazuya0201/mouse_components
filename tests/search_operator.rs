@@ -25,8 +25,8 @@ use components::{
 };
 use typenum::consts::*;
 use uom::si::f32::{
-    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Frequency, Jerk,
-    Length, Time, Velocity,
+    Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, ElectricPotential,
+    Frequency, Jerk, Length, Time, Velocity,
 };
 use uom::si::{
     acceleration::meter_per_second_squared,
@@ -34,6 +34,7 @@ use uom::si::{
     angular_acceleration::degree_per_second_squared,
     angular_jerk::degree_per_second_cubed,
     angular_velocity::degree_per_second,
+    electric_potential::volt,
     frequency::hertz,
     jerk::meter_per_second_cubed,
     length::{meter, millimeter},
@@ -105,7 +106,7 @@ macro_rules! impl_search_operator_test {
                     right_motor,
                     left_motor,
                     distance_sensors,
-                ) = simulator.split(wheel_interval);
+                ) = simulator.split(wheel_interval, ElectricPotential::new::<volt>(3.7));
 
                 let agent = {
                     let robot = {
