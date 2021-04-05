@@ -132,7 +132,6 @@ where
         straight1.chain(curve).chain(straight2)
     }
 
-    #[allow(unused)]
     //TODO: Write test.
     pub fn generate_slalom_with_terminal_velocity(
         &self,
