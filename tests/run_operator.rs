@@ -137,7 +137,7 @@ macro_rules! impl_run_operator_test {
 
                     let tracker = {
                         let trans_controller = TranslationalControllerBuilder::new()
-                            .kp(0.9)
+                            .kp(1.0)
                             .ki(0.05)
                             .kd(0.01)
                             .period(period)
@@ -147,9 +147,9 @@ macro_rules! impl_run_operator_test {
                             .unwrap();
 
                         let rot_controller = RotationalControllerBuilder::new()
-                            .kp(0.2)
-                            .ki(0.2)
-                            .kd(0.0)
+                            .kp(1.0)
+                            .ki(0.05)
+                            .kd(0.01)
                             .period(period)
                             .model_gain(rot_model_gain)
                             .model_time_constant(rot_model_time_constant)
@@ -200,9 +200,9 @@ macro_rules! impl_run_operator_test {
                 let trajectory_manager = {
                     let trajectory_generator = RunTrajectoryGeneratorBuilder::default()
                         .period(period)
-                        .max_velocity(Velocity::new::<meter_per_second>(0.5))
-                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(2.0))
-                        .max_jerk(Jerk::new::<meter_per_second_cubed>(4.0))
+                        .max_velocity(Velocity::new::<meter_per_second>(1.0))
+                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(50.0))
+                        .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
                         .parameters_generator(DefaultSlalomParametersGenerator)
                         .run_slalom_velocity(Velocity::new::<meter_per_second>(0.5))
                         .build()
