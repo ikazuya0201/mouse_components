@@ -25,10 +25,13 @@ use components::{
     wall_manager::WallManager,
 };
 use typenum::consts::*;
-use uom::si::f32::{Acceleration, Angle, Frequency, Jerk, Length, Time, Velocity};
+use uom::si::f32::{
+    Acceleration, Angle, ElectricPotential, Frequency, Jerk, Length, Time, Velocity,
+};
 use uom::si::{
     acceleration::meter_per_second_squared,
     angle::degree,
+    electric_potential::volt,
     frequency::hertz,
     jerk::meter_per_second_cubed,
     length::{meter, millimeter},
@@ -115,7 +118,7 @@ macro_rules! impl_run_operator_test {
                 right_motor,
                 left_motor,
                 distance_sensors,
-            ) = simulator.split(wheel_interval);
+            ) = simulator.split(wheel_interval, ElectricPotential::new::<volt>(3.7));
 
             let agent = {
                 let robot = {

@@ -75,6 +75,7 @@ where
     pub fn split(
         self,
         wheel_interval: Length,
+        max_voltage: ElectricPotential,
     ) -> (
         Stepper,
         Observer,
@@ -118,10 +119,12 @@ where
             Motor {
                 inner: Rc::clone(&self.inner),
                 direction: Direction::Right,
+                max_voltage,
             },
             Motor {
                 inner: Rc::clone(&self.inner),
                 direction: Direction::Left,
+                max_voltage,
             },
             distance_sensors,
         )
@@ -299,10 +302,18 @@ impl IIMU for IMU {
 pub struct Motor {
     inner: Rc<RefCell<AgentSimulatorInner>>,
     direction: Direction,
+    max_voltage: ElectricPotential,
 }
 
 impl IMotor for Motor {
     fn apply(&mut self, electric_potential: ElectricPotential) {
+        let electric_potential = if electric_potential > self.max_voltage {
+            self.max_voltage
+        } else if electric_potential < -self.max_voltage {
+            -self.max_voltage
+        } else {
+            electric_potential
+        };
         match self.direction {
             Direction::Right => self.inner.borrow_mut().right_voltage = electric_potential,
             Direction::Left => self.inner.borrow_mut().left_voltage = electric_potential,
