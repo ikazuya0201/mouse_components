@@ -15,11 +15,29 @@ use crate::pattern_converters::LinearPatternConverter;
 use crate::types::data::SearchKind;
 use crate::utils::builder::{ok_or, BuilderResult};
 
+fn default_square_width() -> Length {
+    crate::wall_detector::DEFAULT_SQUARE_WIDTH
+}
+
+fn default_wall_width() -> Length {
+    crate::wall_detector::DEFAULT_WALL_WIDTH
+}
+
+fn default_ignore_radius_from_pillar() -> Length {
+    crate::wall_detector::DEFAULT_IGNORE_RADIUS
+}
+
+fn default_ignore_length_from_wall() -> Length {
+    crate::wall_detector::DEFAULT_IGNORE_LENGTH
+}
+
 impl_with_getter! {
     /// An implementation of config.
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     pub struct Config<Size> {
+        #[serde(default = "default_square_width")]
         square_width: Length,
+        #[serde(default)]
         front_offset: Length,
         start: RunNode<Size>,
         return_goal: RunNode<Size>,
@@ -37,12 +55,18 @@ impl_with_getter! {
         rotational_kd: f32,
         rotational_model_gain: f32,
         rotational_model_time_constant: Time,
+        #[serde(default)]
         estimator_correction_weight: f32,
+        #[serde(default)]
         wheel_interval: Option<Length>,
         estimator_cut_off_frequency: Frequency,
+        #[serde(default)]
         pattern_converter: LinearPatternConverter<u16>,
+        #[serde(default = "default_wall_width")]
         wall_width: Length,
+        #[serde(default = "default_ignore_radius_from_pillar")]
         ignore_radius_from_pillar: Length,
+        #[serde(default = "default_ignore_length_from_wall")]
         ignore_length_from_wall: Length,
         kx: f32,
         kdx: f32,

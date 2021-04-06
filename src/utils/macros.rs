@@ -4,12 +4,18 @@ macro_rules! impl_with_getter {
     (
         $(#[$meta:meta])*
         pub struct $name: ident <$($tt: tt),*> {
-            $($field_name: ident: $type: ty,)*
+            $(
+                $(#[$field_meta:meta])*
+                $field_name: ident: $type: ty,
+            )*
         }
     ) => {
         $(#[$meta])*
         pub struct $name<$($tt),*> {
-            $($field_name: $type),*
+            $(
+                $(#[$field_meta])*
+                $field_name: $type
+            ),*
         }
 
         impl<$($tt),*> $name<$($tt),*> {
