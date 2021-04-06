@@ -1,6 +1,5 @@
 //! Definition of state.
 
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::impl_with_getter;
@@ -9,8 +8,7 @@ use crate::tracker::RobotState;
 
 impl_with_getter! {
     /// A state for operators.
-    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-    #[derive(Clone, PartialEq, Debug)]
+    #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
     pub struct State<Size> {
         current_node: Node<Size>,
         robot_state: RobotState,

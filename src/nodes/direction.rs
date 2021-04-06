@@ -1,8 +1,6 @@
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Serialize, Deserialize)]
 /// An enum that represents directions fixed to the maze.
 pub enum AbsoluteDirection {
     North,
@@ -15,8 +13,7 @@ pub enum AbsoluteDirection {
     NorthWest,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Serialize, Deserialize)]
 /// An enum that represents directions relative to the robot.
 pub enum RelativeDirection {
     Front,
