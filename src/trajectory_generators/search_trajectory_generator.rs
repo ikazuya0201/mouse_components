@@ -68,8 +68,14 @@ impl<M: Math> Iterator for SearchTrajectory<M> {
 pub type BackTrajectory<M> = Chain<
     Chain<
         Chain<
-            Chain<Chain<Chain<StraightTrajectory, StopTrajectory>, SpinTrajectory>, StopTrajectory>,
-            SpinTrajectory,
+            Chain<
+                Chain<
+                    Chain<StraightTrajectory, StopTrajectory>,
+                    ShiftTrajectory<SpinTrajectory, M>,
+                >,
+                StopTrajectory,
+            >,
+            ShiftTrajectory<SpinTrajectory, M>,
         >,
         StopTrajectory,
     >,
@@ -170,7 +176,13 @@ where
                     period,
                     Time::new::<millisecond>(50.0),
                 ))
-                .chain(spin_generator.generate(Default::default(), Angle::new::<degree>(90.0)))
+                .chain(ShiftTrajectory::new(
+                    Pose {
+                        x: distance,
+                        ..Default::default()
+                    },
+                    spin_generator.generate(Angle::new::<degree>(90.0)),
+                ))
                 .chain(StopTrajectory::new(
                     Pose {
                         x: distance,
@@ -180,9 +192,14 @@ where
                     period,
                     Time::new::<millisecond>(50.0),
                 ))
-                .chain(
-                    spin_generator.generate(Angle::new::<degree>(90.0), Angle::new::<degree>(90.0)),
-                )
+                .chain(ShiftTrajectory::new(
+                    Pose {
+                        x: distance,
+                        y: Default::default(),
+                        theta: Angle::new::<degree>(90.0),
+                    },
+                    spin_generator.generate(Angle::new::<degree>(90.0)),
+                ))
                 .chain(StopTrajectory::new(
                     Pose {
                         x: distance,
@@ -230,7 +247,6 @@ where
 
     fn generate_emergency(&self, target: &Self::Target) -> Self::Trajectory {
         //This method should never be called when spin.
-        let target = target.moving().expect("Should be Target::Moving.");
         let pose = Pose {
             x: target.x.x,
             y: target.y.x,
@@ -423,20 +439,14 @@ mod tests {
 
                 let mut last = trajectory.next().unwrap();
                 for target in trajectory {
-                    match target {
-                        Target::Moving(target) => {
-                            let v = target.x.v * target.theta.x.get::<radian>().cos()
-                                + target.y.v * target.theta.x.get::<radian>().sin();
-                            assert!(
-                                v.get::<meter_per_second>()
-                                    < search_velocity.get::<meter_per_second>() + EPSILON * 100.0,
-                            );
-                        }
-                        Target::Spin(_) => (),
-                    }
+                    let v = target.x.v * target.theta.x.get::<radian>().cos()
+                        + target.y.v * target.theta.x.get::<radian>().sin();
+                    assert!(
+                        v.get::<meter_per_second>()
+                            < search_velocity.get::<meter_per_second>() + EPSILON * 100.0,
+                    );
                     last = target;
                 }
-                let last = last.moving().unwrap();
                 assert_relative_eq!(last.x.x.get::<meter>(), last_x, epsilon = EPSILON);
                 assert_relative_eq!(last.y.x.get::<meter>(), last_y, epsilon = EPSILON);
                 assert_relative_eq!(last.theta.x.get::<degree>(), last_theta, epsilon = EPSILON);

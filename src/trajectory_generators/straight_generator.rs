@@ -8,7 +8,7 @@ use uom::si::{
     time::second,
 };
 
-use super::trajectory::{AngleTarget, LengthTarget, MoveTarget, Target};
+use super::trajectory::{AngleTarget, LengthTarget, Target};
 
 macro_rules! impl_calculator_generator {
     ($mod_name: ident, $t: ty, $dt: ty, $ddt: ty, $dddt: ty, $tunit: ty, $target: ident) => {
@@ -504,10 +504,10 @@ impl Iterator for StraightTrajectory {
             StraightTrajectoryCalculator::Accel(calculator) => calculator.calculate(t),
             StraightTrajectoryCalculator::Constant(calculator) => calculator.calculate(t),
         };
-        Some(Target::Moving(MoveTarget {
+        Some(Target {
             x: target,
             ..Default::default()
-        }))
+        })
     }
 
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
@@ -662,9 +662,8 @@ mod tests {
                 Velocity::new::<meter_per_second>(v_end),
             );
 
-            let mut before = trajectory.next().unwrap().moving().unwrap();
+            let mut before = trajectory.next().unwrap();
             for target in trajectory {
-                let target = target.moving().unwrap();
                 let cos = target.theta.x.get::<radian>().cos();
                 let sin = target.theta.x.get::<radian>().sin();
 

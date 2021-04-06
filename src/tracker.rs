@@ -16,7 +16,7 @@ use uom::si::{
 use uom::{typenum::*, Kind};
 
 use super::robot::Tracker as ITracker;
-use super::trajectory_generators::{AngleTarget, MoveTarget, Target};
+use super::trajectory_generators::{AngleTarget, Target};
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
 use crate::utils::math::{LibmMath, Math};
 pub use state::{AngleState, LengthState, RobotState};
@@ -78,7 +78,7 @@ impl<LM, RM, M, TC, RC> core::fmt::Debug for Tracker<LM, RM, M, TC, RC> {
 #[derive(Clone, PartialEq, Debug)]
 pub struct FailSafeError {
     state: RobotState,
-    target: MoveTarget,
+    target: Target,
 }
 
 impl<LM, RM, M, TC, RC> ITracker<RobotState, Target> for Tracker<LM, RM, M, TC, RC>
@@ -92,10 +92,7 @@ where
     type Error = FailSafeError;
 
     fn track(&mut self, state: &RobotState, target: &Target) -> Result<(), Self::Error> {
-        let (left, right) = match target {
-            Target::Moving(target) => self.track_move(state, target)?,
-            Target::Spin(target) => self.track_spin(state, target),
-        };
+        let (left, right) = self.track_move(state, target)?;
         self.left_motor.apply(left);
         self.right_motor.apply(right);
         Ok(())
@@ -125,7 +122,7 @@ where
         xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
     }
 
-    fn fail_safe(&mut self, state: &RobotState, target: &MoveTarget) -> Result<(), FailSafeError> {
+    fn fail_safe(&mut self, state: &RobotState, target: &Target) -> Result<(), FailSafeError> {
         let x_diff = state.x.x - target.x.x;
         let y_diff = state.y.x - target.y.x;
 
@@ -143,7 +140,7 @@ where
     fn track_move(
         &mut self,
         state: &RobotState,
-        target: &MoveTarget,
+        target: &Target,
     ) -> Result<(ElectricPotential, ElectricPotential), FailSafeError> {
         self.fail_safe(state, target)?;
 
@@ -217,6 +214,7 @@ where
         Ok((vol_v - vol_w, vol_v + vol_w))
     }
 
+    #[allow(unused)]
     fn track_spin(
         &mut self,
         state: &RobotState,
