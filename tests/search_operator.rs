@@ -126,7 +126,7 @@ macro_rules! impl_search_operator_test {
 
                         let tracker = {
                             let trans_controller = TranslationalControllerBuilder::new()
-                                .kp(0.9)
+                                .kp(1.0)
                                 .ki(0.05)
                                 .kd(0.01)
                                 .period(period)
@@ -136,9 +136,9 @@ macro_rules! impl_search_operator_test {
                                 .unwrap();
 
                             let rot_controller = RotationalControllerBuilder::new()
-                                .kp(0.2)
+                                .kp(1.0)
                                 .ki(0.2)
-                                .kd(0.0)
+                                .kd(0.01)
                                 .period(period)
                                 .model_gain(rot_model_gain)
                                 .model_time_constant(rot_model_time_constant)
@@ -153,7 +153,7 @@ macro_rules! impl_search_operator_test {
                                 .kdx(4.0)
                                 .ky(15.0)
                                 .kdy(4.0)
-                                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
+                                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.05))
                                 .translation_controller(trans_controller)
                                 .rotation_controller(rot_controller)
                                 .low_zeta(1.0)
@@ -191,9 +191,9 @@ macro_rules! impl_search_operator_test {
 
                     let trajectory_generator = SearchTrajectoryGeneratorBuilder::default()
                         .period(period)
-                        .max_velocity(Velocity::new::<meter_per_second>(2.0))
-                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
-                        .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
+                        .max_velocity(Velocity::new::<meter_per_second>(0.5))
+                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(20.0))
+                        .max_jerk(Jerk::new::<meter_per_second_cubed>(40.0))
                         .search_velocity(search_velocity)
                         .parameters_generator(SlalomParametersGeneratorWithFrontOffset::new(
                             front_offset,
