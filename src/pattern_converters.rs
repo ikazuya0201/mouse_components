@@ -1,6 +1,5 @@
 //! Implementations for [PatternConverter](crate::mazes::PatternConverter).
 
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::impl_with_builder;
@@ -14,8 +13,7 @@ impl_with_builder! {
         /// An implementation of [PatternConverter](PatternConverter).
         ///
         /// This calculates cost of straight pattern by multiplication with a given multiplier.
-        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-        #[derive(Clone, PartialEq, Eq, Debug)]
+        #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
         pub struct LinearPatternConverter<Cost> {
             search90: Cost,
             fast_run45: Cost,

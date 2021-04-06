@@ -6,7 +6,6 @@ use core::marker::PhantomData;
 use core::ops::Mul;
 
 use heapless::{ArrayLength, Vec};
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
@@ -17,8 +16,7 @@ use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 /// An enum that represents the type of edges of several graphs.
 pub enum Pattern {
     Straight(u8),
@@ -33,8 +31,7 @@ pub enum Pattern {
 }
 
 //TODO: Create new data type to reduce copy cost.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that is the super set of [SearchNode] and [RunNode].
 pub struct Node<N> {
     x: i8,
@@ -242,8 +239,7 @@ where
 }
 
 //TODO: Remove Copy
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that represents nodes (verteces) of a graph for search.
 pub struct SearchNode<N>(Node<N>);
 
@@ -543,8 +539,7 @@ impl<N: Clone> RouteNode for RunNode<N> {
 }
 
 //TODO: Create new data type to reduce copy cost.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that represents nodes (verteces) of a graph for fast run.
 pub struct RunNode<N>(Node<N>);
 
@@ -1019,8 +1014,7 @@ where
 }
 
 /// An enum that indicates kinds of rotation.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RotationKind {
     Front,
     Right,
