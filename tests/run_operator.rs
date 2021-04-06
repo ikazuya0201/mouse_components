@@ -272,11 +272,20 @@ impl_run_operator_test! {
     }
 }
 
-impl_run_operator_test!(
+impl_run_operator_test! {
     test_run_operator3<U4> {
         (
             include_str!("../mazes/maze3.dat"),
             vec![(2, 0, South), (2, 0, West)],
         ),
     }
-);
+}
+
+impl_run_operator_test! {
+    test_run_operator_with_accel_slalom<U4> {
+        (
+            include_str!("../mazes/maze4.dat"),
+            vec![(2, 0, South), (2, 0, West)],
+        ),
+    }
+}
