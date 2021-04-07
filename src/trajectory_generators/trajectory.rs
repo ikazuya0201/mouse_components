@@ -9,36 +9,8 @@ use uom::si::f32::{
 use crate::traits::Math;
 use crate::types::data::Pose;
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub enum Target {
-    Moving(MoveTarget),
-    Spin(AngleTarget),
-}
-
-impl Default for Target {
-    fn default() -> Self {
-        Target::Spin(AngleTarget::default())
-    }
-}
-
-impl Target {
-    pub fn moving(self) -> Option<MoveTarget> {
-        match self {
-            Target::Moving(target) => Some(target),
-            _ => None,
-        }
-    }
-
-    pub fn spin(self) -> Option<AngleTarget> {
-        match self {
-            Target::Spin(target) => Some(target),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct MoveTarget {
+pub struct Target {
     pub x: LengthTarget,
     pub y: LengthTarget,
     pub theta: AngleTarget,
@@ -93,9 +65,9 @@ impl<T, M> ShiftTrajectory<T, M>
 where
     M: Math,
 {
-    fn shift(&self, target: MoveTarget) -> MoveTarget {
+    fn shift(&self, target: Target) -> Target {
         let (sin_th, cos_th) = M::sincos(self.pose.theta);
-        MoveTarget {
+        Target {
             x: LengthTarget {
                 x: target.x.x * cos_th - target.y.x * sin_th + self.pose.x,
                 v: target.x.v * cos_th - target.y.v * sin_th,
@@ -126,10 +98,7 @@ where
     type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.inner.next()? {
-            Target::Moving(target) => Some(Target::Moving(self.shift(target))),
-            target => Some(target),
-        }
+        self.inner.next().map(|item| self.shift(item))
     }
 
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
@@ -162,7 +131,7 @@ impl Iterator for StopTrajectory {
     fn next(&mut self) -> Option<Self::Item> {
         if self.t < self.t_end {
             self.t += self.period;
-            Some(Target::Moving(MoveTarget {
+            Some(Target {
                 x: LengthTarget {
                     x: self.pose.x,
                     ..Default::default()
@@ -175,7 +144,7 @@ impl Iterator for StopTrajectory {
                     x: self.pose.theta,
                     ..Default::default()
                 },
-            }))
+            })
         } else {
             None
         }
@@ -207,7 +176,7 @@ mod tests {
     fn test_shift_trajectory() {
         use crate::utils::math::MathFake;
 
-        let target = Target::Moving(MoveTarget {
+        let target = Target {
             x: LengthTarget {
                 x: Length::new::<meter>(1.0),
                 v: Velocity::new::<meter_per_second>(1.0),
@@ -223,13 +192,13 @@ mod tests {
                 v: AngularVelocity::new::<degree_per_second>(360.0),
                 ..Default::default()
             },
-        });
+        };
         let pose = Pose {
             x: Length::new::<meter>(1.0),
             y: Length::new::<meter>(1.0),
             theta: Angle::new::<degree>(90.0),
         };
-        let expected_target = Target::Moving(MoveTarget {
+        let expected_target = Target {
             x: LengthTarget {
                 x: Length::new::<meter>(0.0),
                 v: Velocity::new::<meter_per_second>(-1.0),
@@ -245,15 +214,12 @@ mod tests {
                 v: AngularVelocity::new::<degree_per_second>(360.0),
                 ..Default::default()
             },
-        });
+        };
         let mut trajectory = ShiftTrajectory::<_, MathFake>::new(pose, vec![target].into_iter());
-        assert_target_relative_eq(
-            trajectory.next().unwrap().moving().unwrap(),
-            expected_target.moving().unwrap(),
-        );
+        assert_target_relative_eq(trajectory.next().unwrap(), expected_target);
     }
 
-    fn assert_target_relative_eq(left: MoveTarget, right: MoveTarget) {
+    fn assert_target_relative_eq(left: Target, right: Target) {
         assert_relative_eq!(left.x.x.get::<meter>(), right.x.x.get::<meter>());
         assert_relative_eq!(
             left.x.v.get::<meter_per_second>(),

@@ -430,32 +430,21 @@ mod tests {
     {
         fn step(&mut self) -> Result<RobotState, FinishError> {
             if let Some(target) = self.trajectory.next() {
-                let state = match target {
-                    Target::Moving(target) => RobotState {
-                        x: LengthState {
-                            x: target.x.x,
-                            v: target.x.v,
-                            a: target.x.a,
-                        },
-                        y: LengthState {
-                            x: target.y.x,
-                            v: target.y.v,
-                            a: target.y.a,
-                        },
-                        theta: AngleState {
-                            x: target.theta.x,
-                            v: target.theta.v,
-                            a: target.theta.a,
-                        },
+                let state = RobotState {
+                    x: LengthState {
+                        x: target.x.x,
+                        v: target.x.v,
+                        a: target.x.a,
                     },
-                    Target::Spin(target) => RobotState {
-                        x: Default::default(),
-                        y: Default::default(),
-                        theta: AngleState {
-                            x: target.x,
-                            v: target.v,
-                            a: target.a,
-                        },
+                    y: LengthState {
+                        x: target.y.x,
+                        v: target.y.v,
+                        a: target.y.a,
+                    },
+                    theta: AngleState {
+                        x: target.theta.x,
+                        v: target.theta.v,
+                        a: target.theta.a,
                     },
                 };
                 core::mem::swap(&mut self.prev, &mut self.current);

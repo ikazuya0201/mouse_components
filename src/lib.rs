@@ -64,8 +64,8 @@ pub mod types {
         pub use trajectory_generators::Pose;
         #[doc(no_inline)]
         pub use trajectory_generators::{
-            AngleTarget, LengthTarget, MoveTarget, RunKind, SearchKind, SlalomDirection,
-            SlalomKind, SlalomParameters, Target,
+            AngleTarget, LengthTarget, RunKind, SearchKind, SlalomDirection, SlalomKind,
+            SlalomParameters, Target,
         };
         #[doc(no_inline)]
         pub use wall_manager::Wall;

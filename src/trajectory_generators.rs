@@ -26,7 +26,7 @@ pub use slalom_generator::{
     SlalomParametersGenerator, SlalomParametersGeneratorWithFrontOffset,
 };
 pub use spin_generator::SpinTrajectory;
-pub use trajectory::{AngleTarget, LengthTarget, MoveTarget, ShiftTrajectory, Target};
+pub use trajectory::{AngleTarget, LengthTarget, ShiftTrajectory, Target};
 
 #[derive(Clone, Copy, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct Pose {

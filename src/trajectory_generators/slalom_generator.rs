@@ -17,7 +17,7 @@ use super::straight_generator::{
     AngleOverallCalculator, AngleStraightCalculatorGenerator, StraightTrajectory,
     StraightTrajectoryGenerator,
 };
-use super::trajectory::{LengthTarget, MoveTarget, ShiftTrajectory, Target};
+use super::trajectory::{LengthTarget, ShiftTrajectory, Target};
 use crate::traits::Math;
 use crate::types::data::Pose;
 
@@ -285,7 +285,7 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
         let jy = self.v
             * (-sin_theta * AngularAcceleration::from(target.v * target.v) + cos_theta * target.a);
 
-        Some(Target::Moving(MoveTarget {
+        Some(Target {
             x: LengthTarget {
                 x,
                 v: vx,
@@ -299,7 +299,7 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
                 j: jy,
             },
             theta: target,
-        }))
+        })
     }
 
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
@@ -547,7 +547,6 @@ mod tests {
                 v_target,
             );
             for target in trajectory {
-                let target = target.moving().unwrap();
                 let v = target.x.v * target.theta.x.get::<radian>().cos()
                     + target.y.v * target.theta.x.get::<radian>().sin();
                 assert_relative_eq!(
@@ -576,7 +575,6 @@ mod tests {
         ) {
             let trajectory = get_curve_trajectory(tv,ta,tj,v_ref,period,v_target,x,y,theta,theta_dist);
             for target in trajectory {
-                let target = target.moving().unwrap();
                 let v = target.x.v * target.theta.x.get::<radian>().cos() + target.y.v * target.theta.x.get::<radian>().sin();
                 prop_assert!((v.abs().get::<meter_per_second>() - v_target).abs() < EPSILON);
             }

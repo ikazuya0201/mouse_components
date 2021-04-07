@@ -43,7 +43,7 @@ impl TrackingTrajectoryGenerator<RotationKind> for ReturnSetupTrajectoryGenerato
             Left => Angle::new::<degree>(90.0),
             Back => Angle::new::<degree>(180.0),
         };
-        self.spin_generator.generate(Default::default(), theta)
+        self.spin_generator.generate(theta)
     }
 }
 

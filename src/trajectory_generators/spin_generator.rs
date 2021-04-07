@@ -27,9 +27,9 @@ impl SpinGenerator {
 }
 
 impl SpinGenerator {
-    pub fn generate(&self, theta_start: Angle, theta_distance: Angle) -> SpinTrajectory {
+    pub fn generate(&self, theta_distance: Angle) -> SpinTrajectory {
         let (trajectory_fn, t_end) = self.function_generator.generate(
-            theta_start,
+            Default::default(),
             theta_distance,
             Default::default(),
             Default::default(),
@@ -66,7 +66,10 @@ impl Iterator for SpinTrajectory {
         }
         let t = self.t;
         self.t += self.period;
-        Some(Target::Spin(self.angle_calculator.calculate(t)))
+        Some(Target {
+            theta: self.angle_calculator.calculate(t),
+            ..Default::default()
+        })
     }
 
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
