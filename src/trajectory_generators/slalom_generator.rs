@@ -331,140 +331,184 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
     }
 }
 
-pub const DEFAULT_DTHETA: AngularVelocity = AngularVelocity {
-    value: 3.0 * PI,
-    dimension: PhantomData,
-    units: PhantomData,
-};
+pub struct DefaultSlalomParametersGenerator {
+    search90: [SlalomParameters; 2],
+    fast_run45: [SlalomParameters; 2],
+    fast_run45_rev: [SlalomParameters; 2],
+    fast_run90: [SlalomParameters; 2],
+    fast_run135: [SlalomParameters; 2],
+    fast_run135_rev: [SlalomParameters; 2],
+    fast_run180: [SlalomParameters; 2],
+    fast_run_diagonal90: [SlalomParameters; 2],
+}
 
-pub const DEFAULT_DDTHETA: AngularAcceleration = AngularAcceleration {
-    value: 36.0 * PI,
-    dimension: PhantomData,
-    units: PhantomData,
-};
+impl Default for DefaultSlalomParametersGenerator {
+    fn default() -> Self {
+        use uom::si::length::meter;
 
-pub const DEFAULT_DDDTHETA: AngularJerk = AngularJerk {
-    value: 1200.0 * PI,
-    dimension: PhantomData,
-    units: PhantomData,
-};
-
-fn into_parameters(
-    l_start: f32,
-    l_end: f32,
-    x_curve_end: f32,
-    y_curve_end: f32,
-    v_ref: f32,
-    theta: f32,
-    dir: SlalomDirection,
-) -> SlalomParameters {
-    use uom::si::{angle::degree, length::millimeter, velocity::millimeter_per_second};
-    use SlalomDirection::*;
-
-    let (y_curve_end, theta) = match dir {
-        Left => (y_curve_end, theta),
-        Right => (-y_curve_end, -theta),
-    };
-    SlalomParameters {
-        l_start: Length::new::<millimeter>(l_start),
-        l_end: Length::new::<millimeter>(l_end),
-        x_curve_end: Length::new::<millimeter>(x_curve_end),
-        y_curve_end: Length::new::<millimeter>(y_curve_end),
-        v_ref: Velocity::new::<millimeter_per_second>(v_ref),
-        theta: Angle::new::<degree>(theta),
-        dtheta: DEFAULT_DTHETA,
-        ddtheta: DEFAULT_DDTHETA,
-        dddtheta: DEFAULT_DDDTHETA,
+        Self::new(Length::new::<meter>(0.09), Default::default())
     }
 }
 
-pub struct DefaultSlalomParametersGenerator;
+impl DefaultSlalomParametersGenerator {
+    pub const DEFAULT_DTHETA: AngularVelocity = AngularVelocity {
+        value: 3.0 * PI,
+        dimension: PhantomData,
+        units: PhantomData,
+    };
+
+    pub const DEFAULT_DDTHETA: AngularAcceleration = AngularAcceleration {
+        value: 36.0 * PI,
+        dimension: PhantomData,
+        units: PhantomData,
+    };
+
+    pub const DEFAULT_DDDTHETA: AngularJerk = AngularJerk {
+        value: 1200.0 * PI,
+        dimension: PhantomData,
+        units: PhantomData,
+    };
+
+    pub fn new(square_width: Length, search_front_offset: Length) -> Self {
+        use uom::si::length::meter;
+        let search_front_offset = (search_front_offset / Length::new::<meter>(0.09)).value;
+        Self {
+            search90: if search_front_offset <= 0.055555556 {
+                Self::create_params(
+                    0.055555567 - search_front_offset,
+                    0.055555556 + search_front_offset,
+                    0.5 - search_front_offset,
+                    0.44444445,
+                    2.6843333,
+                    90.0,
+                    square_width,
+                )
+            } else {
+                Self::create_params(
+                    0.0,
+                    search_front_offset + search_front_offset,
+                    0.5 - search_front_offset,
+                    0.5 - search_front_offset,
+                    (0.5 - search_front_offset) * 6.03975,
+                    90.0,
+                    square_width,
+                )
+            },
+            fast_run45: Self::create_params(
+                0.02859611,
+                0.23570222,
+                0.8333333,
+                0.33333334,
+                4.5737333,
+                45.0,
+                square_width,
+            ),
+            fast_run45_rev: Self::create_params(
+                0.23570222,
+                0.02859611,
+                1.0404397,
+                0.3333329,
+                4.5737333,
+                45.0,
+                square_width,
+            ),
+            fast_run90: Self::create_params(
+                0.22222222,
+                0.22222222,
+                1.0,
+                0.7777778,
+                4.697589,
+                90.0,
+                square_width,
+            ),
+            fast_run135: Self::create_params(
+                0.24291888,
+                0.15713444,
+                0.6111111,
+                0.8888889,
+                3.928989,
+                135.0,
+                square_width,
+            ),
+            fast_run135_rev: Self::create_params(
+                0.15713444,
+                0.24291888,
+                0.52532303,
+                0.88889056,
+                3.928989,
+                135.0,
+                square_width,
+            ),
+            fast_run180: Self::create_params(
+                0.26666668,
+                0.26666668,
+                0.26666668,
+                1.0,
+                4.5803113,
+                180.0,
+                square_width,
+            ),
+            fast_run_diagonal90: Self::create_params(
+                0.17377333,
+                0.17377333,
+                0.70710665,
+                0.53333336,
+                3.2212,
+                90.0,
+                square_width,
+            ),
+        }
+    }
+
+    fn create_params(
+        l_start: f32,
+        l_end: f32,
+        x_curve_end: f32,
+        y_curve_end: f32,
+        v_ref: f32,
+        theta: f32,
+        square_width: Length,
+    ) -> [SlalomParameters; 2] {
+        use uom::si::{angle::degree, f32::Frequency, frequency::hertz};
+
+        let l_start = square_width * l_start;
+        let l_end = square_width * l_end;
+        let x_curve_end = square_width * x_curve_end;
+        let y_curve_end = square_width * y_curve_end;
+        let v_ref = square_width * Frequency::new::<hertz>(v_ref);
+        let theta = Angle::new::<degree>(theta);
+        let param = |y_curve_end, theta| SlalomParameters {
+            l_start,
+            l_end,
+            x_curve_end,
+            y_curve_end,
+            v_ref,
+            theta,
+            dtheta: Self::DEFAULT_DTHETA,
+            ddtheta: Self::DEFAULT_DDTHETA,
+            dddtheta: Self::DEFAULT_DDDTHETA,
+        };
+        [param(y_curve_end, theta), param(-y_curve_end, -theta)]
+    }
+}
 
 impl SlalomParametersGenerator for DefaultSlalomParametersGenerator {
     fn generate(&self, kind: SlalomKind, direction: SlalomDirection) -> SlalomParameters {
         use SlalomKind::*;
 
-        match kind {
-            Search90 => into_parameters(5.000001, 5.0, 45.0, 40.0, 241.59, 90.0, direction),
-            FastRun45 => into_parameters(2.57365, 21.2132, 75.0, 30.0, 411.636, 45.0, direction),
-            FastRun45Rev => into_parameters(
-                21.2132, 2.57365, 93.63957, 29.99996, 411.636, 45.0, direction,
-            ),
-            FastRun90 => into_parameters(20.0, 20.0, 90.0, 70.0, 422.783, 90.0, direction),
-            FastRun135 => into_parameters(21.8627, 14.1421, 55.0, 80.0, 353.609, 135.0, direction),
-            FastRun135Rev => into_parameters(
-                14.1421, 21.8627, 47.27907, 80.00015, 353.609, 135.0, direction,
-            ),
-            FastRun180 => into_parameters(24.0, 24.0, 24.0, 90.0, 412.228, 180.0, direction),
-            FastRunDiagonal90 => {
-                into_parameters(15.6396, 15.6396, 63.6396, 48.0, 289.908, 90.0, direction)
-            }
-        }
-    }
-}
-
-pub struct SlalomParametersGeneratorWithFrontOffset {
-    search90_param_right: SlalomParameters,
-    search90_param_left: SlalomParameters,
-}
-
-impl SlalomParametersGeneratorWithFrontOffset {
-    pub fn new(front_offset: Length) -> Self {
-        let x = front_offset.get::<uom::si::length::millimeter>();
-        let gen_params = |l_start: f32,
-                          l_end: f32,
-                          x_curve_end: f32,
-                          y_curve_end: f32,
-                          v_ref: f32,
-                          theta: f32| {
-            (
-                into_parameters(
-                    l_start,
-                    l_end,
-                    x_curve_end,
-                    y_curve_end,
-                    v_ref,
-                    theta,
-                    SlalomDirection::Right,
-                ),
-                into_parameters(
-                    l_start,
-                    l_end,
-                    x_curve_end,
-                    y_curve_end,
-                    v_ref,
-                    theta,
-                    SlalomDirection::Left,
-                ),
-            )
+        let direction = match direction {
+            SlalomDirection::Left => 0,
+            SlalomDirection::Right => 1,
         };
-        let search90_params = if x <= 5.0 {
-            gen_params(5.000001 - x, 5.0 + x, 45.0 - x, 40.0, 241.59, 90.0)
-        } else {
-            gen_params(
-                0.0,
-                x + x,
-                45.0 - x,
-                45.0 - x,
-                (45.0 - x) * 241.59 / 40.0,
-                90.0,
-            )
-        };
-        Self {
-            search90_param_right: search90_params.0,
-            search90_param_left: search90_params.1,
-        }
-    }
-}
-
-impl SlalomParametersGenerator for SlalomParametersGeneratorWithFrontOffset {
-    fn generate(&self, kind: SlalomKind, direction: SlalomDirection) -> SlalomParameters {
         match kind {
-            SlalomKind::Search90 => match direction {
-                SlalomDirection::Left => self.search90_param_left.clone(),
-                SlalomDirection::Right => self.search90_param_right.clone(),
-            },
-            _ => DefaultSlalomParametersGenerator.generate(kind, direction),
+            Search90 => self.search90[direction].clone(),
+            FastRun45 => self.fast_run45[direction].clone(),
+            FastRun45Rev => self.fast_run45_rev[direction].clone(),
+            FastRun90 => self.fast_run90[direction].clone(),
+            FastRun135 => self.fast_run135[direction].clone(),
+            FastRun135Rev => self.fast_run135_rev[direction].clone(),
+            FastRun180 => self.fast_run180[direction].clone(),
+            FastRunDiagonal90 => self.fast_run_diagonal90[direction].clone(),
         }
     }
 }
@@ -508,7 +552,7 @@ mod tests {
 
         let generator = SlalomGenerator::new(
             period,
-            DefaultSlalomParametersGenerator,
+            DefaultSlalomParametersGenerator::default(),
             Velocity::new::<meter_per_second>(1.0),
             Acceleration::new::<meter_per_second_squared>(1.0),
             Jerk::new::<meter_per_second_cubed>(1.0),
@@ -534,7 +578,7 @@ mod tests {
 
             let generator = SlalomGenerator::<MathFake, DefaultSlalomParametersGenerator>::new(
                 Time::new::<second>(0.001),
-                DefaultSlalomParametersGenerator,
+                DefaultSlalomParametersGenerator::default(),
                 Velocity::new::<meter_per_second>(1.0),
                 Acceleration::new::<meter_per_second_squared>(1.0),
                 Jerk::new::<meter_per_second_cubed>(1.0),

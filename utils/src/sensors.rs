@@ -11,7 +11,7 @@ use components::{
     },
     types::data::{Pose, RobotState},
     utils::{probability::Probability, sample::Sample},
-    wall_detector::{ConversionError, PoseConverter},
+    wall_detector::{ConversionError, PoseConverter, PoseConverterBuilder},
     wall_manager::WallManager,
 };
 use generic_array::ArrayLength;
@@ -76,6 +76,10 @@ where
         self,
         wheel_interval: Length,
         max_voltage: ElectricPotential,
+        square_width: Length,
+        wall_width: Length,
+        ignore_radius_from_pillar: Length,
+        ignore_length_from_wall: Length,
     ) -> (
         Stepper,
         Observer,
@@ -93,7 +97,13 @@ where
                 inner: Rc::clone(&self.inner),
                 pose: pose.clone(),
                 wall_storage: Rc::clone(&self.wall_storage),
-                pose_converter: Default::default(),
+                pose_converter: PoseConverterBuilder::new()
+                    .square_width(square_width)
+                    .wall_width(wall_width)
+                    .ignore_radius_from_pillar(ignore_radius_from_pillar)
+                    .ignore_length_from_wall(ignore_length_from_wall)
+                    .build()
+                    .unwrap(),
             })
             .collect();
         (

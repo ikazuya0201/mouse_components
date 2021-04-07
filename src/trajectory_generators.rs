@@ -23,7 +23,7 @@ pub use search_trajectory_generator::{
 };
 pub use slalom_generator::{
     DefaultSlalomParametersGenerator, SlalomDirection, SlalomKind, SlalomParameters,
-    SlalomParametersGenerator, SlalomParametersGeneratorWithFrontOffset,
+    SlalomParametersGenerator,
 };
 pub use spin_generator::SpinTrajectory;
 pub use trajectory::{AngleTarget, LengthTarget, ShiftTrajectory, Target};

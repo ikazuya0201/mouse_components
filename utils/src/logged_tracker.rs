@@ -2,6 +2,7 @@ extern crate std;
 
 use components::robot::Tracker as ITracker;
 use serde::Serialize;
+use std::cell::RefCell;
 use std::vec::Vec;
 
 #[derive(Serialize)]
@@ -12,11 +13,11 @@ pub struct Log<State, Target> {
 
 pub struct JsonLoggedTracker<'a, State, Target, Tracker> {
     tracker: Tracker,
-    logs: &'a mut Vec<Log<State, Target>>,
+    logs: &'a RefCell<Vec<Log<State, Target>>>,
 }
 
 impl<'a, State, Target, Tracker> JsonLoggedTracker<'a, State, Target, Tracker> {
-    pub fn new(tracker: Tracker, logs: &'a mut Vec<Log<State, Target>>) -> Self {
+    pub fn new(tracker: Tracker, logs: &'a RefCell<Vec<Log<State, Target>>>) -> Self {
         Self { tracker, logs }
     }
 }
@@ -31,7 +32,7 @@ where
     type Error = Tracker::Error;
 
     fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error> {
-        self.logs.push(Log {
+        self.logs.borrow_mut().push(Log {
             state: state.clone(),
             target: target.clone(),
         });
