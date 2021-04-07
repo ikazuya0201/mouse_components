@@ -206,6 +206,7 @@ where
         .max_velocity(*config.max_velocity())
         .max_jerk(*config.max_jerk())
         .run_slalom_velocity(*config.run_slalom_velocity())
+        .square_width(*config.square_width())
         .build()
         .expect("Should never panic")
 }

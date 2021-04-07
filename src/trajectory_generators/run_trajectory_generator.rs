@@ -2,10 +2,7 @@ use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
-use uom::si::{
-    f32::{Acceleration, Jerk, Length, Time, Velocity},
-    length::meter,
-};
+use uom::si::f32::{Acceleration, Jerk, Length, Time, Velocity};
 
 use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParametersGenerator};
 use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
@@ -31,7 +28,11 @@ pub struct RunTrajectoryGenerator<M, Generator> {
     run_slalom_velocity: Velocity,
     straight_generator: StraightTrajectoryGenerator,
     slalom_generator: SlalomGenerator<M, Generator>,
+    square_width: Length,
+    square_diagonal_half: Length,
 }
+
+const HALF_DIAGONAL: f32 = 0.70710677;
 
 impl<M, Generator> RunTrajectoryGenerator<M, Generator>
 where
@@ -45,6 +46,7 @@ where
         max_jerk: Jerk,
         generator: Generator,
         period: Time,
+        square_width: Length,
     ) -> Self {
         let straight_generator =
             StraightTrajectoryGenerator::new(max_velocity, max_acceleration, max_jerk, period);
@@ -55,6 +57,8 @@ where
             run_slalom_velocity,
             straight_generator,
             slalom_generator,
+            square_width,
+            square_diagonal_half: square_width * HALF_DIAGONAL,
         }
     }
 }
@@ -139,11 +143,11 @@ where
         };
         let (trajectory, terminal_velocity) = match kind {
             RunKind::Straight(len) => {
-                let distance = len as f32 * Length::new::<meter>(0.09);
+                let distance = len as f32 * self.square_width;
                 generate_straight(distance)
             }
             RunKind::StraightDiagonal(len) => {
-                let distance = len as f32 * Length::new::<meter>(0.0636396);
+                let distance = len as f32 * self.square_diagonal_half;
                 generate_straight(distance)
             }
             RunKind::Slalom(kind, dir) => {
@@ -169,6 +173,7 @@ pub struct RunTrajectoryGeneratorBuilder<M, Generator> {
     max_jerk: Option<Jerk>,
     parameters_generator: Option<Generator>,
     period: Option<Time>,
+    square_width: Option<Length>,
     _math: PhantomData<fn() -> M>,
 }
 
@@ -187,6 +192,7 @@ impl<M, Generator> RunTrajectoryGeneratorBuilder<M, Generator> {
             max_jerk: None,
             parameters_generator: None,
             period: None,
+            square_width: None,
             _math: PhantomData,
         }
     }
@@ -203,6 +209,7 @@ impl<M, Generator> RunTrajectoryGeneratorBuilder<M, Generator> {
             get_or_err!(self.max_jerk),
             get_or_err!(self.parameters_generator),
             get_or_err!(self.period),
+            get_or_err!(self.square_width),
         ))
     }
 
@@ -212,4 +219,5 @@ impl<M, Generator> RunTrajectoryGeneratorBuilder<M, Generator> {
     impl_setter!(max_jerk: Jerk);
     impl_setter!(period: Time);
     impl_setter!(parameters_generator: Generator);
+    impl_setter!(square_width: Length);
 }

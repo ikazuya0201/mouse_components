@@ -205,6 +205,7 @@ macro_rules! impl_run_operator_test {
                         .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
                         .parameters_generator(DefaultSlalomParametersGenerator)
                         .run_slalom_velocity(Velocity::new::<meter_per_second>(0.5))
+                        .square_width(Length::new::<meter>(0.09))
                         .build()
                         .expect("Should never panic");
                     TrackingTrajectoryManager::new(
