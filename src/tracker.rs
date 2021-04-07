@@ -174,11 +174,18 @@ where
         } else {
             let (sin_th_r, cos_th_r) = M::sincos(target.theta.x);
             let theta_d = {
+                use core::f32::consts::{PI, TAU};
+
                 let theta_d = target.theta.x - state.theta.x;
-                Angle::new::<radian>(
-                    crate::utils::math::rem_euclidf(theta_d.value, core::f32::consts::TAU)
-                        - core::f32::consts::PI,
-                )
+                let theta_d_raw = crate::utils::math::rem_euclidf(theta_d.value, TAU);
+
+                //map to [-PI, PI]
+                let theta_d_raw = if theta_d_raw > PI {
+                    TAU - theta_d_raw
+                } else {
+                    theta_d_raw
+                };
+                Angle::new::<radian>(theta_d_raw)
             };
             let cos_th_d = M::cos(theta_d);
             let xd = target.x.x - state.x.x;
