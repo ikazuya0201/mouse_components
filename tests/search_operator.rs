@@ -108,6 +108,9 @@ macro_rules! impl_search_operator_test {
                     distance_sensors,
                 ) = simulator.split(wheel_interval, ElectricPotential::new::<volt>(3.7));
 
+                #[cfg(feature = "log_test")]
+                let mut logs = Vec::new();
+
                 let agent = {
                     let robot = {
                         let estimator = {
@@ -168,10 +171,7 @@ macro_rules! impl_search_operator_test {
                             }
                             #[cfg(feature = "log_test")]
                             {
-                                utils::logged_tracker::JsonLoggedTracker::new(
-                                    std::io::stdout(),
-                                    tracker,
-                                )
+                                utils::logged_tracker::JsonLoggedTracker::new(tracker, &mut logs)
                             }
                         };
 
@@ -235,20 +235,28 @@ macro_rules! impl_search_operator_test {
                 let commander = create_commander(&wall_manager);
                 let expected_commander = create_commander(&expected_wall_manager);
 
-                #[cfg(feature = "log_test")]
-                write!(std::io::stdout(), "[").unwrap();
                 let operator = TrackingOperator::new(commander, agent);
                 while operator.run().is_err() {
                     stepper.step();
                     operator.tick().expect("Fail safe should never invoke");
                 }
-                #[cfg(feature = "log_test")]
-                write!(std::io::stdout(), "]").unwrap();
+
                 let commander = create_commander(&wall_manager);
                 assert_eq!(
                     commander.compute_shortest_path(),
                     expected_commander.compute_shortest_path()
                 );
+
+                #[cfg(feature = "log_test")]
+                {
+                    std::mem::drop(operator);
+                    writeln!(
+                        std::io::stdout(),
+                        "{}",
+                        serde_json::to_string(&logs).unwrap()
+                    )
+                    .unwrap();
+                }
             }
 
             #[ignore]
