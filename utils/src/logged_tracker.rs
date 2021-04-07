@@ -2,45 +2,39 @@ extern crate std;
 
 use components::robot::Tracker as ITracker;
 use serde::Serialize;
+use std::vec::Vec;
 
-pub struct JsonLoggedTracker<Logger, Tracker> {
-    logger: Logger,
-    tracker: Tracker,
+#[derive(Serialize)]
+pub struct Log<State, Target> {
+    state: State,
+    target: Target,
 }
 
-impl<Logger, Tracker> JsonLoggedTracker<Logger, Tracker> {
-    pub fn new(logger: Logger, tracker: Tracker) -> Self {
-        Self { logger, tracker }
+pub struct JsonLoggedTracker<'a, State, Target, Tracker> {
+    tracker: Tracker,
+    logs: &'a mut Vec<Log<State, Target>>,
+}
+
+impl<'a, State, Target, Tracker> JsonLoggedTracker<'a, State, Target, Tracker> {
+    pub fn new(tracker: Tracker, logs: &'a mut Vec<Log<State, Target>>) -> Self {
+        Self { tracker, logs }
     }
 }
 
-impl<Logger, Tracker, State, Target> ITracker<State, Target> for JsonLoggedTracker<Logger, Tracker>
+impl<'a, Tracker, State, Target> ITracker<State, Target>
+    for JsonLoggedTracker<'a, State, Target, Tracker>
 where
-    Logger: std::io::Write,
+    State: Clone,
+    Target: Clone,
     Tracker: ITracker<State, Target>,
-    State: Serialize,
-    Target: Serialize,
 {
     type Error = Tracker::Error;
 
     fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error> {
-        #[derive(Serialize)]
-        struct Log<'a, State, Target> {
-            state: &'a State,
-            target: &'a Target,
-        }
-
-        self.logger
-            .write_all(
-                std::format!(
-                    "{},",
-                    serde_json::to_string(&Log { state, target })
-                        .unwrap()
-                        .as_str()
-                )
-                .as_bytes(),
-            )
-            .unwrap();
+        self.logs.push(Log {
+            state: state.clone(),
+            target: target.clone(),
+        });
         self.tracker.track(state, target)
     }
 }
