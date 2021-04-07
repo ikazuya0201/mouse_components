@@ -446,6 +446,40 @@ where
     }
 }
 
+pub struct PoseConverterBuilder {
+    square_width: Option<Length>,
+    wall_width: Option<Length>,
+    ignore_radius_from_pillar: Option<Length>,
+    ignore_length_from_wall: Option<Length>,
+}
+
+impl PoseConverterBuilder {
+    pub fn new() -> Self {
+        Self {
+            square_width: None,
+            wall_width: None,
+            ignore_radius_from_pillar: None,
+            ignore_length_from_wall: None,
+        }
+    }
+
+    impl_setter!(square_width: Length);
+    impl_setter!(wall_width: Length);
+    impl_setter!(ignore_length_from_wall: Length);
+    impl_setter!(ignore_radius_from_pillar: Length);
+
+    pub fn build<M, N>(&mut self) -> BuilderResult<PoseConverter<M, N>> {
+        Ok(PoseConverter::new(
+            self.square_width.unwrap_or(DEFAULT_SQUARE_WIDTH),
+            self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
+            self.ignore_radius_from_pillar
+                .unwrap_or(DEFAULT_IGNORE_RADIUS),
+            self.ignore_length_from_wall
+                .unwrap_or(DEFAULT_IGNORE_LENGTH),
+        ))
+    }
+}
+
 pub struct WallDetectorBuilder<'a, Manager, Detector> {
     wall_manager: Option<&'a Manager>,
     obstacle_detector: Option<Detector>,

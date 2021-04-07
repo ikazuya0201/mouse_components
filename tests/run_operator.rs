@@ -1,7 +1,7 @@
 extern crate std;
 
 #[cfg(feature = "log_test")]
-use std::io::Write;
+use std::{cell::RefCell, io::Write};
 
 use components::{
     agents::TrackingAgent,
@@ -45,13 +45,20 @@ macro_rules! impl_run_operator_test {
     ($name: ident < $size: ty > { $input: expr, }) => {
         #[test]
         fn $name() {
+            let (input_str, goals, square_width) = $input;
+
+            let square_width = Length::new::<meter>(square_width);
+            let wall_width = Length::new::<meter>(0.006);
+            let ignore_radius_from_pillar = Length::new::<meter>(0.01);
+            let ignore_length_from_wall = Length::new::<meter>(0.008);
+
             let start_state = RobotState {
                 x: LengthState {
-                    x: Length::new::<millimeter>(45.0),
+                    x: square_width / 2.0,
                     ..Default::default()
                 },
                 y: LengthState {
-                    x: Length::new::<millimeter>(45.0),
+                    x: square_width / 2.0,
                     ..Default::default()
                 },
                 theta: AngleState {
@@ -94,8 +101,6 @@ macro_rules! impl_run_operator_test {
             let existence_threshold = Probability::new(0.1).unwrap();
             let wheel_interval = Length::new::<millimeter>(33.5);
 
-            let (input_str, goals) = $input;
-
             let wall_storage = WallManager::<$size>::with_str(existence_threshold, input_str);
 
             let simulator = AgentSimulator::new(
@@ -118,10 +123,17 @@ macro_rules! impl_run_operator_test {
                 right_motor,
                 left_motor,
                 distance_sensors,
-            ) = simulator.split(wheel_interval, ElectricPotential::new::<volt>(3.7));
+            ) = simulator.split(
+                wheel_interval,
+                ElectricPotential::new::<volt>(3.7),
+                square_width,
+                wall_width,
+                ignore_radius_from_pillar,
+                ignore_length_from_wall,
+            );
 
             #[cfg(feature = "log_test")]
-            let mut logs = Vec::new();
+            let logs = RefCell::new(Vec::new());
 
             let agent = {
                 let robot = {
@@ -182,7 +194,7 @@ macro_rules! impl_run_operator_test {
                         }
                         #[cfg(feature = "log_test")]
                         {
-                            utils::logged_tracker::JsonLoggedTracker::new(tracker, &mut logs)
+                            utils::logged_tracker::JsonLoggedTracker::new(tracker, &logs)
                         }
                     };
 
@@ -203,13 +215,17 @@ macro_rules! impl_run_operator_test {
                         .max_velocity(Velocity::new::<meter_per_second>(1.0))
                         .max_acceleration(Acceleration::new::<meter_per_second_squared>(50.0))
                         .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
-                        .parameters_generator(DefaultSlalomParametersGenerator)
+                        .parameters_generator(DefaultSlalomParametersGenerator::new(
+                            square_width,
+                            Default::default(),
+                        ))
                         .run_slalom_velocity(Velocity::new::<meter_per_second>(0.5))
+                        .square_width(square_width)
                         .build()
                         .expect("Should never panic");
                     TrackingTrajectoryManager::new(
                         trajectory_generator,
-                        CommandConverter::default(),
+                        CommandConverter::new(square_width, Default::default()),
                     )
                 };
                 TrackingAgent::new(trajectory_manager, robot)
@@ -232,21 +248,30 @@ macro_rules! impl_run_operator_test {
             };
 
             let operator = TrackingOperator::new(commander, agent);
-            while operator.run().is_err() {
-                stepper.step();
-                operator.tick().expect("Should never panic");
-            }
 
             #[cfg(feature = "log_test")]
-            {
-                std::mem::drop(operator);
+            let output_log = || {
+                use std::ops::Deref;
+
                 writeln!(
                     std::io::stdout(),
                     "{}",
-                    serde_json::to_string(&logs).unwrap()
+                    serde_json::to_string(logs.borrow().deref()).unwrap()
                 )
                 .unwrap();
+            };
+
+            while operator.run().is_err() {
+                stepper.step();
+                if let Err(err) = operator.tick() {
+                    #[cfg(feature = "log_test")]
+                    output_log();
+                    panic!("Should never panic: {:?}", err);
+                }
             }
+
+            #[cfg(feature = "log_test")]
+            output_log();
         }
     };
 }
@@ -259,6 +284,7 @@ impl_run_operator_test! {
                 (2, 0, South),
                 (2, 0, West),
             ],
+            0.09,
         ),
     }
 }
@@ -273,6 +299,7 @@ impl_run_operator_test! {
                 (15, 16, NorthWest),
                 (15, 16, NorthEast)
             ],
+            0.09,
         ),
     }
 }
@@ -282,6 +309,7 @@ impl_run_operator_test! {
         (
             include_str!("../mazes/maze3.dat"),
             vec![(2, 0, South), (2, 0, West)],
+            0.09,
         ),
     }
 }
@@ -291,6 +319,17 @@ impl_run_operator_test! {
         (
             include_str!("../mazes/maze4.dat"),
             vec![(2, 0, South), (2, 0, West)],
+            0.09,
+        ),
+    }
+}
+
+impl_run_operator_test! {
+    test_run_operator_with_classic_size<U4> {
+        (
+            include_str!("../mazes/maze1.dat"),
+            vec![(2, 0, South), (2, 0, West)],
+            0.18,
         ),
     }
 }

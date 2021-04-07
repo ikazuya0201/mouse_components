@@ -384,7 +384,7 @@ mod tests {
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
-            .parameters_generator(DefaultSlalomParametersGenerator)
+            .parameters_generator(DefaultSlalomParametersGenerator::default())
             .period(Time::new::<second>(0.001))
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
             .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
@@ -417,7 +417,7 @@ mod tests {
                     .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
                     .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
                     .search_velocity(search_velocity)
-                    .parameters_generator(DefaultSlalomParametersGenerator)
+                    .parameters_generator(DefaultSlalomParametersGenerator::default())
                     .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
                     .spin_angular_acceleration(
                         AngularAcceleration::new::<degree_per_second_squared>(90.0),

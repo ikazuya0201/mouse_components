@@ -20,9 +20,9 @@ use crate::obstacle_detector::Vec;
 use crate::sensors::{Encoder, Motor, IMU};
 use crate::tracker::{Tracker, TrackerBuilder};
 use crate::trajectory_generators::{
-    ReturnSetupTrajectoryGenerator, RunKind, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
-    SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
-    SlalomParametersGeneratorWithFrontOffset,
+    DefaultSlalomParametersGenerator, ReturnSetupTrajectoryGenerator, RunKind,
+    RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder, SearchTrajectoryGenerator,
+    SearchTrajectoryGeneratorBuilder,
 };
 use crate::trajectory_managers::{SearchTrajectoryManager, TrackingTrajectoryManager};
 use crate::utils::probability::Probability;
@@ -181,7 +181,8 @@ where
         .max_acceleration(*config.max_acceleration())
         .front_offset(*config.front_offset())
         .search_velocity(*config.search_velocity())
-        .parameters_generator(SlalomParametersGeneratorWithFrontOffset::new(
+        .parameters_generator(DefaultSlalomParametersGenerator::new(
+            *config.square_width(),
             *config.front_offset(),
         ))
         .spin_angular_jerk(*config.spin_angular_jerk())
@@ -193,19 +194,21 @@ where
 
 pub fn init_run_trajectory_generator<'a, Math, Size>(
     config: &Config<Size>,
-) -> RunTrajectoryGenerator<Math, SlalomParametersGeneratorWithFrontOffset>
+) -> RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>
 where
     Math: crate::utils::math::Math,
 {
     RunTrajectoryGeneratorBuilder::new()
         .period(*config.period())
-        .parameters_generator(SlalomParametersGeneratorWithFrontOffset::new(
+        .parameters_generator(DefaultSlalomParametersGenerator::new(
+            *config.square_width(),
             *config.front_offset(),
         ))
         .max_acceleration(*config.max_acceleration())
         .max_velocity(*config.max_velocity())
         .max_jerk(*config.max_jerk())
         .run_slalom_velocity(*config.run_slalom_velocity())
+        .square_width(*config.square_width())
         .build()
         .expect("Should never panic")
 }

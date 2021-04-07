@@ -47,7 +47,7 @@ pub type RunAgent<
     trajectory_managers::TrackingTrajectoryManager<
         trajectory_generators::RunTrajectoryGenerator<
             Math,
-            trajectory_generators::SlalomParametersGeneratorWithFrontOffset,
+            trajectory_generators::DefaultSlalomParametersGenerator,
         >,
         command_converter::CommandConverter,
         types::data::Target,

@@ -519,7 +519,7 @@ mod tests {
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
             .period(PERIOD)
             .search_velocity(Velocity::new::<meter_per_second>(0.6))
-            .parameters_generator(DefaultSlalomParametersGenerator)
+            .parameters_generator(DefaultSlalomParametersGenerator::default())
             .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
             .spin_angular_acceleration(AngularAcceleration::new::<degree_per_second_squared>(90.0))
             .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(180.0))

@@ -1,5 +1,5 @@
 #[cfg(feature = "log_test")]
-use std::io::Write;
+use std::{cell::RefCell, io::Write};
 
 use components::{
     agents::TrackingAgent,
@@ -14,9 +14,7 @@ use components::{
     pattern_converters::LinearPatternConverter,
     robot::Robot,
     tracker::TrackerBuilder,
-    trajectory_generators::{
-        SearchTrajectoryGeneratorBuilder, SlalomParametersGeneratorWithFrontOffset,
-    },
+    trajectory_generators::{DefaultSlalomParametersGenerator, SearchTrajectoryGeneratorBuilder},
     trajectory_managers::SearchTrajectoryManager,
     types::data::{AbsoluteDirection, AngleState, LengthState, Pose, RobotState, SearchKind},
     utils::probability::Probability,
@@ -86,6 +84,11 @@ macro_rules! impl_search_operator_test {
                     WallManager::<Size>::with_str(existence_threshold, input_str);
                 let wall_manager = WallManager::<Size>::new(existence_threshold);
 
+                let square_width = Length::new::<meter>(0.09);
+                let wall_width = Length::new::<meter>(0.006);
+                let ignore_radius_from_pillar = Length::new::<meter>(0.01);
+                let ignore_length_from_wall = Length::new::<meter>(0.008);
+
                 let simulator = AgentSimulator::new(
                     start_state.clone(),
                     period,
@@ -106,10 +109,17 @@ macro_rules! impl_search_operator_test {
                     right_motor,
                     left_motor,
                     distance_sensors,
-                ) = simulator.split(wheel_interval, ElectricPotential::new::<volt>(3.7));
+                ) = simulator.split(
+                    wheel_interval,
+                    ElectricPotential::new::<volt>(3.7),
+                    square_width,
+                    wall_width,
+                    ignore_radius_from_pillar,
+                    ignore_length_from_wall,
+                );
 
                 #[cfg(feature = "log_test")]
-                let mut logs = Vec::new();
+                let logs = RefCell::new(Vec::new());
 
                 let agent = {
                     let robot = {
@@ -171,7 +181,7 @@ macro_rules! impl_search_operator_test {
                             }
                             #[cfg(feature = "log_test")]
                             {
-                                utils::logged_tracker::JsonLoggedTracker::new(tracker, &mut logs)
+                                utils::logged_tracker::JsonLoggedTracker::new(tracker, &logs)
                             }
                         };
 
@@ -195,7 +205,8 @@ macro_rules! impl_search_operator_test {
                         .max_acceleration(Acceleration::new::<meter_per_second_squared>(20.0))
                         .max_jerk(Jerk::new::<meter_per_second_cubed>(40.0))
                         .search_velocity(search_velocity)
-                        .parameters_generator(SlalomParametersGeneratorWithFrontOffset::new(
+                        .parameters_generator(DefaultSlalomParametersGenerator::new(
+                            square_width,
                             front_offset,
                         ))
                         .front_offset(front_offset)
@@ -235,10 +246,26 @@ macro_rules! impl_search_operator_test {
                 let commander = create_commander(&wall_manager);
                 let expected_commander = create_commander(&expected_wall_manager);
 
+                #[cfg(feature = "log_test")]
+                let output_log = || {
+                    use std::ops::Deref;
+
+                    writeln!(
+                        std::io::stdout(),
+                        "{}",
+                        serde_json::to_string(logs.borrow().deref()).unwrap()
+                    )
+                    .unwrap();
+                };
+
                 let operator = TrackingOperator::new(commander, agent);
                 while operator.run().is_err() {
                     stepper.step();
-                    operator.tick().expect("Fail safe should never invoke");
+                    if let Err(err) = operator.tick() {
+                        #[cfg(feature = "log_test")]
+                        output_log();
+                        panic!("Should never panic: {:?}", err);
+                    }
                 }
 
                 let commander = create_commander(&wall_manager);
@@ -248,15 +275,7 @@ macro_rules! impl_search_operator_test {
                 );
 
                 #[cfg(feature = "log_test")]
-                {
-                    std::mem::drop(operator);
-                    writeln!(
-                        std::io::stdout(),
-                        "{}",
-                        serde_json::to_string(&logs).unwrap()
-                    )
-                    .unwrap();
-                }
+                output_log();
             }
 
             #[ignore]
