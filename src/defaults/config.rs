@@ -7,7 +7,7 @@ use uom::si::f32::{
     Velocity,
 };
 
-use crate::commanders::GoalSizeUpperBound;
+use crate::commanders::GOAL_SIZE_UPPER_BOUND;
 use crate::impl_setter;
 use crate::impl_with_getter;
 use crate::nodes::RunNode;
@@ -41,7 +41,7 @@ impl_with_getter! {
         front_offset: Length,
         start: RunNode<N>,
         return_goal: RunNode<N>,
-        goals: Vec<RunNode<N>,GoalSizeUpperBound>,
+        goals: Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>,
         search_initial_route: SearchKind,
         search_final_route: SearchKind,
         translational_kp: f32,
@@ -163,7 +163,7 @@ pub struct ConfigBuilder<const N: usize> {
     front_offset: Option<Length>,
     start: Option<RunNode<N>>,
     return_goal: Option<RunNode<N>>,
-    goals: Option<Vec<RunNode<N>, GoalSizeUpperBound>>,
+    goals: Option<Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>>,
     search_initial_route: Option<SearchKind>,
     search_final_route: Option<SearchKind>,
     translational_kp: Option<f32>,
@@ -230,7 +230,7 @@ impl<const N: usize> ConfigBuilder<N> {
     impl_setter!(
         /// **Required**,
         /// Sets the goal nodes for search.
-        goals: Vec<RunNode<N>, GoalSizeUpperBound>
+        goals: Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>
     );
     impl_setter!(
         /// **Required**,

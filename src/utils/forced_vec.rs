@@ -1,14 +1,9 @@
-use heapless::{ArrayLength, Vec};
+use heapless::Vec;
 
 #[derive(Clone, Debug)]
-pub(crate) struct ForcedVec<T, N>(Vec<T, N>)
-where
-    N: ArrayLength<T>;
+pub(crate) struct ForcedVec<T, const N: usize>(Vec<T, N>);
 
-impl<T, N> ForcedVec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> ForcedVec<T, N> {
     pub fn new() -> Self {
         ForcedVec(Vec::new())
     }
@@ -20,10 +15,7 @@ where
     }
 }
 
-impl<T, N> core::ops::Deref for ForcedVec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> core::ops::Deref for ForcedVec<T, N> {
     type Target = Vec<T, N>;
 
     fn deref(&self) -> &Self::Target {
@@ -32,20 +24,14 @@ where
     }
 }
 
-impl<T, N> core::ops::DerefMut for ForcedVec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> core::ops::DerefMut for ForcedVec<T, N> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         use core::borrow::BorrowMut;
         self.0.borrow_mut()
     }
 }
 
-impl<T, N> Into<Vec<T, N>> for ForcedVec<T, N>
-where
-    N: ArrayLength<T>,
-{
+impl<T, const N: usize> Into<Vec<T, N>> for ForcedVec<T, N> {
     fn into(self) -> Vec<T, N> {
         self.0
     }

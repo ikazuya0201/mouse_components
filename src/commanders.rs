@@ -4,13 +4,11 @@ mod return_setup_commander;
 mod run_commander;
 mod search_commander;
 
-use generic_array::GenericArray;
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num::{Bounded, Saturating};
-use typenum::{consts::*, op, Unsigned, __op_internal__};
 
-use crate::utils::{forced_vec::ForcedVec, itertools::repeat_n};
-use crate::MazeWidthUpperBound;
+use crate::utils::forced_vec::ForcedVec;
+use crate::MAZE_WIDTH_UPPER_BOUND;
 pub use return_setup_commander::{ReturnSetupCommander, ReturnSetupCommanderError, RotationNode};
 pub use run_commander::{RunCommand, RunCommander, RunCommanderError};
 pub use search_commander::{NextNode, NodeChecker, SearchCommander, UncheckedNodeFinder};
@@ -32,7 +30,7 @@ pub trait RouteNode {
     fn route(&self, to: &Self) -> Result<Self::Route, Self::Error>;
 }
 
-pub type GoalSizeUpperBound = U8;
+pub(crate) const GOAL_SIZE_UPPER_BOUND: usize = 8;
 
 #[derive(Debug)]
 struct CostNode<Cost, Node>(Cost, Node);
@@ -57,34 +55,35 @@ impl<Cost: Ord, Node> Ord for CostNode<Cost, Node> {
     }
 }
 
-pub(crate) type PathUpperBound = op!(MazeWidthUpperBound * MazeWidthUpperBound); // Fixed upper bound of path length to 16x16.
+pub(crate) const PATH_UPPER_BOUND: usize = MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
-pub(crate) type NodeNumberUpperBound = op!(U16 * MazeWidthUpperBound * MazeWidthUpperBound); // Fixed upper bound of path length to 16x16x16.
+pub(crate) const NODE_NUMBER_UPPER_BOUND: usize =
+    16 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
 fn compute_shortest_path<Node, Maze>(
     start: &Node,
     goals: &[Node],
     maze: &Maze,
-) -> Option<Vec<Node, PathUpperBound>>
+) -> Option<Vec<Node, PATH_UPPER_BOUND>>
 where
     Node: Clone + Into<usize> + PartialEq,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
-    let mut dists = repeat_n(Maze::Cost::max_value(), NodeNumberUpperBound::USIZE)
-        .collect::<GenericArray<_, NodeNumberUpperBound>>();
+    let mut dists = [Maze::Cost::max_value(); NODE_NUMBER_UPPER_BOUND];
     dists[start.clone().into()] = Maze::Cost::min_value();
 
-    let mut prev = repeat_n(None, NodeNumberUpperBound::USIZE)
-        .collect::<GenericArray<Option<Node>, NodeNumberUpperBound>>();
+    let mut prev = core::iter::repeat(None)
+        .take(NODE_NUMBER_UPPER_BOUND)
+        .collect::<Vec<_, NODE_NUMBER_UPPER_BOUND>>();
 
-    let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node>, NodeNumberUpperBound, Min>::new();
+    let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node>, Min, NODE_NUMBER_UPPER_BOUND>::new();
     heap.push(CostNode(Maze::Cost::min_value(), start.clone()))
         .unwrap_or_else(|_| {
             unreachable!("The length of binary heap should never exceed the upper bound")
         });
 
-    let construct_path = |goal: Node, prev: GenericArray<Option<Node>, NodeNumberUpperBound>| {
+    let construct_path = |goal: Node, prev: &[Option<Node>]| {
         let mut current = prev[goal.clone().into()].clone()?;
         let mut path = ForcedVec::new();
         path.push(goal);
@@ -104,7 +103,7 @@ where
     while let Some(CostNode(cost, node)) = heap.pop() {
         for goal in goals.iter() {
             if &node == goal {
-                return construct_path(goal.clone(), prev);
+                return construct_path(goal.clone(), &prev);
             }
         }
         for (next, edge_cost) in maze.successors(&node) {

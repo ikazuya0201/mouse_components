@@ -3,18 +3,18 @@
 
 use core::fmt;
 
-use generic_array::GenericArray;
+use heapless::Vec;
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
-use typenum::{Unsigned, __op_internal__, consts::*, op};
 
 use crate::mazes::WallChecker;
 use crate::nodes::SearchNode;
-use crate::utils::{itertools::repeat_n, probability::Probability};
+use crate::utils::probability::Probability;
 use crate::wall_detector::WallProbabilityManager;
-use crate::MazeWidthUpperBound;
+use crate::MAZE_WIDTH_UPPER_BOUND;
 
-pub(crate) type WallNumberUpperBound = op!(U2 * MazeWidthUpperBound * MazeWidthUpperBound); // Fixed to 16x16 mazes.
+pub(crate) const WALL_NUMBER_UPPER_BOUND: usize =
+    2 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Wall<const N: usize> {
@@ -99,7 +99,7 @@ impl<const N: usize> Wall<N> {
 }
 
 pub struct WallManager<const N: usize> {
-    walls: GenericArray<Mutex<Probability>, WallNumberUpperBound>,
+    walls: Vec<Mutex<Probability>, WALL_NUMBER_UPPER_BOUND>,
     existence_threshold: Probability,
 }
 
@@ -155,9 +155,12 @@ impl<const N: usize> fmt::Display for WallManager<N> {
 
 impl<const N: usize> WallManager<N> {
     fn _new(existence_threshold: Probability) -> Self {
-        let walls = repeat_n(0.5, WallNumberUpperBound::USIZE)
-            .map(|p| Mutex::new(unsafe { Probability::new_unchecked(p) }))
-            .collect();
+        let walls = core::iter::repeat_with(|| {
+            Mutex::new(Probability::new(0.5).expect("Should never panic"))
+        })
+        .take(WALL_NUMBER_UPPER_BOUND)
+        .collect();
+
         Self {
             walls,
             existence_threshold,

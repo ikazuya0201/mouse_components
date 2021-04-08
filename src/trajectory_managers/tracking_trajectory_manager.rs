@@ -1,4 +1,4 @@
-use heapless::{consts::*, spsc::Queue};
+use heapless::spsc::Queue;
 use spin::Mutex;
 
 use crate::agents::TrackingTrajectoryManager;
@@ -12,7 +12,7 @@ pub trait TrackingTrajectoryGenerator<Command> {
     fn generate(&self, command: &Command) -> Self::Trajectory;
 }
 
-type QueueLength = U3;
+const QUEUE_LENGTH: usize = 3;
 
 /// An implementation of [TrackingTrajectoryManager](crate::agents::TrackingTrajectoryManager) required
 /// by [TrackingAgent](crate::agents::TrackingAgent).
@@ -20,7 +20,7 @@ type QueueLength = U3;
 pub struct TrajectoryManager<Generator, Converter, Target, Trajectory> {
     generator: Generator,
     converter: Converter,
-    trajectories: Mutex<Queue<Trajectory, QueueLength>>,
+    trajectories: Mutex<Queue<Trajectory, usize, QUEUE_LENGTH>>,
     last_target: Mutex<Option<Target>>,
 }
 
@@ -54,12 +54,10 @@ where
     type Target = Generator::Target;
 
     fn set_command(&self, command: &Command) -> Result<(), Self::Error> {
-        use typenum::Unsigned;
-
         //blocking
         let mut trajectories = self.trajectories.lock();
 
-        if trajectories.len() == QueueLength::USIZE {
+        if trajectories.len() == QUEUE_LENGTH {
             Err(TrajectoryManagerError::FullQueue)
         } else {
             let command = self.converter.convert(command);
@@ -102,8 +100,6 @@ where
     }
 
     fn is_full(&self) -> Option<bool> {
-        use typenum::Unsigned;
-
-        Some(self.trajectories.try_lock()?.len() == QueueLength::USIZE)
+        Some(self.trajectories.try_lock()?.len() == QUEUE_LENGTH)
     }
 }

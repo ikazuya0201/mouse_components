@@ -4,15 +4,14 @@ mod direction;
 
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
-use typenum::{__op_internal__, consts::*, op};
 
 use crate::commanders::{NextNode, RotationNode, RouteNode};
-use crate::mazes::NeighborNumberUpperBound;
+use crate::mazes::NEIGHBOR_NUMBER_UPPER_BOUND;
 use crate::mazes::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
-use crate::MazeWidthUpperBound;
+use crate::MAZE_WIDTH_UPPER_BOUND;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -410,8 +409,8 @@ impl<const N: usize> WallSpaceNode for SearchNode<N> {
 
 impl<const N: usize> GraphNode for SearchNode<N> {
     type Pattern = Pattern;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, U2>;
-    type WallNodesList = Vec<Self::WallNodes, U4>;
+    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, 2>;
+    type WallNodesList = Vec<Self::WallNodes, 4>;
 
     fn successors(&self) -> Self::WallNodesList {
         self.neighbors(true)
@@ -650,13 +649,13 @@ impl<const N: usize> RunNode<N> {
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NeighborNumberUpperBound>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>,
         i8,
         i8,
     ) -> Result<(), ()> {
         move |list: &mut ForcedVec<
             WallNode<Wall<N>, (RunNode<N>, Pattern)>,
-            NeighborNumberUpperBound,
+            NEIGHBOR_NUMBER_UPPER_BOUND,
         >,
               dx: i8,
               dy: i8| {
@@ -673,7 +672,7 @@ impl<const N: usize> RunNode<N> {
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NeighborNumberUpperBound>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>,
         i8,
         i8,
         RelativeDirection,
@@ -681,7 +680,7 @@ impl<const N: usize> RunNode<N> {
     ) -> Result<(), ()> {
         move |list: &mut ForcedVec<
             WallNode<Wall<N>, (RunNode<N>, Pattern)>,
-            NeighborNumberUpperBound,
+            NEIGHBOR_NUMBER_UPPER_BOUND,
         >,
               dx: i8,
               dy: i8,
@@ -838,8 +837,8 @@ impl<const N: usize> WallSpaceNode for RunNode<N> {
 //TODO: use iterator instead of vec
 impl<const N: usize> GraphNode for RunNode<N> {
     type Pattern = Pattern;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, NeighborNumberUpperBound>;
-    type WallNodesList = Vec<Self::WallNodes, U3>;
+    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>;
+    type WallNodesList = Vec<Self::WallNodes, 3>;
 
     fn successors(&self) -> Self::WallNodesList {
         self.neighbors(true)
@@ -851,7 +850,7 @@ impl<const N: usize> GraphNode for RunNode<N> {
 }
 
 impl<const N: usize> WallFinderNode for RunNode<N> {
-    type Walls = Vec<Self::Wall, op!(MazeWidthUpperBound * U2)>;
+    type Walls = Vec<Self::Wall, { 2 * MAZE_WIDTH_UPPER_BOUND }>;
 
     fn walls_between(&self, other: &Self) -> Self::Walls {
         use AbsoluteDirection::*;
@@ -960,7 +959,7 @@ pub enum RotationKind {
 
 impl<const N: usize> RotationNode for RunNode<N> {
     type Kind = RotationKind;
-    type Nodes = Vec<(Self, Self::Kind), U4>;
+    type Nodes = Vec<(Self, Self::Kind), 4>;
 
     fn rotation_nodes(&self) -> Self::Nodes {
         use RelativeDirection::*;

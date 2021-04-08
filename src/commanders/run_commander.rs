@@ -5,7 +5,7 @@ use heapless::Vec;
 use num::{Bounded, Saturating};
 use serde::{Deserialize, Serialize};
 
-use super::{compute_shortest_path, Graph, PathUpperBound, RouteNode};
+use super::{compute_shortest_path, Graph, RouteNode, PATH_UPPER_BOUND};
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander).
@@ -15,7 +15,7 @@ where
 {
     current: Node,
     maze: Maze,
-    path: Vec<Node, PathUpperBound>,
+    path: Vec<Node, PATH_UPPER_BOUND>,
     iter: AtomicUsize,
 }
 

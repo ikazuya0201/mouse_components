@@ -2,7 +2,6 @@
 
 pub(crate) mod builder;
 pub(crate) mod forced_vec;
-pub(crate) mod itertools;
 #[macro_use]
 pub(crate) mod macros;
 pub mod math;

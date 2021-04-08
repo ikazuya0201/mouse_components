@@ -2,9 +2,7 @@
 
 use core::marker::PhantomData;
 
-use generic_array::GenericArray;
 use heapless::Vec;
-use typenum::consts::*;
 use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
 
@@ -79,7 +77,7 @@ impl<'a, Manager, Detector, Math, const N: usize> WallDetector<'a, Manager, Dete
     }
 }
 
-type ObstacleSizeUpperBound = typenum::consts::U6;
+const OBSTACLE_SIZE_UPPER_BOUND: usize = 6;
 
 impl<'a, Manager, Detector, Math, State, const N: usize> IWallDetector<State>
     for WallDetector<'a, Manager, Detector, Math, N>
@@ -89,7 +87,7 @@ where
     Math: IMath,
 {
     type Info = CorrectInfo;
-    type Infos = Vec<CorrectInfo, ObstacleSizeUpperBound>;
+    type Infos = Vec<CorrectInfo, OBSTACLE_SIZE_UPPER_BOUND>;
 
     fn detect_and_update(&mut self, state: &State) -> Self::Infos {
         use uom::si::ratio::ratio;
@@ -396,7 +394,7 @@ where
                 };
                 (direction, dist)
             })
-            .collect::<GenericArray<_, U4>>();
+            .collect::<Vec<_, 4>>();
 
         axes_distance.sort_unstable_by_key(|e| Total(e.1));
 

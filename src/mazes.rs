@@ -5,8 +5,9 @@ use core::marker::PhantomData;
 
 use heapless::Vec;
 
-use crate::commanders::{Graph, NodeChecker, NodeNumberUpperBound, UncheckedNodeFinder};
+use crate::commanders::{Graph, NodeChecker, UncheckedNodeFinder, NODE_NUMBER_UPPER_BOUND};
 use crate::utils::forced_vec::ForcedVec;
+use crate::MAZE_WIDTH_UPPER_BOUND;
 
 macro_rules! block {
     ($expr: expr) => {
@@ -46,7 +47,7 @@ pub trait WallSpaceNode {
     type Wall;
 }
 
-pub type NeighborNumberUpperBound = typenum::consts::U64; // Fixed to 16x16 maze.
+pub(crate) const NEIGHBOR_NUMBER_UPPER_BOUND: usize = 4 * MAZE_WIDTH_UPPER_BOUND;
 
 /// A trait that enumerates wall-node successors and predecessors of a node.
 pub trait GraphNode: Sized + WallSpaceNode {
@@ -172,7 +173,7 @@ where
     Manager: WallChecker<Node::Wall>,
 {
     type Cost = Converter::Cost;
-    type Edges = Vec<(Node, Self::Cost), NeighborNumberUpperBound>;
+    type Edges = Vec<(Node, Self::Cost), NEIGHBOR_NUMBER_UPPER_BOUND>;
 
     fn successors(&self, node: &Node) -> Self::Edges {
         //Define blocked state as existence of wall (doesn't consider whether a wall is checked or not).
@@ -193,7 +194,7 @@ where
     Node::Wall: Into<[SearchNode; 2]>,
 {
     type SearchNode = SearchNode;
-    type SearchNodes = Vec<Self::SearchNode, NodeNumberUpperBound>;
+    type SearchNodes = Vec<Self::SearchNode, NODE_NUMBER_UPPER_BOUND>;
 
     fn find_unchecked_nodes(&self, path: &[Node]) -> Self::SearchNodes {
         let mut nodes = ForcedVec::new();
@@ -263,7 +264,7 @@ where
     Manager: WallChecker<Node::Wall>,
 {
     type Cost = Converter::Cost;
-    type Edges = Vec<(Node, Self::Cost), NeighborNumberUpperBound>;
+    type Edges = Vec<(Node, Self::Cost), NEIGHBOR_NUMBER_UPPER_BOUND>;
 
     fn successors(&self, node: &Node) -> Self::Edges {
         //Define the blocked state as a state where a wall is not checked or exists.
