@@ -6,7 +6,6 @@ use spin::Mutex;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use super::initialize::{init_return_commander, init_run_agent, init_run_commander};
-use crate::commanders::CostNode;
 use crate::defaults::aliases::{RunAgent, RunCommander};
 use crate::defaults::{
     config::Config,
@@ -55,7 +54,17 @@ macro_rules! impl_run_operator {
             <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
             Math: crate::utils::math::Math;
 
-        impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>
+        impl<
+                'a,
+                LeftEncoder,
+                RightEncoder,
+                Imu,
+                LeftMotor,
+                RightMotor,
+                DistanceSensor,
+                Math,
+                Size,
+            >
             $operator<
                 'a,
                 LeftEncoder,
@@ -82,9 +91,7 @@ macro_rules! impl_run_operator {
                 + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
             <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
             <<Size as Mul<Size>>::Output as Mul<U4>>::Output: ArrayLength<SearchNode<Size>>,
-            <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<CostNode<u16, RunNode<Size>>>
-                + ArrayLength<CostNode<u16, SearchNode<Size>>>
-                + ArrayLength<SearchNode<Size>>
+            <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<SearchNode<Size>>
                 + ArrayLength<Option<usize>>
                 + ArrayLength<u16>
                 + ArrayLength<(RunNode<Size>, RunKind)>
@@ -96,7 +103,14 @@ macro_rules! impl_run_operator {
             pub fn new(
                 config: &Config<Size>,
                 state: &State<Size>,
-                resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
+                resource: Resource<
+                    LeftEncoder,
+                    RightEncoder,
+                    Imu,
+                    LeftMotor,
+                    RightMotor,
+                    DistanceSensor,
+                >,
                 wall_manager: &'a WallManager<Size>,
             ) -> Self {
                 let commander = $commander_fn(config, state, wall_manager);
@@ -131,7 +145,7 @@ macro_rules! impl_run_operator {
                 (state, resource)
             }
         }
-    }
+    };
 }
 
 impl_run_operator!(RunOperator: init_run_commander);

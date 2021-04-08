@@ -5,7 +5,6 @@ use spin::Mutex;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use crate::command_converter::{CommandConverter, ThroughCommandConverter};
-use crate::commanders::CostNode;
 use crate::controllers::{RotationalControllerBuilder, TranslationalControllerBuilder};
 use crate::defaults::aliases::{
     ReturnSetupAgent, ReturnSetupCommander, Robot, RunAgent, RunCommander, SearchAgent,
@@ -257,7 +256,6 @@ where
         + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
     <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
     <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<(RunNode<Size>, RunKind)>
-        + ArrayLength<CostNode<u16, RunNode<Size>>>
         + ArrayLength<Option<usize>>
         + ArrayLength<u16>
         + ArrayLength<Option<RunNode<Size>>>,
@@ -288,7 +286,6 @@ where
         + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
     <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
     <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<(RunNode<Size>, RunKind)>
-        + ArrayLength<CostNode<u16, RunNode<Size>>>
         + ArrayLength<Option<usize>>
         + ArrayLength<u16>
         + ArrayLength<Option<RunNode<Size>>>,
@@ -319,7 +316,6 @@ where
         + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
     <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
     <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<(RunNode<Size>, RunKind)>
-        + ArrayLength<CostNode<u16, RunNode<Size>>>
         + ArrayLength<Option<usize>>
         + ArrayLength<u16>
         + ArrayLength<Option<RunNode<Size>>>,

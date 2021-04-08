@@ -4,7 +4,7 @@ mod return_setup_commander;
 mod run_commander;
 mod search_commander;
 
-use generic_array::{ArrayLength, GenericArray};
+use generic_array::GenericArray;
 use heapless::{binary_heap::Min, consts::*, BinaryHeap, Vec};
 use num::{Bounded, Saturating};
 use typenum::Unsigned;
@@ -23,11 +23,6 @@ pub trait Graph<Node> {
     fn predecessors(&self, node: &Node) -> Self::Edges;
 }
 
-/// A trait that has a type level upper bound for the number of the given node type.
-pub trait BoundedNode {
-    type UpperBound;
-}
-
 /// A trait that computes a route value between itself and another node.
 pub trait RouteNode {
     type Error;
@@ -39,7 +34,7 @@ pub trait RouteNode {
 pub type GoalSizeUpperBound = U8;
 
 #[derive(Debug)]
-pub struct CostNode<Cost, Node>(Cost, Node);
+struct CostNode<Cost, Node>(Cost, Node);
 
 impl<Cost: PartialEq, Node> PartialEq for CostNode<Cost, Node> {
     fn eq(&self, other: &Self) -> bool {
@@ -61,7 +56,9 @@ impl<Cost: Ord, Node> Ord for CostNode<Cost, Node> {
     }
 }
 
-pub type PathUpperBound = U1024; // Fixed upper bound of path length to 32x32.
+pub type PathUpperBound = U256; // Fixed upper bound of path length to 16x16.
+
+pub type NodeNumberUpperBound = U4096; // Fixed upper bound of path length to 16x16x16.
 
 fn compute_shortest_path<Node, Maze>(
     start: &Node,
@@ -69,31 +66,24 @@ fn compute_shortest_path<Node, Maze>(
     maze: &Maze,
 ) -> Option<Vec<Node, PathUpperBound>>
 where
-    Node: BoundedNode + Clone + Into<usize> + PartialEq,
-    Node::UpperBound: Unsigned
-        + ArrayLength<Maze::Cost>
-        + ArrayLength<CostNode<Maze::Cost, Node>>
-        + ArrayLength<Option<Node>>,
+    Node: Clone + Into<usize> + PartialEq,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
-    let mut dists = repeat_n(
-        Maze::Cost::max_value(),
-        <Node::UpperBound as Unsigned>::USIZE,
-    )
-    .collect::<GenericArray<_, Node::UpperBound>>();
+    let mut dists = repeat_n(Maze::Cost::max_value(), NodeNumberUpperBound::USIZE)
+        .collect::<GenericArray<_, NodeNumberUpperBound>>();
     dists[start.clone().into()] = Maze::Cost::min_value();
 
-    let mut prev = repeat_n(None, <Node::UpperBound as Unsigned>::USIZE)
-        .collect::<GenericArray<Option<Node>, Node::UpperBound>>();
+    let mut prev = repeat_n(None, NodeNumberUpperBound::USIZE)
+        .collect::<GenericArray<Option<Node>, NodeNumberUpperBound>>();
 
-    let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node>, Node::UpperBound, Min>::new();
+    let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node>, NodeNumberUpperBound, Min>::new();
     heap.push(CostNode(Maze::Cost::min_value(), start.clone()))
         .unwrap_or_else(|_| {
             unreachable!("The length of binary heap should never exceed the upper bound")
         });
 
-    let construct_path = |goal: Node, prev: GenericArray<Option<Node>, Node::UpperBound>| {
+    let construct_path = |goal: Node, prev: GenericArray<Option<Node>, NodeNumberUpperBound>| {
         let mut current = prev[goal.clone().into()].clone()?;
         let mut path = ForcedVec::new();
         path.push(goal);
@@ -136,8 +126,6 @@ where
 #[cfg(test)]
 mod tests {
     use std::vec::Vec;
-
-    use heapless::consts::*;
 
     use super::*;
 
@@ -229,10 +217,6 @@ mod tests {
         let n = 9;
 
         let graph = IGraph::new(n, &edges);
-
-        impl BoundedNode for RunNode {
-            type UpperBound = U10;
-        }
 
         let solver = SearchCommander::<Node, RunNode, SearchNode, _, _>::new(
             start.clone(),

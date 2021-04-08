@@ -6,7 +6,6 @@ use spin::Mutex;
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use super::initialize::{init_search_agent, init_search_commander};
-use crate::commanders::CostNode;
 use crate::defaults::aliases::{SearchAgent, SearchCommander};
 use crate::defaults::{
     config::Config,
@@ -79,11 +78,8 @@ where
         + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
     <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
     <<Size as Mul<Size>>::Output as Mul<U4>>::Output: ArrayLength<SearchNode<Size>>,
-    <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<CostNode<u16, RunNode<Size>>>
-        + ArrayLength<CostNode<u16, SearchNode<Size>>>
-        + ArrayLength<SearchNode<Size>>
-        + ArrayLength<u16>
-        + ArrayLength<Option<RunNode<Size>>>,
+    <<Size as Mul<Size>>::Output as Mul<U16>>::Output:
+        ArrayLength<SearchNode<Size>> + ArrayLength<u16> + ArrayLength<Option<RunNode<Size>>>,
     Imu::Error: Debug,
     LeftEncoder::Error: Debug,
     RightEncoder::Error: Debug,

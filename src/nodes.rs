@@ -9,7 +9,8 @@ use heapless::{ArrayLength, Vec};
 use serde::{Deserialize, Serialize};
 use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use crate::commanders::{BoundedNode, NextNode, RotationNode, RouteNode};
+use crate::commanders::{NextNode, RotationNode, RouteNode};
+use crate::mazes::NeighborNumberUpperBound;
 use crate::mazes::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
@@ -436,19 +437,10 @@ impl<N> WallSpaceNode for SearchNode<N> {
     type Wall = Wall<N>;
 }
 
-impl<N> BoundedNode for SearchNode<N>
-where
-    N: Mul<N>,
-    N::Output: Mul<U4>,
-{
-    type UpperBound = <N::Output as Mul<U4>>::Output;
-}
-
 impl<N> GraphNode for SearchNode<N>
 where
     N: Unsigned + PowerOfTwo,
 {
-    type NeighborNum = U4;
     type Pattern = Pattern;
     type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, U2>;
     type WallNodesList = Vec<Self::WallNodes, U4>;
@@ -557,14 +549,6 @@ impl<N> From<RunNode<N>> for Node<N> {
     fn from(value: RunNode<N>) -> Self {
         value.0
     }
-}
-
-impl<N> BoundedNode for RunNode<N>
-where
-    N: Mul<N>,
-    N::Output: Mul<U16>,
-{
-    type UpperBound = <N::Output as Mul<U16>>::Output;
 }
 
 impl<N> core::fmt::Debug for RunNode<N> {
@@ -682,8 +666,7 @@ where
 
 impl<N> RunNode<N>
 where
-    N: Unsigned + PowerOfTwo + Mul<U4>,
-    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, Pattern)>>,
+    N: Unsigned + PowerOfTwo,
 {
     fn neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
         use AbsoluteDirection::*;
@@ -711,11 +694,14 @@ where
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NeighborNumberUpperBound>,
         i8,
         i8,
     ) -> Result<(), ()> {
-        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
+        move |list: &mut ForcedVec<
+            WallNode<Wall<N>, (RunNode<N>, Pattern)>,
+            NeighborNumberUpperBound,
+        >,
               dx: i8,
               dy: i8| {
             let (dx, dy) = if is_succ { (dx, dy) } else { (-dx, -dy) };
@@ -731,13 +717,16 @@ where
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NeighborNumberUpperBound>,
         i8,
         i8,
         RelativeDirection,
         Pattern,
     ) -> Result<(), ()> {
-        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
+        move |list: &mut ForcedVec<
+            WallNode<Wall<N>, (RunNode<N>, Pattern)>,
+            NeighborNumberUpperBound,
+        >,
               dx: i8,
               dy: i8,
               ddir: RelativeDirection,
@@ -893,12 +882,10 @@ impl<N> WallSpaceNode for RunNode<N> {
 //TODO: use iterator instead of vec
 impl<N> GraphNode for RunNode<N>
 where
-    N: Unsigned + PowerOfTwo + Mul<U4>,
-    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, Pattern)>>,
+    N: Unsigned + PowerOfTwo,
 {
-    type NeighborNum = N::Output;
     type Pattern = Pattern;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, N::Output>;
+    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, NeighborNumberUpperBound>;
     type WallNodesList = Vec<Self::WallNodes, U3>;
 
     fn successors(&self) -> Self::WallNodesList {

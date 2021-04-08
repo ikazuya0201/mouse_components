@@ -3,9 +3,9 @@
 use core::fmt;
 use core::marker::PhantomData;
 
-use heapless::{ArrayLength, Vec};
+use heapless::Vec;
 
-use crate::commanders::{BoundedNode, Graph, NodeChecker, UncheckedNodeFinder};
+use crate::commanders::{Graph, NodeChecker, NodeNumberUpperBound, UncheckedNodeFinder};
 use crate::utils::forced_vec::ForcedVec;
 
 macro_rules! block {
@@ -46,9 +46,10 @@ pub trait WallSpaceNode {
     type Wall;
 }
 
+pub type NeighborNumberUpperBound = typenum::consts::U64; // Fixed to 16x16 maze.
+
 /// A trait that enumerates wall-node successors and predecessors of a node.
 pub trait GraphNode: Sized + WallSpaceNode {
-    type NeighborNum;
     type Pattern;
     type WallNodes: IntoIterator<Item = WallNode<Self::Wall, (Self, Self::Pattern)>>;
     type WallNodesList: IntoIterator<Item = Self::WallNodes>;
@@ -118,7 +119,6 @@ impl<'a, Manager, Converter, SearchNode> Maze<'a, Manager, Converter, SearchNode
         Node: GraphNode,
         Converter: PatternConverter<Node::Pattern>,
         Manager: WallChecker<Node::Wall>,
-        Node::NeighborNum: ArrayLength<(Node, Converter::Cost)>,
     {
         let mut successors = ForcedVec::new();
         for wall_nodes in node.successors() {
@@ -144,7 +144,6 @@ impl<'a, Manager, Converter, SearchNode> Maze<'a, Manager, Converter, SearchNode
         Node: GraphNode,
         Converter: PatternConverter<Node::Pattern>,
         Manager: WallChecker<Node::Wall>,
-        Node::NeighborNum: ArrayLength<(Node, Converter::Cost)>,
     {
         let mut predecessors = ForcedVec::new();
         for wall_nodes in node.predecessors() {
@@ -171,10 +170,9 @@ where
     Node: GraphNode,
     Converter: PatternConverter<Node::Pattern>,
     Manager: WallChecker<Node::Wall>,
-    Node::NeighborNum: ArrayLength<(Node, Converter::Cost)>,
 {
     type Cost = Converter::Cost;
-    type Edges = Vec<(Node, Self::Cost), Node::NeighborNum>;
+    type Edges = Vec<(Node, Self::Cost), NeighborNumberUpperBound>;
 
     fn successors(&self, node: &Node) -> Self::Edges {
         //Define blocked state as existence of wall (doesn't consider whether a wall is checked or not).
@@ -193,11 +191,9 @@ where
     Node: WallFinderNode,
     Manager: WallChecker<Node::Wall>,
     Node::Wall: Into<[SearchNode; 2]>,
-    SearchNode: BoundedNode,
-    SearchNode::UpperBound: ArrayLength<SearchNode>,
 {
     type SearchNode = SearchNode;
-    type SearchNodes = Vec<Self::SearchNode, SearchNode::UpperBound>;
+    type SearchNodes = Vec<Self::SearchNode, NodeNumberUpperBound>;
 
     fn find_unchecked_nodes(&self, path: &[Node]) -> Self::SearchNodes {
         let mut nodes = ForcedVec::new();
@@ -265,10 +261,9 @@ where
     Node: GraphNode,
     Converter: PatternConverter<Node::Pattern>,
     Manager: WallChecker<Node::Wall>,
-    Node::NeighborNum: ArrayLength<(Node, Converter::Cost)>,
 {
     type Cost = Converter::Cost;
-    type Edges = Vec<(Node, Self::Cost), Node::NeighborNum>;
+    type Edges = Vec<(Node, Self::Cost), NeighborNumberUpperBound>;
 
     fn successors(&self, node: &Node) -> Self::Edges {
         //Define the blocked state as a state where a wall is not checked or exists.
@@ -287,8 +282,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use heapless::consts::*;
-
     use super::*;
 
     struct ThroughPatternConverter;
@@ -310,7 +303,6 @@ mod tests {
         }
 
         impl GraphNode for usize {
-            type NeighborNum = U10;
             type Pattern = usize;
             type WallNodes = Vec<WallNode<usize, (usize, usize)>>;
             type WallNodesList = Vec<Self::WallNodes>;
@@ -380,7 +372,6 @@ mod tests {
         }
 
         impl GraphNode for NodeType {
-            type NeighborNum = U10;
             type Pattern = usize;
             type WallNodes = Vec<WallNode<WallType, (NodeType, usize)>>;
             type WallNodesList = Vec<Self::WallNodes>;
@@ -457,10 +448,6 @@ mod tests {
 
         impl WallSpaceNode for Node {
             type Wall = Wall;
-        }
-
-        impl BoundedNode for SearchNode {
-            type UpperBound = U10;
         }
 
         impl WallFinderNode for Node {

@@ -1,14 +1,11 @@
 use core::fmt::Debug;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use generic_array::ArrayLength;
 use heapless::Vec;
 use num::{Bounded, Saturating};
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use typenum::Unsigned;
 
-use super::{compute_shortest_path, BoundedNode, CostNode, Graph, PathUpperBound, RouteNode};
+use super::{compute_shortest_path, Graph, PathUpperBound, RouteNode};
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander).
@@ -24,13 +21,7 @@ where
 
 impl<Node, Maze> RunCommander<Node, Maze>
 where
-    Node::UpperBound: ArrayLength<Option<Node>>
-        + ArrayLength<Option<usize>>
-        + ArrayLength<Maze::Cost>
-        + ArrayLength<CostNode<Maze::Cost, Node>>
-        + ArrayLength<(Node, Node::Route)>
-        + Unsigned,
-    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode + BoundedNode,
+    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode,
     Node: From<Node>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
@@ -60,8 +51,7 @@ pub enum RunCommanderError {
 }
 
 /// A command for fast run.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct RunCommand<Node, Route> {
     pub node: Node,
     pub route: Route,

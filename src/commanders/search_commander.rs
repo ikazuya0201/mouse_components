@@ -1,15 +1,15 @@
 use core::convert::{Infallible, TryFrom, TryInto};
 use core::fmt::Debug;
 
-use generic_array::{ArrayLength, GenericArray};
+use generic_array::GenericArray;
 use heapless::{binary_heap::Min, consts::*, BinaryHeap, Vec};
 use num::{Bounded, Saturating};
 use spin::Mutex;
 use typenum::Unsigned;
 
 use super::{
-    compute_shortest_path, BoundedNode, CostNode, GoalSizeUpperBound, Graph, PathUpperBound,
-    RouteNode,
+    compute_shortest_path, CostNode, GoalSizeUpperBound, Graph, NodeNumberUpperBound,
+    PathUpperBound, RouteNode,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::utils::itertools::repeat_n;
@@ -111,13 +111,7 @@ impl<Node, RunNode, Cost, Maze> TrackingCommander
         Maze,
     >
 where
-    RunNode::UpperBound: ArrayLength<Maze::SearchNode>
-        + ArrayLength<Cost>
-        + ArrayLength<Option<RunNode>>
-        + ArrayLength<CostNode<Cost, Maze::SearchNode>>
-        + ArrayLength<CostNode<Cost, RunNode>>
-        + Unsigned,
-    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
+    RunNode: PartialEq + Copy + Debug + Into<usize>,
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + TryFrom<Node>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
@@ -127,7 +121,6 @@ where
     Node: From<Maze::SearchNode> + Clone + NextNode<<Maze::SearchNode as RouteNode>::Route>,
     <Maze::SearchNode as RouteNode>::Route: Clone,
     <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
-    CostNode<Cost, Maze::SearchNode>: core::fmt::Debug,
 {
     type Error = Infallible;
     type Command = (Node, <Maze::SearchNode as RouteNode>::Route);
@@ -204,19 +197,12 @@ where
 //TODO: write test
 impl<Node, RunNode, Cost, Route, Maze> SearchCommander<Node, RunNode, Maze::SearchNode, Route, Maze>
 where
-    RunNode::UpperBound: ArrayLength<Maze::SearchNode>
-        + ArrayLength<Cost>
-        + ArrayLength<Option<RunNode>>
-        + ArrayLength<CostNode<Cost, RunNode>>
-        + ArrayLength<CostNode<Cost, Maze::SearchNode>>
-        + Unsigned,
-    RunNode: PartialEq + Copy + Debug + Into<usize> + BoundedNode,
+    RunNode: PartialEq + Copy + Debug + Into<usize>,
     Maze::SearchNode: PartialEq + Copy + Debug + Into<usize>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
         + UncheckedNodeFinder<RunNode>,
-    CostNode<Cost, Maze::SearchNode>: core::fmt::Debug,
 {
     fn next_node_candidates(
         &self,
@@ -231,10 +217,10 @@ where
             .into_iter()
             .collect::<Vec<(Maze::SearchNode, Cost), U4>>();
 
-        let mut dists = repeat_n(Cost::max_value(), <RunNode::UpperBound as Unsigned>::USIZE)
-            .collect::<GenericArray<_, RunNode::UpperBound>>();
+        let mut dists = repeat_n(Cost::max_value(), NodeNumberUpperBound::USIZE)
+            .collect::<GenericArray<_, NodeNumberUpperBound>>();
         let mut heap =
-            BinaryHeap::<CostNode<Cost, Maze::SearchNode>, RunNode::UpperBound, Min>::new();
+            BinaryHeap::<CostNode<Cost, Maze::SearchNode>, NodeNumberUpperBound, Min>::new();
         for node in checker_nodes {
             heap.push(CostNode(Cost::min_value(), node)).unwrap();
             dists[node.into()] = Cost::min_value();
@@ -269,11 +255,7 @@ where
 
 impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, SearchNode, Route, Maze>
 where
-    RunNode: BoundedNode + Clone + Into<usize> + PartialEq,
-    RunNode::UpperBound: Unsigned
-        + ArrayLength<Maze::Cost>
-        + ArrayLength<Option<RunNode>>
-        + ArrayLength<CostNode<Maze::Cost, RunNode>>,
+    RunNode: Clone + Into<usize> + PartialEq,
     Maze: Graph<RunNode>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
