@@ -2,33 +2,28 @@
 //! [WallProbabilityManager](crate::wall_detector::WallProbabilityManager).
 
 use core::fmt;
-use core::marker::PhantomData;
-use core::ops::Mul;
 
-use generic_array::{ArrayLength, GenericArray};
-#[cfg(feature = "serde")]
+use heapless::Vec;
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
-use typenum::{consts::U2, PowerOfTwo, Unsigned};
 
 use crate::mazes::WallChecker;
 use crate::nodes::SearchNode;
-use crate::utils::{itertools::repeat_n, probability::Probability};
+use crate::utils::probability::Probability;
 use crate::wall_detector::WallProbabilityManager;
+use crate::MAZE_WIDTH_UPPER_BOUND;
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Wall<N> {
+pub(crate) const WALL_NUMBER_UPPER_BOUND: usize =
+    2 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct Wall<const N: usize> {
     x: u8,
     y: u8,
     top: bool,
-    _maze_width: PhantomData<fn() -> N>,
 }
 
-impl<N> Into<[SearchNode<N>; 2]> for Wall<N>
-where
-    N: typenum::Unsigned,
-{
+impl<const N: usize> Into<[SearchNode<N>; 2]> for Wall<N> {
     fn into(self) -> [SearchNode<N>; 2] {
         use crate::types::data::AbsoluteDirection::*;
 
@@ -54,7 +49,7 @@ pub struct OutOfBoundError {
     top: bool,
 }
 
-impl<N> Wall<N> {
+impl<const N: usize> Wall<N> {
     pub fn x(&self) -> u8 {
         self.x
     }
@@ -73,19 +68,14 @@ impl<N> Wall<N> {
     }
 
     pub unsafe fn new_unchecked(x: u8, y: u8, top: bool) -> Self {
-        Self {
-            x,
-            y,
-            top,
-            _maze_width: PhantomData,
-        }
+        Self { x, y, top }
     }
 }
 
-impl<N: Unsigned + PowerOfTwo> Wall<N> {
+impl<const N: usize> Wall<N> {
     #[inline]
     fn x_offset() -> usize {
-        N::USIZE.trailing_zeros() as usize + Self::y_offset()
+        N.trailing_zeros() as usize + Self::y_offset()
     }
 
     fn to_index(&self) -> usize {
@@ -96,7 +86,7 @@ impl<N: Unsigned + PowerOfTwo> Wall<N> {
 
     #[inline]
     fn max() -> u8 {
-        N::U8 - 1
+        N as u8 - 1
     }
 
     pub fn new(x: u8, y: u8, top: bool) -> Result<Self, OutOfBoundError> {
@@ -108,22 +98,12 @@ impl<N: Unsigned + PowerOfTwo> Wall<N> {
     }
 }
 
-pub struct WallManager<N>
-where
-    N: Mul<N>,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
-    walls: GenericArray<Mutex<Probability>, <<N as Mul<N>>::Output as Mul<U2>>::Output>,
+pub struct WallManager<const N: usize> {
+    walls: Vec<Mutex<Probability>, WALL_NUMBER_UPPER_BOUND>,
     existence_threshold: Probability,
 }
 
-impl<N> fmt::Debug for WallManager<N>
-where
-    N: Mul<N>,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+impl<const N: usize> fmt::Debug for WallManager<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WallManager")
             .field("walls", &self.walls)
@@ -132,45 +112,40 @@ where
     }
 }
 
-impl<N> fmt::Display for WallManager<N>
-where
-    N: Mul<N> + Unsigned + PowerOfTwo,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+impl<const N: usize> fmt::Display for WallManager<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let prob = |x: u8, y: u8, is_top: bool| -> Probability {
             let wall = Wall::<N>::new(x, y, is_top).unwrap();
             self.walls[wall.to_index()].lock().clone()
         };
         writeln!(f, "")?;
-        for y in (0..N::U8).rev() {
+        for y in (0..N as u8).rev() {
             write!(f, " +--")?;
-            for x in 0..N::U8 - 1 {
+            for x in 0..N as u8 - 1 {
                 write!(f, "{:1.1}--+--", f32::from(prob(x, y, true)))?;
             }
-            writeln!(f, "{:1.1}--+", f32::from(prob(N::U8 - 1, y, true)))?;
+            writeln!(f, "{:1.1}--+", f32::from(prob(N as u8 - 1, y, true)))?;
 
             write!(f, " |  ")?;
-            for _ in 0..N::U8 {
+            for _ in 0..N as u8 {
                 write!(f, "     |  ")?;
             }
             writeln!(f, "")?;
 
             write!(f, "1.0 ")?;
-            for x in 0..N::U8 {
+            for x in 0..N as u8 {
                 write!(f, "    {:1.1} ", f32::from(prob(x, y, false)))?;
             }
             writeln!(f, "")?;
 
             write!(f, " |  ")?;
-            for _ in 0..N::U8 {
+            for _ in 0..N as u8 {
                 write!(f, "     |  ")?;
             }
             writeln!(f, "")?;
         }
         write!(f, " +--")?;
-        for _ in 0..N::U8 - 1 {
+        for _ in 0..N as u8 - 1 {
             write!(f, "1.0--+--")?;
         }
         writeln!(f, "1.0--+")?;
@@ -178,16 +153,14 @@ where
     }
 }
 
-impl<N> WallManager<N>
-where
-    N: Mul<N> + Unsigned + PowerOfTwo,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+impl<const N: usize> WallManager<N> {
     fn _new(existence_threshold: Probability) -> Self {
-        let walls = repeat_n(0.5, <<N as Mul<N>>::Output as Mul<U2>>::Output::USIZE)
-            .map(|p| Mutex::new(unsafe { Probability::new_unchecked(p) }))
-            .collect();
+        let walls = core::iter::repeat_with(|| {
+            Mutex::new(Probability::new(0.5).expect("Should never panic"))
+        })
+        .take(WALL_NUMBER_UPPER_BOUND)
+        .collect();
+
         Self {
             walls,
             existence_threshold,
@@ -271,7 +244,7 @@ where
         input
             .lines()
             .enumerate()
-            .take(2 * N::USIZE) //not consider bottom line
+            .take(2 * N) //not consider bottom line
             .for_each(|(y, line)| {
                 let y = y as u8;
                 line.chars().enumerate().skip(1).for_each(|(x, c)| {
@@ -284,9 +257,9 @@ where
                         }
                         let x = x / 4;
                         if c == '-' {
-                            self._update(x, N::U8 - y / 2 - 1, true, Probability::one());
+                            self._update(x, N as u8 - y / 2 - 1, true, Probability::one());
                         } else {
-                            self._update(x, N::U8 - y / 2 - 1, true, Probability::zero());
+                            self._update(x, N as u8 - y / 2 - 1, true, Probability::zero());
                         }
                     } else {
                         //check right walls
@@ -295,9 +268,9 @@ where
                         }
                         let x = x / 4;
                         if c == '|' {
-                            self._update(x - 1, N::U8 - y / 2 - 1, false, Probability::one());
+                            self._update(x - 1, N as u8 - y / 2 - 1, false, Probability::one());
                         } else {
-                            self._update(x - 1, N::U8 - y / 2 - 1, false, Probability::zero());
+                            self._update(x - 1, N as u8 - y / 2 - 1, false, Probability::zero());
                         }
                     }
                 });
@@ -313,12 +286,7 @@ where
 pub struct MutexError;
 
 //TODO: Write test.
-impl<N> WallProbabilityManager<Wall<N>> for WallManager<N>
-where
-    N: Mul<N> + Unsigned + PowerOfTwo,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+impl<const N: usize> WallProbabilityManager<Wall<N>> for WallManager<N> {
     type Error = MutexError;
 
     fn try_existence_probability(&self, wall: &Wall<N>) -> Result<Probability, Self::Error> {
@@ -334,12 +302,7 @@ where
     }
 }
 
-impl<N> WallChecker<Wall<N>> for WallManager<N>
-where
-    N: Mul<N> + Unsigned + PowerOfTwo,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+impl<const N: usize> WallChecker<Wall<N>> for WallManager<N> {
     type Error = MutexError;
 
     fn try_is_checked(&self, wall: &Wall<N>) -> Result<bool, Self::Error> {
@@ -355,8 +318,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use typenum::consts::*;
-
     use super::*;
 
     #[test]
@@ -369,7 +330,7 @@ mod tests {
         ];
 
         for (x, y, top, expected) in test_cases {
-            let wall = Wall::<U4>::new(x, y, top).unwrap();
+            let wall = Wall::<4>::new(x, y, top).unwrap();
             assert_eq!(wall.to_index(), expected);
         }
     }
@@ -382,9 +343,9 @@ mod tests {
 |       |
 +---+---+";
 
-        type Size = U2;
+        const SIZE: usize = 2;
 
-        let wall_manager = WallManager::<Size>::with_str(Probability::new(0.1).unwrap(), input);
+        let wall_manager = WallManager::<SIZE>::with_str(Probability::new(0.1).unwrap(), input);
 
         let walls = vec![
             ((0, 0, false), false),
@@ -398,7 +359,7 @@ mod tests {
         ];
 
         for (wall, expected) in walls {
-            let wall = Wall::<Size>::new(wall.0, wall.1, wall.2).unwrap();
+            let wall = Wall::<SIZE>::new(wall.0, wall.1, wall.2).unwrap();
             assert_eq!(wall_manager.exists(&wall), expected, "{:?}", wall);
         }
     }

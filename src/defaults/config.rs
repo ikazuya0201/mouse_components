@@ -7,7 +7,7 @@ use uom::si::f32::{
     Velocity,
 };
 
-use crate::commanders::GoalSizeUpperBound;
+use crate::commanders::GOAL_SIZE_UPPER_BOUND;
 use crate::impl_setter;
 use crate::impl_with_getter;
 use crate::nodes::RunNode;
@@ -34,14 +34,14 @@ fn default_ignore_length_from_wall() -> Length {
 impl_with_getter! {
     /// An implementation of config.
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-    pub struct Config<Size> {
+    pub struct Config<const N: usize> {
         #[serde(default = "default_square_width")]
         square_width: Length,
         #[serde(default)]
         front_offset: Length,
-        start: RunNode<Size>,
-        return_goal: RunNode<Size>,
-        goals: Vec<RunNode<Size>,GoalSizeUpperBound>,
+        start: RunNode<N>,
+        return_goal: RunNode<N>,
+        goals: Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>,
         search_initial_route: SearchKind,
         search_final_route: SearchKind,
         translational_kp: f32,
@@ -109,13 +109,11 @@ impl_with_getter! {
 ///
 /// use AbsoluteDirection::*;
 ///
-/// type Size = U4;
-///
-/// let start = RunNode::<Size>::new(0, 0, North).unwrap();
-/// let return_goal = RunNode::<Size>::new(0, 0, South).unwrap();
+/// let start = RunNode::<4>::new(0, 0, North).unwrap();
+/// let return_goal = RunNode::<4>::new(0, 0, South).unwrap();
 /// let goals = vec![
-///     RunNode::<Size>::new(2, 0, South).unwrap(),
-///     RunNode::<Size>::new(2, 0, West).unwrap(),
+///     RunNode::<4>::new(2, 0, South).unwrap(),
+///     RunNode::<4>::new(2, 0, West).unwrap(),
 /// ];
 ///
 /// let config = ConfigBuilder::new()
@@ -160,12 +158,12 @@ impl_with_getter! {
 ///     .unwrap();
 /// ```
 
-pub struct ConfigBuilder<Size> {
+pub struct ConfigBuilder<const N: usize> {
     square_width: Option<Length>,
     front_offset: Option<Length>,
-    start: Option<RunNode<Size>>,
-    return_goal: Option<RunNode<Size>>,
-    goals: Option<Vec<RunNode<Size>, GoalSizeUpperBound>>,
+    start: Option<RunNode<N>>,
+    return_goal: Option<RunNode<N>>,
+    goals: Option<Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>>,
     search_initial_route: Option<SearchKind>,
     search_final_route: Option<SearchKind>,
     translational_kp: Option<f32>,
@@ -204,7 +202,7 @@ pub struct ConfigBuilder<Size> {
     spin_angular_jerk: Option<AngularJerk>,
 }
 
-impl<Size> ConfigBuilder<Size> {
+impl<const N: usize> ConfigBuilder<N> {
     impl_setter!(
         /// **Optional**,
         /// Default: 90 \[mm\] (half size).
@@ -222,17 +220,17 @@ impl<Size> ConfigBuilder<Size> {
     impl_setter!(
         /// **Required**,
         /// Sets the start node for search.
-        start: RunNode<Size>
+        start: RunNode<N>
     );
     impl_setter!(
         /// **Required**,
         /// Sets a goal for return to start.
-        return_goal: RunNode<Size>
+        return_goal: RunNode<N>
     );
     impl_setter!(
         /// **Required**,
         /// Sets the goal nodes for search.
-        goals: Vec<RunNode<Size>, GoalSizeUpperBound>
+        goals: Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>
     );
     impl_setter!(
         /// **Required**,
@@ -503,7 +501,7 @@ impl<Size> ConfigBuilder<Size> {
     /// Builds [Config](Config).
     ///
     /// This method can be failed when required parameters are not given.
-    pub fn build(&mut self) -> BuilderResult<Config<Size>> {
+    pub fn build(&mut self) -> BuilderResult<Config<N>> {
         macro_rules! get {
             ($field_name: ident) => {{
                 ok_or(self.$field_name.take(), core::stringify!($field_name))?
@@ -573,9 +571,7 @@ pub use tests::default_config;
 mod tests {
     use super::*;
 
-    type Size = typenum::consts::U4;
-
-    pub fn default_config() -> Config<Size> {
+    pub fn default_config() -> Config<4> {
         use uom::si::{
             acceleration::meter_per_second_squared,
             angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
@@ -587,11 +583,11 @@ mod tests {
 
         use AbsoluteDirection::*;
 
-        let start = RunNode::<Size>::new(0, 0, North).unwrap();
-        let return_goal = RunNode::<Size>::new(0, 0, South).unwrap();
+        let start = RunNode::<4>::new(0, 0, North).unwrap();
+        let return_goal = RunNode::<4>::new(0, 0, South).unwrap();
         let goals = vec![
-            RunNode::<Size>::new(2, 0, South).unwrap(),
-            RunNode::<Size>::new(2, 0, West).unwrap(),
+            RunNode::<4>::new(2, 0, South).unwrap(),
+            RunNode::<4>::new(2, 0, West).unwrap(),
         ];
 
         ConfigBuilder::new()

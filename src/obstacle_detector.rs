@@ -23,9 +23,9 @@ pub struct Obstacle {
     pub distance: Sample<Length>,
 }
 
-pub type SensorSizeUpperBound = typenum::consts::U6;
+pub(crate) const SENSOR_SIZE_UPPER_BOUND: usize = 6;
 
-pub type Vec<T, N = SensorSizeUpperBound> = heapless::Vec<T, N>;
+pub type Vec<T> = heapless::Vec<T, SENSOR_SIZE_UPPER_BOUND>;
 
 //NOTE: the number of sensors is upper-bounded.
 pub struct ObstacleDetector<D, M> {

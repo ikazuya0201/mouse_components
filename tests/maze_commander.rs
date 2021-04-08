@@ -9,16 +9,15 @@ use components::{
     utils::probability::Probability,
     wall_manager::WallManager,
 };
-use typenum::consts::*;
 
 #[test]
 fn test_compute_shortest_path_u4() {
     use AbsoluteDirection::*;
 
-    type Size = U4;
+    const N: usize = 4;
 
-    let new = |x, y, dir| RunNode::<Size>::new(x, y, dir).unwrap();
-    let new_wall = |x, y, z| Wall::<Size>::new(x, y, z).unwrap();
+    let new = |x, y, dir| RunNode::<N>::new(x, y, dir).unwrap();
+    let new_wall = |x, y, z| Wall::<N>::new(x, y, z).unwrap();
 
     let start = new(0, 0, North);
     let goals = vec![new(2, 0, West), new(2, 0, South)];
@@ -57,9 +56,9 @@ fn test_compute_shortest_path_u4() {
         }
 
         let maze =
-            Maze::<_, _, SearchNode<Size>>::new(&wall_manager, LinearPatternConverter::default());
-        let current: Node<Size> = start.clone().into();
-        let commander = SearchCommander::<_, _, SearchNode<Size>, _, _>::new(
+            Maze::<_, _, SearchNode<N>>::new(&wall_manager, LinearPatternConverter::default());
+        let current: Node<N> = start.clone().into();
+        let commander = SearchCommander::<_, _, SearchNode<N>, _, _>::new(
             start,
             &goals,
             current,

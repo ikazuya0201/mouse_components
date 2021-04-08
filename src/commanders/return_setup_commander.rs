@@ -1,9 +1,7 @@
-use heapless::ArrayLength;
 use num::{Bounded, Saturating};
 use spin::Mutex;
-use typenum::Unsigned;
 
-use super::{compute_shortest_path, BoundedNode, CostNode, Graph};
+use super::{compute_shortest_path, Graph};
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander).
@@ -20,12 +18,7 @@ where
 
 impl<Node, Maze> ReturnSetupCommander<Node, Maze>
 where
-    Node: BoundedNode + Clone + Into<usize> + PartialEq + RotationNode,
-    Node::UpperBound: Unsigned
-        + ArrayLength<Maze::Cost>
-        + ArrayLength<Option<Node>>
-        + ArrayLength<CostNode<Maze::Cost, Node>>
-        + ArrayLength<Option<usize>>,
+    Node: Clone + Into<usize> + PartialEq + RotationNode,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
@@ -68,12 +61,7 @@ pub trait RotationNode: Sized {
 
 impl<Node, Maze> TrackingCommander for ReturnSetupCommander<Node, Maze>
 where
-    Node: BoundedNode + Clone + Into<usize> + PartialEq + RotationNode,
-    Node::UpperBound: Unsigned
-        + ArrayLength<Maze::Cost>
-        + ArrayLength<Option<Node>>
-        + ArrayLength<CostNode<Maze::Cost, Node>>
-        + ArrayLength<Option<usize>>,
+    Node: Clone + Into<usize> + PartialEq + RotationNode,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {

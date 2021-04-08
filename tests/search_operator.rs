@@ -21,7 +21,6 @@ use components::{
     wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
 };
-use typenum::consts::*;
 use uom::si::f32::{
     Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, ElectricPotential,
     Frequency, Jerk, Length, Time, Velocity,
@@ -43,11 +42,11 @@ use utils::math::MathFake;
 use utils::sensors::AgentSimulator;
 
 macro_rules! impl_search_operator_test {
-    ($name: ident: $size: ty, $input_str: expr, $goals: expr,) => {
+    ($name: ident: $size: literal, $input_str: expr, $goals: expr,) => {
         mod $name {
             use super::*;
 
-            type Size = $size;
+            const N: usize = $size;
 
             fn _test_search_operator(front_offset: Length, distance_sensors_poses: Vec<Pose>) {
                 use components::prelude::*;
@@ -55,7 +54,7 @@ macro_rules! impl_search_operator_test {
                 let input_str = $input_str;
                 let goals = $goals
                     .into_iter()
-                    .map(|goal| RunNode::<Size>::new(goal.0, goal.1, goal.2).unwrap())
+                    .map(|goal| RunNode::<N>::new(goal.0, goal.1, goal.2).unwrap())
                     .collect::<Vec<_>>();
 
                 let start_state = RobotState {
@@ -81,8 +80,8 @@ macro_rules! impl_search_operator_test {
                 let wheel_interval = Length::new::<millimeter>(33.5);
 
                 let expected_wall_manager =
-                    WallManager::<Size>::with_str(existence_threshold, input_str);
-                let wall_manager = WallManager::<Size>::new(existence_threshold);
+                    WallManager::<N>::with_str(existence_threshold, input_str);
+                let wall_manager = WallManager::<N>::new(existence_threshold);
 
                 let square_width = Length::new::<meter>(0.09);
                 let wall_width = Length::new::<meter>(0.006);
@@ -96,7 +95,7 @@ macro_rules! impl_search_operator_test {
                     trans_model_time_constant,
                     rot_model_gain,
                     rot_model_time_constant,
-                    WallManager::<Size>::with_str(existence_threshold, input_str),
+                    WallManager::<N>::with_str(existence_threshold, input_str),
                     distance_sensors_poses,
                 );
 
@@ -191,7 +190,7 @@ macro_rules! impl_search_operator_test {
                             WallDetectorBuilder::new()
                                 .wall_manager(&wall_manager)
                                 .obstacle_detector(obstacle_detector)
-                                .build::<MathFake, Size>()
+                                .build::<MathFake, N>()
                                 .unwrap()
                         };
                         Robot::new(estimator, tracker, wall_detector)
@@ -229,10 +228,10 @@ macro_rules! impl_search_operator_test {
                 use AbsoluteDirection::*;
 
                 let create_commander = |wall_storage| {
-                    let maze: Maze<_, _, SearchNode<Size>> =
+                    let maze: Maze<_, _, SearchNode<N>> =
                         Maze::new(wall_storage, LinearPatternConverter::default());
-                    let start = RunNode::<Size>::new(0, 0, North).unwrap();
-                    let current: Node<Size> = start.clone().into();
+                    let start = RunNode::<N>::new(0, 0, North).unwrap();
+                    let current: Node<N> = start.clone().into();
                     SearchCommander::new(
                         start,
                         &goals,
@@ -342,13 +341,13 @@ macro_rules! impl_search_operator_test {
 }
 
 impl_search_operator_test!(
-    search_operator_tests1: U4,
+    search_operator_tests1: 4,
     include_str!("../mazes/maze1.dat"),
     vec![(2, 0, South), (2, 0, West)],
 );
 
 impl_search_operator_test!(
-    search_operator_tests2: U16,
+    search_operator_tests2: 16,
     include_str!("../mazes/maze2.dat"),
     vec![
         (15, 14, SouthWest),
@@ -359,7 +358,7 @@ impl_search_operator_test!(
 );
 
 impl_search_operator_test!(
-    search_operator_tests3: U4,
+    search_operator_tests3: 4,
     include_str!("../mazes/maze3.dat"),
     vec![(2, 0, South), (2, 0, West)],
 );

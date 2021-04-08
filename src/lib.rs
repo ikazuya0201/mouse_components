@@ -35,9 +35,7 @@ pub mod traits {
     #[doc(no_inline)]
     pub use administrator::{Operator, OperatorStore, Selector};
     #[doc(no_inline)]
-    pub use commanders::{
-        BoundedNode, Graph, NextNode, NodeChecker, RouteNode, UncheckedNodeFinder,
-    };
+    pub use commanders::{Graph, NextNode, NodeChecker, RouteNode, UncheckedNodeFinder};
     #[doc(no_inline)]
     pub use mazes::{GraphNode, WallChecker, WallFinderNode, WallSpaceNode};
     #[doc(no_inline)]
@@ -83,3 +81,5 @@ pub mod sensors {
     #[doc(no_inline)]
     pub use tracker::Motor;
 }
+
+const MAZE_WIDTH_UPPER_BOUND: usize = 16;

@@ -3,7 +3,7 @@
 use heapless::Vec;
 
 use crate::get_or_err;
-use crate::obstacle_detector::SensorSizeUpperBound;
+use crate::obstacle_detector::SENSOR_SIZE_UPPER_BOUND;
 use crate::utils::builder::BuilderResult;
 
 /// An resource type for initialization of operators.
@@ -13,7 +13,7 @@ pub struct Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, Dista
     pub imu: Imu,
     pub left_motor: LeftMotor,
     pub right_motor: RightMotor,
-    pub distance_sensors: Vec<DistanceSensor, SensorSizeUpperBound>,
+    pub distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>,
 }
 
 /// A builder for [Resource](Resource).
@@ -23,7 +23,7 @@ pub struct ResourceBuilder<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor
     imu: Option<Imu>,
     left_motor: Option<LeftMotor>,
     right_motor: Option<RightMotor>,
-    distance_sensors: Option<Vec<DistanceSensor, SensorSizeUpperBound>>,
+    distance_sensors: Option<Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>>,
 }
 
 macro_rules! impl_setter {
@@ -69,5 +69,5 @@ impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>
     impl_setter!(imu: Imu);
     impl_setter!(left_motor: LeftMotor);
     impl_setter!(right_motor: RightMotor);
-    impl_setter!(distance_sensors: Vec<DistanceSensor, SensorSizeUpperBound>);
+    impl_setter!(distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>);
 }

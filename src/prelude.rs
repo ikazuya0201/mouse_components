@@ -20,8 +20,8 @@ pub use crate::operators::{
 
 #[doc(no_inline)]
 pub use crate::commanders::{
-    BoundedNode as _components_commanders_BoundedNode, Graph as _components_commanders_Graph,
-    NextNode as _components_commanders_NextNode, NodeChecker as _components_commanders_NodeChecker,
+    Graph as _components_commanders_Graph, NextNode as _components_commanders_NextNode,
+    NodeChecker as _components_commanders_NodeChecker,
     RouteNode as _components_commanders_RouteNode,
     UncheckedNodeFinder as _components_commanders_UncheckedNodeFinder,
 };

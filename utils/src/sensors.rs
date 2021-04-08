@@ -2,7 +2,6 @@ use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::convert::Infallible;
-use core::ops::Mul;
 
 use components::{
     prelude::*,
@@ -10,13 +9,10 @@ use components::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
     },
     types::data::{Pose, RobotState},
-    utils::{probability::Probability, sample::Sample},
+    utils::sample::Sample,
     wall_detector::{ConversionError, PoseConverter, PoseConverterBuilder},
     wall_manager::WallManager,
 };
-use generic_array::ArrayLength;
-use spin::Mutex;
-use typenum::{consts::*, PowerOfTwo, Unsigned};
 use uom::si::f32::{
     Acceleration, Angle, AngularAcceleration, AngularVelocity, ElectricPotential, Length, Time,
     Velocity,
@@ -28,23 +24,13 @@ use uom::si::{
 
 use crate::math::MathFake;
 
-pub struct AgentSimulator<N>
-where
-    N: Mul<N>,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+pub struct AgentSimulator<const N: usize> {
     inner: Rc<RefCell<AgentSimulatorInner>>,
     wall_storage: Rc<WallManager<N>>,
     distance_sensors_poses: Vec<Pose>,
 }
 
-impl<N> AgentSimulator<N>
-where
-    N: Mul<N>,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+impl<const N: usize> AgentSimulator<N> {
     pub fn new(
         state: RobotState,
         period: Time,
@@ -331,24 +317,14 @@ impl IMotor for Motor {
     }
 }
 
-pub struct DistanceSensor<N>
-where
-    N: Mul<N>,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+pub struct DistanceSensor<const N: usize> {
     inner: Rc<RefCell<AgentSimulatorInner>>,
     pose: Pose,
     wall_storage: Rc<WallManager<N>>,
     pose_converter: PoseConverter<MathFake, N>,
 }
 
-impl<N> IDistanceSensor for DistanceSensor<N>
-where
-    N: Mul<N> + PowerOfTwo + Unsigned,
-    <N as Mul<N>>::Output: Mul<U2>,
-    <<N as Mul<N>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
     type Error = ConversionError;
 
     fn pose(&self) -> Pose {

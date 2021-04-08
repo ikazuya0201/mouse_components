@@ -2,18 +2,16 @@
 
 mod direction;
 
-use core::marker::PhantomData;
-use core::ops::Mul;
-
-use heapless::{ArrayLength, Vec};
+use heapless::Vec;
 use serde::{Deserialize, Serialize};
-use typenum::{consts::*, PowerOfTwo, Unsigned};
 
-use crate::commanders::{BoundedNode, NextNode, RotationNode, RouteNode};
+use crate::commanders::{NextNode, RotationNode, RouteNode};
+use crate::mazes::NEIGHBOR_NUMBER_UPPER_BOUND;
 use crate::mazes::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
+use crate::MAZE_WIDTH_UPPER_BOUND;
 pub use direction::{AbsoluteDirection, RelativeDirection};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -33,17 +31,13 @@ pub enum Pattern {
 //TODO: Create new data type to reduce copy cost.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that is the super set of [SearchNode] and [RunNode].
-pub struct Node<N> {
+pub struct Node<const N: usize> {
     x: i8,
     y: i8,
     direction: AbsoluteDirection,
-    _maze_width: PhantomData<fn() -> N>,
 }
 
-impl<N> NextNode<SearchKind> for Node<N>
-where
-    N: Unsigned,
-{
+impl<const N: usize> NextNode<SearchKind> for Node<N> {
     type Error = NodeCreationError;
 
     fn next(&self, route: &SearchKind) -> Result<Self, Self::Error> {
@@ -60,7 +54,7 @@ where
     }
 }
 
-impl<N> core::fmt::Debug for Node<N> {
+impl<const N: usize> core::fmt::Debug for Node<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
@@ -96,14 +90,9 @@ enum Location {
     Pillar,
 }
 
-impl<N> Node<N> {
+impl<const N: usize> Node<N> {
     unsafe fn new_unchecked(x: i8, y: i8, direction: AbsoluteDirection) -> Self {
-        Self {
-            x,
-            y,
-            direction,
-            _maze_width: PhantomData,
-        }
+        Self { x, y, direction }
     }
 
     pub fn x(&self) -> &i8 {
@@ -150,10 +139,7 @@ impl<N> Node<N> {
     }
 }
 
-impl<N> Node<N>
-where
-    N: Unsigned,
-{
+impl<const N: usize> Node<N> {
     fn new(x: i8, y: i8, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         if x < 0 || y < 0 || x > Self::max() || y > Self::max() {
             Err(NodeCreationError { x, y, direction })
@@ -163,7 +149,7 @@ where
     }
 
     fn max() -> i8 {
-        2 * N::I8 - 1
+        2 * N as i8 - 1
     }
 
     fn relative(
@@ -187,10 +173,7 @@ where
     }
 }
 
-impl<N> Node<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
+impl<const N: usize> Node<N> {
     fn relative_wall(
         &self,
         dx: i8,
@@ -241,9 +224,9 @@ where
 //TODO: Remove Copy
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that represents nodes (verteces) of a graph for search.
-pub struct SearchNode<N>(Node<N>);
+pub struct SearchNode<const N: usize>(Node<N>);
 
-impl<N> SearchNode<N> {
+impl<const N: usize> SearchNode<N> {
     pub fn inner(&self) -> &Node<N> {
         &self.0
     }
@@ -253,19 +236,19 @@ impl<N> SearchNode<N> {
     }
 }
 
-impl<N> From<SearchNode<N>> for Node<N> {
+impl<const N: usize> From<SearchNode<N>> for Node<N> {
     fn from(value: SearchNode<N>) -> Self {
         value.0
     }
 }
 
-impl<N> core::fmt::Debug for SearchNode<N> {
+impl<const N: usize> core::fmt::Debug for SearchNode<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "RunNode({:?})", self.0)
     }
 }
 
-impl<N> SearchNode<N> {
+impl<const N: usize> SearchNode<N> {
     /// Creates a new `SearchNode` from the given values.
     ///
     /// # Safety
@@ -300,25 +283,19 @@ impl<N> SearchNode<N> {
     }
 }
 
-impl<N> SearchNode<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
+impl<const N: usize> SearchNode<N> {
     #[inline]
     fn y_offset() -> u32 {
-        (N::USIZE * 2).trailing_zeros()
+        (N * 2).trailing_zeros()
     }
 
     #[inline]
     fn direction_offset() -> u32 {
-        2 * (N::USIZE * 2).trailing_zeros()
+        2 * (N * 2).trailing_zeros()
     }
 }
 
-impl<N> Into<usize> for SearchNode<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
+impl<const N: usize> Into<usize> for SearchNode<N> {
     fn into(self) -> usize {
         use AbsoluteDirection::*;
 
@@ -349,7 +326,7 @@ where
     }
 }
 
-impl<N> From<SearchNode<N>> for Wall<N> {
+impl<const N: usize> From<SearchNode<N>> for Wall<N> {
     fn from(value: SearchNode<N>) -> Self {
         unsafe {
             Wall::new_unchecked(
@@ -361,10 +338,7 @@ impl<N> From<SearchNode<N>> for Wall<N> {
     }
 }
 
-impl<N> SearchNode<N>
-where
-    N: Unsigned,
-{
+impl<const N: usize> SearchNode<N> {
     /// Creates a new `SearchNode` with a check of constraints.
     pub fn new(x: i8, y: i8, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use core::convert::TryInto;
@@ -383,10 +357,7 @@ where
     }
 }
 
-impl<N> SearchNode<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
+impl<const N: usize> SearchNode<N> {
     fn neighbors(&self, succs: bool) -> <Self as GraphNode>::WallNodesList {
         use Pattern::*;
         use RelativeDirection::*;
@@ -416,7 +387,7 @@ where
     }
 }
 
-impl<N: Unsigned> core::convert::TryFrom<Node<N>> for SearchNode<N> {
+impl<const N: usize> core::convert::TryFrom<Node<N>> for SearchNode<N> {
     type Error = NodeCreationError;
 
     fn try_from(value: Node<N>) -> Result<Self, Self::Error> {
@@ -432,26 +403,14 @@ impl<N: Unsigned> core::convert::TryFrom<Node<N>> for SearchNode<N> {
     }
 }
 
-impl<N> WallSpaceNode for SearchNode<N> {
+impl<const N: usize> WallSpaceNode for SearchNode<N> {
     type Wall = Wall<N>;
 }
 
-impl<N> BoundedNode for SearchNode<N>
-where
-    N: Mul<N>,
-    N::Output: Mul<U4>,
-{
-    type UpperBound = <N::Output as Mul<U4>>::Output;
-}
-
-impl<N> GraphNode for SearchNode<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
-    type NeighborNum = U4;
+impl<const N: usize> GraphNode for SearchNode<N> {
     type Pattern = Pattern;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, U2>;
-    type WallNodesList = Vec<Self::WallNodes, U4>;
+    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, 2>;
+    type WallNodesList = Vec<Self::WallNodes, 4>;
 
     fn successors(&self) -> Self::WallNodesList {
         self.neighbors(true)
@@ -469,7 +428,7 @@ pub struct RouteError<T> {
     dst: T,
 }
 
-impl<N: Clone> RouteNode for SearchNode<N> {
+impl<const N: usize> RouteNode for SearchNode<N> {
     type Error = RouteError<SearchNode<N>>;
     type Route = SearchKind;
 
@@ -491,7 +450,7 @@ impl<N: Clone> RouteNode for SearchNode<N> {
     }
 }
 
-impl<N: Clone> RouteNode for RunNode<N> {
+impl<const N: usize> RouteNode for RunNode<N> {
     type Error = RouteError<RunNode<N>>;
     type Route = RunKind;
 
@@ -541,9 +500,9 @@ impl<N: Clone> RouteNode for RunNode<N> {
 //TODO: Create new data type to reduce copy cost.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that represents nodes (verteces) of a graph for fast run.
-pub struct RunNode<N>(Node<N>);
+pub struct RunNode<const N: usize>(Node<N>);
 
-impl<N> RunNode<N> {
+impl<const N: usize> RunNode<N> {
     pub fn inner(&self) -> &Node<N> {
         &self.0
     }
@@ -553,30 +512,19 @@ impl<N> RunNode<N> {
     }
 }
 
-impl<N> From<RunNode<N>> for Node<N> {
+impl<const N: usize> From<RunNode<N>> for Node<N> {
     fn from(value: RunNode<N>) -> Self {
         value.0
     }
 }
 
-impl<N> BoundedNode for RunNode<N>
-where
-    N: Mul<N>,
-    N::Output: Mul<U16>,
-{
-    type UpperBound = <N::Output as Mul<U16>>::Output;
-}
-
-impl<N> core::fmt::Debug for RunNode<N> {
+impl<const N: usize> core::fmt::Debug for RunNode<N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "RunNode({:?})", self.0)
     }
 }
 
-impl<N> Into<usize> for RunNode<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
+impl<const N: usize> Into<usize> for RunNode<N> {
     fn into(self) -> usize {
         use AbsoluteDirection::*;
 
@@ -606,22 +554,19 @@ where
     }
 }
 
-impl<N> RunNode<N>
-where
-    N: Unsigned + PowerOfTwo,
-{
+impl<const N: usize> RunNode<N> {
     #[inline]
     fn y_offset() -> u32 {
-        (N::USIZE * 2).trailing_zeros()
+        (N * 2).trailing_zeros()
     }
 
     #[inline]
     fn direction_offset() -> u32 {
-        2 * (N::USIZE * 2).trailing_zeros()
+        2 * (N * 2).trailing_zeros()
     }
 }
 
-impl<N> RunNode<N> {
+impl<const N: usize> RunNode<N> {
     /// Creates a new `RunNode` from the given values.
     ///
     /// # Safety
@@ -658,10 +603,7 @@ impl<N> RunNode<N> {
     }
 }
 
-impl<N> RunNode<N>
-where
-    N: Unsigned,
-{
+impl<const N: usize> RunNode<N> {
     /// Creates a new `RunNode` with a check of constraints.
     pub fn new(x: i8, y: i8, direction: AbsoluteDirection) -> Result<Self, NodeCreationError> {
         use core::convert::TryInto;
@@ -680,11 +622,7 @@ where
     }
 }
 
-impl<N> RunNode<N>
-where
-    N: Unsigned + PowerOfTwo + Mul<U4>,
-    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, Pattern)>>,
-{
+impl<const N: usize> RunNode<N> {
     fn neighbors(&self, is_succ: bool) -> <Self as GraphNode>::WallNodesList {
         use AbsoluteDirection::*;
         use Location::*;
@@ -711,11 +649,14 @@ where
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>,
         i8,
         i8,
     ) -> Result<(), ()> {
-        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
+        move |list: &mut ForcedVec<
+            WallNode<Wall<N>, (RunNode<N>, Pattern)>,
+            NEIGHBOR_NUMBER_UPPER_BOUND,
+        >,
               dx: i8,
               dy: i8| {
             let (dx, dy) = if is_succ { (dx, dy) } else { (-dx, -dy) };
@@ -731,13 +672,16 @@ where
         base_dir: AbsoluteDirection,
     ) -> impl 'a
            + Fn(
-        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
+        &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>,
         i8,
         i8,
         RelativeDirection,
         Pattern,
     ) -> Result<(), ()> {
-        move |list: &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, N::Output>,
+        move |list: &mut ForcedVec<
+            WallNode<Wall<N>, (RunNode<N>, Pattern)>,
+            NEIGHBOR_NUMBER_UPPER_BOUND,
+        >,
               dx: i8,
               dy: i8,
               ddir: RelativeDirection,
@@ -870,7 +814,7 @@ where
     }
 }
 
-impl<N: Unsigned> core::convert::TryFrom<Node<N>> for RunNode<N> {
+impl<const N: usize> core::convert::TryFrom<Node<N>> for RunNode<N> {
     type Error = NodeCreationError;
 
     fn try_from(value: Node<N>) -> Result<Self, Self::Error> {
@@ -886,20 +830,15 @@ impl<N: Unsigned> core::convert::TryFrom<Node<N>> for RunNode<N> {
     }
 }
 
-impl<N> WallSpaceNode for RunNode<N> {
+impl<const N: usize> WallSpaceNode for RunNode<N> {
     type Wall = Wall<N>;
 }
 
 //TODO: use iterator instead of vec
-impl<N> GraphNode for RunNode<N>
-where
-    N: Unsigned + PowerOfTwo + Mul<U4>,
-    N::Output: ArrayLength<WallNode<Wall<N>, (RunNode<N>, Pattern)>>,
-{
-    type NeighborNum = N::Output;
+impl<const N: usize> GraphNode for RunNode<N> {
     type Pattern = Pattern;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, N::Output>;
-    type WallNodesList = Vec<Self::WallNodes, U3>;
+    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>;
+    type WallNodesList = Vec<Self::WallNodes, 3>;
 
     fn successors(&self) -> Self::WallNodesList {
         self.neighbors(true)
@@ -910,12 +849,8 @@ where
     }
 }
 
-impl<N> WallFinderNode for RunNode<N>
-where
-    N: Unsigned + PowerOfTwo + Mul<U2>,
-    N::Output: ArrayLength<Wall<N>>,
-{
-    type Walls = Vec<Self::Wall, N::Output>;
+impl<const N: usize> WallFinderNode for RunNode<N> {
+    type Walls = Vec<Self::Wall, { 2 * MAZE_WIDTH_UPPER_BOUND }>;
 
     fn walls_between(&self, other: &Self) -> Self::Walls {
         use AbsoluteDirection::*;
@@ -1022,9 +957,9 @@ pub enum RotationKind {
     Back,
 }
 
-impl<N> RotationNode for RunNode<N> {
+impl<const N: usize> RotationNode for RunNode<N> {
     type Kind = RotationKind;
-    type Nodes = Vec<(Self, Self::Kind), U4>;
+    type Nodes = Vec<(Self, Self::Kind), 4>;
 
     fn rotation_nodes(&self) -> Self::Nodes {
         use RelativeDirection::*;
@@ -1035,7 +970,6 @@ impl<N> RotationNode for RunNode<N> {
                 x: self.0.x,
                 y: self.0.y,
                 direction: self.0.direction.rotate(dir),
-                _maze_width: PhantomData,
             });
             nodes.push((node, kind));
         };
@@ -1049,8 +983,6 @@ impl<N> RotationNode for RunNode<N> {
 
 #[cfg(test)]
 mod tests {
-    use typenum::consts::*;
-
     use super::*;
 
     #[test]
@@ -1086,7 +1018,6 @@ mod tests {
                     x: 0,
                     y: 1,
                     direction: North,
-                    _maze_width: PhantomData,
                 })),
             ),
             (
@@ -1097,7 +1028,6 @@ mod tests {
                     x: 0,
                     y: 1,
                     direction: South,
-                    _maze_width: PhantomData,
                 })),
             ),
             (
@@ -1118,7 +1048,6 @@ mod tests {
                     x: 1,
                     y: 0,
                     direction: East,
-                    _maze_width: PhantomData,
                 })),
             ),
             (
@@ -1144,7 +1073,7 @@ mod tests {
         ];
 
         for (x, y, dir, expected) in test_cases {
-            assert_eq!(SearchNode::<U4>::new(x, y, dir,), expected);
+            assert_eq!(SearchNode::<4>::new(x, y, dir,), expected);
         }
     }
 
@@ -1193,11 +1122,11 @@ mod tests {
             ),
         ];
 
-        type List = Vec<Vec<WallNode<Wall<U4>, (SearchNode<U4>, Pattern)>>>;
+        type List = Vec<Vec<WallNode<Wall<4>, (SearchNode<4>, Pattern)>>>;
 
         use std::vec::Vec;
         for ((x, y, dir), expected) in test_cases {
-            let node = SearchNode::<U4>::new(x, y, dir).unwrap();
+            let node = SearchNode::<4>::new(x, y, dir).unwrap();
             let successors: List = node
                 .successors()
                 .into_iter()
@@ -1210,10 +1139,10 @@ mod tests {
                     e.into_iter()
                         .map(|wall_node| match wall_node {
                             WallNode::Wall((x, y, top)) => {
-                                WallNode::Wall(Wall::<U4>::new(x, y, top).unwrap())
+                                WallNode::Wall(Wall::<4>::new(x, y, top).unwrap())
                             }
                             WallNode::Node((x, y, dir, c)) => {
-                                WallNode::Node((SearchNode::<U4>::new(x, y, dir).unwrap(), c))
+                                WallNode::Node((SearchNode::<4>::new(x, y, dir).unwrap(), c))
                             }
                         })
                         .collect()
@@ -1236,7 +1165,6 @@ mod tests {
                     x: 0,
                     y: 0,
                     direction: North,
-                    _maze_width: PhantomData,
                 })),
             ),
             (
@@ -1247,7 +1175,6 @@ mod tests {
                     x: 0,
                     y: 1,
                     direction: NorthEast,
-                    _maze_width: PhantomData,
                 })),
             ),
             (
@@ -1263,7 +1190,7 @@ mod tests {
         ];
 
         for (x, y, dir, expected) in test_cases {
-            assert_eq!(RunNode::<U4>::new(x, y, dir,), expected);
+            assert_eq!(RunNode::<4>::new(x, y, dir,), expected);
         }
     }
 
@@ -1375,11 +1302,11 @@ mod tests {
 
         use std::vec::Vec;
 
-        type Size = U2;
-        type List = Vec<Vec<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>>;
+        const SIZE: usize = 2;
+        type List = Vec<Vec<WallNode<Wall<SIZE>, (RunNode<SIZE>, Pattern)>>>;
 
         for ((x, y, dir), expected) in test_cases {
-            let node = RunNode::<Size>::new(x, y, dir).unwrap();
+            let node = RunNode::<SIZE>::new(x, y, dir).unwrap();
             let successors: List = node
                 .successors()
                 .into_iter()
@@ -1392,10 +1319,10 @@ mod tests {
                     e.into_iter()
                         .map(|wall_nodes| match wall_nodes {
                             WallNode::Wall((x, y, top)) => {
-                                WallNode::Wall(Wall::<Size>::new(x, y, top).unwrap())
+                                WallNode::Wall(Wall::<SIZE>::new(x, y, top).unwrap())
                             }
                             WallNode::Node((x, y, dir, c)) => {
-                                WallNode::Node((RunNode::<Size>::new(x, y, dir).unwrap(), c))
+                                WallNode::Node((RunNode::<SIZE>::new(x, y, dir).unwrap(), c))
                             }
                         })
                         .collect()
@@ -1410,7 +1337,7 @@ mod tests {
     fn test_run_node_wall_finder() {
         use AbsoluteDirection::*;
 
-        type Size = U4;
+        const SIZE: usize = 4;
 
         let test_cases = vec![
             (
@@ -1444,13 +1371,13 @@ mod tests {
         use std::vec::Vec;
 
         for (src, dst, expected) in test_cases {
-            let src = RunNode::<Size>::new(src.0, src.1, src.2).unwrap();
-            let dst = RunNode::<Size>::new(dst.0, dst.1, dst.2).unwrap();
-            let expected: Vec<Wall<Size>> = expected
+            let src = RunNode::<SIZE>::new(src.0, src.1, src.2).unwrap();
+            let dst = RunNode::<SIZE>::new(dst.0, dst.1, dst.2).unwrap();
+            let expected: Vec<Wall<SIZE>> = expected
                 .into_iter()
-                .map(|(x, y, top)| Wall::<Size>::new(x, y, top).unwrap())
+                .map(|(x, y, top)| Wall::<SIZE>::new(x, y, top).unwrap())
                 .collect();
-            let walls: Vec<Wall<Size>> = src.walls_between(&dst).into_iter().collect();
+            let walls: Vec<Wall<SIZE>> = src.walls_between(&dst).into_iter().collect();
             assert_eq!(walls, expected);
         }
     }
@@ -1468,11 +1395,11 @@ mod tests {
             ((0, 1, North), (0, 1, South), Ok(Back)),
         ];
 
-        type Size = U4;
+        const SIZE: usize = 4;
 
         for (src, dst, expected) in test_cases {
-            let src = SearchNode::<Size>::new(src.0, src.1, src.2).unwrap();
-            let dst = SearchNode::<Size>::new(dst.0, dst.1, dst.2).unwrap();
+            let src = SearchNode::<SIZE>::new(src.0, src.1, src.2).unwrap();
+            let dst = SearchNode::<SIZE>::new(dst.0, dst.1, dst.2).unwrap();
             let expected = expected.map_err(|_| RouteError {
                 src: src.clone(),
                 dst: dst.clone(),
@@ -1524,11 +1451,11 @@ mod tests {
             ),
         ];
 
-        type Size = U4;
+        const SIZE: usize = 4;
 
         for (src, dst, expected) in test_cases {
-            let src = RunNode::<Size>::new(src.0, src.1, src.2).unwrap();
-            let dst = RunNode::<Size>::new(dst.0, dst.1, dst.2).unwrap();
+            let src = RunNode::<SIZE>::new(src.0, src.1, src.2).unwrap();
+            let dst = RunNode::<SIZE>::new(dst.0, dst.1, dst.2).unwrap();
             let expected = expected.map_err(|_| RouteError {
                 src: src.clone(),
                 dst: dst.clone(),
@@ -1541,7 +1468,7 @@ mod tests {
     fn test_search_node_into_wall() {
         use AbsoluteDirection::*;
 
-        type Size = U4;
+        const SIZE: usize = 4;
 
         let test_cases = vec![
             ((1, 0, East), (0, 0, false)),
@@ -1552,8 +1479,8 @@ mod tests {
         ];
 
         for (node, expected) in test_cases {
-            let node = SearchNode::<Size>::new(node.0, node.1, node.2).unwrap();
-            let expected = Wall::<Size>::new(expected.0, expected.1, expected.2).unwrap();
+            let node = SearchNode::<SIZE>::new(node.0, node.1, node.2).unwrap();
+            let expected = Wall::<SIZE>::new(expected.0, expected.1, expected.2).unwrap();
             assert_eq!(Wall::from(node), expected);
         }
     }
@@ -1563,7 +1490,7 @@ mod tests {
         use AbsoluteDirection::*;
         use RotationKind::*;
 
-        type Size = U4;
+        const SIZE: usize = 4;
 
         let test_cases = vec![
             (
@@ -1589,10 +1516,10 @@ mod tests {
         use std::vec::Vec;
 
         for (node, expected) in test_cases {
-            let node = RunNode::<Size>::new(node.0, node.1, node.2).unwrap();
+            let node = RunNode::<SIZE>::new(node.0, node.1, node.2).unwrap();
             let expected = expected
                 .into_iter()
-                .map(|(node, kind)| (RunNode::<Size>::new(node.0, node.1, node.2).unwrap(), kind))
+                .map(|(node, kind)| (RunNode::<SIZE>::new(node.0, node.1, node.2).unwrap(), kind))
                 .collect::<Vec<_>>();
             assert_eq!(node.rotation_nodes(), expected.as_slice());
         }

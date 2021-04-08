@@ -13,7 +13,7 @@ pub type Robot<
     RightMotor,
     DistanceSensor,
     Math,
-    Size,
+    const N: usize,
 > = robot::Robot<
     estimator::Estimator<LeftEncoder, RightEncoder, Imu, Math>,
     tracker::Tracker<
@@ -25,10 +25,10 @@ pub type Robot<
     >,
     wall_detector::WallDetector<
         'a,
-        wall_manager::WallManager<Size>,
+        wall_manager::WallManager<N>,
         obstacle_detector::ObstacleDetector<DistanceSensor, Math>,
         Math,
-        Size,
+        N,
     >,
     types::data::RobotState,
 >;
@@ -42,7 +42,7 @@ pub type RunAgent<
     RightMotor,
     DistanceSensor,
     Math,
-    Size,
+    const N: usize,
 > = agents::TrackingAgent<
     trajectory_managers::TrackingTrajectoryManager<
         trajectory_generators::RunTrajectoryGenerator<
@@ -53,7 +53,7 @@ pub type RunAgent<
         types::data::Target,
         trajectory_generators::ShiftTrajectory<trajectory_generators::RunTrajectory<Math>, Math>,
     >,
-    Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>,
+    Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, N>,
 >;
 
 pub type ReturnSetupAgent<
@@ -65,7 +65,7 @@ pub type ReturnSetupAgent<
     RightMotor,
     DistanceSensor,
     Math,
-    Size,
+    const N: usize,
 > = agents::TrackingAgent<
     trajectory_managers::TrackingTrajectoryManager<
         trajectory_generators::ReturnSetupTrajectoryGenerator,
@@ -73,7 +73,7 @@ pub type ReturnSetupAgent<
         types::data::Target,
         trajectory_generators::SpinTrajectory,
     >,
-    Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>,
+    Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, N>,
 >;
 
 pub type SearchAgent<
@@ -85,7 +85,7 @@ pub type SearchAgent<
         RightMotor,
         DistanceSensor,
         Math,
-        Size,
+        const N: usize,
     > = agents::TrackingAgent<
         trajectory_managers::SearchTrajectoryManager<
             trajectory_generators::SearchTrajectoryGenerator<Math>,
@@ -96,38 +96,38 @@ pub type SearchAgent<
                 types::data::SearchKind,
             )>>::Trajectory,
         >,
-        Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>,
+        Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, N>,
     >;
 
-pub type SearchCommander<'a, Size> = commanders::SearchCommander<
-    nodes::Node<Size>,
-    nodes::RunNode<Size>,
-    nodes::SearchNode<Size>,
+pub type SearchCommander<'a, const N: usize> = commanders::SearchCommander<
+    nodes::Node<N>,
+    nodes::RunNode<N>,
+    nodes::SearchNode<N>,
     types::data::SearchKind,
     mazes::Maze<
         'a,
-        wall_manager::WallManager<Size>,
+        wall_manager::WallManager<N>,
         pattern_converters::LinearPatternConverter<u16>,
-        nodes::SearchNode<Size>,
+        nodes::SearchNode<N>,
     >,
 >;
 
-pub type RunCommander<'a, Size> = commanders::RunCommander<
-    nodes::RunNode<Size>,
+pub type RunCommander<'a, const N: usize> = commanders::RunCommander<
+    nodes::RunNode<N>,
     mazes::CheckedMaze<
         'a,
-        wall_manager::WallManager<Size>,
+        wall_manager::WallManager<N>,
         pattern_converters::LinearPatternConverter<u16>,
-        nodes::SearchNode<Size>,
+        nodes::SearchNode<N>,
     >,
 >;
 
-pub type ReturnSetupCommander<'a, Size> = commanders::ReturnSetupCommander<
-    nodes::RunNode<Size>,
+pub type ReturnSetupCommander<'a, const N: usize> = commanders::ReturnSetupCommander<
+    nodes::RunNode<N>,
     mazes::CheckedMaze<
         'a,
-        wall_manager::WallManager<Size>,
+        wall_manager::WallManager<N>,
         pattern_converters::LinearPatternConverter<u16>,
-        nodes::SearchNode<Size>,
+        nodes::SearchNode<N>,
     >,
 >;

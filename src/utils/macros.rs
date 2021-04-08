@@ -3,7 +3,47 @@
 macro_rules! impl_with_getter {
     (
         $(#[$meta:meta])*
-        pub struct $name: ident <$($tt: tt),*> {
+        pub struct $name: ident $(<$(const $const: ident : usize),*>)? {
+            $(
+                $(#[$field_meta:meta])*
+                $field_name: ident: $type: ty,
+            )*
+        }
+    ) => {
+        impl_with_getter! {
+            $(#[$meta])*
+            pub struct $name$(<; $(const $const: usize),*>)? {
+                $(
+                    $(#[$field_meta])*
+                    $field_name: $type,
+                )*
+            }
+        }
+    };
+
+    (
+        $(#[$meta:meta])*
+        pub struct $name: ident $(<$($tt: ident),*>)? {
+            $(
+                $(#[$field_meta:meta])*
+                $field_name: ident: $type: ty,
+            )*
+        }
+    ) => {
+        impl_with_getter! {
+            $(#[$meta])*
+            pub struct $name$(<$($tt),*;>)? {
+                $(
+                    $(#[$field_meta])*
+                    $field_name: $type,
+                )*
+            }
+        }
+    };
+
+    (
+        $(#[$meta:meta])*
+        pub struct $name: ident <$($tt: ident),*; $(const $const: ident : usize),*> {
             $(
                 $(#[$field_meta:meta])*
                 $field_name: ident: $type: ty,
@@ -11,21 +51,21 @@ macro_rules! impl_with_getter {
         }
     ) => {
         $(#[$meta])*
-        pub struct $name<$($tt),*> {
+        pub struct $name<$($tt,)* $(const $const: usize),*> {
             $(
                 $(#[$field_meta])*
                 $field_name: $type
             ),*
         }
 
-        impl<$($tt),*> $name<$($tt),*> {
+        impl<$($tt,)* $(const $const: usize),*> $name<$($tt,)* $($const),*> {
             $(
                 pub fn $field_name(&self) -> &$type {
                     &self.$field_name
                 }
             )*
         }
-    };
+    }
 }
 
 #[doc(hidden)]
