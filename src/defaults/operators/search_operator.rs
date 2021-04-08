@@ -1,9 +1,4 @@
 use core::fmt::Debug;
-use core::ops::Mul;
-
-use generic_array::ArrayLength;
-use spin::Mutex;
-use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use super::initialize::{init_search_agent, init_search_commander};
 use crate::defaults::aliases::{SearchAgent, SearchCommander};
@@ -12,12 +7,8 @@ use crate::defaults::{
     resource::{Resource, ResourceBuilder},
     state::State,
 };
-use crate::mazes::WallNode;
-use crate::nodes::Pattern;
-use crate::nodes::{RunNode, SearchNode};
 use crate::sensors::{DistanceSensor as IDistanceSensor, Encoder, Motor, IMU};
-use crate::utils::probability::Probability;
-use crate::wall_manager::{Wall, WallManager};
+use crate::wall_manager::WallManager;
 
 pub struct SearchOperator<
     'a,
@@ -28,10 +19,10 @@ pub struct SearchOperator<
     RightMotor,
     DistanceSensor,
     Math,
-    Size,
+    const N: usize,
 >(
     crate::operators::TrackingOperator<
-        SearchCommander<'a, Size>,
+        SearchCommander<'a, N>,
         SearchAgent<
             'a,
             LeftEncoder,
@@ -41,17 +32,24 @@ pub struct SearchOperator<
             RightMotor,
             DistanceSensor,
             Math,
-            Size,
+            N,
         >,
     >,
 )
 where
-    Size: Mul<Size>,
-    Size::Output: Mul<U2>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
     Math: crate::utils::math::Math;
 
-impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>
+impl<
+        'a,
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        Math,
+        const N: usize,
+    >
     SearchOperator<
         'a,
         LeftEncoder,
@@ -61,7 +59,7 @@ impl<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, 
         RightMotor,
         DistanceSensor,
         Math,
-        Size,
+        N,
     >
 where
     Math: crate::utils::math::Math,
@@ -71,24 +69,15 @@ where
     LeftMotor: Motor,
     RightMotor: Motor,
     DistanceSensor: IDistanceSensor,
-    Size: Mul<Size> + Mul<U2> + Mul<U4> + Clone + PartialEq + Unsigned + PowerOfTwo,
-    <Size as Mul<Size>>::Output: Mul<U2> + Mul<U16> + Mul<U4>,
-    <Size as Mul<U2>>::Output: ArrayLength<Wall<Size>>,
-    <Size as Mul<U4>>::Output: ArrayLength<(RunNode<Size>, u16)>
-        + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
-    <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-    <<Size as Mul<Size>>::Output as Mul<U4>>::Output: ArrayLength<SearchNode<Size>>,
-    <<Size as Mul<Size>>::Output as Mul<U16>>::Output:
-        ArrayLength<SearchNode<Size>> + ArrayLength<u16> + ArrayLength<Option<RunNode<Size>>>,
     Imu::Error: Debug,
     LeftEncoder::Error: Debug,
     RightEncoder::Error: Debug,
 {
     pub fn new(
-        config: &Config<Size>,
-        state: &State<Size>,
+        config: &Config<N>,
+        state: &State<N>,
         resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
-        wall_manager: &'a WallManager<Size>,
+        wall_manager: &'a WallManager<N>,
     ) -> Self {
         let commander = init_search_commander(config, state, wall_manager);
         let agent = init_search_agent(config, state, resource, wall_manager);
@@ -98,7 +87,7 @@ where
     pub fn release(
         self,
     ) -> (
-        State<Size>,
+        State<N>,
         Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
     ) {
         let Self(inner) = self;
@@ -143,7 +132,7 @@ mod tests {
             Default::default(),
         );
         let wall_manager = WallManager::new(Probability::new(0.1).unwrap());
-        let operator = SearchOperator::<_, _, _, _, _, _, MathFake, _>::new(
+        let operator = SearchOperator::<_, _, _, _, _, _, MathFake, 4>::new(
             &config,
             &state,
             resource,

@@ -24,7 +24,6 @@ use components::{
     wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
 };
-use typenum::consts::*;
 use uom::si::f32::{
     Acceleration, Angle, ElectricPotential, Frequency, Jerk, Length, Time, Velocity,
 };
@@ -42,7 +41,7 @@ use utils::math::MathFake;
 use utils::sensors::AgentSimulator;
 
 macro_rules! impl_run_operator_test {
-    ($name: ident < $size: ty > { $input: expr, }) => {
+    ($name: ident < $size: literal > { $input: expr, }) => {
         #[test]
         fn $name() {
             let (input_str, goals, square_width) = $input;
@@ -204,7 +203,7 @@ macro_rules! impl_run_operator_test {
                         WallDetectorBuilder::new()
                             .wall_manager(&wall_storage)
                             .obstacle_detector(obstacle_detector)
-                            .build::<MathFake, _>()
+                            .build::<MathFake, $size>()
                             .unwrap()
                     };
                     Robot::new(estimator, tracker, wall_detector)
@@ -277,7 +276,7 @@ macro_rules! impl_run_operator_test {
 }
 
 impl_run_operator_test! {
-    test_run_operator1<U4> {
+    test_run_operator1<4> {
         (
             include_str!("../mazes/maze1.dat"),
             vec![
@@ -290,7 +289,7 @@ impl_run_operator_test! {
 }
 
 impl_run_operator_test! {
-    test_run_operator2<U16> {
+    test_run_operator2<16> {
         (
             include_str!("../mazes/maze2.dat"),
             vec![
@@ -305,7 +304,7 @@ impl_run_operator_test! {
 }
 
 impl_run_operator_test! {
-    test_run_operator3<U4> {
+    test_run_operator3<4> {
         (
             include_str!("../mazes/maze3.dat"),
             vec![(2, 0, South), (2, 0, West)],
@@ -315,7 +314,7 @@ impl_run_operator_test! {
 }
 
 impl_run_operator_test! {
-    test_run_operator_with_accel_slalom<U4> {
+    test_run_operator_with_accel_slalom<4> {
         (
             include_str!("../mazes/maze4.dat"),
             vec![(2, 0, South), (2, 0, West)],
@@ -325,7 +324,7 @@ impl_run_operator_test! {
 }
 
 impl_run_operator_test! {
-    test_run_operator_with_classic_size<U4> {
+    test_run_operator_with_classic_size<4> {
         (
             include_str!("../mazes/maze1.dat"),
             vec![(2, 0, South), (2, 0, West)],

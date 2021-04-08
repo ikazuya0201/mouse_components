@@ -1,9 +1,4 @@
 use core::fmt::Debug;
-use core::ops::Mul;
-
-use generic_array::ArrayLength;
-use spin::Mutex;
-use typenum::{consts::*, PowerOfTwo, Unsigned};
 
 use super::initialize::{init_return_commander, init_run_agent, init_run_commander};
 use crate::defaults::aliases::{RunAgent, RunCommander};
@@ -12,13 +7,8 @@ use crate::defaults::{
     resource::{Resource, ResourceBuilder},
     state::State,
 };
-use crate::mazes::WallNode;
-use crate::nodes::Pattern;
-use crate::nodes::{RunNode, SearchNode};
 use crate::sensors::{DistanceSensor as IDistanceSensor, Encoder, Motor, IMU};
-use crate::trajectory_generators::RunKind;
-use crate::utils::probability::Probability;
-use crate::wall_manager::{Wall, WallManager};
+use crate::wall_manager::WallManager;
 
 macro_rules! impl_run_operator {
     ($operator: ident: $commander_fn: ident) => {
@@ -31,10 +21,10 @@ macro_rules! impl_run_operator {
             RightMotor,
             DistanceSensor,
             Math,
-            Size,
+            const N: usize,
         >(
             crate::operators::TrackingOperator<
-                RunCommander<'a, Size>,
+                RunCommander<'a, N>,
                 RunAgent<
                     'a,
                     LeftEncoder,
@@ -44,14 +34,11 @@ macro_rules! impl_run_operator {
                     RightMotor,
                     DistanceSensor,
                     Math,
-                    Size,
+                    N,
                 >,
             >,
         )
         where
-            Size: Mul<Size> + Clone,
-            Size::Output: Mul<U2>,
-            <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
             Math: crate::utils::math::Math;
 
         impl<
@@ -63,7 +50,7 @@ macro_rules! impl_run_operator {
                 RightMotor,
                 DistanceSensor,
                 Math,
-                Size,
+                const N: usize,
             >
             $operator<
                 'a,
@@ -74,7 +61,7 @@ macro_rules! impl_run_operator {
                 RightMotor,
                 DistanceSensor,
                 Math,
-                Size,
+                N,
             >
         where
             Math: crate::utils::math::Math,
@@ -84,25 +71,13 @@ macro_rules! impl_run_operator {
             LeftMotor: Motor,
             RightMotor: Motor,
             DistanceSensor: IDistanceSensor,
-            Size: Mul<Size> + Mul<U2> + Mul<U4> + Clone + PartialEq + Unsigned + PowerOfTwo,
-            <Size as Mul<Size>>::Output: Mul<U2> + Mul<U16> + Mul<U4>,
-            <Size as Mul<U2>>::Output: ArrayLength<Wall<Size>>,
-            <Size as Mul<U4>>::Output: ArrayLength<(RunNode<Size>, u16)>
-                + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
-            <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-            <<Size as Mul<Size>>::Output as Mul<U4>>::Output: ArrayLength<SearchNode<Size>>,
-            <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<SearchNode<Size>>
-                + ArrayLength<Option<usize>>
-                + ArrayLength<u16>
-                + ArrayLength<(RunNode<Size>, RunKind)>
-                + ArrayLength<Option<RunNode<Size>>>,
             Imu::Error: Debug,
             LeftEncoder::Error: Debug,
             RightEncoder::Error: Debug,
         {
             pub fn new(
-                config: &Config<Size>,
-                state: &State<Size>,
+                config: &Config<N>,
+                state: &State<N>,
                 resource: Resource<
                     LeftEncoder,
                     RightEncoder,
@@ -111,7 +86,7 @@ macro_rules! impl_run_operator {
                     RightMotor,
                     DistanceSensor,
                 >,
-                wall_manager: &'a WallManager<Size>,
+                wall_manager: &'a WallManager<N>,
             ) -> Self {
                 let commander = $commander_fn(config, state, wall_manager);
                 let agent = init_run_agent(config, state, resource, wall_manager);
@@ -121,7 +96,7 @@ macro_rules! impl_run_operator {
             pub fn release(
                 self,
             ) -> (
-                State<Size>,
+                State<N>,
                 Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
             ) {
                 let Self(inner) = self;
@@ -173,7 +148,7 @@ mod tests {
                     Probability::new(0.1).unwrap(),
                     include_str!("../../../mazes/maze1.dat"),
                 );
-                let operator = $operator::<_, _, _, _, _, _, MathFake, _>::new(
+                let operator = $operator::<_, _, _, _, _, _, MathFake, 4>::new(
                     &config,
                     &state,
                     resource,

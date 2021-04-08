@@ -9,14 +9,14 @@ use crate::tracker::RobotState;
 impl_with_getter! {
     /// A state for operators.
     #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
-    pub struct State<Size> {
-        current_node: Node<Size>,
+    pub struct State<const N: usize> {
+        current_node: Node<N>,
         robot_state: RobotState,
     }
 }
 
-impl<Size> State<Size> {
-    pub fn new(current_node: Node<Size>, robot_state: RobotState) -> Self {
+impl<const N: usize> State<N> {
+    pub fn new(current_node: Node<N>, robot_state: RobotState) -> Self {
         Self {
             current_node,
             robot_state,

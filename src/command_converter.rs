@@ -42,7 +42,11 @@ impl Default for CommandConverter {
     }
 }
 
-fn _convert<N>(node: &Node<N>, square_width_half: Length, front_offset: Length) -> Pose {
+fn _convert<const N: usize>(
+    node: &Node<N>,
+    square_width_half: Length,
+    front_offset: Length,
+) -> Pose {
     use AbsoluteDirection::*;
 
     let (dx, dy, theta) = if (node.x() ^ node.y()) & 1 == 1 {
@@ -80,7 +84,7 @@ fn _convert<N>(node: &Node<N>, square_width_half: Length, front_offset: Length) 
 }
 
 //TODO: Write test.
-impl<N, K: Clone> ICommandConverter<(Node<N>, K)> for CommandConverter {
+impl<K: Clone, const N: usize> ICommandConverter<(Node<N>, K)> for CommandConverter {
     type Output = (Pose, K);
 
     fn convert(&self, (node, kind): &(Node<N>, K)) -> Self::Output {
@@ -91,7 +95,7 @@ impl<N, K: Clone> ICommandConverter<(Node<N>, K)> for CommandConverter {
     }
 }
 
-impl<N, K: Clone> ICommandConverter<(SearchNode<N>, K)> for CommandConverter {
+impl<K: Clone, const N: usize> ICommandConverter<(SearchNode<N>, K)> for CommandConverter {
     type Output = (Pose, K);
 
     fn convert(&self, (node, kind): &(SearchNode<N>, K)) -> Self::Output {
@@ -102,7 +106,7 @@ impl<N, K: Clone> ICommandConverter<(SearchNode<N>, K)> for CommandConverter {
     }
 }
 
-impl<N, K: Clone> ICommandConverter<(RunNode<N>, K)> for CommandConverter {
+impl<K: Clone, const N: usize> ICommandConverter<(RunNode<N>, K)> for CommandConverter {
     type Output = (Pose, K);
 
     fn convert(&self, (node, kind): &(RunNode<N>, K)) -> Self::Output {
@@ -113,7 +117,7 @@ impl<N, K: Clone> ICommandConverter<(RunNode<N>, K)> for CommandConverter {
     }
 }
 
-impl<N> ICommandConverter<RunCommand<RunNode<N>, RunKind>> for CommandConverter {
+impl<const N: usize> ICommandConverter<RunCommand<RunNode<N>, RunKind>> for CommandConverter {
     type Output = RunTrajectoryParameters;
 
     fn convert(&self, command: &RunCommand<RunNode<N>, RunKind>) -> Self::Output {

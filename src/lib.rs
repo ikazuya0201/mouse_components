@@ -81,3 +81,5 @@ pub mod sensors {
     #[doc(no_inline)]
     pub use tracker::Motor;
 }
+
+pub type MazeWidthUpperBound = typenum::consts::U16;

@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 
 use generic_array::GenericArray;
 use heapless::Vec;
-use typenum::{consts::*, PowerOfTwo, Unsigned};
+use typenum::consts::*;
 use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
 
@@ -52,18 +52,18 @@ pub trait WallProbabilityManager<Wall>: Send + Sync {
 }
 
 /// An implementation of [WallDetector](crate::robot::WallDetector).
-pub struct WallDetector<'a, Manager, Detector, Math, Size> {
+pub struct WallDetector<'a, Manager, Detector, Math, const N: usize> {
     manager: &'a Manager,
     detector: Detector,
-    converter: PoseConverter<Math, Size>,
+    converter: PoseConverter<Math, N>,
     _math: PhantomData<fn() -> Math>,
 }
 
-impl<'a, Manager, Detector, Math, Size> WallDetector<'a, Manager, Detector, Math, Size> {
+impl<'a, Manager, Detector, Math, const N: usize> WallDetector<'a, Manager, Detector, Math, N> {
     pub fn new(
         manager: &'a Manager,
         detector: Detector,
-        converter: PoseConverter<Math, Size>,
+        converter: PoseConverter<Math, N>,
     ) -> Self {
         Self {
             manager,
@@ -81,12 +81,11 @@ impl<'a, Manager, Detector, Math, Size> WallDetector<'a, Manager, Detector, Math
 
 type ObstacleSizeUpperBound = typenum::consts::U6;
 
-impl<'a, Manager, Detector, Math, Size, State> IWallDetector<State>
-    for WallDetector<'a, Manager, Detector, Math, Size>
+impl<'a, Manager, Detector, Math, State, const N: usize> IWallDetector<State>
+    for WallDetector<'a, Manager, Detector, Math, N>
 where
-    Manager: WallProbabilityManager<Wall<Size>>,
+    Manager: WallProbabilityManager<Wall<N>>,
     Detector: ObstacleDetector<State, Obstacle = Obstacle>,
-    Size: Unsigned + PowerOfTwo,
     Math: IMath,
 {
     type Info = CorrectInfo;
@@ -157,7 +156,7 @@ where
 
 /// An implementation of [PoseConverter](crate::wall_detector::PoseConverter).
 #[derive(Clone, PartialEq, Debug)]
-pub struct PoseConverter<M, N> {
+pub struct PoseConverter<M, const N: usize> {
     i_square_width: i32, //[mm]
     square_width_half: Length,
     square_width: Length,
@@ -167,7 +166,6 @@ pub struct PoseConverter<M, N> {
     p2: Length,
     n1: Length,
     n2: Length,
-    _maze_width: PhantomData<fn() -> N>,
     _math: PhantomData<fn() -> M>,
 }
 
@@ -192,7 +190,7 @@ pub(crate) const DEFAULT_IGNORE_LENGTH: Length = Length {
     units: PhantomData,
 };
 
-impl<M, N> Default for PoseConverter<M, N> {
+impl<M, const N: usize> Default for PoseConverter<M, N> {
     fn default() -> Self {
         Self::new(
             DEFAULT_SQUARE_WIDTH,
@@ -203,7 +201,7 @@ impl<M, N> Default for PoseConverter<M, N> {
     }
 }
 
-impl<M, N> PoseConverter<M, N> {
+impl<M, const N: usize> PoseConverter<M, N> {
     fn new(
         square_width: Length,
         wall_width: Length,
@@ -224,7 +222,6 @@ impl<M, N> PoseConverter<M, N> {
             p2,
             n1,
             n2,
-            _maze_width: PhantomData,
             _math: PhantomData,
         }
     }
@@ -237,7 +234,7 @@ impl<M, N> PoseConverter<M, N> {
     }
 }
 
-impl<M, N> PoseConverter<M, N>
+impl<M, const N: usize> PoseConverter<M, N>
 where
     M: Math,
 {
@@ -303,9 +300,8 @@ impl From<OutOfBoundError> for ConversionError {
     }
 }
 
-impl<M, N> PoseConverter<M, N>
+impl<M, const N: usize> PoseConverter<M, N>
 where
-    N: Unsigned + PowerOfTwo,
     M: Math,
 {
     pub fn convert(&self, pose: &Pose) -> Result<WallInfo<Wall<N>>, ConversionError> {
@@ -468,7 +464,7 @@ impl PoseConverterBuilder {
     impl_setter!(ignore_length_from_wall: Length);
     impl_setter!(ignore_radius_from_pillar: Length);
 
-    pub fn build<M, N>(&mut self) -> BuilderResult<PoseConverter<M, N>> {
+    pub fn build<M, const N: usize>(&mut self) -> BuilderResult<PoseConverter<M, N>> {
         Ok(PoseConverter::new(
             self.square_width.unwrap_or(DEFAULT_SQUARE_WIDTH),
             self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
@@ -547,7 +543,9 @@ impl<'a, Manager, Detector> WallDetectorBuilder<'a, Manager, Detector> {
         ignore_length_from_wall: Length
     }
 
-    pub fn build<M, N>(&mut self) -> BuilderResult<WallDetector<'a, Manager, Detector, M, N>> {
+    pub fn build<M, const N: usize>(
+        &mut self,
+    ) -> BuilderResult<WallDetector<'a, Manager, Detector, M, N>> {
         let converter = PoseConverter::<M, N>::new(
             self.square_width.unwrap_or(DEFAULT_SQUARE_WIDTH),
             self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
@@ -576,7 +574,7 @@ mod tests {
     use crate::utils::math::MathFake;
 
     macro_rules! define_convert_ok_test {
-        ($name:ident: ($size:ty, $value: expr)) => {
+        ($name:ident: ($size:expr, $value: expr)) => {
             #[test]
             fn $name() {
                 let (input, expected) = $value;
@@ -612,7 +610,7 @@ mod tests {
     }
 
     macro_rules! define_convert_err_test {
-        ($name:ident: ($size:ty, $value: expr)) => {
+        ($name:ident: ($size:expr, $value: expr)) => {
             #[test]
             fn $name() {
                 let input = $value;
@@ -634,44 +632,44 @@ mod tests {
     }
 
     define_convert_ok_test! (
-    convert_ok_test1: (U4, (
+    convert_ok_test1: (4, (
         (0.045, 0.045, 0.0),
         (0, 0, false, 0.042, 0.132),
     )));
     define_convert_ok_test! (
-    convert_ok_test2: (U4, (
+    convert_ok_test2: (4, (
         (0.077, 0.045, 45.0),
         (0, 0, false, 2.0f32.sqrt() * 0.01, 2.0f32.sqrt() * 0.042),
     )));
     define_convert_ok_test! (
-    convert_ok_test3: (U4, (
+    convert_ok_test3: (4, (
         (0.135, 0.045, 180.0),
         (0, 0, false, 0.042, 0.132),
     )));
     define_convert_ok_test! (
-    convert_ok_test4: (U4, (
+    convert_ok_test4: (4, (
         (0.045, 0.135, 270.0),
         (0, 0, true, 0.042, 0.132),
     )));
     define_convert_ok_test! (
-    convert_ok_test5: (U4, (
+    convert_ok_test5: (4, (
         (0.135, 0.135, 90.0),
         (1, 1, true, 0.042, 0.132),
     )));
     define_convert_ok_test! (
-    convert_ok_test6: (U4, (
+    convert_ok_test6: (4, (
         (0.135, 0.135, 180.0),
         (0, 1, false, 0.042, 0.132),
     )));
     define_convert_ok_test! (
-    convert_ok_test7: (U4, (
+    convert_ok_test7: (4, (
         (0.045, 0.135, 0.0),
         (0, 1, false, 0.042, 0.132),
     )));
 
-    define_convert_err_test!(convert_err_test1: (U4, (0.0, 0.0, 0.0)));
-    define_convert_err_test!(convert_err_test2: (U4, (0.405, 0.045, 0.0)));
-    define_convert_err_test!(convert_err_test3: (U4, (-0.045, 0.045, 0.0)));
-    define_convert_err_test!(convert_err_test4: (U4, (0.045, 0.045, 45.0)));
-    define_convert_err_test!(convert_err_test5: (U4, (0.085, 0.045, 0.0)));
+    define_convert_err_test!(convert_err_test1: (4, (0.0, 0.0, 0.0)));
+    define_convert_err_test!(convert_err_test2: (4, (0.405, 0.045, 0.0)));
+    define_convert_err_test!(convert_err_test3: (4, (-0.045, 0.045, 0.0)));
+    define_convert_err_test!(convert_err_test4: (4, (0.045, 0.045, 45.0)));
+    define_convert_err_test!(convert_err_test5: (4, (0.085, 0.045, 0.0)));
 }

@@ -1,9 +1,3 @@
-use core::ops::Mul;
-
-use generic_array::ArrayLength;
-use spin::Mutex;
-use typenum::{consts::*, PowerOfTwo, Unsigned};
-
 use crate::command_converter::{CommandConverter, ThroughCommandConverter};
 use crate::controllers::{RotationalControllerBuilder, TranslationalControllerBuilder};
 use crate::defaults::aliases::{
@@ -12,25 +6,22 @@ use crate::defaults::aliases::{
 };
 use crate::defaults::{config::Config, resource::Resource, state::State};
 use crate::estimator::{Estimator, EstimatorBuilder};
-use crate::mazes::{CheckedMaze, Maze, WallNode};
-use crate::nodes::{Pattern, RunNode};
+use crate::mazes::{CheckedMaze, Maze};
 use crate::obstacle_detector::ObstacleDetector;
 use crate::obstacle_detector::Vec;
 use crate::sensors::{Encoder, Motor, IMU};
 use crate::tracker::{Tracker, TrackerBuilder};
 use crate::trajectory_generators::{
-    DefaultSlalomParametersGenerator, ReturnSetupTrajectoryGenerator, RunKind,
-    RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder, SearchTrajectoryGenerator,
-    SearchTrajectoryGeneratorBuilder,
+    DefaultSlalomParametersGenerator, ReturnSetupTrajectoryGenerator, RunTrajectoryGenerator,
+    RunTrajectoryGeneratorBuilder, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
 };
 use crate::trajectory_managers::{SearchTrajectoryManager, TrackingTrajectoryManager};
-use crate::utils::probability::Probability;
 use crate::wall_detector::{WallDetector, WallDetectorBuilder};
-use crate::wall_manager::{Wall, WallManager};
+use crate::wall_manager::WallManager;
 
-pub fn init_estimator<'a, LeftEncoder, RightEncoder, Imu, Math, Size>(
-    config: &Config<Size>,
-    state: &State<Size>,
+pub fn init_estimator<'a, LeftEncoder, RightEncoder, Imu, Math, const N: usize>(
+    config: &Config<N>,
+    state: &State<N>,
     left_encoder: LeftEncoder,
     right_encoder: RightEncoder,
     imu: Imu,
@@ -54,8 +45,8 @@ where
         .expect("Should never panic")
 }
 
-pub fn init_tracker<'a, LeftMotor, RightMotor, Math, Size>(
-    config: &Config<Size>,
+pub fn init_tracker<'a, LeftMotor, RightMotor, Math, const N: usize>(
+    config: &Config<N>,
     left_motor: LeftMotor,
     right_motor: RightMotor,
 ) -> Tracker<LeftMotor, RightMotor, Math>
@@ -102,16 +93,13 @@ where
         .expect("Should never panic")
 }
 
-pub fn init_wall_detector<'a, DistanceSensor, Math, Size>(
-    config: &Config<Size>,
+pub fn init_wall_detector<'a, DistanceSensor, Math, const N: usize>(
+    config: &Config<N>,
     distance_sensors: Vec<DistanceSensor>,
-    wall_manager: &'a WallManager<Size>,
-) -> WallDetector<'a, WallManager<Size>, ObstacleDetector<DistanceSensor, Math>, Math, Size>
+    wall_manager: &'a WallManager<N>,
+) -> WallDetector<'a, WallManager<N>, ObstacleDetector<DistanceSensor, Math>, Math, N>
 where
     Math: crate::utils::math::Math,
-    Size: Mul<Size>,
-    Size::Output: Mul<U2>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     let obstacle_detector = ObstacleDetector::new(distance_sensors);
     WallDetectorBuilder::new()
@@ -134,13 +122,13 @@ pub fn init_robot<
     RightMotor,
     DistanceSensor,
     Math,
-    Size,
+    const N: usize,
 >(
-    config: &Config<Size>,
-    state: &State<Size>,
+    config: &Config<N>,
+    state: &State<N>,
     resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
-    wall_manager: &'a WallManager<Size>,
-) -> Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>
+    wall_manager: &'a WallManager<N>,
+) -> Robot<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, N>
 where
     Math: crate::utils::math::Math,
     LeftEncoder: Encoder,
@@ -148,9 +136,6 @@ where
     Imu: IMU,
     LeftMotor: Motor,
     RightMotor: Motor,
-    Size: Mul<Size>,
-    Size::Output: Mul<U2>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     let Resource {
         left_encoder,
@@ -167,8 +152,8 @@ where
     )
 }
 
-pub fn init_search_trajectory_generator<'a, Math, Size>(
-    config: &Config<Size>,
+pub fn init_search_trajectory_generator<'a, Math, const N: usize>(
+    config: &Config<N>,
 ) -> SearchTrajectoryGenerator<Math>
 where
     Math: crate::utils::math::Math,
@@ -191,8 +176,8 @@ where
         .expect("Should never panic")
 }
 
-pub fn init_run_trajectory_generator<'a, Math, Size>(
-    config: &Config<Size>,
+pub fn init_run_trajectory_generator<'a, Math, const N: usize>(
+    config: &Config<N>,
 ) -> RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>
 where
     Math: crate::utils::math::Math,
@@ -212,8 +197,8 @@ where
         .expect("Should never panic")
 }
 
-pub fn init_return_setup_trajectory_generator<'a, Size>(
-    config: &Config<Size>,
+pub fn init_return_setup_trajectory_generator<'a, const N: usize>(
+    config: &Config<N>,
 ) -> ReturnSetupTrajectoryGenerator {
     ReturnSetupTrajectoryGenerator::new(
         *config.spin_angular_velocity(),
@@ -223,16 +208,11 @@ pub fn init_return_setup_trajectory_generator<'a, Size>(
     )
 }
 
-pub fn init_search_commander<'a, Size>(
-    config: &Config<Size>,
-    state: &State<Size>,
-    wall_manager: &'a WallManager<Size>,
-) -> SearchCommander<'a, Size>
-where
-    Size: Mul<Size> + Clone,
-    Size::Output: Mul<U2>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-{
+pub fn init_search_commander<'a, const N: usize>(
+    config: &Config<N>,
+    state: &State<N>,
+    wall_manager: &'a WallManager<N>,
+) -> SearchCommander<'a, N> {
     let maze = Maze::new(wall_manager, config.pattern_converter().clone());
     SearchCommander::new(
         config.start().clone(),
@@ -244,22 +224,11 @@ where
     )
 }
 
-pub fn init_run_commander<'a, Size>(
-    config: &Config<Size>,
-    state: &State<Size>,
-    wall_manager: &'a WallManager<Size>,
-) -> RunCommander<'a, Size>
-where
-    Size: Mul<Size> + Mul<U2> + Mul<U4> + Clone + PartialEq + PowerOfTwo + Unsigned,
-    <Size as Mul<Size>>::Output: Mul<U2> + Mul<U16>,
-    <Size as Mul<U4>>::Output: ArrayLength<(RunNode<Size>, u16)>
-        + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
-    <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-    <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<(RunNode<Size>, RunKind)>
-        + ArrayLength<Option<usize>>
-        + ArrayLength<u16>
-        + ArrayLength<Option<RunNode<Size>>>,
-{
+pub fn init_run_commander<'a, const N: usize>(
+    config: &Config<N>,
+    state: &State<N>,
+    wall_manager: &'a WallManager<N>,
+) -> RunCommander<'a, N> {
     use core::convert::TryInto;
 
     let maze = CheckedMaze::new(wall_manager, config.pattern_converter().clone());
@@ -274,22 +243,11 @@ where
     )
 }
 
-pub fn init_return_commander<'a, Size>(
-    config: &Config<Size>,
-    state: &State<Size>,
-    wall_manager: &'a WallManager<Size>,
-) -> RunCommander<'a, Size>
-where
-    Size: Mul<Size> + Mul<U2> + Mul<U4> + Clone + PartialEq + PowerOfTwo + Unsigned,
-    <Size as Mul<Size>>::Output: Mul<U2> + Mul<U16>,
-    <Size as Mul<U4>>::Output: ArrayLength<(RunNode<Size>, u16)>
-        + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
-    <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-    <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<(RunNode<Size>, RunKind)>
-        + ArrayLength<Option<usize>>
-        + ArrayLength<u16>
-        + ArrayLength<Option<RunNode<Size>>>,
-{
+pub fn init_return_commander<'a, const N: usize>(
+    config: &Config<N>,
+    state: &State<N>,
+    wall_manager: &'a WallManager<N>,
+) -> RunCommander<'a, N> {
     use core::convert::TryInto;
 
     let maze = CheckedMaze::new(wall_manager, config.pattern_converter().clone());
@@ -304,22 +262,11 @@ where
     )
 }
 
-pub fn init_return_setup_commander<'a, Size>(
-    config: &Config<Size>,
-    state: &State<Size>,
-    wall_manager: &'a WallManager<Size>,
-) -> ReturnSetupCommander<'a, Size>
-where
-    Size: Mul<Size> + Mul<U2> + Mul<U4> + Clone + PartialEq + PowerOfTwo + Unsigned,
-    <Size as Mul<Size>>::Output: Mul<U2> + Mul<U16>,
-    <Size as Mul<U4>>::Output: ArrayLength<(RunNode<Size>, u16)>
-        + ArrayLength<WallNode<Wall<Size>, (RunNode<Size>, Pattern)>>,
-    <<Size as Mul<Size>>::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
-    <<Size as Mul<Size>>::Output as Mul<U16>>::Output: ArrayLength<(RunNode<Size>, RunKind)>
-        + ArrayLength<Option<usize>>
-        + ArrayLength<u16>
-        + ArrayLength<Option<RunNode<Size>>>,
-{
+pub fn init_return_setup_commander<'a, const N: usize>(
+    config: &Config<N>,
+    state: &State<N>,
+    wall_manager: &'a WallManager<N>,
+) -> ReturnSetupCommander<'a, N> {
     use core::convert::TryInto;
 
     let maze = CheckedMaze::new(wall_manager, config.pattern_converter().clone());
@@ -343,23 +290,13 @@ pub fn init_search_agent<
     RightMotor,
     DistanceSensor,
     Math,
-    Size,
+    const N: usize,
 >(
-    config: &Config<Size>,
-    state: &State<Size>,
+    config: &Config<N>,
+    state: &State<N>,
     resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
-    wall_manager: &'a WallManager<Size>,
-) -> SearchAgent<
-    'a,
-    LeftEncoder,
-    RightEncoder,
-    Imu,
-    LeftMotor,
-    RightMotor,
-    DistanceSensor,
-    Math,
-    Size,
->
+    wall_manager: &'a WallManager<N>,
+) -> SearchAgent<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, N>
 where
     Math: crate::utils::math::Math,
     LeftEncoder: Encoder,
@@ -367,9 +304,6 @@ where
     Imu: IMU,
     LeftMotor: Motor,
     RightMotor: Motor,
-    Size: Mul<Size>,
-    Size::Output: Mul<U2>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     let robot = init_robot(config, state, resource, wall_manager);
     let command_converter = CommandConverter::new(*config.square_width(), *config.front_offset());
@@ -387,13 +321,13 @@ pub fn init_run_agent<
     RightMotor,
     DistanceSensor,
     Math,
-    Size,
+    const N: usize,
 >(
-    config: &Config<Size>,
-    state: &State<Size>,
+    config: &Config<N>,
+    state: &State<N>,
     resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
-    wall_manager: &'a WallManager<Size>,
-) -> RunAgent<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, Size>
+    wall_manager: &'a WallManager<N>,
+) -> RunAgent<'a, LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, Math, N>
 where
     Math: crate::utils::math::Math,
     LeftEncoder: Encoder,
@@ -401,9 +335,6 @@ where
     Imu: IMU,
     LeftMotor: Motor,
     RightMotor: Motor,
-    Size: Mul<Size>,
-    Size::Output: Mul<U2>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     let robot = init_robot(config, state, resource, wall_manager);
     let command_converter = CommandConverter::new(*config.square_width(), *config.front_offset());
@@ -421,12 +352,12 @@ pub fn init_return_setup_agent<
     RightMotor,
     DistanceSensor,
     Math,
-    Size,
+    const N: usize,
 >(
-    config: &Config<Size>,
-    state: &State<Size>,
+    config: &Config<N>,
+    state: &State<N>,
     resource: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor>,
-    wall_manager: &'a WallManager<Size>,
+    wall_manager: &'a WallManager<N>,
 ) -> ReturnSetupAgent<
     'a,
     LeftEncoder,
@@ -436,7 +367,7 @@ pub fn init_return_setup_agent<
     RightMotor,
     DistanceSensor,
     Math,
-    Size,
+    N,
 >
 where
     Math: crate::utils::math::Math,
@@ -445,9 +376,6 @@ where
     Imu: IMU,
     LeftMotor: Motor,
     RightMotor: Motor,
-    Size: Mul<Size>,
-    Size::Output: Mul<U2>,
-    <Size::Output as Mul<U2>>::Output: ArrayLength<Mutex<Probability>>,
 {
     let robot = init_robot(config, state, resource, wall_manager);
     let trajectory_manager = TrackingTrajectoryManager::new(

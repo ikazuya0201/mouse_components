@@ -5,11 +5,12 @@ mod run_commander;
 mod search_commander;
 
 use generic_array::GenericArray;
-use heapless::{binary_heap::Min, consts::*, BinaryHeap, Vec};
+use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num::{Bounded, Saturating};
-use typenum::Unsigned;
+use typenum::{consts::*, op, Unsigned, __op_internal__};
 
 use crate::utils::{forced_vec::ForcedVec, itertools::repeat_n};
+use crate::MazeWidthUpperBound;
 pub use return_setup_commander::{ReturnSetupCommander, ReturnSetupCommanderError, RotationNode};
 pub use run_commander::{RunCommand, RunCommander, RunCommanderError};
 pub use search_commander::{NextNode, NodeChecker, SearchCommander, UncheckedNodeFinder};
@@ -56,9 +57,9 @@ impl<Cost: Ord, Node> Ord for CostNode<Cost, Node> {
     }
 }
 
-pub type PathUpperBound = U256; // Fixed upper bound of path length to 16x16.
+pub(crate) type PathUpperBound = op!(MazeWidthUpperBound * MazeWidthUpperBound); // Fixed upper bound of path length to 16x16.
 
-pub type NodeNumberUpperBound = U4096; // Fixed upper bound of path length to 16x16x16.
+pub(crate) type NodeNumberUpperBound = op!(U16 * MazeWidthUpperBound * MazeWidthUpperBound); // Fixed upper bound of path length to 16x16x16.
 
 fn compute_shortest_path<Node, Maze>(
     start: &Node,
