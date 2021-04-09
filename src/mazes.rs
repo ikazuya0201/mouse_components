@@ -1,5 +1,6 @@
 //! Definition of [Maze](crate::mazes::Maze) and its dependent traits.
 
+use alloc::rc::Rc;
 use core::fmt;
 use core::marker::PhantomData;
 
@@ -77,13 +78,13 @@ pub trait PatternConverter<Pattern> {
 /// [UncheckedNodeFinder](crate::commanders::UncheckedNodeFinder) and
 /// [NodeChecker](crate::commanders::NodeChecker) required by
 /// [SearchCommander](crate::commanders::SearchCommander).
-pub struct Maze<'a, Manager, Converter, SearchNode> {
-    manager: &'a Manager,
+pub struct Maze<Manager, Converter, SearchNode> {
+    manager: Rc<Manager>,
     converter: Converter,
     _search_node: PhantomData<fn() -> SearchNode>,
 }
 
-impl<'a, Manager, Converter, SearchNode> fmt::Debug for Maze<'a, Manager, Converter, SearchNode>
+impl<Manager, Converter, SearchNode> fmt::Debug for Maze<Manager, Converter, SearchNode>
 where
     Manager: fmt::Debug,
 {
@@ -94,7 +95,7 @@ where
     }
 }
 
-impl<'a, Manager, Converter, SearchNode> fmt::Display for Maze<'a, Manager, Converter, SearchNode>
+impl<Manager, Converter, SearchNode> fmt::Display for Maze<Manager, Converter, SearchNode>
 where
     Manager: fmt::Display,
 {
@@ -103,8 +104,8 @@ where
     }
 }
 
-impl<'a, Manager, Converter, SearchNode> Maze<'a, Manager, Converter, SearchNode> {
-    pub fn new(manager: &'a Manager, converter: Converter) -> Self {
+impl<Manager, Converter, SearchNode> Maze<Manager, Converter, SearchNode> {
+    pub fn new(manager: Rc<Manager>, converter: Converter) -> Self {
         Self {
             manager,
             converter,
@@ -113,7 +114,7 @@ impl<'a, Manager, Converter, SearchNode> Maze<'a, Manager, Converter, SearchNode
     }
 }
 
-impl<'a, Manager, Converter, SearchNode> Maze<'a, Manager, Converter, SearchNode> {
+impl<Manager, Converter, SearchNode> Maze<Manager, Converter, SearchNode> {
     fn _successors<Node, F>(&self, node: &Node, is_blocked: F) -> <Self as Graph<Node>>::Edges
     where
         F: Fn(&Node::Wall) -> bool,
@@ -165,8 +166,7 @@ impl<'a, Manager, Converter, SearchNode> Maze<'a, Manager, Converter, SearchNode
     }
 }
 
-impl<'a, Node, Manager, Converter, SearchNode> Graph<Node>
-    for Maze<'a, Manager, Converter, SearchNode>
+impl<Node, Manager, Converter, SearchNode> Graph<Node> for Maze<Manager, Converter, SearchNode>
 where
     Node: GraphNode,
     Converter: PatternConverter<Node::Pattern>,
@@ -186,8 +186,8 @@ where
     }
 }
 
-impl<'a, Node, Manager, Converter, SearchNode> UncheckedNodeFinder<Node>
-    for Maze<'a, Manager, Converter, SearchNode>
+impl<Node, Manager, Converter, SearchNode> UncheckedNodeFinder<Node>
+    for Maze<Manager, Converter, SearchNode>
 where
     Node: WallFinderNode,
     Manager: WallChecker<Node::Wall>,
@@ -212,8 +212,8 @@ where
     }
 }
 
-impl<'a, Manager, Converter, SearchNode> NodeChecker<SearchNode>
-    for Maze<'a, Manager, Converter, SearchNode>
+impl<Manager, Converter, SearchNode> NodeChecker<SearchNode>
+    for Maze<Manager, Converter, SearchNode>
 where
     SearchNode: WallSpaceNode + Into<<SearchNode as WallSpaceNode>::Wall> + Clone,
     Manager: WallChecker<SearchNode::Wall>,
@@ -236,28 +236,26 @@ where
 /// The implementation of [Graph](crate::commanders::Graph) is deffered from [Maze](Maze).
 ///
 /// This checks whether a wall is checked or not in the implementation of [Graph](crate::commanders::Graph).
-pub struct CheckedMaze<'a, Manager, Converter, SearchNode>(
-    Maze<'a, Manager, Converter, SearchNode>,
-);
+pub struct CheckedMaze<Manager, Converter, SearchNode>(Maze<Manager, Converter, SearchNode>);
 
-impl<'a, Manager, Converter, SearchNode> CheckedMaze<'a, Manager, Converter, SearchNode> {
-    pub fn new(manager: &'a Manager, converter: Converter) -> Self {
+impl<Manager, Converter, SearchNode> CheckedMaze<Manager, Converter, SearchNode> {
+    pub fn new(manager: Rc<Manager>, converter: Converter) -> Self {
         Self(<Self as core::ops::Deref>::Target::new(manager, converter))
     }
 }
 
-impl<'a, Manager, Converter, SearchNode> core::ops::Deref
-    for CheckedMaze<'a, Manager, Converter, SearchNode>
+impl<Manager, Converter, SearchNode> core::ops::Deref
+    for CheckedMaze<Manager, Converter, SearchNode>
 {
-    type Target = Maze<'a, Manager, Converter, SearchNode>;
+    type Target = Maze<Manager, Converter, SearchNode>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'a, Node, Manager, Converter, SearchNode> Graph<Node>
-    for CheckedMaze<'a, Manager, Converter, SearchNode>
+impl<Node, Manager, Converter, SearchNode> Graph<Node>
+    for CheckedMaze<Manager, Converter, SearchNode>
 where
     Node: GraphNode,
     Converter: PatternConverter<Node::Pattern>,
@@ -353,7 +351,7 @@ mod tests {
 
         let manager = WallManagerType;
 
-        let maze = Maze::<_, _, usize>::new(&manager, ThroughPatternConverter);
+        let maze = Maze::<_, _, usize>::new(Rc::new(manager), ThroughPatternConverter);
         let expected = vec![(2usize, 2usize), (2, 1), (4, 2)];
         assert_eq!(maze.successors(&0), expected.as_slice());
         assert_eq!(maze.predecessors(&0), expected.as_slice());
@@ -425,7 +423,7 @@ mod tests {
 
         let manager = WallManagerType;
 
-        let maze = CheckedMaze::<_, _, usize>::new(&manager, ThroughPatternConverter);
+        let maze = CheckedMaze::<_, _, usize>::new(Rc::new(manager), ThroughPatternConverter);
         let expected = vec![(2usize, 2usize), (2, 1)]
             .into_iter()
             .map(|(node, cost)| (NodeType(node), cost))
@@ -485,7 +483,7 @@ mod tests {
 
         let manager = WallManagerType;
 
-        let maze = Maze::<_, _, SearchNode>::new(&manager, ThroughPatternConverter);
+        let maze = Maze::<_, _, SearchNode>::new(Rc::new(manager), ThroughPatternConverter);
 
         let path = vec![0, 1, 1, 2, 3, 5, 8]
             .into_iter()
@@ -522,7 +520,7 @@ mod tests {
 
         let manager = WallManagerType;
 
-        let maze = Maze::<_, _, usize>::new(&manager, ThroughPatternConverter);
+        let maze = Maze::<_, _, usize>::new(Rc::new(manager), ThroughPatternConverter);
         let test_cases = vec![
             (0, Some(false)),
             (1, Some(true)),

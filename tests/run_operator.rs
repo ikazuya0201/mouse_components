@@ -1,5 +1,6 @@
 extern crate std;
 
+use std::rc::Rc;
 #[cfg(feature = "log_test")]
 use std::{cell::RefCell, io::Write};
 
@@ -100,7 +101,10 @@ macro_rules! impl_run_operator_test {
             let existence_threshold = Probability::new(0.1).unwrap();
             let wheel_interval = Length::new::<millimeter>(33.5);
 
-            let wall_storage = WallManager::<$size>::with_str(existence_threshold, input_str);
+            let wall_storage = Rc::new(WallManager::<$size>::with_str(
+                existence_threshold,
+                input_str,
+            ));
 
             let simulator = AgentSimulator::new(
                 start_state.clone(),
@@ -201,7 +205,7 @@ macro_rules! impl_run_operator_test {
                         let obstacle_detector =
                             ObstacleDetector::<_, MathFake>::new(distance_sensors);
                         WallDetectorBuilder::new()
-                            .wall_manager(&wall_storage)
+                            .wall_manager(Rc::clone(&wall_storage))
                             .obstacle_detector(obstacle_detector)
                             .build::<MathFake, $size>()
                             .unwrap()
@@ -239,7 +243,7 @@ macro_rules! impl_run_operator_test {
 
             let commander = {
                 let maze = CheckedMaze::<_, _, SearchNode<$size>>::new(
-                    &wall_storage,
+                    Rc::clone(&wall_storage),
                     LinearPatternConverter::default(),
                 );
                 let start = RunNode::new(0, 0, North).unwrap();

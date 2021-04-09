@@ -1,5 +1,7 @@
 extern crate components;
 
+use std::rc::Rc;
+
 use components::{
     commanders::SearchCommander,
     mazes::Maze,
@@ -55,8 +57,10 @@ fn test_compute_shortest_path_u4() {
             wall_manager.update(&wall, &Probability::one());
         }
 
-        let maze =
-            Maze::<_, _, SearchNode<N>>::new(&wall_manager, LinearPatternConverter::default());
+        let maze = Maze::<_, _, SearchNode<N>>::new(
+            Rc::new(wall_manager),
+            LinearPatternConverter::default(),
+        );
         let current: Node<N> = start.clone().into();
         let commander = SearchCommander::<_, _, SearchNode<N>, _, _>::new(
             start,

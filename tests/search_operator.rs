@@ -1,3 +1,4 @@
+use std::rc::Rc;
 #[cfg(feature = "log_test")]
 use std::{cell::RefCell, io::Write};
 
@@ -81,7 +82,7 @@ macro_rules! impl_search_operator_test {
 
                 let expected_wall_manager =
                     WallManager::<N>::with_str(existence_threshold, input_str);
-                let wall_manager = WallManager::<N>::new(existence_threshold);
+                let wall_manager = Rc::new(WallManager::<N>::new(existence_threshold));
 
                 let square_width = Length::new::<meter>(0.09);
                 let wall_width = Length::new::<meter>(0.006);
@@ -188,7 +189,7 @@ macro_rules! impl_search_operator_test {
                             let obstacle_detector =
                                 ObstacleDetector::<_, MathFake>::new(distance_sensors);
                             WallDetectorBuilder::new()
-                                .wall_manager(&wall_manager)
+                                .wall_manager(Rc::clone(&wall_manager))
                                 .obstacle_detector(obstacle_detector)
                                 .build::<MathFake, N>()
                                 .unwrap()
@@ -242,8 +243,8 @@ macro_rules! impl_search_operator_test {
                     )
                 };
 
-                let commander = create_commander(&wall_manager);
-                let expected_commander = create_commander(&expected_wall_manager);
+                let commander = create_commander(Rc::clone(&wall_manager));
+                let expected_commander = create_commander(Rc::new(expected_wall_manager));
 
                 #[cfg(feature = "log_test")]
                 let output_log = || {
@@ -267,7 +268,7 @@ macro_rules! impl_search_operator_test {
                     }
                 }
 
-                let commander = create_commander(&wall_manager);
+                let commander = create_commander(Rc::clone(&wall_manager));
                 assert_eq!(
                     commander.compute_shortest_path(),
                     expected_commander.compute_shortest_path()

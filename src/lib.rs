@@ -4,6 +4,8 @@
 #![deny(warnings)]
 #![feature(iter_advance_by)]
 
+extern crate alloc;
+
 pub mod administrator;
 pub mod agents;
 pub mod command_converter;
