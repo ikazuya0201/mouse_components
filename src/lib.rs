@@ -51,6 +51,7 @@ pub mod traits {
 /// Types in this crate.
 pub mod types {
     use super::*;
+    /// Data types.
     pub mod data {
         use super::*;
 
@@ -70,6 +71,54 @@ pub mod types {
         #[doc(no_inline)]
         pub use wall_manager::Wall;
     }
+
+    /// Configs for construction.
+    pub mod configs {
+        use super::*;
+
+        #[doc(no_inline)]
+        pub use command_converter::CommandConverterConfig;
+        #[doc(no_inline)]
+        pub use commanders::{
+            ReturnCommanderConfig, ReturnSetupCommanderConfig, RunCommanderConfig,
+            SearchCommanderConfig,
+        };
+        #[doc(no_inline)]
+        pub use controllers::{RotationalControllerConfig, TranslationalControllerConfig};
+        #[doc(no_inline)]
+        pub use estimator::EstimatorConfig;
+        #[doc(no_inline)]
+        pub use tracker::TrackerConfig;
+        #[doc(no_inline)]
+        pub use trajectory_generators::{
+            ReturnSetupTrajectoryGeneratorConfig, RunTrajectoryGeneratorConfig,
+            SearchTrajectoryGeneratorConfig,
+        };
+        #[doc(no_inline)]
+        pub use wall_detector::WallDetectorConfig;
+    }
+
+    /// States for construction.
+    pub mod states {
+        use super::*;
+
+        #[doc(no_inline)]
+        pub use commanders::CommanderState;
+        #[doc(no_inline)]
+        pub use estimator::EstimatorState;
+    }
+
+    /// Resources for construction.
+    pub mod resources {
+        use super::*;
+
+        #[doc(no_inline)]
+        pub use estimator::EstimatorResource;
+        #[doc(no_inline)]
+        pub use obstacle_detector::ObstacleDetectorResource;
+        #[doc(no_inline)]
+        pub use tracker::TrackerResource;
+    }
 }
 
 /// Traits of sensors.
@@ -85,3 +134,32 @@ pub mod sensors {
 }
 
 const MAZE_WIDTH_UPPER_BOUND: usize = 16;
+
+/// A trait for constructing itself by config, state and resource.
+pub trait Construct<Config, State, Resource>: Sized {
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource);
+}
+
+/// A trait for deconstructing itself into state and resource.
+pub trait Deconstruct<State, Resource> {
+    fn deconstruct(self) -> (State, Resource);
+}
+
+/// A conversion for merging two values.
+pub trait Merge {
+    fn merge(self, rhs: Self) -> Self;
+}
+
+#[macro_export]
+macro_rules! impl_deconstruct_with_default {
+    ($name: ident $(<$($param: ident),*>)?) => {
+        impl<$($($param,)*)? State, Resource> crate::Deconstruct<State, Resource> for $name $(<$($param),*>)?
+            where State: Default,
+                  Resource: Default,
+        {
+            fn deconstruct(self) -> (State, Resource) {
+                (Default::default(), Default::default())
+            }
+        }
+    }
+}

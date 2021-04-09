@@ -3,13 +3,15 @@ use core::fmt::Debug;
 
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num::{Bounded, Saturating};
+use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
 use super::{
-    compute_shortest_path, CostNode, Graph, RouteNode, GOAL_SIZE_UPPER_BOUND,
+    compute_shortest_path, CommanderState, CostNode, Graph, RouteNode, GOAL_SIZE_UPPER_BOUND,
     NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
+use crate::{Construct, Deconstruct, Merge};
 
 /// A trait that converts a given path to nodes which are on the path.
 pub trait UncheckedNodeFinder<Node> {
@@ -84,6 +86,61 @@ where
     pub fn release(self) -> (Node, Maze) {
         let Self { current, maze, .. } = self;
         (current.into_inner(), maze)
+    }
+}
+
+/// Config for [SearchCommander].
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct SearchCommanderConfig<RunNode, Route> {
+    pub start: RunNode,
+    pub goals: Vec<RunNode, GOAL_SIZE_UPPER_BOUND>,
+    pub initial_route: Route,
+    pub final_route: Route,
+}
+
+impl<Node, RunNode, SearchNode, Route, Maze, Config, State, Resource>
+    Construct<Config, State, Resource>
+    for crate::commanders::SearchCommander<Node, RunNode, SearchNode, Route, Maze>
+where
+    Maze: Construct<Config, State, Resource>,
+    Config: AsRef<SearchCommanderConfig<RunNode, Route>>,
+    State: AsRef<CommanderState<Node>>,
+    Node: Clone,
+    RunNode: Clone,
+    Route: Clone,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (maze, resource) = Maze::construct(config, state, resource);
+        let config = config.as_ref();
+        let state = state.as_ref();
+        (
+            Self::new(
+                config.start.clone(),
+                &config.goals,
+                state.current_node.clone(),
+                config.initial_route.clone(),
+                config.final_route.clone(),
+                maze,
+            ),
+            resource,
+        )
+    }
+}
+
+impl<Node, RunNode, SearchNode, Route, Maze, State, Resource> Deconstruct<State, Resource>
+    for SearchCommander<Node, RunNode, SearchNode, Route, Maze>
+where
+    RunNode: Clone,
+    Maze: Deconstruct<State, Resource>,
+    State: From<CommanderState<Node>> + Merge,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let (current_node, maze) = self.release();
+        let (state, resource) = maze.deconstruct();
+        (
+            state.merge(CommanderState { current_node }.into()),
+            resource,
+        )
     }
 }
 

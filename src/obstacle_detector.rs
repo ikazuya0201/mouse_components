@@ -1,5 +1,6 @@
 //! An implementation of [ObstacleDetector](crate::wall_detector::ObstacleDetector).
 
+use core::convert::TryInto;
 use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
@@ -9,6 +10,7 @@ use crate::tracker::RobotState;
 use crate::types::data::Pose;
 use crate::utils::{math::Math, sample::Sample};
 use crate::wall_detector::ObstacleDetector as IObstacleDetector;
+use crate::{Construct, Deconstruct};
 
 pub trait DistanceSensor {
     type Error;
@@ -47,6 +49,40 @@ impl<D, M> ObstacleDetector<D, M> {
             distance_sensors, ..
         } = self;
         distance_sensors
+    }
+}
+
+/// Resource for [ObstacleDetector].
+#[derive(PartialEq, Eq, Debug)]
+pub struct ObstacleDetectorResource<DistanceSensor> {
+    pub distance_sensors: Vec<DistanceSensor>,
+}
+
+impl<DistanceSensor, Math, Config, State, Resource> Construct<Config, State, Resource>
+    for ObstacleDetector<DistanceSensor, Math>
+where
+    Resource: TryInto<(Resource, ObstacleDetectorResource<DistanceSensor>)>,
+    Resource::Error: core::fmt::Debug,
+{
+    fn construct(_config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+        let (resource, ObstacleDetectorResource { distance_sensors }) =
+            resource.try_into().expect("Should never panic");
+        (Self::new(distance_sensors), resource)
+    }
+}
+
+impl<DistanceSensor, Math, State, Resource> Deconstruct<State, Resource>
+    for ObstacleDetector<DistanceSensor, Math>
+where
+    State: Default,
+    Resource: From<ObstacleDetectorResource<DistanceSensor>>,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let distance_sensors = self.release();
+        (
+            Default::default(),
+            ObstacleDetectorResource { distance_sensors }.into(),
+        )
     }
 }
 

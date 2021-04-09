@@ -59,3 +59,9 @@ pub use crate::trajectory_managers::{
 
 #[doc(no_inline)]
 pub use crate::wall_detector::ObstacleDetector as _components_wall_detector_ObstacleDetector;
+
+#[doc(no_inline)]
+pub use crate::{
+    Construct as _components_Construct, Deconstruct as _components_Deconstruct,
+    Merge as _components_Merge,
+};

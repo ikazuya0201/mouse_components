@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use uom::si::f32::{Acceleration, Angle, AngularAcceleration, AngularVelocity, Length, Velocity};
 
+use crate::types::data::Pose;
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct RobotState {
     pub x: LengthState,
@@ -20,6 +22,25 @@ pub struct AngleState {
     pub x: Angle,
     pub v: AngularVelocity,
     pub a: AngularAcceleration,
+}
+
+impl From<Pose> for RobotState {
+    fn from(pose: Pose) -> Self {
+        Self {
+            x: LengthState {
+                x: pose.x,
+                ..Default::default()
+            },
+            y: LengthState {
+                x: pose.y,
+                ..Default::default()
+            },
+            theta: AngleState {
+                x: pose.theta,
+                ..Default::default()
+            },
+        }
+    }
 }
 
 #[cfg(test)]

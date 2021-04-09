@@ -2,6 +2,13 @@ use core::iter::Chain;
 use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
+use uom::si::{
+    angle::degree,
+    f32::{
+        Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
+        Velocity,
+    },
+};
 
 use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParametersGenerator};
 use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
@@ -14,13 +21,7 @@ use crate::trajectory_managers::SearchTrajectoryGenerator as ISearchTrajectoryGe
 use crate::utils::builder::RequiredFieldEmptyError;
 use crate::utils::math::Math;
 use crate::{get_or_err, impl_setter};
-use uom::si::{
-    angle::degree,
-    f32::{
-        Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
-        Velocity,
-    },
-};
+use crate::{impl_deconstruct_with_default, Construct};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum SearchKind {
@@ -233,6 +234,53 @@ where
         }
     }
 }
+
+/// Config for [SearchTrajectoryGenerator].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct SearchTrajectoryGeneratorConfig {
+    pub max_velocity: Velocity,
+    pub max_acceleration: Acceleration,
+    pub max_jerk: Jerk,
+    pub period: Time,
+    pub search_velocity: Velocity,
+    pub front_offset: Length,
+    pub square_width: Length,
+    pub spin_angular_velocity: AngularVelocity,
+    pub spin_angular_acceleration: AngularAcceleration,
+    pub spin_angular_jerk: AngularJerk,
+}
+
+impl<Math, Config, State, Resource> Construct<Config, State, Resource>
+    for SearchTrajectoryGenerator<Math>
+where
+    Config: AsRef<SearchTrajectoryGeneratorConfig>,
+    Math: crate::utils::math::Math,
+{
+    fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+        let config = config.as_ref();
+        (
+            Self::new(
+                crate::trajectory_generators::DefaultSlalomParametersGenerator::new(
+                    config.square_width,
+                    config.front_offset,
+                ),
+                config.max_velocity,
+                config.max_acceleration,
+                config.max_jerk,
+                config.period,
+                config.search_velocity,
+                config.front_offset,
+                config.square_width,
+                config.spin_angular_velocity,
+                config.spin_angular_acceleration,
+                config.spin_angular_jerk,
+            ),
+            resource,
+        )
+    }
+}
+
+impl_deconstruct_with_default!(SearchTrajectoryGenerator<Math>);
 
 impl<M> ISearchTrajectoryGenerator<(Pose, SearchKind)> for SearchTrajectoryGenerator<M>
 where

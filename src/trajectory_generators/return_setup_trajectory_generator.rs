@@ -1,19 +1,25 @@
+use core::marker::PhantomData;
+
+use serde::{Deserialize, Serialize};
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
 use super::spin_generator::{SpinGenerator, SpinTrajectory};
-use super::Target;
+use super::{ShiftTrajectory, Target};
 use crate::nodes::RotationKind;
 use crate::trajectory_managers::TrackingTrajectoryGenerator;
+use crate::types::data::Pose;
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
+use crate::{impl_deconstruct_with_default, Construct};
 
 /// An implementation of
 /// [TrackingTrajectoryGenerator](crate::trajectory_managers::TrackingTrajectoryGenerator).
-pub struct ReturnSetupTrajectoryGenerator {
+pub struct ReturnSetupTrajectoryGenerator<Math> {
     spin_generator: SpinGenerator,
+    _math: PhantomData<fn() -> Math>,
 }
 
-impl ReturnSetupTrajectoryGenerator {
+impl<Math> ReturnSetupTrajectoryGenerator<Math> {
     pub fn new(
         max_angular_velocity: AngularVelocity,
         max_angular_acceleration: AngularAcceleration,
@@ -26,24 +32,62 @@ impl ReturnSetupTrajectoryGenerator {
             max_angular_jerk,
             period,
         );
-        Self { spin_generator }
+        Self {
+            spin_generator,
+            _math: PhantomData,
+        }
     }
 }
 
-impl TrackingTrajectoryGenerator<RotationKind> for ReturnSetupTrajectoryGenerator {
-    type Target = Target;
-    type Trajectory = SpinTrajectory;
+/// Config for [ReturnSetupTrajectoryGenerator].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct ReturnSetupTrajectoryGeneratorConfig {
+    pub max_angular_velocity: AngularVelocity,
+    pub max_angular_acceleration: AngularAcceleration,
+    pub max_angular_jerk: AngularJerk,
+    pub period: Time,
+}
 
-    fn generate(&self, command: &RotationKind) -> Self::Trajectory {
+impl<Math, Config, State, Resource> Construct<Config, State, Resource>
+    for ReturnSetupTrajectoryGenerator<Math>
+where
+    Config: AsRef<ReturnSetupTrajectoryGeneratorConfig>,
+{
+    fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+        let config = config.as_ref();
+        (
+            Self::new(
+                config.max_angular_velocity,
+                config.max_angular_acceleration,
+                config.max_angular_jerk,
+                config.period,
+            ),
+            resource,
+        )
+    }
+}
+
+impl_deconstruct_with_default!(ReturnSetupTrajectoryGenerator<Math>);
+
+//TODO: Write test.
+impl<Math> TrackingTrajectoryGenerator<(Pose, RotationKind)>
+    for ReturnSetupTrajectoryGenerator<Math>
+where
+    Math: crate::utils::math::Math,
+{
+    type Target = Target;
+    type Trajectory = ShiftTrajectory<SpinTrajectory, Math>;
+
+    fn generate(&self, &(pose, kind): &(Pose, RotationKind)) -> Self::Trajectory {
         use RotationKind::*;
 
-        let theta = match command {
+        let theta = match kind {
             Front => Default::default(),
             Right => Angle::new::<degree>(-90.0),
             Left => Angle::new::<degree>(90.0),
             Back => Angle::new::<degree>(180.0),
         };
-        self.spin_generator.generate(theta)
+        ShiftTrajectory::new(pose, self.spin_generator.generate(theta))
     }
 }
 
@@ -94,7 +138,9 @@ impl ReturnSetupTrajectoryGeneratorBuilder {
         self
     }
 
-    pub fn build(self) -> Result<ReturnSetupTrajectoryGenerator, RequiredFieldEmptyError> {
+    pub fn build<Math>(
+        self,
+    ) -> Result<ReturnSetupTrajectoryGenerator<Math>, RequiredFieldEmptyError> {
         Ok(ReturnSetupTrajectoryGenerator::new(
             ok_or(self.max_angular_velocity, "max_angular_velocity")?,
             ok_or(self.max_angular_acceleration, "max_angular_acceleration")?,

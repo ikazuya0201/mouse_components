@@ -6,12 +6,20 @@ mod search_commander;
 
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num::{Bounded, Saturating};
+use serde::{Deserialize, Serialize};
 
 use crate::utils::forced_vec::ForcedVec;
 use crate::MAZE_WIDTH_UPPER_BOUND;
-pub use return_setup_commander::{ReturnSetupCommander, ReturnSetupCommanderError, RotationNode};
-pub use run_commander::{RunCommand, RunCommander, RunCommanderError};
-pub use search_commander::{NextNode, NodeChecker, SearchCommander, UncheckedNodeFinder};
+pub use return_setup_commander::{
+    ReturnSetupCommander, ReturnSetupCommanderConfig, ReturnSetupCommanderError, RotationNode,
+};
+pub use run_commander::{
+    ReturnCommander, ReturnCommanderConfig, RunCommand, RunCommander, RunCommanderConfig,
+    RunCommanderError,
+};
+pub use search_commander::{
+    NextNode, NodeChecker, SearchCommander, SearchCommanderConfig, UncheckedNodeFinder,
+};
 
 /// A trait that behaves like a directed graph which has weighted edges.
 pub trait Graph<Node> {
@@ -53,6 +61,12 @@ impl<Cost: Ord, Node> Ord for CostNode<Cost, Node> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.0.cmp(&other.0)
     }
+}
+
+/// State for commanders.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct CommanderState<Node> {
+    pub current_node: Node,
 }
 
 pub(crate) const PATH_UPPER_BOUND: usize = MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;

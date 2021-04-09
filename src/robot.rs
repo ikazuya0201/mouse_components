@@ -3,6 +3,7 @@
 use core::marker::PhantomData;
 
 use crate::agents::Robot as IRobot;
+use crate::{Construct, Deconstruct, Merge};
 
 /// A trait that estimates the state of robot.
 pub trait StateEstimator<Info> {
@@ -71,6 +72,44 @@ impl<Estimator, Tracker, Detector, State> Robot<Estimator, Tracker, Detector, St
             ..
         } = self;
         (estimator, tracker, detector)
+    }
+}
+
+impl<Estimator, Tracker, Detector, RobotState, Config, State, Resource>
+    Construct<Config, State, Resource> for Robot<Estimator, Tracker, Detector, RobotState>
+where
+    Estimator: Construct<Config, State, Resource>,
+    Tracker: Construct<Config, State, Resource>,
+    Detector: Construct<Config, State, Resource>,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (estimator, resource) = Estimator::construct(config, state, resource);
+        let (tracker, resource) = Tracker::construct(config, state, resource);
+        let (detector, resource) = Detector::construct(config, state, resource);
+        (Self::new(estimator, tracker, detector), resource)
+    }
+}
+
+impl<Estimator, Tracker, Detector, RobotState, State, Resource> Deconstruct<State, Resource>
+    for Robot<Estimator, Tracker, Detector, RobotState>
+where
+    Estimator: Deconstruct<State, Resource>,
+    Tracker: Deconstruct<State, Resource>,
+    Detector: Deconstruct<State, Resource>,
+    State: Merge,
+    Resource: Merge,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let (estimator, tracker, detector) = self.release();
+        let (estimator_state, estimator_resource) = estimator.deconstruct();
+        let (tracker_state, tracker_resource) = tracker.deconstruct();
+        let (detector_state, detector_resource) = detector.deconstruct();
+        (
+            estimator_state.merge(tracker_state).merge(detector_state),
+            estimator_resource
+                .merge(tracker_resource)
+                .merge(detector_resource),
+        )
     }
 }
 

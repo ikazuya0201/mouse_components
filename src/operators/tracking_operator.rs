@@ -1,4 +1,5 @@
 use crate::administrator::{Operator, OperatorError};
+use crate::{Construct, Deconstruct, Merge};
 
 /// A trait that processes command and moves the machine.
 ///
@@ -52,10 +53,44 @@ where
             .unwrap_or_else(|_| unreachable!());
         Self { commander, agent }
     }
+}
 
+impl<Commander, Agent> TrackingOperator<Commander, Agent> {
     pub fn release(self) -> (Commander, Agent) {
         let Self { commander, agent } = self;
         (commander, agent)
+    }
+}
+
+impl<Commander, Agent, Config, State, Resource> Construct<Config, State, Resource>
+    for TrackingOperator<Commander, Agent>
+where
+    Commander: Construct<Config, State, Resource> + TrackingCommander,
+    Agent: Construct<Config, State, Resource> + TrackingAgent<Commander::Command>,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (commander, resource) = Commander::construct(config, state, resource);
+        let (agent, resource) = Agent::construct(config, state, resource);
+        (Self::new(commander, agent), resource)
+    }
+}
+
+impl<Commander, Agent, State, Resource> Deconstruct<State, Resource>
+    for TrackingOperator<Commander, Agent>
+where
+    Commander: Deconstruct<State, Resource> + TrackingCommander,
+    Agent: Deconstruct<State, Resource> + TrackingAgent<Commander::Command>,
+    State: Merge,
+    Resource: Merge,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let (commander, agent) = self.release();
+        let (commander_state, commander_resource) = commander.deconstruct();
+        let (agent_state, agent_resource) = agent.deconstruct();
+        (
+            commander_state.merge(agent_state),
+            commander_resource.merge(agent_resource),
+        )
     }
 }
 

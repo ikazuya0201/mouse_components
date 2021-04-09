@@ -1,9 +1,11 @@
 //! An implementation of [WallDetector](crate::robot::WallDetector).
 
 use alloc::rc::Rc;
+use core::convert::TryInto;
 use core::marker::PhantomData;
 
 use heapless::Vec;
+use serde::{Deserialize, Serialize};
 use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
 
@@ -19,6 +21,7 @@ use crate::utils::{
     total::Total,
 };
 use crate::wall_manager::Wall;
+use crate::{Construct, Deconstruct};
 
 /// An info for corrects the state of robot.
 #[derive(Debug, Clone)]
@@ -75,6 +78,49 @@ impl<Manager, Detector, Math, const N: usize> WallDetector<Manager, Detector, Ma
     pub fn release(self) -> Detector {
         let Self { detector, .. } = self;
         detector
+    }
+}
+
+/// Config for [WallDetector].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct WallDetectorConfig {
+    pub square_width: Length,
+    pub wall_width: Length,
+    pub ignore_radius_from_pillar: Length,
+    pub ignore_length_from_wall: Length,
+}
+
+impl<Manager, Detector, Math, Config, State, Resource, const N: usize>
+    Construct<Config, State, Resource> for WallDetector<Manager, Detector, Math, N>
+where
+    Detector: Construct<Config, State, Resource>,
+    Config: AsRef<WallDetectorConfig>,
+    Resource: TryInto<(Resource, Rc<Manager>)>,
+    Resource::Error: core::fmt::Debug,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (detector, resource) = Detector::construct(config, state, resource);
+        let (resource, wall_manager) = resource.try_into().expect("Should never panic");
+        let config = config.as_ref();
+        let converter = PoseConverterBuilder::new()
+            .square_width(config.square_width)
+            .wall_width(config.wall_width)
+            .ignore_radius_from_pillar(config.ignore_radius_from_pillar)
+            .ignore_length_from_wall(config.ignore_length_from_wall)
+            .build()
+            .expect("Should never panic");
+        (Self::new(wall_manager, detector, converter), resource)
+    }
+}
+
+impl<Manager, Detector, Math, State, Resource, const N: usize> Deconstruct<State, Resource>
+    for WallDetector<Manager, Detector, Math, N>
+where
+    Detector: Deconstruct<State, Resource>,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let detector = self.release();
+        detector.deconstruct()
     }
 }
 

@@ -1,6 +1,7 @@
 //! Definition of [Maze](crate::mazes::Maze) and its dependent traits.
 
 use alloc::rc::Rc;
+use core::convert::TryInto;
 use core::fmt;
 use core::marker::PhantomData;
 
@@ -9,6 +10,7 @@ use heapless::Vec;
 use crate::commanders::{Graph, NodeChecker, UncheckedNodeFinder, NODE_NUMBER_UPPER_BOUND};
 use crate::utils::forced_vec::ForcedVec;
 use crate::MAZE_WIDTH_UPPER_BOUND;
+use crate::{impl_deconstruct_with_default, Construct};
 
 macro_rules! block {
     ($expr: expr) => {
@@ -113,6 +115,22 @@ impl<Manager, Converter, SearchNode> Maze<Manager, Converter, SearchNode> {
         }
     }
 }
+
+impl<Manager, Converter, SearchNode, Config, State, Resource> Construct<Config, State, Resource>
+    for Maze<Manager, Converter, SearchNode>
+where
+    Converter: Construct<Config, State, Resource>,
+    Resource: TryInto<(Resource, Rc<Manager>)>,
+    Resource::Error: core::fmt::Debug,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (converter, resource) = Converter::construct(config, state, resource);
+        let (resource, wall_manager) = resource.try_into().expect("Should never panic");
+        (Self::new(wall_manager, converter), resource)
+    }
+}
+
+impl_deconstruct_with_default!(Maze<Manager, Converter, SearchNode>);
 
 impl<Manager, Converter, SearchNode> Maze<Manager, Converter, SearchNode> {
     fn _successors<Node, F>(&self, node: &Node, is_blocked: F) -> <Self as Graph<Node>>::Edges
@@ -243,6 +261,22 @@ impl<Manager, Converter, SearchNode> CheckedMaze<Manager, Converter, SearchNode>
         Self(<Self as core::ops::Deref>::Target::new(manager, converter))
     }
 }
+
+impl<Manager, Converter, SearchNode, Config, State, Resource> Construct<Config, State, Resource>
+    for CheckedMaze<Manager, Converter, SearchNode>
+where
+    Converter: Construct<Config, State, Resource>,
+    Resource: TryInto<(Resource, Rc<Manager>)>,
+    Resource::Error: core::fmt::Debug,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (converter, resource) = Converter::construct(config, state, resource);
+        let (resource, wall_manager) = resource.try_into().expect("Should never panic");
+        (Self::new(wall_manager, converter), resource)
+    }
+}
+
+impl_deconstruct_with_default!(CheckedMaze<Manager, Converter, SearchNode>);
 
 impl<Manager, Converter, SearchNode> core::ops::Deref
     for CheckedMaze<Manager, Converter, SearchNode>
