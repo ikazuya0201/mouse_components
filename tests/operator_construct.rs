@@ -5,7 +5,9 @@ use alloc::rc::Rc;
 use components::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
-    commanders::{ReturnCommander, ReturnSetupCommander, RunCommander, SearchCommander},
+    commanders::{
+        ReturnCommander, ReturnSetupCommander, RunCommander, RunSetupCommander, SearchCommander,
+    },
     controllers::{RotationalController, TranslationalController},
     defaults::{
         config::{ConfigBuilder, ConfigContainer},
@@ -330,4 +332,35 @@ impl_construct_and_deconstruct_test! {
     >,
     WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
     new_state(2, 0, North),
+}
+
+impl_construct_and_deconstruct_test! {
+    test_run_setup_operator_construct_and_deconstruct:
+    TrackingOperator<
+        RunSetupCommander<
+            RunNode<N>,
+            Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+        >,
+        TrackingAgent<
+            TrackingTrajectoryManager<
+                ReturnSetupTrajectoryGenerator<MathFake>,
+                CommandConverter,
+                Target,
+                ShiftTrajectory<SpinTrajectory, MathFake>,
+            >,
+            Robot<
+                Estimator<Encoder, Encoder, IMU, MathFake>,
+                Tracker<Motor, Motor, MathFake, TranslationalController, RotationalController>,
+                WallDetector<
+                    WallManager<N>,
+                    ObstacleDetector<DistanceSensor<N>, MathFake>,
+                    MathFake,
+                    N,
+                >,
+                RobotState,
+            >,
+        >,
+    >,
+    WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
+    new_state(0, 0, South),
 }

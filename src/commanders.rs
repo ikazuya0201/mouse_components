@@ -1,8 +1,8 @@
 //! Implementations of commanders which is required by operators in [operators](crate::operators).
 
-mod return_setup_commander;
 mod run_commander;
 mod search_commander;
+mod setup_commander;
 
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num::{Bounded, Saturating};
@@ -10,15 +10,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::forced_vec::ForcedVec;
 use crate::MAZE_WIDTH_UPPER_BOUND;
-pub use return_setup_commander::{
-    ReturnSetupCommander, ReturnSetupCommanderConfig, ReturnSetupCommanderError, RotationNode,
-};
 pub use run_commander::{
     ReturnCommander, ReturnCommanderConfig, RunCommand, RunCommander, RunCommanderConfig,
     RunCommanderError,
 };
 pub use search_commander::{
     NextNode, NodeChecker, SearchCommander, SearchCommanderConfig, UncheckedNodeFinder,
+};
+pub use setup_commander::{
+    ReturnSetupCommander, ReturnSetupCommanderConfig, RotationNode, RunSetupCommander,
+    RunSetupCommanderConfig, SetupCommander, SetupCommanderError,
 };
 
 /// A trait that behaves like a directed graph which has weighted edges.

@@ -115,6 +115,7 @@ impl_with_as_ref! {
         command_converter: CommandConverterConfig,
         search_commander: SearchCommanderConfig<RunNode<N>, SearchKind>,
         run_commander: RunCommanderConfig<RunNode<N>>,
+        run_setup_commander: RunSetupCommanderConfig<RunNode<N>>,
         return_setup_commander: ReturnSetupCommanderConfig<RunNode<N>>,
         return_commander: ReturnCommanderConfig<RunNode<N>>,
         translational_controller: TranslationalControllerConfig,
@@ -186,6 +187,9 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
                 final_route: search_final_route,
             },
             run_commander: RunCommanderConfig {
+                goals: goals.clone(),
+            },
+            run_setup_commander: RunSetupCommanderConfig {
                 goals: goals.clone(),
             },
             return_setup_commander: ReturnSetupCommanderConfig {

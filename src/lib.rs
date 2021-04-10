@@ -81,7 +81,7 @@ pub mod types {
         #[doc(no_inline)]
         pub use commanders::{
             ReturnCommanderConfig, ReturnSetupCommanderConfig, RunCommanderConfig,
-            SearchCommanderConfig,
+            RunSetupCommanderConfig, SearchCommanderConfig,
         };
         #[doc(no_inline)]
         pub use controllers::{RotationalControllerConfig, TranslationalControllerConfig};
