@@ -3,35 +3,20 @@ extern crate alloc;
 use alloc::rc::Rc;
 
 use components::{
-    agents::TrackingAgent,
     command_converter::CommandConverter,
-    commanders::{
-        ReturnCommander, ReturnSetupCommander, RunCommander, RunSetupCommander, SearchCommander,
-    },
-    controllers::{RotationalController, TranslationalController},
     defaults::{
+        alias::{
+            ReturnOperator, ReturnSetupOperator, RunOperator, RunSetupOperator, SearchOperator,
+        },
         config::{ConfigBuilder, ConfigContainer},
         resource::ResourceBuilder,
         state::{State, StateBuilder, StateContainer},
     },
-    estimator::Estimator,
-    mazes::Maze,
-    nodes::{Node, RunNode, SearchNode},
-    obstacle_detector::ObstacleDetector,
-    operators::TrackingOperator,
+    nodes::RunNode,
     pattern_converters::LinearPatternConverter,
     prelude::*,
-    robot::Robot,
-    tracker::{RobotState, Tracker},
-    trajectory_generators::{
-        DefaultSlalomParametersGenerator, ReturnSetupTrajectoryGenerator, RunTrajectory,
-        RunTrajectoryGenerator, SearchTrajectory, SearchTrajectoryGenerator, ShiftTrajectory,
-        SpinTrajectory, Target,
-    },
-    trajectory_managers::{SearchTrajectoryManager, TrackingTrajectoryManager},
     types::data::{AbsoluteDirection, Pose, SearchKind},
     utils::probability::Probability,
-    wall_detector::WallDetector,
     wall_manager::WallManager,
 };
 use uom::si::{
@@ -59,7 +44,7 @@ use utils::{
 const N: usize = 4;
 
 macro_rules! impl_construct_and_deconstruct_test {
-    ($name: ident: $type: ty, $wall_manager: expr, $state: expr,) => {
+    ($name: ident: $operator: ident, $wall_manager: expr, $state: expr,) => {
         #[test]
         fn $name() {
             use AbsoluteDirection::*;
@@ -176,7 +161,16 @@ macro_rules! impl_construct_and_deconstruct_test {
 
             let config: ConfigContainer<N> = config.into();
             let state: StateContainer<N> = $state.into();
-            let (operator, resource) = <$type>::construct(&config, &state, resource);
+            let (operator, resource) = <$operator<
+                Encoder,
+                Encoder,
+                IMU,
+                Motor,
+                Motor,
+                DistanceSensor<N>,
+                MathFake,
+                N,
+            >>::construct(&config, &state, resource);
 
             // Execute operator.
             while operator.run().is_err() {
@@ -209,158 +203,35 @@ fn new_state(x: i8, y: i8, dir: AbsoluteDirection) -> State<N> {
 
 impl_construct_and_deconstruct_test! {
     test_search_operator_construct_and_deconstruct:
-    TrackingOperator<
-        SearchCommander<
-            Node<N>,
-            RunNode<N>,
-            SearchNode<N>,
-            SearchKind,
-            Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
-        >,
-        TrackingAgent<
-            SearchTrajectoryManager<
-                SearchTrajectoryGenerator<MathFake>,
-                CommandConverter,
-                Target,
-                ShiftTrajectory<SearchTrajectory<MathFake>, MathFake>,
-            >,
-            Robot<
-                Estimator<Encoder, Encoder, IMU, MathFake>,
-                Tracker<Motor, Motor, MathFake, TranslationalController, RotationalController>,
-                WallDetector<
-                    WallManager<N>,
-                    ObstacleDetector<DistanceSensor<N>, MathFake>,
-                    MathFake,
-                    N,
-                >,
-                RobotState,
-            >,
-        >,
-    >,
+    SearchOperator,
     WallManager::<N>::new(Probability::new(0.1).unwrap()),
     new_state(0, 0, North),
 }
 
 impl_construct_and_deconstruct_test! {
     test_run_operator_construct_and_deconstruct:
-    TrackingOperator<
-        RunCommander<
-            RunNode<N>,
-            Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
-        >,
-        TrackingAgent<
-            TrackingTrajectoryManager<
-                RunTrajectoryGenerator<MathFake, DefaultSlalomParametersGenerator>,
-                CommandConverter,
-                Target,
-                ShiftTrajectory<RunTrajectory<MathFake>, MathFake>,
-            >,
-            Robot<
-                Estimator<Encoder, Encoder, IMU, MathFake>,
-                Tracker<Motor, Motor, MathFake, TranslationalController, RotationalController>,
-                WallDetector<
-                    WallManager<N>,
-                    ObstacleDetector<DistanceSensor<N>, MathFake>,
-                    MathFake,
-                    N,
-                >,
-                RobotState,
-            >,
-        >,
-    >,
+    RunOperator,
     WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
     new_state(0, 0, North),
 }
 
 impl_construct_and_deconstruct_test! {
     test_return_setup_operator_construct_and_deconstruct:
-    TrackingOperator<
-        ReturnSetupCommander<
-            RunNode<N>,
-            Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
-        >,
-        TrackingAgent<
-            TrackingTrajectoryManager<
-                ReturnSetupTrajectoryGenerator<MathFake>,
-                CommandConverter,
-                Target,
-                ShiftTrajectory<SpinTrajectory, MathFake>,
-            >,
-            Robot<
-                Estimator<Encoder, Encoder, IMU, MathFake>,
-                Tracker<Motor, Motor, MathFake, TranslationalController, RotationalController>,
-                WallDetector<
-                    WallManager<N>,
-                    ObstacleDetector<DistanceSensor<N>, MathFake>,
-                    MathFake,
-                    N,
-                >,
-                RobotState,
-            >,
-        >,
-    >,
+    ReturnSetupOperator,
     WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
     new_state(2, 0, West),
 }
 
 impl_construct_and_deconstruct_test! {
     test_return_operator_construct_and_deconstruct:
-    TrackingOperator<
-        ReturnCommander<
-            RunNode<N>,
-            Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
-        >,
-        TrackingAgent<
-            TrackingTrajectoryManager<
-                RunTrajectoryGenerator<MathFake, DefaultSlalomParametersGenerator>,
-                CommandConverter,
-                Target,
-                ShiftTrajectory<RunTrajectory<MathFake>, MathFake>,
-            >,
-            Robot<
-                Estimator<Encoder, Encoder, IMU, MathFake>,
-                Tracker<Motor, Motor, MathFake, TranslationalController, RotationalController>,
-                WallDetector<
-                    WallManager<N>,
-                    ObstacleDetector<DistanceSensor<N>, MathFake>,
-                    MathFake,
-                    N,
-                >,
-                RobotState,
-            >,
-        >,
-    >,
+    ReturnOperator,
     WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
     new_state(2, 0, North),
 }
 
 impl_construct_and_deconstruct_test! {
     test_run_setup_operator_construct_and_deconstruct:
-    TrackingOperator<
-        RunSetupCommander<
-            RunNode<N>,
-            Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
-        >,
-        TrackingAgent<
-            TrackingTrajectoryManager<
-                ReturnSetupTrajectoryGenerator<MathFake>,
-                CommandConverter,
-                Target,
-                ShiftTrajectory<SpinTrajectory, MathFake>,
-            >,
-            Robot<
-                Estimator<Encoder, Encoder, IMU, MathFake>,
-                Tracker<Motor, Motor, MathFake, TranslationalController, RotationalController>,
-                WallDetector<
-                    WallManager<N>,
-                    ObstacleDetector<DistanceSensor<N>, MathFake>,
-                    MathFake,
-                    N,
-                >,
-                RobotState,
-            >,
-        >,
-    >,
+    RunSetupOperator,
     WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
     new_state(0, 0, South),
 }
