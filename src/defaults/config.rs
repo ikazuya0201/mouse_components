@@ -12,6 +12,7 @@ use crate::impl_setter;
 use crate::impl_with_getter;
 use crate::nodes::RunNode;
 use crate::pattern_converters::LinearPatternConverter;
+use crate::types::configs::*;
 use crate::types::data::SearchKind;
 use crate::utils::builder::{ok_or, BuilderResult};
 
@@ -84,6 +85,183 @@ impl_with_getter! {
         spin_angular_velocity: AngularVelocity,
         spin_angular_acceleration: AngularAcceleration,
         spin_angular_jerk: AngularJerk,
+    }
+}
+
+macro_rules! impl_with_as_ref {
+    (
+        $(#[$meta:meta])*
+        pub struct $name : ident <const N: usize> {
+            $($field_name: ident : $type: ty,)*
+        }
+    ) => {
+        $(#[$meta])*
+        pub struct $name<const N: usize> {
+            $($field_name: $type,)*
+        }
+
+        $(
+            impl<const N: usize> AsRef<$type> for $name<N> {
+                fn as_ref(&self) -> &$type {
+                    &self.$field_name
+                }
+            }
+        )*
+    }
+}
+
+impl_with_as_ref! {
+    pub struct ConfigContainer<const N: usize> {
+        command_converter: CommandConverterConfig,
+        search_commander: SearchCommanderConfig<RunNode<N>, SearchKind>,
+        run_commander: RunCommanderConfig<RunNode<N>>,
+        return_setup_commander: ReturnSetupCommanderConfig<RunNode<N>>,
+        return_commander: ReturnCommanderConfig<RunNode<N>>,
+        translational_controller: TranslationalControllerConfig,
+        rotational_controller: RotationalControllerConfig,
+        estimator: EstimatorConfig,
+        tracker: TrackerConfig,
+        search_trajectory_generator: SearchTrajectoryGeneratorConfig,
+        run_trajectory_generator: RunTrajectoryGeneratorConfig,
+        return_setup_generator: ReturnSetupTrajectoryGeneratorConfig,
+        wall_detector: WallDetectorConfig,
+        pattern_converter: LinearPatternConverter<u16>,
+    }
+}
+
+impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
+    fn into(self) -> ConfigContainer<N> {
+        let Config {
+            square_width,
+            front_offset,
+            start,
+            return_goal,
+            goals,
+            search_initial_route,
+            search_final_route,
+            translational_kp,
+            translational_ki,
+            translational_kd,
+            period,
+            translational_model_gain,
+            translational_model_time_constant,
+            rotational_kp,
+            rotational_ki,
+            rotational_kd,
+            rotational_model_gain,
+            rotational_model_time_constant,
+            estimator_correction_weight,
+            wheel_interval,
+            estimator_cut_off_frequency,
+            pattern_converter,
+            wall_width,
+            ignore_radius_from_pillar,
+            ignore_length_from_wall,
+            kx,
+            kdx,
+            ky,
+            kdy,
+            valid_control_lower_bound,
+            fail_safe_distance,
+            low_zeta,
+            low_b,
+            run_slalom_velocity,
+            max_velocity,
+            max_acceleration,
+            max_jerk,
+            search_velocity,
+            spin_angular_velocity,
+            spin_angular_acceleration,
+            spin_angular_jerk,
+        } = self;
+        ConfigContainer {
+            command_converter: CommandConverterConfig {
+                square_width,
+                front_offset,
+            },
+            search_commander: SearchCommanderConfig {
+                start: start.clone(),
+                goals: goals.clone(),
+                initial_route: search_initial_route,
+                final_route: search_final_route,
+            },
+            run_commander: RunCommanderConfig {
+                goals: goals.clone(),
+            },
+            return_setup_commander: ReturnSetupCommanderConfig {
+                return_goal: return_goal.clone(),
+            },
+            return_commander: ReturnCommanderConfig {
+                return_goal: return_goal.clone(),
+            },
+            translational_controller: TranslationalControllerConfig {
+                model_gain: translational_model_gain,
+                model_time_constant: translational_model_time_constant,
+                kp: translational_kp,
+                ki: translational_ki,
+                kd: translational_kd,
+                period,
+            },
+            rotational_controller: RotationalControllerConfig {
+                model_gain: rotational_model_gain,
+                model_time_constant: rotational_model_time_constant,
+                kp: rotational_kp,
+                ki: rotational_ki,
+                kd: rotational_kd,
+                period,
+            },
+            estimator: EstimatorConfig {
+                period,
+                cut_off_frequency: estimator_cut_off_frequency,
+                wheel_interval,
+                correction_weight: estimator_correction_weight,
+            },
+            tracker: TrackerConfig {
+                kx,
+                kdx,
+                ky,
+                kdy,
+                period,
+                valid_control_lower_bound,
+                fail_safe_distance,
+                low_zeta,
+                low_b,
+            },
+            search_trajectory_generator: SearchTrajectoryGeneratorConfig {
+                max_velocity,
+                max_acceleration,
+                max_jerk,
+                period,
+                search_velocity,
+                front_offset,
+                square_width,
+                spin_angular_velocity,
+                spin_angular_acceleration,
+                spin_angular_jerk,
+            },
+            run_trajectory_generator: RunTrajectoryGeneratorConfig {
+                run_slalom_velocity,
+                max_velocity,
+                max_acceleration,
+                max_jerk,
+                period,
+                square_width,
+                front_offset,
+            },
+            return_setup_generator: ReturnSetupTrajectoryGeneratorConfig {
+                max_angular_velocity: spin_angular_velocity,
+                max_angular_acceleration: spin_angular_acceleration,
+                max_angular_jerk: spin_angular_jerk,
+                period,
+            },
+            wall_detector: WallDetectorConfig {
+                square_width,
+                wall_width,
+                ignore_radius_from_pillar,
+                ignore_length_from_wall,
+            },
+            pattern_converter,
+        }
     }
 }
 

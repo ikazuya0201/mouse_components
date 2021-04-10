@@ -1,8 +1,10 @@
 //! An implementation of [StateEstimator](crate::robot::StateEstimator).
 
+use core::convert::TryInto;
 use core::marker::PhantomData;
 
 use nb::block;
+use serde::{Deserialize, Serialize};
 use uom::si::{
     f32::{
         Acceleration, Angle, AngularAcceleration, AngularVelocity, Frequency, Length, Time,
@@ -16,6 +18,7 @@ use crate::tracker::RobotState;
 use crate::utils::builder::{ok_or, BuilderResult};
 use crate::utils::math::{LibmMath, Math};
 use crate::wall_detector::CorrectInfo;
+use crate::{Construct, Deconstruct};
 
 pub trait IMU {
     type Error;
@@ -172,6 +175,89 @@ impl<LE, RE, I, M> Estimator<LE, RE, I, M> {
         } = self;
         let EstimatorInner { state, .. } = inner;
         (left_encoder, right_encoder, imu, state)
+    }
+}
+
+/// Config for [Estimator].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct EstimatorConfig {
+    pub period: Time,
+    pub cut_off_frequency: Frequency,
+    pub wheel_interval: Option<Length>,
+    pub correction_weight: f32,
+}
+
+/// State for [Estimator].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct EstimatorState {
+    pub robot_state: RobotState,
+}
+
+/// Resource for [Estimator].
+#[derive(PartialEq, Eq, Debug)]
+pub struct EstimatorResource<LeftEncoder, RightEncoder, Imu> {
+    pub left_encoder: LeftEncoder,
+    pub right_encoder: RightEncoder,
+    pub imu: Imu,
+}
+
+impl<LeftEncoder, RightEncoder, Imu, Math, Config, State, Resource>
+    Construct<Config, State, Resource> for Estimator<LeftEncoder, RightEncoder, Imu, Math>
+where
+    LeftEncoder: Encoder,
+    RightEncoder: Encoder,
+    Imu: IMU,
+    Config: AsRef<EstimatorConfig>,
+    State: AsRef<EstimatorState>,
+    Resource: TryInto<(Resource, EstimatorResource<LeftEncoder, RightEncoder, Imu>)>,
+    Resource::Error: core::fmt::Debug,
+    Math: crate::utils::math::Math,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let config = config.as_ref();
+        let state = state.as_ref();
+        let (
+            resource,
+            EstimatorResource {
+                left_encoder,
+                right_encoder,
+                imu,
+            },
+        ) = resource.try_into().expect("Should never panic");
+        (
+            EstimatorBuilder::new()
+                .left_encoder(left_encoder)
+                .right_encoder(right_encoder)
+                .imu(imu)
+                .initial_state(state.robot_state.clone())
+                .correction_weight(config.correction_weight)
+                .wheel_interval(config.wheel_interval)
+                .period(config.period)
+                .cut_off_frequency(config.cut_off_frequency)
+                .build()
+                .expect("Should never panic"),
+            resource,
+        )
+    }
+}
+
+impl<LeftEncoder, RightEncoder, Imu, Math, State, Resource> Deconstruct<State, Resource>
+    for Estimator<LeftEncoder, RightEncoder, Imu, Math>
+where
+    State: From<EstimatorState>,
+    Resource: From<EstimatorResource<LeftEncoder, RightEncoder, Imu>>,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let (left_encoder, right_encoder, imu, robot_state) = self.release();
+        (
+            EstimatorState { robot_state }.into(),
+            EstimatorResource {
+                left_encoder,
+                right_encoder,
+                imu,
+            }
+            .into(),
+        )
     }
 }
 

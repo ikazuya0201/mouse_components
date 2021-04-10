@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::impl_with_builder;
 use crate::mazes::PatternConverter;
 use crate::types::data::Pattern;
+use crate::{impl_deconstruct_with_default, Construct};
 
 impl_with_builder! {
     /// A builder for [LinearPatternConverter].
@@ -43,6 +44,20 @@ impl Default for LinearPatternConverter<u16> {
         }
     }
 }
+
+impl<Config, State, Resource, Cost> Construct<Config, State, Resource>
+    for LinearPatternConverter<Cost>
+where
+    Cost: Clone,
+    Config: AsRef<LinearPatternConverter<Cost>>,
+{
+    fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+        let converter = config.as_ref();
+        (converter.clone(), resource)
+    }
+}
+
+impl_deconstruct_with_default!(LinearPatternConverter<Cost>);
 
 impl<Cost> PatternConverter<Pattern> for LinearPatternConverter<Cost>
 where

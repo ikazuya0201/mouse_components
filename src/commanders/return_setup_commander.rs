@@ -1,8 +1,10 @@
 use num::{Bounded, Saturating};
+use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
-use super::{compute_shortest_path, Graph};
+use super::{compute_shortest_path, CommanderState, Graph};
 use crate::operators::{TrackingCommander, TrackingCommanderError};
+use crate::{Construct, Deconstruct, Merge};
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander).
 ///
@@ -13,7 +15,7 @@ where
 {
     current: Node,
     maze: Maze,
-    kind: Mutex<Option<Node::Kind>>,
+    command: Mutex<Option<(Node, Node::Kind)>>,
 }
 
 impl<Node, Maze> ReturnSetupCommander<Node, Maze>
@@ -28,7 +30,7 @@ where
                 return Self {
                     current: node,
                     maze,
-                    kind: Mutex::new(Some(kind)),
+                    command: Mutex::new(Some((current, kind))),
                 };
             }
         }
@@ -46,6 +48,48 @@ where
     }
 }
 
+/// Config for [ReturnSetupCommander].
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct ReturnSetupCommanderConfig<Node> {
+    pub return_goal: Node,
+}
+
+impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
+    for ReturnSetupCommander<Node, Maze>
+where
+    Node: Clone + Into<usize> + PartialEq + RotationNode,
+    Maze: Construct<Config, State, Resource> + Graph<Node>,
+    Maze::Cost: Ord + Bounded + Saturating + Copy,
+    Config: AsRef<ReturnSetupCommanderConfig<Node>>,
+    State: AsRef<CommanderState<Node>>,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (maze, resource) = Maze::construct(config, state, resource);
+        let config = config.as_ref();
+        let state = state.as_ref();
+        (
+            Self::new(state.current_node.clone(), config.return_goal.clone(), maze),
+            resource,
+        )
+    }
+}
+
+impl<Node, Maze, State, Resource> Deconstruct<State, Resource> for ReturnSetupCommander<Node, Maze>
+where
+    Node: RotationNode,
+    Maze: Deconstruct<State, Resource>,
+    State: From<CommanderState<Node>> + Merge,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let (current_node, maze) = self.release();
+        let (state, resource) = maze.deconstruct();
+        (
+            state.merge(CommanderState { current_node }.into()),
+            resource,
+        )
+    }
+}
+
 /// Error on [ReturnSetupCommander](ReturnSetupCommander).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ReturnSetupCommanderError;
@@ -59,6 +103,7 @@ pub trait RotationNode: Sized {
     fn rotation_nodes(&self) -> Self::Nodes;
 }
 
+//TODO: Write test.
 impl<Node, Maze> TrackingCommander for ReturnSetupCommander<Node, Maze>
 where
     Node: Clone + Into<usize> + PartialEq + RotationNode,
@@ -66,11 +111,11 @@ where
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
     type Error = ReturnSetupCommanderError;
-    type Command = Node::Kind;
+    type Command = (Node, Node::Kind);
 
     fn next_command(&self) -> Result<Self::Command, TrackingCommanderError<Self::Error>> {
-        if let Some(kind) = self.kind.lock().take() {
-            Ok(kind)
+        if let Some(command) = self.command.lock().take() {
+            Ok(command)
         } else {
             Err(TrackingCommanderError::TrackingFinish)
         }

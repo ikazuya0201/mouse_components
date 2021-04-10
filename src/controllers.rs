@@ -2,6 +2,7 @@
 
 use core::ops::{Add, Div, Mul, Sub};
 
+use serde::{Deserialize, Serialize};
 use uom::si::{
     f32::{
         Acceleration, AngularAcceleration, AngularVelocity, ElectricPotential, Length, Ratio, Time,
@@ -13,6 +14,7 @@ use uom::si::{
 use crate::impl_setter;
 use crate::tracker::Controller as IController;
 use crate::utils::builder::{ok_or, BuilderResult};
+use crate::{impl_deconstruct_with_default, Construct};
 
 struct Controller<T>
 where
@@ -75,7 +77,7 @@ where
 }
 
 macro_rules! impl_controller {
-    ($controller: ident, $builder: ident, $dt: ty, $ddt: ty) => {
+    ($controller: ident, $builder: ident, $config: ident, $dt: ty, $ddt: ty) => {
         impl $controller {
             pub fn new(
                 model_gain: f32,
@@ -159,6 +161,39 @@ macro_rules! impl_controller {
                 ))
             }
         }
+
+        /// Config for a controller.
+        #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+        pub struct $config {
+            pub model_gain: f32,
+            pub model_time_constant: Time,
+            pub kp: f32,
+            pub ki: f32,
+            pub kd: f32,
+            pub period: Time,
+        }
+
+        impl<Config, State, Resource> Construct<Config, State, Resource> for $controller
+        where
+            Config: AsRef<$config>,
+        {
+            fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+                let config = config.as_ref();
+                (
+                    Self::new(
+                        config.model_gain,
+                        config.model_time_constant,
+                        config.kp,
+                        config.ki,
+                        config.kd,
+                        config.period,
+                    ),
+                    resource,
+                )
+            }
+        }
+
+        impl_deconstruct_with_default!($controller);
     };
 }
 
@@ -166,6 +201,7 @@ pub struct TranslationalController(Controller<Length>);
 impl_controller!(
     TranslationalController,
     TranslationalControllerBuilder,
+    TranslationalControllerConfig,
     Velocity,
     Acceleration
 );
@@ -174,6 +210,7 @@ pub struct RotationalController(Controller<Ratio>);
 impl_controller!(
     RotationalController,
     RotationalControllerBuilder,
+    RotationalControllerConfig,
     AngularVelocity,
     AngularAcceleration
 );

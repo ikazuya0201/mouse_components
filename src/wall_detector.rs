@@ -1,8 +1,11 @@
 //! An implementation of [WallDetector](crate::robot::WallDetector).
 
+use alloc::rc::Rc;
+use core::convert::TryInto;
 use core::marker::PhantomData;
 
 use heapless::Vec;
+use serde::{Deserialize, Serialize};
 use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
 
@@ -18,6 +21,7 @@ use crate::utils::{
     total::Total,
 };
 use crate::wall_manager::Wall;
+use crate::{Construct, Deconstruct};
 
 /// An info for corrects the state of robot.
 #[derive(Debug, Clone)]
@@ -50,16 +54,16 @@ pub trait WallProbabilityManager<Wall>: Send + Sync {
 }
 
 /// An implementation of [WallDetector](crate::robot::WallDetector).
-pub struct WallDetector<'a, Manager, Detector, Math, const N: usize> {
-    manager: &'a Manager,
+pub struct WallDetector<Manager, Detector, Math, const N: usize> {
+    manager: Rc<Manager>,
     detector: Detector,
     converter: PoseConverter<Math, N>,
     _math: PhantomData<fn() -> Math>,
 }
 
-impl<'a, Manager, Detector, Math, const N: usize> WallDetector<'a, Manager, Detector, Math, N> {
+impl<Manager, Detector, Math, const N: usize> WallDetector<Manager, Detector, Math, N> {
     pub fn new(
-        manager: &'a Manager,
+        manager: Rc<Manager>,
         detector: Detector,
         converter: PoseConverter<Math, N>,
     ) -> Self {
@@ -77,10 +81,53 @@ impl<'a, Manager, Detector, Math, const N: usize> WallDetector<'a, Manager, Dete
     }
 }
 
+/// Config for [WallDetector].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct WallDetectorConfig {
+    pub square_width: Length,
+    pub wall_width: Length,
+    pub ignore_radius_from_pillar: Length,
+    pub ignore_length_from_wall: Length,
+}
+
+impl<Manager, Detector, Math, Config, State, Resource, const N: usize>
+    Construct<Config, State, Resource> for WallDetector<Manager, Detector, Math, N>
+where
+    Detector: Construct<Config, State, Resource>,
+    Config: AsRef<WallDetectorConfig>,
+    Resource: TryInto<(Resource, Rc<Manager>)>,
+    Resource::Error: core::fmt::Debug,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (detector, resource) = Detector::construct(config, state, resource);
+        let (resource, wall_manager) = resource.try_into().expect("Should never panic");
+        let config = config.as_ref();
+        let converter = PoseConverterBuilder::new()
+            .square_width(config.square_width)
+            .wall_width(config.wall_width)
+            .ignore_radius_from_pillar(config.ignore_radius_from_pillar)
+            .ignore_length_from_wall(config.ignore_length_from_wall)
+            .build()
+            .expect("Should never panic");
+        (Self::new(wall_manager, detector, converter), resource)
+    }
+}
+
+impl<Manager, Detector, Math, State, Resource, const N: usize> Deconstruct<State, Resource>
+    for WallDetector<Manager, Detector, Math, N>
+where
+    Detector: Deconstruct<State, Resource>,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let detector = self.release();
+        detector.deconstruct()
+    }
+}
+
 const OBSTACLE_SIZE_UPPER_BOUND: usize = 6;
 
-impl<'a, Manager, Detector, Math, State, const N: usize> IWallDetector<State>
-    for WallDetector<'a, Manager, Detector, Math, N>
+impl<Manager, Detector, Math, State, const N: usize> IWallDetector<State>
+    for WallDetector<Manager, Detector, Math, N>
 where
     Manager: WallProbabilityManager<Wall<N>>,
     Detector: ObstacleDetector<State, Obstacle = Obstacle>,
@@ -474,8 +521,8 @@ impl PoseConverterBuilder {
     }
 }
 
-pub struct WallDetectorBuilder<'a, Manager, Detector> {
-    wall_manager: Option<&'a Manager>,
+pub struct WallDetectorBuilder<Manager, Detector> {
+    wall_manager: Option<Rc<Manager>>,
     obstacle_detector: Option<Detector>,
     square_width: Option<Length>,
     wall_width: Option<Length>,
@@ -483,7 +530,7 @@ pub struct WallDetectorBuilder<'a, Manager, Detector> {
     ignore_length_from_wall: Option<Length>,
 }
 
-impl<'a, Manager, Detector> WallDetectorBuilder<'a, Manager, Detector> {
+impl<Manager, Detector> WallDetectorBuilder<Manager, Detector> {
     pub fn new() -> Self {
         Self {
             wall_manager: None,
@@ -498,7 +545,7 @@ impl<'a, Manager, Detector> WallDetectorBuilder<'a, Manager, Detector> {
     impl_setter! {
         /// **Required**,
         /// Sets a reference to an implementation of [WallProbabilityManager](WallProbabilityManager).
-        wall_manager: &'a Manager
+        wall_manager: Rc<Manager>
     }
 
     impl_setter! {
@@ -543,7 +590,7 @@ impl<'a, Manager, Detector> WallDetectorBuilder<'a, Manager, Detector> {
 
     pub fn build<M, const N: usize>(
         &mut self,
-    ) -> BuilderResult<WallDetector<'a, Manager, Detector, M, N>> {
+    ) -> BuilderResult<WallDetector<Manager, Detector, M, N>> {
         let converter = PoseConverter::<M, N>::new(
             self.square_width.unwrap_or(DEFAULT_SQUARE_WIDTH),
             self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
@@ -553,7 +600,7 @@ impl<'a, Manager, Detector> WallDetectorBuilder<'a, Manager, Detector> {
                 .unwrap_or(DEFAULT_IGNORE_LENGTH),
         );
         Ok(WallDetector::new(
-            ok_or(self.wall_manager, "wall_manager")?,
+            ok_or(self.wall_manager.take(), "wall_manager")?,
             ok_or(self.obstacle_detector.take(), "obstacle_detector")?,
             converter,
         ))

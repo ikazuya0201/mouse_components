@@ -13,13 +13,15 @@ use uom::si::f32::{Angle, Length};
 
 pub use return_setup_trajectory_generator::{
     ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryGeneratorBuilder,
+    ReturnSetupTrajectoryGeneratorConfig,
 };
 pub use run_trajectory_generator::{
     RunKind, RunTrajectory, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
-    RunTrajectoryParameters,
+    RunTrajectoryGeneratorConfig, RunTrajectoryParameters,
 };
 pub use search_trajectory_generator::{
     SearchKind, SearchTrajectory, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
+    SearchTrajectoryGeneratorConfig,
 };
 pub use slalom_generator::{
     DefaultSlalomParametersGenerator, SlalomDirection, SlalomKind, SlalomParameters,

@@ -12,7 +12,7 @@ macro_rules! impl_with_getter {
     ) => {
         impl_with_getter! {
             $(#[$meta])*
-            pub struct $name$(<; $(const $const: usize),*>)? {
+            pub struct $name$(<;; $(const $const: usize),*>)? {
                 $(
                     $(#[$field_meta])*
                     $field_name: $type,
@@ -32,7 +32,7 @@ macro_rules! impl_with_getter {
     ) => {
         impl_with_getter! {
             $(#[$meta])*
-            pub struct $name$(<$($tt),*;>)? {
+            pub struct $name$(<;$($tt),*;>)? {
                 $(
                     $(#[$field_meta])*
                     $field_name: $type,
@@ -43,7 +43,7 @@ macro_rules! impl_with_getter {
 
     (
         $(#[$meta:meta])*
-        pub struct $name: ident <$($tt: ident),*; $(const $const: ident : usize),*> {
+        pub struct $name: ident <$($lt: lifetime),*; $($tt: ident),*; $(const $const: ident : usize),*> {
             $(
                 $(#[$field_meta:meta])*
                 $field_name: ident: $type: ty,
@@ -51,14 +51,14 @@ macro_rules! impl_with_getter {
         }
     ) => {
         $(#[$meta])*
-        pub struct $name<$($tt,)* $(const $const: usize),*> {
+        pub struct $name<$($lt,)* $($tt,)* $(const $const: usize),*> {
             $(
                 $(#[$field_meta])*
                 $field_name: $type
             ),*
         }
 
-        impl<$($tt,)* $(const $const: usize),*> $name<$($tt,)* $($const),*> {
+        impl<$($lt,)* $($tt,)* $(const $const: usize),*> $name<$($lt,)* $($tt,)* $($const),*> {
             $(
                 pub fn $field_name(&self) -> &$type {
                     &self.$field_name

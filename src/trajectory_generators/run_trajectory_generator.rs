@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use spin::Mutex;
 use uom::si::f32::{Acceleration, Jerk, Length, Time, Velocity};
 
-use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParametersGenerator};
+use super::slalom_generator::{
+    DefaultSlalomParametersGenerator, SlalomDirection, SlalomKind, SlalomParametersGenerator,
+};
 use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
 use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::{ShiftTrajectory, Target};
@@ -13,6 +15,7 @@ use crate::trajectory_managers::TrackingTrajectoryGenerator;
 use crate::utils::builder::BuilderResult;
 use crate::utils::math::{LibmMath, Math};
 use crate::{get_or_err, impl_setter};
+use crate::{impl_deconstruct_with_default, Construct};
 
 /// An enum for specifying a kind of trajectory of fast run.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -32,13 +35,13 @@ pub struct RunTrajectoryGenerator<M, Generator> {
     square_diagonal_half: Length,
 }
 
-const HALF_DIAGONAL: f32 = 0.70710677;
-
 impl<M, Generator> RunTrajectoryGenerator<M, Generator>
 where
     M: Math,
     Generator: SlalomParametersGenerator,
 {
+    const HALF_DIAGONAL: f32 = 0.70710677;
+
     fn new(
         run_slalom_velocity: Velocity,
         max_velocity: Velocity,
@@ -58,10 +61,47 @@ where
             straight_generator,
             slalom_generator,
             square_width,
-            square_diagonal_half: square_width * HALF_DIAGONAL,
+            square_diagonal_half: square_width * Self::HALF_DIAGONAL,
         }
     }
 }
+
+/// Config for [RunTrajectoryGenerator].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct RunTrajectoryGeneratorConfig {
+    pub run_slalom_velocity: Velocity,
+    pub max_velocity: Velocity,
+    pub max_acceleration: Acceleration,
+    pub max_jerk: Jerk,
+    pub period: Time,
+    pub square_width: Length,
+    pub front_offset: Length,
+}
+
+impl<Math, Config, State, Resource> Construct<Config, State, Resource>
+    for RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>
+where
+    Config: AsRef<RunTrajectoryGeneratorConfig>,
+    Math: crate::utils::math::Math,
+{
+    fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+        let config = config.as_ref();
+        (
+            Self::new(
+                config.run_slalom_velocity,
+                config.max_velocity,
+                config.max_acceleration,
+                config.max_jerk,
+                DefaultSlalomParametersGenerator::new(config.square_width, config.front_offset),
+                config.period,
+                config.square_width,
+            ),
+            resource,
+        )
+    }
+}
+
+impl_deconstruct_with_default!(RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>);
 
 /// A parameter type for [RunTrajectoryGenerator].
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

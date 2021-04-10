@@ -5,6 +5,7 @@ use spin::Mutex;
 
 use crate::agents::TrackingTrajectoryManager;
 use crate::trajectory_managers::CommandConverter;
+use crate::{impl_deconstruct_with_default, Construct};
 
 /// A trait that generates trajectory for search.
 pub trait SearchTrajectoryGenerator<Command> {
@@ -46,6 +47,23 @@ impl<Generator, Converter, Target, Trajectory>
         }
     }
 }
+
+impl<Generator, Converter, Target, Trajectory, Config, State, Resource>
+    Construct<Config, State, Resource>
+    for TrajectoryManager<Generator, Converter, Target, Trajectory>
+where
+    Generator: Construct<Config, State, Resource>,
+    Converter: Construct<Config, State, Resource>,
+    Target: Default,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (generator, resource) = Generator::construct(config, state, resource);
+        let (converter, resource) = Converter::construct(config, state, resource);
+        (Self::new(generator, converter), resource)
+    }
+}
+
+impl_deconstruct_with_default!(TrajectoryManager<Generator,Converter, Target, Trajectory>);
 
 /// Error on [TrajectoryManager](TrajectoryManager).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

@@ -2,8 +2,10 @@
 
 mod state;
 
+use core::convert::TryInto;
 use core::marker::PhantomData;
 
+use serde::{Deserialize, Serialize};
 use uom::si::{
     angle::radian,
     f32::{
@@ -19,6 +21,7 @@ use super::robot::Tracker as ITracker;
 use super::trajectory_generators::{AngleTarget, Target};
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
 use crate::utils::math::{LibmMath, Math};
+use crate::{Construct, Deconstruct};
 pub use state::{AngleState, LengthState, RobotState};
 
 pub trait Motor {
@@ -65,6 +68,90 @@ impl<LM, RM, M, TC, RC> Tracker<LM, RM, M, TC, RC> {
             ..
         } = self;
         (left_motor, right_motor)
+    }
+}
+
+/// Config for [Tracker].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct TrackerConfig {
+    pub kx: f32,
+    pub kdx: f32,
+    pub ky: f32,
+    pub kdy: f32,
+    pub period: Time,
+    pub valid_control_lower_bound: Velocity,
+    pub fail_safe_distance: Length,
+    pub low_zeta: f32,
+    pub low_b: f32,
+}
+
+/// Resource for [Tracker].
+#[derive(PartialEq, Debug)]
+pub struct TrackerResource<LeftMotor, RightMotor> {
+    pub left_motor: LeftMotor,
+    pub right_motor: RightMotor,
+}
+
+impl<LeftMotor, RightMotor, Math, TC, RC, Config, State, Resource>
+    Construct<Config, State, Resource> for Tracker<LeftMotor, RightMotor, Math, TC, RC>
+where
+    TC: Construct<Config, State, Resource> + Controller<Velocity, Acceleration>,
+    RC: Construct<Config, State, Resource> + Controller<AngularVelocity, AngularAcceleration>,
+    LeftMotor: Motor,
+    RightMotor: Motor,
+    Config: AsRef<TrackerConfig>,
+    Resource: TryInto<(Resource, TrackerResource<LeftMotor, RightMotor>)>,
+    Resource::Error: core::fmt::Debug,
+{
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (translation_controller, resource) = TC::construct(config, state, resource);
+        let (rotation_controller, resource) = RC::construct(config, state, resource);
+        let config = config.as_ref();
+        let (
+            resource,
+            TrackerResource {
+                left_motor,
+                right_motor,
+            },
+        ) = resource.try_into().expect("Should never panic");
+        (
+            TrackerBuilder::new()
+                .translation_controller(translation_controller)
+                .rotation_controller(rotation_controller)
+                .left_motor(left_motor)
+                .right_motor(right_motor)
+                .kx(config.kx)
+                .kdx(config.kdx)
+                .ky(config.ky)
+                .kdy(config.kdy)
+                .period(config.period)
+                .valid_control_lower_bound(config.valid_control_lower_bound)
+                .fail_safe_distance(config.fail_safe_distance)
+                .low_zeta(config.low_zeta)
+                .low_b(config.low_b)
+                .build()
+                .expect("Should never panic"),
+            resource,
+        )
+    }
+}
+
+impl<LeftMotor, RightMotor, Math, TC, RC, State, Resource> Deconstruct<State, Resource>
+    for Tracker<LeftMotor, RightMotor, Math, TC, RC>
+where
+    State: Default,
+    Resource: From<TrackerResource<LeftMotor, RightMotor>>,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let (left_motor, right_motor) = self.release();
+        (
+            Default::default(),
+            TrackerResource {
+                left_motor,
+                right_motor,
+            }
+            .into(),
+        )
     }
 }
 

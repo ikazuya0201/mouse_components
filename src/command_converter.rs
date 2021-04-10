@@ -2,6 +2,7 @@
 
 use core::marker::PhantomData;
 
+use serde::{Deserialize, Serialize};
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, Length};
 
@@ -10,6 +11,7 @@ use crate::nodes::{Node, RunNode, SearchNode};
 use crate::trajectory_generators::{RunKind, RunTrajectoryParameters};
 use crate::trajectory_managers::CommandConverter as ICommandConverter;
 use crate::types::data::{AbsoluteDirection, Pose};
+use crate::{impl_deconstruct_with_default, Construct};
 
 //NOTE: This struct is intended to be used by SearchOperator
 /// An implementation of [CommandConverter](crate::trajectory_managers::CommandConverter).
@@ -27,6 +29,28 @@ impl CommandConverter {
         }
     }
 }
+
+/// Config for [CommandConverter].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct CommandConverterConfig {
+    pub square_width: Length,
+    pub front_offset: Length,
+}
+
+impl<Config, State, Resource> Construct<Config, State, Resource> for CommandConverter
+where
+    Config: AsRef<CommandConverterConfig>,
+{
+    fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+        let config = config.as_ref();
+        (
+            Self::new(config.square_width, config.front_offset),
+            resource,
+        )
+    }
+}
+
+impl_deconstruct_with_default!(CommandConverter);
 
 impl CommandConverter {
     const DEFAULT_SQUARE_WIDTH: Length = Length {
@@ -143,3 +167,11 @@ impl<K: Clone> ICommandConverter<K> for ThroughCommandConverter {
         kind.clone()
     }
 }
+
+impl<Config, State, Resource> Construct<Config, State, Resource> for ThroughCommandConverter {
+    fn construct(_config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+        (Self, resource)
+    }
+}
+
+impl_deconstruct_with_default!(ThroughCommandConverter);
