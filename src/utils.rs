@@ -1,6 +1,6 @@
 //! Utilities for this crate.
 
-pub(crate) mod builder;
+pub mod builder;
 pub(crate) mod forced_vec;
 #[macro_use]
 pub(crate) mod macros;
