@@ -18,8 +18,8 @@ pub use search_commander::{
     NextNode, NodeChecker, SearchCommander, SearchCommanderConfig, UncheckedNodeFinder,
 };
 pub use setup_commander::{
-    ReturnSetupCommander, ReturnSetupCommanderConfig, RotationNode, SetupCommander,
-    SetupCommanderError,
+    ReturnSetupCommander, ReturnSetupCommanderConfig, RotationNode, RunSetupCommander,
+    RunSetupCommanderConfig, SetupCommander, SetupCommanderError,
 };
 
 /// A trait that behaves like a directed graph which has weighted edges.

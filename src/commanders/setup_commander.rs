@@ -1,8 +1,9 @@
+use heapless::Vec;
 use num::{Bounded, Saturating};
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
-use super::{compute_shortest_path, CommanderState, Graph};
+use super::{compute_shortest_path, CommanderState, Graph, GOAL_SIZE_UPPER_BOUND};
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
 
@@ -24,9 +25,9 @@ where
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
-    pub fn new(current: Node, start: Node, maze: Maze) -> Self {
+    pub fn new(current: Node, goals: &[Node], maze: Maze) -> Self {
         for (node, kind) in current.rotation_nodes() {
-            if let Some(_) = compute_shortest_path(&node, &[start.clone()], &maze) {
+            if let Some(_) = compute_shortest_path(&node, goals, &maze) {
                 return Self {
                     current: node,
                     maze,
@@ -45,6 +46,22 @@ where
     pub fn release(self) -> (Node, Maze) {
         let Self { current, maze, .. } = self;
         (current, maze)
+    }
+}
+
+impl<Node, Maze, State, Resource> Deconstruct<State, Resource> for SetupCommander<Node, Maze>
+where
+    Node: RotationNode,
+    Maze: Deconstruct<State, Resource>,
+    State: From<CommanderState<Node>> + Merge,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let (current_node, maze) = self.release();
+        let (state, resource) = maze.deconstruct();
+        (
+            state.merge(CommanderState { current_node }.into()),
+            resource,
+        )
     }
 }
 
@@ -75,7 +92,7 @@ where
         (
             Self(SetupCommander::new(
                 state.current_node.clone(),
-                config.return_goal.clone(),
+                &[config.return_goal.clone()],
                 maze,
             )),
             resource,
@@ -83,17 +100,36 @@ where
     }
 }
 
-impl<Node, Maze, State, Resource> Deconstruct<State, Resource> for ReturnSetupCommander<Node, Maze>
+/// Config for [ReturnSetupCommander].
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct RunSetupCommanderConfig<Node> {
+    pub goals: Vec<Node, GOAL_SIZE_UPPER_BOUND>,
+}
+
+/// A commander for setting up fast run.
+pub struct RunSetupCommander<Node, Maze>(SetupCommander<Node, Maze>)
 where
-    Node: RotationNode,
-    Maze: Deconstruct<State, Resource>,
-    State: From<CommanderState<Node>> + Merge,
+    Node: RotationNode;
+
+impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
+    for RunSetupCommander<Node, Maze>
+where
+    Node: Clone + Into<usize> + PartialEq + RotationNode,
+    Maze: Construct<Config, State, Resource> + Graph<Node>,
+    Maze::Cost: Ord + Bounded + Saturating + Copy,
+    Config: AsRef<RunSetupCommanderConfig<Node>>,
+    State: AsRef<CommanderState<Node>>,
 {
-    fn deconstruct(self) -> (State, Resource) {
-        let (current_node, maze) = self.0.release();
-        let (state, resource) = maze.deconstruct();
+    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+        let (maze, resource) = Maze::construct(config, state, resource);
+        let config = config.as_ref();
+        let state = state.as_ref();
         (
-            state.merge(CommanderState { current_node }.into()),
+            Self(SetupCommander::new(
+                state.current_node.clone(),
+                &config.goals,
+                maze,
+            )),
             resource,
         )
     }
@@ -131,16 +167,34 @@ where
     }
 }
 
-impl<Node, Maze> TrackingCommander for ReturnSetupCommander<Node, Maze>
-where
-    Node: Clone + Into<usize> + PartialEq + RotationNode,
-    Maze: Graph<Node>,
-    Maze::Cost: Bounded + Saturating + Copy + Ord,
-{
-    type Error = SetupCommanderError;
-    type Command = (Node, Node::Kind);
+macro_rules! impl_all_for_setup_commander {
+    ($name: ident) => {
+        impl<Node, Maze, State, Resource> Deconstruct<State, Resource> for $name<Node, Maze>
+        where
+            Node: RotationNode,
+            Maze: Deconstruct<State, Resource>,
+            State: From<CommanderState<Node>> + Merge,
+        {
+            fn deconstruct(self) -> (State, Resource) {
+                self.0.deconstruct()
+            }
+        }
 
-    fn next_command(&self) -> Result<Self::Command, TrackingCommanderError<Self::Error>> {
-        self.0.next_command()
-    }
+        impl<Node, Maze> TrackingCommander for $name<Node, Maze>
+        where
+            Node: Clone + Into<usize> + PartialEq + RotationNode,
+            Maze: Graph<Node>,
+            Maze::Cost: Bounded + Saturating + Copy + Ord,
+        {
+            type Error = SetupCommanderError;
+            type Command = (Node, Node::Kind);
+
+            fn next_command(&self) -> Result<Self::Command, TrackingCommanderError<Self::Error>> {
+                self.0.next_command()
+            }
+        }
+    };
 }
+
+impl_all_for_setup_commander!(ReturnSetupCommander);
+impl_all_for_setup_commander!(RunSetupCommander);
