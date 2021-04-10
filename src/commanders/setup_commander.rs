@@ -8,8 +8,8 @@ use crate::{Construct, Deconstruct, Merge};
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander).
 ///
-/// This produces a setup command for returning to start position.
-pub struct ReturnSetupCommander<Node, Maze>
+/// This produces a setup command.
+pub struct SetupCommander<Node, Maze>
 where
     Node: RotationNode,
 {
@@ -18,7 +18,7 @@ where
     command: Mutex<Option<(Node, Node::Kind)>>,
 }
 
-impl<Node, Maze> ReturnSetupCommander<Node, Maze>
+impl<Node, Maze> SetupCommander<Node, Maze>
 where
     Node: Clone + Into<usize> + PartialEq + RotationNode,
     Maze: Graph<Node>,
@@ -38,7 +38,7 @@ where
     }
 }
 
-impl<Node, Maze> ReturnSetupCommander<Node, Maze>
+impl<Node, Maze> SetupCommander<Node, Maze>
 where
     Node: RotationNode,
 {
@@ -54,6 +54,11 @@ pub struct ReturnSetupCommanderConfig<Node> {
     pub return_goal: Node,
 }
 
+/// A commander for setting up return.
+pub struct ReturnSetupCommander<Node, Maze>(SetupCommander<Node, Maze>)
+where
+    Node: RotationNode;
+
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for ReturnSetupCommander<Node, Maze>
 where
@@ -68,7 +73,11 @@ where
         let config = config.as_ref();
         let state = state.as_ref();
         (
-            Self::new(state.current_node.clone(), config.return_goal.clone(), maze),
+            Self(SetupCommander::new(
+                state.current_node.clone(),
+                config.return_goal.clone(),
+                maze,
+            )),
             resource,
         )
     }
@@ -81,7 +90,7 @@ where
     State: From<CommanderState<Node>> + Merge,
 {
     fn deconstruct(self) -> (State, Resource) {
-        let (current_node, maze) = self.release();
+        let (current_node, maze) = self.0.release();
         let (state, resource) = maze.deconstruct();
         (
             state.merge(CommanderState { current_node }.into()),
@@ -92,7 +101,7 @@ where
 
 /// Error on [ReturnSetupCommander](ReturnSetupCommander).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct ReturnSetupCommanderError;
+pub struct SetupCommanderError;
 
 /// A trait that enumerates all nodes which is reachable from the given node, and also enumerates
 /// kinds of rotation.
@@ -104,13 +113,13 @@ pub trait RotationNode: Sized {
 }
 
 //TODO: Write test.
-impl<Node, Maze> TrackingCommander for ReturnSetupCommander<Node, Maze>
+impl<Node, Maze> TrackingCommander for SetupCommander<Node, Maze>
 where
     Node: Clone + Into<usize> + PartialEq + RotationNode,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
-    type Error = ReturnSetupCommanderError;
+    type Error = SetupCommanderError;
     type Command = (Node, Node::Kind);
 
     fn next_command(&self) -> Result<Self::Command, TrackingCommanderError<Self::Error>> {
@@ -119,5 +128,19 @@ where
         } else {
             Err(TrackingCommanderError::TrackingFinish)
         }
+    }
+}
+
+impl<Node, Maze> TrackingCommander for ReturnSetupCommander<Node, Maze>
+where
+    Node: Clone + Into<usize> + PartialEq + RotationNode,
+    Maze: Graph<Node>,
+    Maze::Cost: Bounded + Saturating + Copy + Ord,
+{
+    type Error = SetupCommanderError;
+    type Command = (Node, Node::Kind);
+
+    fn next_command(&self) -> Result<Self::Command, TrackingCommanderError<Self::Error>> {
+        self.0.next_command()
     }
 }

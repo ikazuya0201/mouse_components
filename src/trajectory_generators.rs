@@ -1,8 +1,8 @@
 //! Implementations of trajectory generators.
 
-mod return_setup_trajectory_generator;
 mod run_trajectory_generator;
 mod search_trajectory_generator;
+mod setup_trajectory_generator;
 mod slalom_generator;
 mod spin_generator;
 mod straight_generator;
@@ -11,10 +11,6 @@ mod trajectory;
 use serde::{Deserialize, Serialize};
 use uom::si::f32::{Angle, Length};
 
-pub use return_setup_trajectory_generator::{
-    ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryGeneratorBuilder,
-    ReturnSetupTrajectoryGeneratorConfig,
-};
 pub use run_trajectory_generator::{
     RunKind, RunTrajectory, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
     RunTrajectoryGeneratorConfig, RunTrajectoryParameters,
@@ -22,6 +18,10 @@ pub use run_trajectory_generator::{
 pub use search_trajectory_generator::{
     SearchKind, SearchTrajectory, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
     SearchTrajectoryGeneratorConfig,
+};
+pub use setup_trajectory_generator::{
+    ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryGeneratorBuilder,
+    ReturnSetupTrajectoryGeneratorConfig,
 };
 pub use slalom_generator::{
     DefaultSlalomParametersGenerator, SlalomDirection, SlalomKind, SlalomParameters,
