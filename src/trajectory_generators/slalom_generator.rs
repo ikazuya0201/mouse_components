@@ -302,6 +302,7 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
         })
     }
 
+    #[cfg(nightly)]
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let t = self.t;
         self.t += self.period * n as f32;

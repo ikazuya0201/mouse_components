@@ -510,6 +510,7 @@ impl Iterator for StraightTrajectory {
         })
     }
 
+    #[cfg(nightly)]
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         self.t += self.period * n as f32;
         if self.t < self.t_end {
