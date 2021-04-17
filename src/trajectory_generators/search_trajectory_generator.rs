@@ -54,6 +54,7 @@ impl<M: Math> Iterator for SearchTrajectory<M> {
         }
     }
 
+    #[cfg(nightly)]
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         use SearchTrajectory::*;
 

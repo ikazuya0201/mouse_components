@@ -2,7 +2,7 @@
 
 #![cfg_attr(not(test), no_std)]
 #![deny(warnings)]
-#![feature(iter_advance_by)]
+#![cfg_attr(nightly, feature(iter_advance_by))]
 
 extern crate alloc;
 
