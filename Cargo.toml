@@ -15,7 +15,7 @@ typenum = "1.13.0"
 
 [dependencies.heapless]
 git = "https://github.com/japaric/heapless"
-branch = "const_generics"
+rev = "2c248a31e9c97d185c430111293763f526a7005e"
 features = ["serde"]
 
 [dependencies.spin]
