@@ -879,7 +879,7 @@ impl<const N: usize> WallFinderNode for RunNode<N> {
                         add(0, 1);
                         add(-1, 2);
                     }
-                    (-2, 1, BackRight) | (-2, 0, Back) => {
+                    (-2, 1, BackLeft) | (-2, 0, Back) => {
                         add(0, 1);
                         add(-1, 2);
                         add(-2, 1);
