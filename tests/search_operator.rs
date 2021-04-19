@@ -363,3 +363,14 @@ impl_search_operator_test!(
     include_str!("../mazes/maze3.dat"),
     vec![(2, 0, South), (2, 0, West)],
 );
+
+impl_search_operator_test!(
+    search_operator_test_corner1: 16,
+    include_str!("../mazes/search-corner1.dat"),
+    vec![
+        (15, 14, SouthWest),
+        (15, 14, SouthEast),
+        (15, 16, NorthWest),
+        (15, 16, NorthEast)
+    ],
+);
