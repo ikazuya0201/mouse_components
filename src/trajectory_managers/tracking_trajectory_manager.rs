@@ -13,7 +13,7 @@ pub trait TrackingTrajectoryGenerator<Command> {
     fn generate(&self, command: &Command) -> Self::Trajectory;
 }
 
-const QUEUE_LENGTH: usize = 3;
+const QUEUE_LENGTH: usize = 4;
 
 /// An implementation of [TrackingTrajectoryManager](crate::agents::TrackingTrajectoryManager) required
 /// by [TrackingAgent](crate::agents::TrackingAgent).
@@ -21,7 +21,7 @@ const QUEUE_LENGTH: usize = 3;
 pub struct TrajectoryManager<Generator, Converter, Target, Trajectory> {
     generator: Generator,
     converter: Converter,
-    trajectories: Mutex<Queue<Trajectory, usize, QUEUE_LENGTH>>,
+    trajectories: Mutex<Queue<Trajectory, QUEUE_LENGTH>>,
     last_target: Mutex<Option<Target>>,
 }
 
@@ -71,19 +71,19 @@ where
     type Target = Generator::Target;
 
     fn set_command(&self, command: &Command) -> Result<(), Self::Error> {
+        if self.is_full().unwrap_or(true) {
+            return Err(TrajectoryManagerError::FullQueue);
+        }
+
         //blocking
         let mut trajectories = self.trajectories.lock();
 
-        if trajectories.len() == QUEUE_LENGTH {
-            Err(TrajectoryManagerError::FullQueue)
-        } else {
-            let command = self.converter.convert(command);
-            let trajectory = self.generator.generate(&command);
-            trajectories
-                .enqueue(trajectory)
-                .unwrap_or_else(|_| unreachable!("Should never exceed the length of queue."));
-            Ok(())
-        }
+        let command = self.converter.convert(command);
+        let trajectory = self.generator.generate(&command);
+        trajectories
+            .enqueue(trajectory)
+            .unwrap_or_else(|_| unreachable!("Should never exceed the length of queue."));
+        Ok(())
     }
 
     fn next(&self) -> Self::Target {
@@ -117,6 +117,7 @@ where
     }
 
     fn is_full(&self) -> Option<bool> {
-        Some(self.trajectories.try_lock()?.len() == QUEUE_LENGTH)
+        // actual queue length is QUEUE_LENGTH-1
+        Some(self.trajectories.try_lock()?.len() + 1 == QUEUE_LENGTH)
     }
 }
