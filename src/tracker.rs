@@ -265,7 +265,7 @@ where
 
                 //map to [-PI, PI]
                 let theta_d_raw = if theta_d_raw > PI {
-                    TAU - theta_d_raw
+                    theta_d_raw - TAU
                 } else {
                     theta_d_raw
                 };
