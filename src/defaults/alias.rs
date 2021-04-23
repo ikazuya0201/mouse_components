@@ -15,8 +15,8 @@ use crate::{
     tracker::{RobotState, Tracker},
     trajectory_generators::{
         DefaultSlalomParametersGenerator, ReturnSetupTrajectoryGenerator, RunTrajectory,
-        RunTrajectoryGenerator, SearchTrajectory, SearchTrajectoryGenerator, ShiftTrajectory,
-        SpinTrajectory, Target,
+        RunTrajectoryGenerator, SearchTrajectory, SearchTrajectoryGenerator, SetupTrajectory,
+        ShiftTrajectory, Target,
     },
     trajectory_managers::{SearchTrajectoryManager, TrackingTrajectoryManager},
     types::data::SearchKind,
@@ -103,7 +103,7 @@ pub type ReturnSetupOperator<
             ReturnSetupTrajectoryGenerator<Math>,
             CommandConverter,
             Target,
-            ShiftTrajectory<SpinTrajectory, Math>,
+            ShiftTrajectory<SetupTrajectory, Math>,
         >,
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu, Math>,
@@ -157,7 +157,7 @@ pub type RunSetupOperator<
             ReturnSetupTrajectoryGenerator<Math>,
             CommandConverter,
             Target,
-            ShiftTrajectory<SpinTrajectory, Math>,
+            ShiftTrajectory<SetupTrajectory, Math>,
         >,
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu, Math>,

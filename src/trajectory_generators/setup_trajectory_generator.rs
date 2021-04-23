@@ -5,7 +5,7 @@ use uom::si::angle::degree;
 use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
 use super::spin_generator::{SpinGenerator, SpinTrajectory};
-use super::{ShiftTrajectory, Target};
+use super::{ShiftTrajectory, SingleTrajectory, Target};
 use crate::nodes::RotationKind;
 use crate::trajectory_managers::TrackingTrajectoryGenerator;
 use crate::types::data::Pose;
@@ -69,6 +69,22 @@ where
 
 impl_deconstruct_with_default!(ReturnSetupTrajectoryGenerator<Math>);
 
+pub enum SetupTrajectory {
+    Empty(SingleTrajectory),
+    Rotation(SpinTrajectory),
+}
+
+impl Iterator for SetupTrajectory {
+    type Item = Target;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Empty(inner) => inner.next(),
+            Self::Rotation(inner) => inner.next(),
+        }
+    }
+}
+
 //TODO: Write test.
 impl<Math> TrackingTrajectoryGenerator<(Pose, RotationKind)>
     for ReturnSetupTrajectoryGenerator<Math>
@@ -76,18 +92,26 @@ where
     Math: crate::utils::math::Math,
 {
     type Target = Target;
-    type Trajectory = ShiftTrajectory<SpinTrajectory, Math>;
+    type Trajectory = ShiftTrajectory<SetupTrajectory, Math>;
 
     fn generate(&self, &(pose, kind): &(Pose, RotationKind)) -> Self::Trajectory {
         use RotationKind::*;
 
         let theta = match kind {
-            Front => Default::default(),
+            Front => {
+                return ShiftTrajectory::new(
+                    pose,
+                    SetupTrajectory::Empty(SingleTrajectory::new(Default::default())),
+                )
+            }
             Right => Angle::new::<degree>(-90.0),
             Left => Angle::new::<degree>(90.0),
             Back => Angle::new::<degree>(180.0),
         };
-        ShiftTrajectory::new(pose, self.spin_generator.generate(theta))
+        ShiftTrajectory::new(
+            pose,
+            SetupTrajectory::Rotation(self.spin_generator.generate(theta)),
+        )
     }
 }
 

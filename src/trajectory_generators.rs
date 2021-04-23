@@ -21,14 +21,14 @@ pub use search_trajectory_generator::{
 };
 pub use setup_trajectory_generator::{
     ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryGeneratorBuilder,
-    ReturnSetupTrajectoryGeneratorConfig,
+    ReturnSetupTrajectoryGeneratorConfig, SetupTrajectory,
 };
 pub use slalom_generator::{
     DefaultSlalomParametersGenerator, SlalomDirection, SlalomKind, SlalomParameters,
     SlalomParametersGenerator,
 };
 pub use spin_generator::SpinTrajectory;
-pub use trajectory::{AngleTarget, LengthTarget, ShiftTrajectory, Target};
+pub use trajectory::{AngleTarget, LengthTarget, ShiftTrajectory, SingleTrajectory, Target};
 
 #[derive(Clone, Copy, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct Pose {
