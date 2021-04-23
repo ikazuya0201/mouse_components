@@ -284,12 +284,12 @@ where
             let k2 = self.b;
             let k3 = k1;
 
-            let e = xd * cos_th + yd * sin_th;
-            let uv = vr * cos_th_d + k1 * e;
-            let uw = wr
-                + AngularVelocity::from(k2 * vr * e * Self::sinc(theta_d.get::<radian>()))
-                + AngularVelocity::from(k3 * theta_d);
-            (uv, uw, Default::default(), Default::default())
+            let uv = vr * cos_th_d + k1 * (xd * cos_th + yd * sin_th);
+            let uw =
+                wr + AngularVelocity::from(
+                    k2 * vr * (xd * cos_th - yd * sin_th) * Self::sinc(theta_d.get::<radian>()),
+                ) + AngularVelocity::from(k3 * theta_d);
+            (uv, uw, Default::default(), target.theta.a)
         };
 
         self.xi += self.period * dxi;
