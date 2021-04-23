@@ -15,13 +15,10 @@ use AbsoluteDirection::*;
 
 fn test_compute_shortest_path<const N: usize>(
     maze_str: &str,
+    start: RunNode<N>,
     goals: &[RunNode<N>],
     expected: &[RunNode<N>],
 ) {
-    use AbsoluteDirection::*;
-
-    let start = RunNode::<N>::new(0, 0, North).unwrap();
-
     let wall_manager = WallManager::with_str(Probability::new(0.1).unwrap(), maze_str);
     let maze =
         Maze::<_, _, SearchNode<N>>::new(Rc::new(wall_manager), LinearPatternConverter::default());
@@ -55,6 +52,7 @@ fn test_compute_shortest_path1() {
 +   +   +   +   +
 |               |
 +---+---+---+---+",
+        new((0, 0, North)),
         &vec![(2, 0, West), (2, 0, South)]
             .into_iter()
             .map(new)
@@ -78,6 +76,7 @@ fn test_compute_shortest_path2() {
 +   +---+   +   +
 |   |           |
 +---+---+---+---+",
+        new((0, 0, North)),
         &vec![(2, 0, West), (2, 0, South)]
             .into_iter()
             .map(new)
@@ -91,6 +90,28 @@ fn test_compute_shortest_path2() {
             (5, 4, SouthWest),
             (4, 2, South),
             (2, 0, West),
+        ]
+        .into_iter()
+        .map(new)
+        .collect::<Vec<_>>(),
+    )
+}
+
+#[test]
+fn test_compute_shortest_path3() {
+    test_compute_shortest_path::<16>(
+        include_str!("../mazes/maze2.dat"),
+        new((0, 24, South)),
+        &vec![(0, 0, South)].into_iter().map(new).collect::<Vec<_>>(),
+        &vec![
+            (0, 24, South),
+            (0, 20, South),
+            (1, 18, SouthEast),
+            (2, 16, South),
+            (2, 14, South),
+            (1, 12, SouthWest),
+            (0, 10, South),
+            (0, 0, South),
         ]
         .into_iter()
         .map(new)
