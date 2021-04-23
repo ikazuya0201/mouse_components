@@ -41,10 +41,8 @@ use utils::{
     sensors::{AgentSimulator, DistanceSensor, Encoder, Motor, IMU},
 };
 
-const N: usize = 4;
-
 macro_rules! impl_construct_and_deconstruct_test {
-    ($name: ident: $operator: ident, $wall_manager: expr, $state: expr,) => {
+    ($name: ident: $operator: ident, $wall_manager: expr, $state: expr, $maze_width: literal,) => {
         #[test]
         fn $name() {
             use AbsoluteDirection::*;
@@ -52,12 +50,12 @@ macro_rules! impl_construct_and_deconstruct_test {
             let existence_threshold = Probability::new(0.1).unwrap();
 
             let config = ConfigBuilder::new()
-                .start(RunNode::<N>::new(0, 0, North).unwrap())
-                .return_goal(RunNode::<N>::new(0, 0, South).unwrap())
+                .start(RunNode::<$maze_width>::new(0, 0, North).unwrap())
+                .return_goal(RunNode::<$maze_width>::new(0, 0, South).unwrap())
                 .goals(
                     vec![
-                        RunNode::<N>::new(2, 0, South).unwrap(),
-                        RunNode::<N>::new(2, 0, West).unwrap(),
+                        RunNode::<$maze_width>::new(2, 0, South).unwrap(),
+                        RunNode::<$maze_width>::new(2, 0, West).unwrap(),
                     ]
                     .into_iter()
                     .collect(),
@@ -126,7 +124,10 @@ macro_rules! impl_construct_and_deconstruct_test {
                 *config.translational_model_time_constant(),
                 *config.rotational_model_gain(),
                 *config.rotational_model_time_constant(),
-                WallManager::<N>::with_str(existence_threshold, include_str!("../mazes/maze1.dat")),
+                WallManager::<$maze_width>::with_str(
+                    existence_threshold,
+                    include_str!("../mazes/maze1.dat"),
+                ),
                 distance_sensors_poses,
             );
 
@@ -159,17 +160,17 @@ macro_rules! impl_construct_and_deconstruct_test {
                 .build()
                 .unwrap();
 
-            let config: ConfigContainer<N> = config.into();
-            let state: StateContainer<N> = $state.into();
+            let config: ConfigContainer<$maze_width> = config.into();
+            let state: StateContainer<$maze_width> = $state.into();
             let (operator, resource) = <$operator<
                 Encoder,
                 Encoder,
                 IMU,
                 Motor,
                 Motor,
-                DistanceSensor<N>,
+                DistanceSensor<$maze_width>,
                 MathFake,
-                N,
+                $maze_width,
             >>::construct(&config, &state, resource);
 
             // Execute operator.
@@ -178,7 +179,8 @@ macro_rules! impl_construct_and_deconstruct_test {
                 operator.tick().expect("Should never panic");
             }
 
-            let (mut state_builder, dec_resource): (StateBuilder<N>, _) = operator.deconstruct();
+            let (mut state_builder, dec_resource): (StateBuilder<$maze_width>, _) =
+                operator.deconstruct();
             let resource = resource.merge(dec_resource);
             state_builder.build().expect("Should never panic"); // Assert if all fields exist.
 
@@ -194,8 +196,8 @@ macro_rules! impl_construct_and_deconstruct_test {
     };
 }
 
-fn new_state(x: i8, y: i8, dir: AbsoluteDirection) -> State<N> {
-    let node = RunNode::<N>::new(x, y, dir).unwrap();
+fn new_state<const N: usize>(x: i8, y: i8, dir: AbsoluteDirection) -> State<N> {
+    let node = RunNode::new(x, y, dir).unwrap();
     let command_converter = CommandConverter::default();
     let (pose, _) = command_converter.convert(&(node, ()));
     State::new(node, pose.into())
@@ -204,34 +206,39 @@ fn new_state(x: i8, y: i8, dir: AbsoluteDirection) -> State<N> {
 impl_construct_and_deconstruct_test! {
     test_search_operator_construct_and_deconstruct:
     SearchOperator,
-    WallManager::<N>::new(Probability::new(0.1).unwrap()),
-    new_state(0, 0, North),
+    WallManager::<4>::new(Probability::new(0.1).unwrap()),
+    new_state::<4>(0, 0, North),
+    4,
 }
 
 impl_construct_and_deconstruct_test! {
     test_run_operator_construct_and_deconstruct:
     RunOperator,
-    WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
-    new_state(0, 0, North),
+    WallManager::<4>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
+    new_state::<4>(0, 0, North),
+    4,
 }
 
 impl_construct_and_deconstruct_test! {
     test_return_setup_operator_construct_and_deconstruct:
     ReturnSetupOperator,
-    WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
-    new_state(2, 0, West),
+    WallManager::<16>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze2.dat")),
+    new_state::<16>(0, 26, South),
+    16,
 }
 
 impl_construct_and_deconstruct_test! {
     test_return_operator_construct_and_deconstruct:
     ReturnOperator,
-    WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
-    new_state(2, 0, North),
+    WallManager::<4>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
+    new_state::<4>(2, 0, North),
+    4,
 }
 
 impl_construct_and_deconstruct_test! {
     test_run_setup_operator_construct_and_deconstruct:
     RunSetupOperator,
-    WallManager::<N>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
-    new_state(0, 0, South),
+    WallManager::<4>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
+    new_state::<4>(0, 0, South),
+    4,
 }
