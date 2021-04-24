@@ -6,7 +6,7 @@ use crate::{
     },
     controllers::{RotationalController, TranslationalController},
     estimator::Estimator,
-    mazes::Maze,
+    mazes::{CheckedMaze, Maze},
     nodes::{Node, RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
@@ -67,7 +67,10 @@ pub type RunOperator<
     Math,
     const N: usize,
 > = TrackingOperator<
-    RunCommander<RunNode<N>, Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>>,
+    RunCommander<
+        RunNode<N>,
+        CheckedMaze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+    >,
     TrackingAgent<
         TrackingTrajectoryManager<
             RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>,
@@ -96,7 +99,7 @@ pub type ReturnSetupOperator<
 > = TrackingOperator<
     ReturnSetupCommander<
         RunNode<N>,
-        Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+        CheckedMaze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
@@ -124,7 +127,10 @@ pub type ReturnOperator<
     Math,
     const N: usize,
 > = TrackingOperator<
-    ReturnCommander<RunNode<N>, Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>>,
+    ReturnCommander<
+        RunNode<N>,
+        CheckedMaze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+    >,
     TrackingAgent<
         TrackingTrajectoryManager<
             RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>,
@@ -151,7 +157,10 @@ pub type RunSetupOperator<
     Math,
     const N: usize,
 > = TrackingOperator<
-    RunSetupCommander<RunNode<N>, Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>>,
+    RunSetupCommander<
+        RunNode<N>,
+        CheckedMaze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+    >,
     TrackingAgent<
         TrackingTrajectoryManager<
             ReturnSetupTrajectoryGenerator<Math>,
