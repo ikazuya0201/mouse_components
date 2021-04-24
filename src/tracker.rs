@@ -186,6 +186,26 @@ where
     }
 }
 
+// normalize angle to [-pi, pi].
+fn normalize_angle(angle: Angle) -> Angle {
+    use core::f32::consts::{PI, TAU};
+
+    let raw_angle = crate::utils::math::rem_euclidf(angle.value, TAU);
+
+    Angle::new::<radian>(if raw_angle > PI {
+        raw_angle - TAU
+    } else {
+        raw_angle
+    })
+}
+
+// calculate sin(x)/x
+fn sinc(x: f32) -> f32 {
+    let xx = x * x;
+    let xxxx = xx * xx;
+    xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
+}
+
 impl<LM, RM, M, TC, RC> Tracker<LM, RM, M, TC, RC>
 where
     LM: Motor,
@@ -201,12 +221,6 @@ where
     {
         self.left_motor.apply(Default::default());
         self.right_motor.apply(Default::default());
-    }
-
-    fn sinc(x: f32) -> f32 {
-        let xx = x * x;
-        let xxxx = xx * xx;
-        xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
     }
 
     fn fail_safe(&mut self, state: &RobotState, target: &Target) -> Result<(), FailSafeError> {
@@ -257,20 +271,7 @@ where
             (uv, uw, duv, duw)
         } else {
             let (sin_th_r, cos_th_r) = M::sincos(target.theta.x);
-            let theta_d = {
-                use core::f32::consts::{PI, TAU};
-
-                let theta_d = target.theta.x - state.theta.x;
-                let theta_d_raw = crate::utils::math::rem_euclidf(theta_d.value, TAU);
-
-                //map to [-PI, PI]
-                let theta_d_raw = if theta_d_raw > PI {
-                    theta_d_raw - TAU
-                } else {
-                    theta_d_raw
-                };
-                Angle::new::<radian>(theta_d_raw)
-            };
+            let theta_d = normalize_angle(target.theta.x - state.theta.x);
             let cos_th_d = M::cos(theta_d);
             let xd = target.x.x - state.x.x;
             let yd = target.y.x - state.y.x;
@@ -287,9 +288,14 @@ where
             let uv = vr * cos_th_d + k1 * (xd * cos_th + yd * sin_th);
             let uw =
                 wr + AngularVelocity::from(
-                    k2 * vr * (xd * cos_th - yd * sin_th) * Self::sinc(theta_d.get::<radian>()),
+                    k2 * vr * (-xd * sin_th + yd * cos_th) * sinc(theta_d.value),
                 ) + AngularVelocity::from(k3 * theta_d);
-            (uv, uw, Default::default(), target.theta.a)
+            (
+                uv,
+                uw,
+                target.x.a * cos_th_r + target.y.a * sin_th_r,
+                target.theta.a,
+            )
         };
 
         self.xi += self.period * dxi;
@@ -528,5 +534,29 @@ mod tests {
     #[test]
     fn test_build() {
         let _tracker = build_tracker();
+    }
+
+    #[test]
+    fn test_normalize_angle() {
+        use approx::assert_relative_eq;
+        use uom::si::angle::degree;
+
+        let test_cases = vec![
+            (45.0, 45.0),
+            (180.0, 180.0),
+            (-45.0, -45.0),
+            (-300.0, 60.0),
+            (-660.0, 60.0),
+        ];
+
+        for (angle, expected) in test_cases {
+            let angle = Angle::new::<degree>(angle);
+            let expected = Angle::new::<degree>(expected);
+            assert_relative_eq!(
+                normalize_angle(angle).value,
+                expected.value,
+                epsilon = 0.001
+            );
+        }
     }
 }
