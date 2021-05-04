@@ -51,9 +51,9 @@ where
     Cost: Clone,
     Config: AsRef<LinearPatternConverter<Cost>>,
 {
-    fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+    fn construct<'a>(config: &'a Config, _state: &'a State, _resource: &'a mut Resource) -> Self {
         let converter = config.as_ref();
-        (converter.clone(), resource)
+        converter.clone()
     }
 }
 

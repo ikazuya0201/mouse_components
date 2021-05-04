@@ -9,7 +9,7 @@ use components::{
             ReturnOperator, ReturnSetupOperator, RunOperator, RunSetupOperator, SearchOperator,
         },
         config::{ConfigBuilder, ConfigContainer},
-        resource::ResourceBuilder,
+        resource::{ResourceBuilder, ResourceContainer},
         state::{State, StateBuilder, StateContainer},
     },
     nodes::RunNode,
@@ -149,20 +149,22 @@ macro_rules! impl_construct_and_deconstruct_test {
                 *config.ignore_length_from_wall(),
             );
 
-            let resource = ResourceBuilder::new()
-                .left_encoder(left_encoder)
-                .right_encoder(right_encoder)
-                .imu(imu)
-                .left_motor(left_motor)
-                .right_motor(right_motor)
-                .wall_manager(Rc::new($wall_manager))
-                .distance_sensors(distance_sensors.into_iter().collect())
-                .build()
-                .unwrap();
+            let mut resource: ResourceContainer<_, _, _, _, _, _, $maze_width> =
+                ResourceBuilder::new()
+                    .left_encoder(left_encoder)
+                    .right_encoder(right_encoder)
+                    .imu(imu)
+                    .left_motor(left_motor)
+                    .right_motor(right_motor)
+                    .wall_manager(Rc::new($wall_manager))
+                    .distance_sensors(distance_sensors.into_iter().collect())
+                    .build()
+                    .unwrap()
+                    .into();
 
             let config: ConfigContainer<$maze_width> = config.into();
             let state: StateContainer<$maze_width> = $state.into();
-            let (operator, resource) = <$operator<
+            let operator = <$operator<
                 Encoder,
                 Encoder,
                 IMU,
@@ -171,7 +173,7 @@ macro_rules! impl_construct_and_deconstruct_test {
                 DistanceSensor<$maze_width>,
                 MathFake,
                 $maze_width,
-            >>::construct(&config, &state, resource);
+            >>::construct(&config, &state, &mut resource);
 
             // Execute operator.
             while operator.run().is_err() {
@@ -179,19 +181,12 @@ macro_rules! impl_construct_and_deconstruct_test {
                 operator.tick().expect("Should never panic");
             }
 
-            let (mut state_builder, dec_resource): (StateBuilder<$maze_width>, _) =
-                operator.deconstruct();
-            let resource = resource.merge(dec_resource);
+            let (mut state_builder, mut resource_builder): (
+                StateBuilder<$maze_width>,
+                ResourceBuilder<_, _, _, _, _, _, $maze_width>,
+            ) = operator.deconstruct();
             state_builder.build().expect("Should never panic"); // Assert if all fields exist.
-
-            // Assert if all fields exist in resource.
-            assert!(resource.left_encoder.is_some());
-            assert!(resource.right_encoder.is_some());
-            assert!(resource.imu.is_some());
-            assert!(resource.left_motor.is_some());
-            assert!(resource.right_motor.is_some());
-            assert!(resource.distance_sensors.is_some());
-            assert!(resource.wall_manager.is_some());
+            resource_builder.build().expect("Should never panic");
         }
     };
 }

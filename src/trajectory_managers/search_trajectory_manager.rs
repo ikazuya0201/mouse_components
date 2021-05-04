@@ -56,10 +56,10 @@ where
     Converter: Construct<Config, State, Resource>,
     Target: Default,
 {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
-        let (generator, resource) = Generator::construct(config, state, resource);
-        let (converter, resource) = Converter::construct(config, state, resource);
-        (Self::new(generator, converter), resource)
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
+        let generator = Generator::construct(config, state, resource);
+        let converter = Converter::construct(config, state, resource);
+        Self::new(generator, converter)
     }
 }
 

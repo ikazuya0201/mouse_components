@@ -1,6 +1,5 @@
 //! An implementation of [StateEstimator](crate::robot::StateEstimator).
 
-use core::convert::TryInto;
 use core::marker::PhantomData;
 
 use nb::block;
@@ -209,35 +208,28 @@ where
     Imu: IMU,
     Config: AsRef<EstimatorConfig>,
     State: AsRef<EstimatorState>,
-    Resource: TryInto<(Resource, EstimatorResource<LeftEncoder, RightEncoder, Imu>)>,
-    Resource::Error: core::fmt::Debug,
+    Resource: AsMut<Option<EstimatorResource<LeftEncoder, RightEncoder, Imu>>>,
     Math: crate::utils::math::Math,
 {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
         let config = config.as_ref();
         let state = state.as_ref();
-        let (
-            resource,
-            EstimatorResource {
-                left_encoder,
-                right_encoder,
-                imu,
-            },
-        ) = resource.try_into().expect("Should never panic");
-        (
-            EstimatorBuilder::new()
-                .left_encoder(left_encoder)
-                .right_encoder(right_encoder)
-                .imu(imu)
-                .initial_state(state.robot_state.clone())
-                .correction_weight(config.correction_weight)
-                .wheel_interval(config.wheel_interval)
-                .period(config.period)
-                .cut_off_frequency(config.cut_off_frequency)
-                .build()
-                .expect("Should never panic"),
-            resource,
-        )
+        let EstimatorResource {
+            left_encoder,
+            right_encoder,
+            imu,
+        } = resource.as_mut().take().unwrap_or_else(|| unimplemented!());
+        EstimatorBuilder::new()
+            .left_encoder(left_encoder)
+            .right_encoder(right_encoder)
+            .imu(imu)
+            .initial_state(state.robot_state.clone())
+            .correction_weight(config.correction_weight)
+            .wheel_interval(config.wheel_interval)
+            .period(config.period)
+            .cut_off_frequency(config.cut_off_frequency)
+            .build()
+            .expect("Should never panic")
     }
 }
 

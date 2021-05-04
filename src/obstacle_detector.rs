@@ -1,6 +1,5 @@
 //! An implementation of [ObstacleDetector](crate::wall_detector::ObstacleDetector).
 
-use core::convert::TryInto;
 use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
@@ -61,13 +60,12 @@ pub struct ObstacleDetectorResource<DistanceSensor> {
 impl<DistanceSensor, Math, Config, State, Resource> Construct<Config, State, Resource>
     for ObstacleDetector<DistanceSensor, Math>
 where
-    Resource: TryInto<(Resource, ObstacleDetectorResource<DistanceSensor>)>,
-    Resource::Error: core::fmt::Debug,
+    Resource: AsMut<Option<ObstacleDetectorResource<DistanceSensor>>>,
 {
-    fn construct(_config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
-        let (resource, ObstacleDetectorResource { distance_sensors }) =
-            resource.try_into().expect("Should never panic");
-        (Self::new(distance_sensors), resource)
+    fn construct<'a>(_config: &'a Config, _state: &'a State, resource: &'a mut Resource) -> Self {
+        let ObstacleDetectorResource { distance_sensors } =
+            resource.as_mut().take().unwrap_or_else(|| unimplemented!());
+        Self::new(distance_sensors)
     }
 }
 

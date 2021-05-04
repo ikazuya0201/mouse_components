@@ -44,10 +44,10 @@ where
     Manager: Construct<Config, State, Resource>,
     Robot: Construct<Config, State, Resource>,
 {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
-        let (manager, resource) = Manager::construct(config, state, resource);
-        let (robot, resource) = Robot::construct(config, state, resource);
-        (Self::new(manager, robot), resource)
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
+        let manager = Manager::construct(config, state, resource);
+        let robot = Robot::construct(config, state, resource);
+        Self::new(manager, robot)
     }
 }
 

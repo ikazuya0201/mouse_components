@@ -2,7 +2,6 @@
 
 mod state;
 
-use core::convert::TryInto;
 use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
@@ -100,39 +99,32 @@ where
     LeftMotor: Motor,
     RightMotor: Motor,
     Config: AsRef<TrackerConfig>,
-    Resource: TryInto<(Resource, TrackerResource<LeftMotor, RightMotor>)>,
-    Resource::Error: core::fmt::Debug,
+    Resource: AsMut<Option<TrackerResource<LeftMotor, RightMotor>>>,
 {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
-        let (translation_controller, resource) = TC::construct(config, state, resource);
-        let (rotation_controller, resource) = RC::construct(config, state, resource);
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
+        let translation_controller = TC::construct(config, state, resource);
+        let rotation_controller = RC::construct(config, state, resource);
         let config = config.as_ref();
-        let (
-            resource,
-            TrackerResource {
-                left_motor,
-                right_motor,
-            },
-        ) = resource.try_into().expect("Should never panic");
-        (
-            TrackerBuilder::new()
-                .translation_controller(translation_controller)
-                .rotation_controller(rotation_controller)
-                .left_motor(left_motor)
-                .right_motor(right_motor)
-                .kx(config.kx)
-                .kdx(config.kdx)
-                .ky(config.ky)
-                .kdy(config.kdy)
-                .period(config.period)
-                .valid_control_lower_bound(config.valid_control_lower_bound)
-                .fail_safe_distance(config.fail_safe_distance)
-                .low_zeta(config.low_zeta)
-                .low_b(config.low_b)
-                .build()
-                .expect("Should never panic"),
-            resource,
-        )
+        let TrackerResource {
+            left_motor,
+            right_motor,
+        } = resource.as_mut().take().unwrap_or_else(|| unimplemented!());
+        TrackerBuilder::new()
+            .translation_controller(translation_controller)
+            .rotation_controller(rotation_controller)
+            .left_motor(left_motor)
+            .right_motor(right_motor)
+            .kx(config.kx)
+            .kdx(config.kdx)
+            .ky(config.ky)
+            .kdy(config.kdy)
+            .period(config.period)
+            .valid_control_lower_bound(config.valid_control_lower_bound)
+            .fail_safe_distance(config.fail_safe_distance)
+            .low_zeta(config.low_zeta)
+            .low_b(config.low_b)
+            .build()
+            .expect("Should never panic")
     }
 }
 
