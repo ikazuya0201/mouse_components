@@ -109,20 +109,17 @@ where
     RunNode: Clone,
     Route: Clone,
 {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
-        let (maze, resource) = Maze::construct(config, state, resource);
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
+        let maze = Maze::construct(config, state, resource);
         let config = config.as_ref();
         let state = state.as_ref();
-        (
-            Self::new(
-                config.start.clone(),
-                &config.goals,
-                state.current_node.clone(),
-                config.initial_route.clone(),
-                config.final_route.clone(),
-                maze,
-            ),
-            resource,
+        Self::new(
+            config.start.clone(),
+            &config.goals,
+            state.current_node.clone(),
+            config.initial_route.clone(),
+            config.final_route.clone(),
+            maze,
         )
     }
 }

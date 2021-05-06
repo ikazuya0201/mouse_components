@@ -82,11 +82,11 @@ where
     Tracker: Construct<Config, State, Resource>,
     Detector: Construct<Config, State, Resource>,
 {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
-        let (estimator, resource) = Estimator::construct(config, state, resource);
-        let (tracker, resource) = Tracker::construct(config, state, resource);
-        let (detector, resource) = Detector::construct(config, state, resource);
-        (Self::new(estimator, tracker, detector), resource)
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
+        let estimator = Estimator::construct(config, state, resource);
+        let tracker = Tracker::construct(config, state, resource);
+        let detector = Detector::construct(config, state, resource);
+        Self::new(estimator, tracker, detector)
     }
 }
 

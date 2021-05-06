@@ -85,18 +85,15 @@ where
     Config: AsRef<ReturnSetupCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
 {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
-        let (maze, resource) = Maze::construct(config, state, resource);
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
+        let maze = Maze::construct(config, state, resource);
         let config = config.as_ref();
         let state = state.as_ref();
-        (
-            Self(SetupCommander::new(
-                state.current_node.clone(),
-                &[config.return_goal.clone()],
-                maze,
-            )),
-            resource,
-        )
+        Self(SetupCommander::new(
+            state.current_node.clone(),
+            &[config.return_goal.clone()],
+            maze,
+        ))
     }
 }
 
@@ -120,18 +117,15 @@ where
     Config: AsRef<RunSetupCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
 {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
-        let (maze, resource) = Maze::construct(config, state, resource);
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
+        let maze = Maze::construct(config, state, resource);
         let config = config.as_ref();
         let state = state.as_ref();
-        (
-            Self(SetupCommander::new(
-                state.current_node.clone(),
-                &config.goals,
-                maze,
-            )),
-            resource,
-        )
+        Self(SetupCommander::new(
+            state.current_node.clone(),
+            &config.goals,
+            maze,
+        ))
     }
 }
 

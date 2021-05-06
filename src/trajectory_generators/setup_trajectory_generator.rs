@@ -53,16 +53,13 @@ impl<Math, Config, State, Resource> Construct<Config, State, Resource>
 where
     Config: AsRef<ReturnSetupTrajectoryGeneratorConfig>,
 {
-    fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+    fn construct<'a>(config: &'a Config, _state: &'a State, _resource: &'a mut Resource) -> Self {
         let config = config.as_ref();
-        (
-            Self::new(
-                config.max_angular_velocity,
-                config.max_angular_acceleration,
-                config.max_angular_jerk,
-                config.period,
-            ),
-            resource,
+        Self::new(
+            config.max_angular_velocity,
+            config.max_angular_acceleration,
+            config.max_angular_jerk,
+            config.period,
         )
     }
 }

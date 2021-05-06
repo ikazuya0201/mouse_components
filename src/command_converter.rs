@@ -41,12 +41,9 @@ impl<Config, State, Resource> Construct<Config, State, Resource> for CommandConv
 where
     Config: AsRef<CommandConverterConfig>,
 {
-    fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+    fn construct<'a>(config: &'a Config, _state: &'a State, _resource: &'a mut Resource) -> Self {
         let config = config.as_ref();
-        (
-            Self::new(config.square_width, config.front_offset),
-            resource,
-        )
+        Self::new(config.square_width, config.front_offset)
     }
 }
 
@@ -169,8 +166,8 @@ impl<K: Clone> ICommandConverter<K> for ThroughCommandConverter {
 }
 
 impl<Config, State, Resource> Construct<Config, State, Resource> for ThroughCommandConverter {
-    fn construct(_config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
-        (Self, resource)
+    fn construct<'a>(_config: &'a Config, _state: &'a State, _resource: &'a mut Resource) -> Self {
+        Self
     }
 }
 

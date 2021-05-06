@@ -177,18 +177,19 @@ macro_rules! impl_controller {
         where
             Config: AsRef<$config>,
         {
-            fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+            fn construct<'a>(
+                config: &'a Config,
+                _state: &'a State,
+                _resource: &'a mut Resource,
+            ) -> Self {
                 let config = config.as_ref();
-                (
-                    Self::new(
-                        config.model_gain,
-                        config.model_time_constant,
-                        config.kp,
-                        config.ki,
-                        config.kd,
-                        config.period,
-                    ),
-                    resource,
+                Self::new(
+                    config.model_gain,
+                    config.model_time_constant,
+                    config.kp,
+                    config.ki,
+                    config.kd,
+                    config.period,
                 )
             }
         }

@@ -137,7 +137,7 @@ const MAZE_WIDTH_UPPER_BOUND: usize = 32;
 
 /// A trait for constructing itself by config, state and resource.
 pub trait Construct<Config, State, Resource>: Sized {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource);
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self;
 }
 
 /// A trait for deconstructing itself into state and resource.

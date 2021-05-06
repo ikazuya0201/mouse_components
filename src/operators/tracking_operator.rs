@@ -68,10 +68,10 @@ where
     Commander: Construct<Config, State, Resource> + TrackingCommander,
     Agent: Construct<Config, State, Resource> + TrackingAgent<Commander::Command>,
 {
-    fn construct(config: &Config, state: &State, resource: Resource) -> (Self, Resource) {
-        let (commander, resource) = Commander::construct(config, state, resource);
-        let (agent, resource) = Agent::construct(config, state, resource);
-        (Self::new(commander, agent), resource)
+    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
+        let commander = Commander::construct(config, state, resource);
+        let agent = Agent::construct(config, state, resource);
+        Self::new(commander, agent)
     }
 }
 

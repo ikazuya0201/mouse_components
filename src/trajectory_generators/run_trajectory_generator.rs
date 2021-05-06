@@ -84,19 +84,16 @@ where
     Config: AsRef<RunTrajectoryGeneratorConfig>,
     Math: crate::utils::math::Math,
 {
-    fn construct(config: &Config, _state: &State, resource: Resource) -> (Self, Resource) {
+    fn construct<'a>(config: &'a Config, _state: &'a State, _resource: &'a mut Resource) -> Self {
         let config = config.as_ref();
-        (
-            Self::new(
-                config.run_slalom_velocity,
-                config.max_velocity,
-                config.max_acceleration,
-                config.max_jerk,
-                DefaultSlalomParametersGenerator::new(config.square_width, config.front_offset),
-                config.period,
-                config.square_width,
-            ),
-            resource,
+        Self::new(
+            config.run_slalom_velocity,
+            config.max_velocity,
+            config.max_acceleration,
+            config.max_jerk,
+            DefaultSlalomParametersGenerator::new(config.square_width, config.front_offset),
+            config.period,
+            config.square_width,
         )
     }
 }
