@@ -65,3 +65,9 @@ pub use crate::{
     Construct as _components_Construct, Deconstruct as _components_Deconstruct,
     Merge as _components_Merge,
 };
+
+#[doc(no_inline)]
+pub use crate::agents::{
+    Robot as _components_agents_Robot, TrackingAgent as _components_agents_TrackingAgent,
+    TrackingTrajectoryManager as _components_agents_TrackingTrajectoryManager,
+};
