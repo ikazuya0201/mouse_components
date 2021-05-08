@@ -150,6 +150,7 @@ pub trait Merge {
     fn merge(self, rhs: Self) -> Self;
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_deconstruct_with_default {
     ($name: ident $(<$($param: ident),*>)?) => {
