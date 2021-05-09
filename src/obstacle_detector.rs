@@ -1,13 +1,13 @@
 //! An implementation of [ObstacleDetector](crate::wall_detector::ObstacleDetector).
 
-use core::marker::PhantomData;
-
+#[allow(unused_imports)]
+use micromath::F32Ext;
 use serde::{Deserialize, Serialize};
 use uom::si::f32::Length;
 
 use crate::tracker::RobotState;
 use crate::types::data::Pose;
-use crate::utils::{math::Math, sample::Sample};
+use crate::utils::sample::Sample;
 use crate::wall_detector::ObstacleDetector as IObstacleDetector;
 use crate::{Construct, Deconstruct};
 
@@ -29,18 +29,14 @@ pub(crate) const SENSOR_SIZE_UPPER_BOUND: usize = 6;
 pub type Vec<T> = heapless::Vec<T, SENSOR_SIZE_UPPER_BOUND>;
 
 //NOTE: the number of sensors is upper-bounded.
-pub struct ObstacleDetector<D, M> {
+pub struct ObstacleDetector<D> {
     distance_sensors: Vec<D>,
-    _math: PhantomData<fn() -> M>,
 }
 
-impl<D, M> ObstacleDetector<D, M> {
+impl<D> ObstacleDetector<D> {
     pub fn new<I: IntoIterator<Item = D>>(distance_sensors: I) -> Self {
         let distance_sensors = distance_sensors.into_iter().collect();
-        Self {
-            distance_sensors,
-            _math: PhantomData,
-        }
+        Self { distance_sensors }
     }
 
     pub fn release(self) -> Vec<D> {
@@ -57,8 +53,8 @@ pub struct ObstacleDetectorResource<DistanceSensor> {
     pub distance_sensors: Vec<DistanceSensor>,
 }
 
-impl<DistanceSensor, Math, Config, State, Resource> Construct<Config, State, Resource>
-    for ObstacleDetector<DistanceSensor, Math>
+impl<DistanceSensor, Config, State, Resource> Construct<Config, State, Resource>
+    for ObstacleDetector<DistanceSensor>
 where
     Resource: AsMut<Option<ObstacleDetectorResource<DistanceSensor>>>,
 {
@@ -69,8 +65,8 @@ where
     }
 }
 
-impl<DistanceSensor, Math, State, Resource> Deconstruct<State, Resource>
-    for ObstacleDetector<DistanceSensor, Math>
+impl<DistanceSensor, State, Resource> Deconstruct<State, Resource>
+    for ObstacleDetector<DistanceSensor>
 where
     State: Default,
     Resource: From<ObstacleDetectorResource<DistanceSensor>>,
@@ -84,9 +80,8 @@ where
     }
 }
 
-impl<D, M> IObstacleDetector<RobotState> for ObstacleDetector<D, M>
+impl<D> IObstacleDetector<RobotState> for ObstacleDetector<D>
 where
-    M: Math,
     D: DistanceSensor,
 {
     type Obstacle = Obstacle;
@@ -94,7 +89,8 @@ where
 
     fn detect(&mut self, state: &RobotState) -> Self::Obstacles {
         let mut obstacles = Vec::new();
-        let (sin_th, cos_th) = M::sincos(state.theta.x);
+        let sin_th = state.theta.x.value.sin();
+        let cos_th = state.theta.x.value.cos();
         for distance_sensor in &mut self.distance_sensors {
             let pose = distance_sensor.pose();
             if let Ok(distance) = distance_sensor.get_distance() {
@@ -119,7 +115,6 @@ mod tests {
 
     use super::*;
     use crate::types::data::Pose;
-    use crate::utils::math::MathFake;
 
     struct IDistanceSensor {
         pose: Pose,
@@ -195,7 +190,7 @@ mod tests {
         use crate::prelude::*;
         use crate::types::data::{AngleState, LengthState};
 
-        let mut detector = ObstacleDetector::<_, MathFake>::new(sensors);
+        let mut detector = ObstacleDetector::new(sensors);
         let obstacles = detector.detect(&RobotState {
             x: LengthState {
                 x: Length::new::<meter>(0.045),

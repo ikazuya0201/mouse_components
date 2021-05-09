@@ -3,5 +3,4 @@
 extern crate alloc;
 
 pub mod logged_tracker;
-pub mod math;
 pub mod sensors;

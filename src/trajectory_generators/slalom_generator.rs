@@ -2,6 +2,8 @@ use core::f32::consts::PI;
 use core::iter::Chain;
 use core::marker::PhantomData;
 
+#[allow(unused_imports)]
+use micromath::F32Ext;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -18,7 +20,6 @@ use super::straight_generator::{
     StraightTrajectoryGenerator,
 };
 use super::trajectory::{LengthTarget, ShiftTrajectory, Target};
-use crate::traits::Math;
 use crate::types::data::Pose;
 
 /// An enum for specifying the direction of slaloms.
@@ -62,14 +63,13 @@ pub trait SlalomParametersGenerator {
     fn generate(&self, kind: SlalomKind, direction: SlalomDirection) -> SlalomParameters;
 }
 
-pub struct SlalomGenerator<M, Generator> {
+pub struct SlalomGenerator<Generator> {
     period: Time,
     parameters_generator: Generator,
     straight_generator: StraightTrajectoryGenerator,
-    _phantom: PhantomData<fn() -> M>,
 }
 
-impl<M, Generator> SlalomGenerator<M, Generator> {
+impl<Generator> SlalomGenerator<Generator> {
     pub fn new(
         period: Time,
         parameters_generator: Generator,
@@ -84,17 +84,15 @@ impl<M, Generator> SlalomGenerator<M, Generator> {
             period,
             parameters_generator,
             straight_generator: StraightTrajectoryGenerator::new(v_max, a_max, j_max, period),
-            _phantom: PhantomData,
         }
     }
 }
 
-pub type SlalomTrajectory<M> =
-    Chain<Chain<StraightTrajectory, CurveTrajectory<M>>, ShiftTrajectory<StraightTrajectory, M>>;
+pub type SlalomTrajectory =
+    Chain<Chain<StraightTrajectory, CurveTrajectory>, ShiftTrajectory<StraightTrajectory>>;
 
-impl<M, Generator> SlalomGenerator<M, Generator>
+impl<Generator> SlalomGenerator<Generator>
 where
-    M: Math,
     Generator: SlalomParametersGenerator,
 {
     pub fn generate_constant_slalom(
@@ -102,7 +100,7 @@ where
         kind: SlalomKind,
         dir: SlalomDirection,
         v: Velocity,
-    ) -> SlalomTrajectory<M> {
+    ) -> SlalomTrajectory {
         let params = self.parameters_generator.generate(kind, dir);
         let straight1 =
             StraightTrajectoryGenerator::generate_constant(params.l_start, v, self.period);
@@ -135,7 +133,7 @@ where
         dir: SlalomDirection,
         v_start: Velocity,
         v_end: Velocity,
-    ) -> (SlalomTrajectory<M>, Velocity) {
+    ) -> (SlalomTrajectory, Velocity) {
         let params = self.parameters_generator.generate(kind, dir);
         let (start_straight, middle_velocity) = self
             .straight_generator
@@ -180,7 +178,7 @@ where
         dtheta: AngularVelocity,
         ddtheta: AngularAcceleration,
         dddtheta: AngularJerk,
-    ) -> CurveTrajectory<M> {
+    ) -> CurveTrajectory {
         let k = (v / v_ref).get::<ratio>();
         let angle_generator = AngleStraightCalculatorGenerator::new(
             k * dtheta,
@@ -197,7 +195,7 @@ where
     }
 }
 
-pub struct CurveTrajectory<M> {
+pub struct CurveTrajectory {
     angle_calculator: AngleOverallCalculator,
     t: Time,
     t_end: Time,
@@ -205,10 +203,9 @@ pub struct CurveTrajectory<M> {
     x: Length,
     y: Length,
     v: Velocity,
-    _phantom: PhantomData<fn() -> M>,
 }
 
-impl<M> Clone for CurveTrajectory<M> {
+impl Clone for CurveTrajectory {
     fn clone(&self) -> Self {
         Self {
             angle_calculator: self.angle_calculator.clone(),
@@ -218,12 +215,11 @@ impl<M> Clone for CurveTrajectory<M> {
             x: self.x.clone(),
             y: self.y.clone(),
             v: self.v.clone(),
-            _phantom: PhantomData,
         }
     }
 }
 
-impl<M> CurveTrajectory<M> {
+impl CurveTrajectory {
     pub fn new(
         angle_calculator: AngleOverallCalculator,
         t_end: Time,
@@ -240,12 +236,11 @@ impl<M> CurveTrajectory<M> {
             x: x_start,
             y: y_start,
             v,
-            _phantom: PhantomData,
         }
     }
 }
 
-impl<M: Math> Iterator for CurveTrajectory<M> {
+impl Iterator for CurveTrajectory {
     type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -260,7 +255,9 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
         let mut delta_x = 0.0;
         let mut delta_y = 0.0;
         for i in 0..2 {
-            let (sin, cos) = M::sincos(self.angle_calculator.calculate(t + cs[i] * self.period).x);
+            let angle = self.angle_calculator.calculate(t + cs[i] * self.period).x;
+            let sin = angle.value.sin();
+            let cos = angle.value.cos();
             delta_x += bs[i] * cos;
             delta_y += bs[i] * sin;
         }
@@ -273,7 +270,8 @@ impl<M: Math> Iterator for CurveTrajectory<M> {
         self.y += self.v * self.period * delta_y;
 
         let target = self.angle_calculator.calculate(t);
-        let (sin_theta, cos_theta) = M::sincos(target.x);
+        let sin_theta = target.x.value.sin();
+        let cos_theta = target.x.value.cos();
 
         let vx = self.v * cos_theta;
         let ax = -self.v * sin_theta * target.v;
@@ -517,7 +515,6 @@ impl SlalomParametersGenerator for DefaultSlalomParametersGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::math::MathFake;
     use proptest::prelude::*;
     use uom::si::{
         acceleration::meter_per_second_squared,
@@ -544,7 +541,7 @@ mod tests {
         y: f32,
         theta: f32,
         theta_dist: f32,
-    ) -> CurveTrajectory<MathFake> {
+    ) -> CurveTrajectory {
         let dtheta = AngularVelocity::new::<radian_per_second>(tv);
         let ddtheta = AngularAcceleration::new::<radian_per_second_squared>(ta);
         let dddtheta = AngularJerk::new::<radian_per_second_cubed>(tj);
@@ -577,7 +574,7 @@ mod tests {
         fn test_slalom_generator(kind: SlalomKind, dir: SlalomDirection) {
             use approx::assert_relative_eq;
 
-            let generator = SlalomGenerator::<MathFake, DefaultSlalomParametersGenerator>::new(
+            let generator = SlalomGenerator::< DefaultSlalomParametersGenerator>::new(
                 Time::new::<second>(0.001),
                 DefaultSlalomParametersGenerator::default(),
                 Velocity::new::<meter_per_second>(1.0),

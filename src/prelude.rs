@@ -41,9 +41,6 @@ pub use crate::sensors::{
 };
 
 #[doc(no_inline)]
-pub use crate::utils::math::Math as _utils_math_Math;
-
-#[doc(no_inline)]
 pub use crate::mazes::{
     GraphNode as _components_maze_GraphNode, WallChecker as _components_maze_WallManager,
     WallFinderNode as _components_maze_WallFinderNode,

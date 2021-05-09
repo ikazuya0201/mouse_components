@@ -22,8 +22,6 @@ use uom::si::{
     velocity::meter_per_second,
 };
 
-use crate::math::MathFake;
-
 pub struct AgentSimulator<const N: usize> {
     inner: Rc<RefCell<AgentSimulatorInner>>,
     wall_storage: Rc<WallManager<N>>,
@@ -178,8 +176,10 @@ impl AgentSimulatorInner {
         next.theta.a =
             AngularAcceleration::from((next_rot_vel - self.current.theta.v) / self.period);
 
-        let (cur_sin, cur_cos) = MathFake::sincos(self.current.theta.x);
-        let (next_sin, next_cos) = MathFake::sincos(next.theta.x);
+        let cur_sin = self.current.theta.x.value.sin();
+        let cur_cos = self.current.theta.x.value.cos();
+        let next_sin = next.theta.x.value.sin();
+        let next_cos = next.theta.x.value.cos();
 
         next.x.x += (current_trans_vel * cur_cos + next_trans_vel * next_cos) * self.period / 2.0;
         next.y.x += (current_trans_vel * cur_sin + next_trans_vel * next_sin) * self.period / 2.0;
@@ -195,7 +195,7 @@ impl AgentSimulatorInner {
     }
 
     fn trans_vel(state: &RobotState) -> Velocity {
-        state.x.v * MathFake::cos(state.theta.x) + state.y.v * MathFake::sin(state.theta.x)
+        state.x.v * state.theta.x.value.cos() + state.y.v * state.theta.x.value.sin()
     }
 
     fn next_trans_vel(&self) -> Velocity {
@@ -321,7 +321,7 @@ pub struct DistanceSensor<const N: usize> {
     inner: Rc<RefCell<AgentSimulatorInner>>,
     pose: Pose,
     wall_storage: Rc<WallManager<N>>,
-    pose_converter: PoseConverter<MathFake, N>,
+    pose_converter: PoseConverter<N>,
 }
 
 impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
@@ -333,7 +333,8 @@ impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
 
     fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {
         let state = &self.inner.borrow().current;
-        let (sin_th, cos_th) = MathFake::sincos(state.theta.x);
+        let sin_th = state.theta.x.value.sin();
+        let cos_th = state.theta.x.value.cos();
         let pose = Pose {
             x: state.x.x + self.pose.x * sin_th + self.pose.y * cos_th,
             y: state.y.x + self.pose.y * sin_th - self.pose.x * cos_th,

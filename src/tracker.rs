@@ -4,6 +4,8 @@ mod state;
 
 use core::marker::PhantomData;
 
+#[allow(unused_imports)]
+use micromath::F32Ext;
 use serde::{Deserialize, Serialize};
 use uom::si::{
     angle::radian,
@@ -17,9 +19,8 @@ use uom::si::{
 use uom::{typenum::*, Kind};
 
 use super::robot::Tracker as ITracker;
-use super::trajectory_generators::{AngleTarget, Target};
+use super::trajectory_generators::Target;
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
-use crate::utils::math::{LibmMath, Math};
 use crate::{Construct, Deconstruct};
 pub use state::{AngleState, LengthState, RobotState};
 
@@ -38,7 +39,6 @@ pub trait Controller<T, U> {
 pub struct Tracker<
     LM,
     RM,
-    M,
     TC = crate::controllers::TranslationalController,
     RC = crate::controllers::RotationalController,
 > {
@@ -56,10 +56,9 @@ pub struct Tracker<
     right_motor: RM,
     zeta: f32,
     b: BType,
-    _phantom: PhantomData<fn() -> M>,
 }
 
-impl<LM, RM, M, TC, RC> Tracker<LM, RM, M, TC, RC> {
+impl<LM, RM, TC, RC> Tracker<LM, RM, TC, RC> {
     pub fn release(self) -> (LM, RM) {
         let Self {
             left_motor,
@@ -91,8 +90,8 @@ pub struct TrackerResource<LeftMotor, RightMotor> {
     pub right_motor: RightMotor,
 }
 
-impl<LeftMotor, RightMotor, Math, TC, RC, Config, State, Resource>
-    Construct<Config, State, Resource> for Tracker<LeftMotor, RightMotor, Math, TC, RC>
+impl<LeftMotor, RightMotor, TC, RC, Config, State, Resource> Construct<Config, State, Resource>
+    for Tracker<LeftMotor, RightMotor, TC, RC>
 where
     TC: Construct<Config, State, Resource> + Controller<Velocity, Acceleration>,
     RC: Construct<Config, State, Resource> + Controller<AngularVelocity, AngularAcceleration>,
@@ -128,8 +127,8 @@ where
     }
 }
 
-impl<LeftMotor, RightMotor, Math, TC, RC, State, Resource> Deconstruct<State, Resource>
-    for Tracker<LeftMotor, RightMotor, Math, TC, RC>
+impl<LeftMotor, RightMotor, TC, RC, State, Resource> Deconstruct<State, Resource>
+    for Tracker<LeftMotor, RightMotor, TC, RC>
 where
     State: Default,
     Resource: From<TrackerResource<LeftMotor, RightMotor>>,
@@ -147,7 +146,7 @@ where
     }
 }
 
-impl<LM, RM, M, TC, RC> core::fmt::Debug for Tracker<LM, RM, M, TC, RC> {
+impl<LM, RM, TC, RC> core::fmt::Debug for Tracker<LM, RM, TC, RC> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "Tracker{{ xi:{:?} }}", self.xi)
     }
@@ -160,13 +159,12 @@ pub struct FailSafeError {
     target: Target,
 }
 
-impl<LM, RM, M, TC, RC> ITracker<RobotState, Target> for Tracker<LM, RM, M, TC, RC>
+impl<LM, RM, TC, RC> ITracker<RobotState, Target> for Tracker<LM, RM, TC, RC>
 where
     LM: Motor,
     RM: Motor,
     TC: Controller<Velocity, Acceleration>,
     RC: Controller<AngularVelocity, AngularAcceleration>,
-    M: Math,
 {
     type Error = FailSafeError;
 
@@ -182,7 +180,7 @@ where
 fn normalize_angle(angle: Angle) -> Angle {
     use core::f32::consts::{PI, TAU};
 
-    let raw_angle = crate::utils::math::rem_euclidf(angle.value, TAU);
+    let raw_angle = angle.value.rem_euclid(TAU);
 
     Angle::new::<radian>(if raw_angle > PI {
         raw_angle - TAU
@@ -198,13 +196,12 @@ fn sinc(x: f32) -> f32 {
     xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
 }
 
-impl<LM, RM, M, TC, RC> Tracker<LM, RM, M, TC, RC>
+impl<LM, RM, TC, RC> Tracker<LM, RM, TC, RC>
 where
     LM: Motor,
     RM: Motor,
     TC: Controller<Velocity, Acceleration>,
     RC: Controller<AngularVelocity, AngularAcceleration>,
-    M: Math,
 {
     pub fn stop(&mut self)
     where
@@ -219,7 +216,8 @@ where
         let x_diff = state.x.x - target.x.x;
         let y_diff = state.y.x - target.y.x;
 
-        let distance = crate::utils::math::sqrt(x_diff * x_diff + y_diff * y_diff);
+        let distance =
+            Length::new::<uom::si::length::meter>((x_diff * x_diff + y_diff * y_diff).value.sqrt());
         if distance >= self.fail_safe_distance {
             Err(FailSafeError {
                 state: state.clone(),
@@ -237,7 +235,8 @@ where
     ) -> Result<(ElectricPotential, ElectricPotential), FailSafeError> {
         self.fail_safe(state, target)?;
 
-        let (sin_th, cos_th) = M::sincos(state.theta.x);
+        let sin_th = state.theta.x.value.sin();
+        let cos_th = state.theta.x.value.cos();
 
         let vv = state.x.v * cos_th + state.y.v * sin_th;
         let va = state.x.a * cos_th + state.y.a * sin_th;
@@ -262,9 +261,10 @@ where
             );
             (uv, uw, duv, duw)
         } else {
-            let (sin_th_r, cos_th_r) = M::sincos(target.theta.x);
+            let sin_th_r = target.theta.x.value.sin();
+            let cos_th_r = target.theta.x.value.cos();
             let theta_d = normalize_angle(target.theta.x - state.theta.x);
-            let cos_th_d = M::cos(theta_d);
+            let cos_th_d = theta_d.value.cos();
             let xd = target.x.x - state.x.x;
             let yd = target.y.x - state.y.x;
 
@@ -298,29 +298,9 @@ where
             .calculate(uw, duw, state.theta.v, state.theta.a);
         Ok((vol_v - vol_w, vol_v + vol_w))
     }
-
-    #[allow(unused)]
-    fn track_spin(
-        &mut self,
-        state: &RobotState,
-        target: &AngleTarget,
-    ) -> (ElectricPotential, ElectricPotential) {
-        let (sin_th, cos_th) = M::sincos(state.theta.x);
-        let vv = state.x.v * cos_th + state.y.v * sin_th;
-        let va = state.x.a * cos_th + state.y.a * sin_th;
-
-        let vol_v =
-            self.translation_controller
-                .calculate(Default::default(), Default::default(), vv, va);
-        let vol_w =
-            self.rotation_controller
-                .calculate(target.v, target.a, state.theta.v, state.theta.a);
-
-        (vol_v - vol_w, vol_v + vol_w)
-    }
 }
 
-pub struct TrackerBuilder<TC, RC, LM, RM, M> {
+pub struct TrackerBuilder<TC, RC, LM, RM> {
     kx: Option<GainType>,
     kdx: Option<Frequency>,
     ky: Option<GainType>,
@@ -335,10 +315,9 @@ pub struct TrackerBuilder<TC, RC, LM, RM, M> {
     fail_safe_distance: Option<Length>,
     zeta: Option<f32>,
     b: Option<BType>,
-    _math: PhantomData<fn() -> M>,
 }
 
-impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
+impl<TC, RC, LM, RM> TrackerBuilder<TC, RC, LM, RM> {
     pub fn new() -> Self {
         Self {
             kx: None,
@@ -355,7 +334,6 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
             fail_safe_distance: None,
             zeta: None,
             b: None,
-            _math: PhantomData,
         }
     }
 
@@ -452,7 +430,7 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
         self
     }
 
-    pub fn build(&mut self) -> Result<Tracker<LM, RM, M, TC, RC>, RequiredFieldEmptyError> {
+    pub fn build(&mut self) -> Result<Tracker<LM, RM, TC, RC>, RequiredFieldEmptyError> {
         Ok(Tracker {
             kx: ok_or(self.kx, "kx")?,
             kdx: ok_or(self.kdx, "kdx")?,
@@ -471,12 +449,11 @@ impl<TC, RC, LM, RM, M> TrackerBuilder<TC, RC, LM, RM, M> {
             fail_safe_distance: ok_or(self.fail_safe_distance, "fail_safe_distance")?,
             zeta: ok_or(self.zeta, "zeta")?,
             b: ok_or(self.b, "b")?,
-            _phantom: PhantomData,
         })
     }
 }
 
-impl<TC, RC, LM, RM> Default for TrackerBuilder<TC, RC, LM, RM, LibmMath> {
+impl<TC, RC, LM, RM> Default for TrackerBuilder<TC, RC, LM, RM> {
     fn default() -> Self {
         Self::new()
     }
@@ -503,7 +480,7 @@ mod tests {
         }
     }
 
-    fn build_tracker() -> Tracker<IMotor, IMotor, LibmMath, IController, IController> {
+    fn build_tracker() -> Tracker<IMotor, IMotor, IController, IController> {
         TrackerBuilder::default()
             .kx(1.0)
             .kdx(1.0)
