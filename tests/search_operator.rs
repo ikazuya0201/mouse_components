@@ -133,6 +133,9 @@ macro_rules! impl_search_operator_test {
                                 .initial_state(start_state)
                                 .wheel_interval(Some(wheel_interval))
                                 .correction_weight(0.1)
+                                .slip_angle_const(Acceleration::new::<meter_per_second_squared>(
+                                    100.0,
+                                ))
                                 .build()
                                 .unwrap()
                         };

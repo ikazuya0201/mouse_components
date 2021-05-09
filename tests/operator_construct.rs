@@ -94,6 +94,7 @@ macro_rules! impl_construct_and_deconstruct_test {
                 ))
                 .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
                 .run_slalom_velocity(Velocity::new::<meter_per_second>(0.5))
+                .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
                 .build()
                 .unwrap();
 
