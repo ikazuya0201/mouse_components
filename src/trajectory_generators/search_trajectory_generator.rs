@@ -157,7 +157,7 @@ impl SearchTrajectoryGenerator {
         );
         //TODO: use configurable value
         let front_trajectory =
-            straight_generator.generate(square_width, search_velocity, search_velocity);
+            StraightTrajectoryGenerator::generate_constant(square_width, search_velocity, period);
         use uom::si::time::{millisecond, second};
         let back_trajectory = {
             let distance = square_width_half - front_offset; //TODO: use configurable value
