@@ -131,7 +131,7 @@ macro_rules! impl_search_operator_test {
                                 .cut_off_frequency(Frequency::new::<hertz>(50.0))
                                 .initial_state(start_state)
                                 .wheel_interval(Some(wheel_interval))
-                                .correction_weight(0.1)
+                                .correction_weight(0.0)
                                 .slip_angle_const(Acceleration::new::<meter_per_second_squared>(
                                     100.0,
                                 ))
@@ -202,7 +202,6 @@ macro_rules! impl_search_operator_test {
 
                     let trajectory_generator = SearchTrajectoryGeneratorBuilder::default()
                         .period(period)
-                        .max_velocity(Velocity::new::<meter_per_second>(0.5))
                         .max_acceleration(Acceleration::new::<meter_per_second_squared>(20.0))
                         .max_jerk(Jerk::new::<meter_per_second_cubed>(40.0))
                         .search_velocity(search_velocity)

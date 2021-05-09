@@ -235,7 +235,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
                 low_b,
             },
             search_trajectory_generator: SearchTrajectoryGeneratorConfig {
-                max_velocity,
                 max_acceleration,
                 max_jerk,
                 period,

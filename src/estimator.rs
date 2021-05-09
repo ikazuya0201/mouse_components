@@ -594,7 +594,6 @@ mod tests {
 
     fn build_generator() -> SearchTrajectoryGenerator {
         SearchTrajectoryGeneratorBuilder::new()
-            .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
             .period(PERIOD)
