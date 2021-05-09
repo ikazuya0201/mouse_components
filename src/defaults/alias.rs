@@ -31,7 +31,6 @@ pub type SearchOperator<
     LeftMotor,
     RightMotor,
     DistanceSensor,
-    Math,
     const N: usize,
 > = TrackingOperator<
     SearchCommander<
@@ -43,15 +42,15 @@ pub type SearchOperator<
     >,
     TrackingAgent<
         SearchTrajectoryManager<
-            SearchTrajectoryGenerator<Math>,
+            SearchTrajectoryGenerator,
             CommandConverter,
             Target,
-            ShiftTrajectory<SearchTrajectory<Math>, Math>,
+            ShiftTrajectory<SearchTrajectory>,
         >,
         Robot<
-            Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-            Tracker<LeftMotor, RightMotor, Math, TranslationalController, RotationalController>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor, Math>, Math, N>,
+            Estimator<LeftEncoder, RightEncoder, Imu>,
+            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,
     >,
@@ -64,7 +63,6 @@ pub type RunOperator<
     LeftMotor,
     RightMotor,
     DistanceSensor,
-    Math,
     const N: usize,
 > = TrackingOperator<
     RunCommander<
@@ -73,15 +71,15 @@ pub type RunOperator<
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
-            RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>,
+            RunTrajectoryGenerator<DefaultSlalomParametersGenerator>,
             CommandConverter,
             Target,
-            ShiftTrajectory<RunTrajectory<Math>, Math>,
+            ShiftTrajectory<RunTrajectory>,
         >,
         Robot<
-            Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-            Tracker<LeftMotor, RightMotor, Math, TranslationalController, RotationalController>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor, Math>, Math, N>,
+            Estimator<LeftEncoder, RightEncoder, Imu>,
+            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,
     >,
@@ -94,7 +92,6 @@ pub type ReturnSetupOperator<
     LeftMotor,
     RightMotor,
     DistanceSensor,
-    Math,
     const N: usize,
 > = TrackingOperator<
     ReturnSetupCommander<
@@ -103,15 +100,15 @@ pub type ReturnSetupOperator<
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
-            ReturnSetupTrajectoryGenerator<Math>,
+            ReturnSetupTrajectoryGenerator,
             CommandConverter,
             Target,
-            ShiftTrajectory<SetupTrajectory, Math>,
+            ShiftTrajectory<SetupTrajectory>,
         >,
         Robot<
-            Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-            Tracker<LeftMotor, RightMotor, Math, TranslationalController, RotationalController>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor, Math>, Math, N>,
+            Estimator<LeftEncoder, RightEncoder, Imu>,
+            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,
     >,
@@ -124,7 +121,6 @@ pub type ReturnOperator<
     LeftMotor,
     RightMotor,
     DistanceSensor,
-    Math,
     const N: usize,
 > = TrackingOperator<
     ReturnCommander<
@@ -133,15 +129,15 @@ pub type ReturnOperator<
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
-            RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>,
+            RunTrajectoryGenerator<DefaultSlalomParametersGenerator>,
             CommandConverter,
             Target,
-            ShiftTrajectory<RunTrajectory<Math>, Math>,
+            ShiftTrajectory<RunTrajectory>,
         >,
         Robot<
-            Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-            Tracker<LeftMotor, RightMotor, Math, TranslationalController, RotationalController>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor, Math>, Math, N>,
+            Estimator<LeftEncoder, RightEncoder, Imu>,
+            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,
     >,
@@ -154,7 +150,6 @@ pub type RunSetupOperator<
     LeftMotor,
     RightMotor,
     DistanceSensor,
-    Math,
     const N: usize,
 > = TrackingOperator<
     RunSetupCommander<
@@ -163,15 +158,15 @@ pub type RunSetupOperator<
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
-            ReturnSetupTrajectoryGenerator<Math>,
+            ReturnSetupTrajectoryGenerator,
             CommandConverter,
             Target,
-            ShiftTrajectory<SetupTrajectory, Math>,
+            ShiftTrajectory<SetupTrajectory>,
         >,
         Robot<
-            Estimator<LeftEncoder, RightEncoder, Imu, Math>,
-            Tracker<LeftMotor, RightMotor, Math, TranslationalController, RotationalController>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor, Math>, Math, N>,
+            Estimator<LeftEncoder, RightEncoder, Imu>,
+            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,
     >,

@@ -1,7 +1,7 @@
 //! An implementation of [StateEstimator](crate::robot::StateEstimator).
 
-use core::marker::PhantomData;
-
+#[allow(unused_imports)]
+use micromath::F32Ext;
 use nb::block;
 use serde::{Deserialize, Serialize};
 use uom::si::{
@@ -15,7 +15,6 @@ use uom::si::{
 use crate::robot::StateEstimator;
 use crate::tracker::RobotState;
 use crate::utils::builder::{ok_or, BuilderResult};
-use crate::utils::math::{LibmMath, Math};
 use crate::wall_detector::CorrectInfo;
 use crate::{get_or_err, Construct, Deconstruct};
 
@@ -32,7 +31,7 @@ pub trait Encoder {
     fn get_relative_distance(&mut self) -> nb::Result<Length, Self::Error>;
 }
 
-pub struct EstimatorInner<M> {
+pub struct EstimatorInner {
     period: Time,
     alpha: f32,
     trans_velocity: Velocity,
@@ -43,10 +42,9 @@ pub struct EstimatorInner<M> {
     weight: f32,
     slip_angle_const: Acceleration,
     slip_angle: Angle,
-    _phantom: PhantomData<fn() -> M>,
 }
 
-impl<M> EstimatorInner<M> {
+impl EstimatorInner {
     pub fn new(
         period: Time,
         alpha: f32,
@@ -66,15 +64,11 @@ impl<M> EstimatorInner<M> {
             state: initial_state,
             slip_angle_const,
             slip_angle: Default::default(),
-            _phantom: PhantomData,
         }
     }
 }
 
-impl<M> EstimatorInner<M>
-where
-    M: Math,
-{
+impl EstimatorInner {
     pub fn estimate(
         &mut self,
         left_distance: Length,
@@ -119,7 +113,9 @@ where
         };
 
         self.state.theta.x += delta_angle;
-        let (sin_th, cos_th) = M::sincos(self.state.theta.x - self.slip_angle);
+        let theta_m = self.state.theta.x - self.slip_angle;
+        let sin_th = theta_m.value.sin();
+        let cos_th = theta_m.value.cos();
         self.state.x.x += trans_distance * cos_th;
         self.state.y.x += trans_distance * sin_th;
         //------
@@ -141,7 +137,8 @@ where
         let mut sum_x = Length::default();
         let mut sum_y = Length::default();
         for info in infos {
-            let (sin, cos) = M::sincos(info.obstacle.source.theta);
+            let sin = info.obstacle.source.theta.value.sin();
+            let cos = info.obstacle.source.theta.value.cos();
             sum_x += info.diff_from_expected * cos;
             sum_y += info.diff_from_expected * sin;
         }
@@ -153,14 +150,14 @@ where
 /// An implementation of [StateEstimator](crate::robot::StateEstimator).
 ///
 /// This should be created by [EstimatorBuilder](EstimatorBuilder).
-pub struct Estimator<LE, RE, I, M> {
-    inner: EstimatorInner<M>,
+pub struct Estimator<LE, RE, I> {
+    inner: EstimatorInner,
     left_encoder: LE,
     right_encoder: RE,
     imu: I,
 }
 
-impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
+impl<LE, RE, I> core::fmt::Debug for Estimator<LE, RE, I> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(
             f,
@@ -173,7 +170,7 @@ impl<LE, RE, I, M> core::fmt::Debug for Estimator<LE, RE, I, M> {
     }
 }
 
-impl<LE, RE, I, M> Estimator<LE, RE, I, M> {
+impl<LE, RE, I> Estimator<LE, RE, I> {
     pub fn release(self) -> (LE, RE, I, RobotState) {
         let Self {
             left_encoder,
@@ -211,8 +208,8 @@ pub struct EstimatorResource<LeftEncoder, RightEncoder, Imu> {
     pub imu: Imu,
 }
 
-impl<LeftEncoder, RightEncoder, Imu, Math, Config, State, Resource>
-    Construct<Config, State, Resource> for Estimator<LeftEncoder, RightEncoder, Imu, Math>
+impl<LeftEncoder, RightEncoder, Imu, Config, State, Resource> Construct<Config, State, Resource>
+    for Estimator<LeftEncoder, RightEncoder, Imu>
 where
     LeftEncoder: Encoder,
     RightEncoder: Encoder,
@@ -220,7 +217,6 @@ where
     Config: AsRef<EstimatorConfig>,
     State: AsRef<EstimatorState>,
     Resource: AsMut<Option<EstimatorResource<LeftEncoder, RightEncoder, Imu>>>,
-    Math: crate::utils::math::Math,
 {
     fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
         let config = config.as_ref();
@@ -245,8 +241,8 @@ where
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu, Math, State, Resource> Deconstruct<State, Resource>
-    for Estimator<LeftEncoder, RightEncoder, Imu, Math>
+impl<LeftEncoder, RightEncoder, Imu, State, Resource> Deconstruct<State, Resource>
+    for Estimator<LeftEncoder, RightEncoder, Imu>
 where
     State: From<EstimatorState>,
     Resource: From<EstimatorResource<LeftEncoder, RightEncoder, Imu>>,
@@ -265,7 +261,7 @@ where
     }
 }
 
-impl<LE, RE, I, M> StateEstimator<CorrectInfo> for Estimator<LE, RE, I, M>
+impl<LE, RE, I> StateEstimator<CorrectInfo> for Estimator<LE, RE, I>
 where
     LE: Encoder,
     RE: Encoder,
@@ -273,7 +269,6 @@ where
     <LE as Encoder>::Error: core::fmt::Debug,
     <RE as Encoder>::Error: core::fmt::Debug,
     <I as IMU>::Error: core::fmt::Debug,
-    M: Math,
 {
     type State = RobotState;
 
@@ -323,7 +318,7 @@ where
 ///     .build::<Math>()
 ///     .unwrap();
 /// ```
-pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M = LibmMath> {
+pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     left_encoder: Option<LeftEncoder>,
     right_encoder: Option<RightEncoder>,
     imu: Option<Imu>,
@@ -333,43 +328,36 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M = LibmMath> {
     wheel_interval: Option<Length>,
     correction_weight: Option<f32>,
     slip_angle_const: Option<Acceleration>,
-    _math: PhantomData<fn() -> M>,
 }
 
-impl<LeftEncoder: Encoder, RightEncoder, Imu, M>
-    EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M>
-{
+impl<LeftEncoder: Encoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     pub fn left_encoder(&mut self, left_encoder: LeftEncoder) -> &mut Self {
         self.left_encoder = Some(left_encoder);
         self
     }
 }
 
-impl<LeftEncoder, RightEncoder: Encoder, Imu, M>
-    EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M>
-{
+impl<LeftEncoder, RightEncoder: Encoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     pub fn right_encoder(&mut self, right_encoder: RightEncoder) -> &mut Self {
         self.right_encoder = Some(right_encoder);
         self
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu: IMU, M> EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M> {
+impl<LeftEncoder, RightEncoder, Imu: IMU> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     pub fn imu(&mut self, imu: Imu) -> &mut Self {
         self.imu = Some(imu);
         self
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu> Default
-    for EstimatorBuilder<LeftEncoder, RightEncoder, Imu, LibmMath>
-{
+impl<LeftEncoder, RightEncoder, Imu> Default for EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M> {
+impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     pub fn new() -> Self {
         Self {
             left_encoder: None,
@@ -381,7 +369,6 @@ impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncod
             wheel_interval: None,
             correction_weight: None,
             slip_angle_const: None,
-            _math: PhantomData,
         }
     }
 
@@ -416,10 +403,10 @@ impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncod
     }
 }
 
-impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU, M: Math>
-    EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M>
+impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
+    EstimatorBuilder<LeftEncoder, RightEncoder, Imu>
 {
-    pub fn build(&mut self) -> BuilderResult<Estimator<LeftEncoder, RightEncoder, Imu, M>> {
+    pub fn build(&mut self) -> BuilderResult<Estimator<LeftEncoder, RightEncoder, Imu>> {
         let period = ok_or(self.period, "period")?;
         let cut_off_frequency = ok_or(self.cut_off_frequency, "cut_off_frequency")?;
         let alpha =
@@ -451,7 +438,6 @@ mod tests {
             SearchTrajectoryGeneratorBuilder,
         },
         types::data::{AngleState, LengthState, Pose, SearchKind, Target},
-        utils::math::MathFake,
     };
     use approx::assert_abs_diff_eq;
     use core::marker::PhantomData;
@@ -572,7 +558,7 @@ mod tests {
             let xd = current.x.x - prev.x.x;
             let yd = current.y.x - prev.y.x;
             let middle_angle = (current.theta.x + prev.theta.x) / 2.0;
-            let d = xd * MathFake::cos(middle_angle) + yd * MathFake::sin(middle_angle);
+            let d = xd * middle_angle.value.cos() + yd * middle_angle.value.sin();
             match self.direction {
                 Direction::Right => Ok(d + self.wheel_interval * angle / 2.0),
                 Direction::Left => Ok(d - self.wheel_interval * angle / 2.0),
@@ -606,7 +592,7 @@ mod tests {
         value: 0.001,
     };
 
-    fn build_generator() -> SearchTrajectoryGenerator<MathFake> {
+    fn build_generator() -> SearchTrajectoryGenerator {
         SearchTrajectoryGeneratorBuilder::new()
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))

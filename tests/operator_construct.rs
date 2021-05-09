@@ -36,10 +36,7 @@ use uom::si::{
     time::second,
     velocity::meter_per_second,
 };
-use utils::{
-    math::MathFake,
-    sensors::{AgentSimulator, DistanceSensor, Encoder, Motor, IMU},
-};
+use utils::sensors::{AgentSimulator, DistanceSensor, Encoder, Motor, IMU};
 
 macro_rules! impl_construct_and_deconstruct_test {
     ($name: ident: $operator: ident, $wall_manager: expr, $state: expr, $maze_width: literal,) => {
@@ -172,7 +169,6 @@ macro_rules! impl_construct_and_deconstruct_test {
                 Motor,
                 Motor,
                 DistanceSensor<$maze_width>,
-                MathFake,
                 $maze_width,
             >>::construct(&config, &state, &mut resource);
 

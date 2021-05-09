@@ -33,8 +33,6 @@ pub mod traits {
     use super::*;
 
     #[doc(no_inline)]
-    pub use crate::utils::math::Math;
-    #[doc(no_inline)]
     pub use administrator::{Operator, OperatorStore, Selector};
     #[doc(no_inline)]
     pub use commanders::{Graph, NextNode, NodeChecker, RouteNode, UncheckedNodeFinder};

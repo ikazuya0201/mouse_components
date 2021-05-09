@@ -4,6 +4,8 @@ use alloc::rc::Rc;
 use core::marker::PhantomData;
 
 use heapless::Vec;
+#[allow(unused_imports)]
+use micromath::F32Ext;
 use serde::{Deserialize, Serialize};
 use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
@@ -14,8 +16,6 @@ use crate::types::data::{Obstacle, Pose};
 use crate::utils::{
     builder::{ok_or, BuilderResult},
     forced_vec::ForcedVec,
-    math::Math as IMath,
-    math::Math,
     probability::Probability,
     total::Total,
 };
@@ -53,24 +53,18 @@ pub trait WallProbabilityManager<Wall>: Send + Sync {
 }
 
 /// An implementation of [WallDetector](crate::robot::WallDetector).
-pub struct WallDetector<Manager, Detector, Math, const N: usize> {
+pub struct WallDetector<Manager, Detector, const N: usize> {
     manager: Rc<Manager>,
     detector: Detector,
-    converter: PoseConverter<Math, N>,
-    _math: PhantomData<fn() -> Math>,
+    converter: PoseConverter<N>,
 }
 
-impl<Manager, Detector, Math, const N: usize> WallDetector<Manager, Detector, Math, N> {
-    pub fn new(
-        manager: Rc<Manager>,
-        detector: Detector,
-        converter: PoseConverter<Math, N>,
-    ) -> Self {
+impl<Manager, Detector, const N: usize> WallDetector<Manager, Detector, N> {
+    pub fn new(manager: Rc<Manager>, detector: Detector, converter: PoseConverter<N>) -> Self {
         Self {
             manager,
             detector,
             converter,
-            _math: PhantomData,
         }
     }
 
@@ -91,8 +85,8 @@ pub struct WallDetectorConfig {
     pub ignore_length_from_wall: Length,
 }
 
-impl<Manager, Detector, Math, Config, State, Resource, const N: usize>
-    Construct<Config, State, Resource> for WallDetector<Manager, Detector, Math, N>
+impl<Manager, Detector, Config, State, Resource, const N: usize> Construct<Config, State, Resource>
+    for WallDetector<Manager, Detector, N>
 where
     Detector: Construct<Config, State, Resource>,
     Config: AsRef<WallDetectorConfig>,
@@ -113,8 +107,8 @@ where
     }
 }
 
-impl<Manager, Detector, Math, State, Resource, const N: usize> Deconstruct<State, Resource>
-    for WallDetector<Manager, Detector, Math, N>
+impl<Manager, Detector, State, Resource, const N: usize> Deconstruct<State, Resource>
+    for WallDetector<Manager, Detector, N>
 where
     Resource: Merge + From<Rc<Manager>>,
     Detector: Deconstruct<State, Resource>,
@@ -128,12 +122,11 @@ where
 
 const OBSTACLE_SIZE_UPPER_BOUND: usize = 6;
 
-impl<Manager, Detector, Math, State, const N: usize> IWallDetector<State>
-    for WallDetector<Manager, Detector, Math, N>
+impl<Manager, Detector, State, const N: usize> IWallDetector<State>
+    for WallDetector<Manager, Detector, N>
 where
     Manager: WallProbabilityManager<Wall<N>>,
     Detector: ObstacleDetector<State, Obstacle = Obstacle>,
-    Math: IMath,
 {
     type Info = CorrectInfo;
     type Infos = Vec<CorrectInfo, OBSTACLE_SIZE_UPPER_BOUND>;
@@ -180,8 +173,8 @@ where
                     } else {
                         not_exist_val
                     };
-                    let exist_val = libm::expf(exist_val - min) * existence;
-                    let not_exist_val = libm::expf(not_exist_val - min) * existence.reverse();
+                    let exist_val = (exist_val - min).exp() * existence;
+                    let not_exist_val = (not_exist_val - min).exp() * existence.reverse();
 
                     let existence = if exist_val.is_infinite() {
                         Probability::one()
@@ -203,7 +196,7 @@ where
 
 /// An implementation of [PoseConverter](crate::wall_detector::PoseConverter).
 #[derive(Clone, PartialEq, Debug)]
-pub struct PoseConverter<M, const N: usize> {
+pub struct PoseConverter<const N: usize> {
     i_square_width: i32, //[mm]
     square_width_half: Length,
     square_width: Length,
@@ -213,7 +206,6 @@ pub struct PoseConverter<M, const N: usize> {
     p2: Length,
     n1: Length,
     n2: Length,
-    _math: PhantomData<fn() -> M>,
 }
 
 pub(crate) const DEFAULT_SQUARE_WIDTH: Length = Length {
@@ -237,7 +229,7 @@ pub(crate) const DEFAULT_IGNORE_LENGTH: Length = Length {
     units: PhantomData,
 };
 
-impl<M, const N: usize> Default for PoseConverter<M, N> {
+impl<const N: usize> Default for PoseConverter<N> {
     fn default() -> Self {
         Self::new(
             DEFAULT_SQUARE_WIDTH,
@@ -248,7 +240,7 @@ impl<M, const N: usize> Default for PoseConverter<M, N> {
     }
 }
 
-impl<M, const N: usize> PoseConverter<M, N> {
+impl<const N: usize> PoseConverter<N> {
     fn new(
         square_width: Length,
         wall_width: Length,
@@ -269,7 +261,6 @@ impl<M, const N: usize> PoseConverter<M, N> {
             p2,
             n1,
             n2,
-            _math: PhantomData,
         }
     }
 
@@ -281,12 +272,9 @@ impl<M, const N: usize> PoseConverter<M, N> {
     }
 }
 
-impl<M, const N: usize> PoseConverter<M, N>
-where
-    M: Math,
-{
+impl<const N: usize> PoseConverter<N> {
     fn is_near_pillar(&self, pose: &Pose) -> bool {
-        let rot = crate::utils::math::rem_euclidf(pose.theta.get::<revolution>(), 1.0);
+        let rot = pose.theta.get::<revolution>().rem_euclid(1.0);
         let pillars = if rot < 0.125 || rot > 0.875 {
             [
                 (self.square_width, Length::default()),
@@ -309,7 +297,8 @@ where
             ]
         };
 
-        let (sin_th, cos_th) = M::sincos(pose.theta);
+        let sin_th = pose.theta.value.sin();
+        let cos_th = pose.theta.value.cos();
         let mind = pillars
             .iter()
             .map(|pillar| {
@@ -347,10 +336,7 @@ impl From<OutOfBoundError> for ConversionError {
     }
 }
 
-impl<M, const N: usize> PoseConverter<M, N>
-where
-    M: Math,
-{
+impl<const N: usize> PoseConverter<N> {
     pub fn convert(&self, pose: &Pose) -> Result<WallInfo<Wall<N>>, ConversionError> {
         #[derive(Clone, Copy, Debug)]
         enum Axis {
@@ -394,7 +380,7 @@ where
             return create_error();
         }
 
-        let rot = crate::utils::math::rem_euclidf(pose.theta.get::<revolution>(), 1.0);
+        let rot = pose.theta.get::<revolution>().rem_euclid(1.0);
 
         let axes = if rot < 0.25 {
             [
@@ -426,7 +412,8 @@ where
             ]
         };
 
-        let (sin_th, cos_th) = M::sincos(pose.theta);
+        let sin_th = pose.theta.value.sin();
+        let cos_th = pose.theta.value.cos();
 
         let mut axes_distance = axes
             .iter()
@@ -511,7 +498,7 @@ impl PoseConverterBuilder {
     impl_setter!(ignore_length_from_wall: Length);
     impl_setter!(ignore_radius_from_pillar: Length);
 
-    pub fn build<M, const N: usize>(&mut self) -> BuilderResult<PoseConverter<M, N>> {
+    pub fn build<const N: usize>(&mut self) -> BuilderResult<PoseConverter<N>> {
         Ok(PoseConverter::new(
             self.square_width.unwrap_or(DEFAULT_SQUARE_WIDTH),
             self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
@@ -590,10 +577,8 @@ impl<Manager, Detector> WallDetectorBuilder<Manager, Detector> {
         ignore_length_from_wall: Length
     }
 
-    pub fn build<M, const N: usize>(
-        &mut self,
-    ) -> BuilderResult<WallDetector<Manager, Detector, M, N>> {
-        let converter = PoseConverter::<M, N>::new(
+    pub fn build<const N: usize>(&mut self) -> BuilderResult<WallDetector<Manager, Detector, N>> {
+        let converter = PoseConverter::<N>::new(
             self.square_width.unwrap_or(DEFAULT_SQUARE_WIDTH),
             self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
             self.ignore_radius_from_pillar
@@ -618,7 +603,6 @@ mod tests {
 
     use super::*;
     use crate::types::data::Pose;
-    use crate::utils::math::MathFake;
 
     macro_rules! define_convert_ok_test {
         ($name:ident: ($size:expr, $value: expr)) => {
@@ -636,7 +620,7 @@ mod tests {
                     not_existing_distance: Length::new::<meter>(expected.4),
                 };
 
-                let converter = PoseConverter::<MathFake, $size>::new(
+                let converter = PoseConverter::<$size>::new(
                     Length::new::<meter>(0.09),
                     Length::new::<meter>(0.006),
                     Length::new::<meter>(0.01),
@@ -667,7 +651,7 @@ mod tests {
                     theta: Angle::new::<degree>(input.2),
                 };
 
-                let converter = PoseConverter::<MathFake, $size>::new(
+                let converter = PoseConverter::<$size>::new(
                     Length::new::<meter>(0.09),
                     Length::new::<meter>(0.006),
                     Length::new::<meter>(0.01),

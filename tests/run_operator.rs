@@ -38,7 +38,6 @@ use uom::si::{
     time::{millisecond, second},
     velocity::meter_per_second,
 };
-use utils::math::MathFake;
 use utils::sensors::AgentSimulator;
 
 macro_rules! impl_run_operator_test {
@@ -203,12 +202,11 @@ macro_rules! impl_run_operator_test {
                     };
 
                     let wall_detector = {
-                        let obstacle_detector =
-                            ObstacleDetector::<_, MathFake>::new(distance_sensors);
+                        let obstacle_detector = ObstacleDetector::new(distance_sensors);
                         WallDetectorBuilder::new()
                             .wall_manager(Rc::clone(&wall_storage))
                             .obstacle_detector(obstacle_detector)
-                            .build::<MathFake, $size>()
+                            .build::<$size>()
                             .unwrap()
                     };
                     Robot::new(estimator, tracker, wall_detector)

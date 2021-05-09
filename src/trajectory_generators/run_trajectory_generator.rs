@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 use uom::si::f32::{Acceleration, Jerk, Length, Time, Velocity};
@@ -13,7 +11,6 @@ use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
 use crate::trajectory_managers::TrackingTrajectoryGenerator;
 use crate::utils::builder::BuilderResult;
-use crate::utils::math::{LibmMath, Math};
 use crate::{get_or_err, impl_setter};
 use crate::{impl_deconstruct_with_default, Construct};
 
@@ -26,18 +23,17 @@ pub enum RunKind {
 }
 
 /// A trajectory generator for fast run.
-pub struct RunTrajectoryGenerator<M, Generator> {
+pub struct RunTrajectoryGenerator<Generator> {
     current_velocity: Mutex<Velocity>,
     run_slalom_velocity: Velocity,
     straight_generator: StraightTrajectoryGenerator,
-    slalom_generator: SlalomGenerator<M, Generator>,
+    slalom_generator: SlalomGenerator<Generator>,
     square_width: Length,
     square_diagonal_half: Length,
 }
 
-impl<M, Generator> RunTrajectoryGenerator<M, Generator>
+impl<Generator> RunTrajectoryGenerator<Generator>
 where
-    M: Math,
     Generator: SlalomParametersGenerator,
 {
     const HALF_DIAGONAL: f32 = 0.70710677;
@@ -78,11 +74,10 @@ pub struct RunTrajectoryGeneratorConfig {
     pub front_offset: Length,
 }
 
-impl<Math, Config, State, Resource> Construct<Config, State, Resource>
-    for RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>
+impl<Config, State, Resource> Construct<Config, State, Resource>
+    for RunTrajectoryGenerator<DefaultSlalomParametersGenerator>
 where
     Config: AsRef<RunTrajectoryGeneratorConfig>,
-    Math: crate::utils::math::Math,
 {
     fn construct<'a>(config: &'a Config, _state: &'a State, _resource: &'a mut Resource) -> Self {
         let config = config.as_ref();
@@ -98,7 +93,7 @@ where
     }
 }
 
-impl_deconstruct_with_default!(RunTrajectoryGenerator<Math, DefaultSlalomParametersGenerator>);
+impl_deconstruct_with_default!(RunTrajectoryGenerator<DefaultSlalomParametersGenerator>);
 
 /// A parameter type for [RunTrajectoryGenerator].
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -114,14 +109,13 @@ pub struct RunTrajectoryParameters {
 //TODO: To deal with arbitrary initial commands
 //TODO: Specify start and end of trajectories by `RunKind`.
 //TODO: Hold current velocity as a state.
-impl<M, Generator> TrackingTrajectoryGenerator<RunTrajectoryParameters>
-    for RunTrajectoryGenerator<M, Generator>
+impl<Generator> TrackingTrajectoryGenerator<RunTrajectoryParameters>
+    for RunTrajectoryGenerator<Generator>
 where
-    M: Math,
     Generator: SlalomParametersGenerator,
 {
     type Target = Target;
-    type Trajectory = ShiftTrajectory<RunTrajectory<M>, M>;
+    type Trajectory = ShiftTrajectory<RunTrajectory>;
 
     fn generate(&self, parameters: &RunTrajectoryParameters) -> Self::Trajectory {
         let mut current_velocity = self.current_velocity.lock();
@@ -141,15 +135,12 @@ where
     }
 }
 
-pub enum RunTrajectory<M> {
+pub enum RunTrajectory {
     Straight(StraightTrajectory),
-    Slalom(SlalomTrajectory<M>),
+    Slalom(SlalomTrajectory),
 }
 
-impl<M> Iterator for RunTrajectory<M>
-where
-    M: Math,
-{
+impl Iterator for RunTrajectory {
     type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -160,9 +151,8 @@ where
     }
 }
 
-impl<M, Generator> RunTrajectoryGenerator<M, Generator>
+impl<Generator> RunTrajectoryGenerator<Generator>
 where
-    M: Math,
     Generator: SlalomParametersGenerator,
 {
     fn generate_run_trajectory_and_terminal_velocity(
@@ -171,7 +161,7 @@ where
         kind: RunKind,
         start_velocity: Velocity,
         end_velocity: Velocity,
-    ) -> (ShiftTrajectory<RunTrajectory<M>, M>, Velocity) {
+    ) -> (ShiftTrajectory<RunTrajectory>, Velocity) {
         let generate_straight = |distance: Length| {
             let (trajectory, terminal_velocity) = self
                 .straight_generator
@@ -203,7 +193,7 @@ where
     }
 }
 
-pub struct RunTrajectoryGeneratorBuilder<M, Generator> {
+pub struct RunTrajectoryGeneratorBuilder<Generator> {
     run_slalom_velocity: Option<Velocity>,
     max_velocity: Option<Velocity>,
     max_acceleration: Option<Acceleration>,
@@ -211,16 +201,15 @@ pub struct RunTrajectoryGeneratorBuilder<M, Generator> {
     parameters_generator: Option<Generator>,
     period: Option<Time>,
     square_width: Option<Length>,
-    _math: PhantomData<fn() -> M>,
 }
 
-impl<Generator> Default for RunTrajectoryGeneratorBuilder<LibmMath, Generator> {
+impl<Generator> Default for RunTrajectoryGeneratorBuilder<Generator> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<M, Generator> RunTrajectoryGeneratorBuilder<M, Generator> {
+impl<Generator> RunTrajectoryGeneratorBuilder<Generator> {
     pub fn new() -> Self {
         Self {
             run_slalom_velocity: None,
@@ -230,16 +219,14 @@ impl<M, Generator> RunTrajectoryGeneratorBuilder<M, Generator> {
             parameters_generator: None,
             period: None,
             square_width: None,
-            _math: PhantomData,
         }
     }
 
-    pub fn build(&mut self) -> BuilderResult<RunTrajectoryGenerator<M, Generator>>
+    pub fn build(&mut self) -> BuilderResult<RunTrajectoryGenerator<Generator>>
     where
-        M: Math,
         Generator: SlalomParametersGenerator,
     {
-        Ok(RunTrajectoryGenerator::<M, Generator>::new(
+        Ok(RunTrajectoryGenerator::<Generator>::new(
             get_or_err!(self.run_slalom_velocity),
             get_or_err!(self.max_velocity),
             get_or_err!(self.max_acceleration),

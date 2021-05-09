@@ -1,12 +1,11 @@
-use core::marker::PhantomData;
-
+#[allow(unused_imports)]
+use micromath::F32Ext;
 use serde::{Deserialize, Serialize};
 use uom::si::f32::{
     Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Jerk, Length, Time,
     Velocity,
 };
 
-use crate::traits::Math;
 use crate::types::data::Pose;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -52,13 +51,12 @@ impl Iterator for SingleTrajectory {
     }
 }
 
-pub struct ShiftTrajectory<T, M> {
+pub struct ShiftTrajectory<T> {
     pose: Pose,
     inner: T,
-    _math: PhantomData<fn() -> M>,
 }
 
-impl<T, M> Clone for ShiftTrajectory<T, M>
+impl<T> Clone for ShiftTrajectory<T>
 where
     T: Clone,
 {
@@ -66,27 +64,20 @@ where
         Self {
             pose: self.pose.clone(),
             inner: self.inner.clone(),
-            _math: PhantomData,
         }
     }
 }
 
-impl<T, M> ShiftTrajectory<T, M> {
+impl<T> ShiftTrajectory<T> {
     pub fn new(pose: Pose, inner: T) -> Self {
-        Self {
-            pose,
-            inner,
-            _math: PhantomData,
-        }
+        Self { pose, inner }
     }
 }
 
-impl<T, M> ShiftTrajectory<T, M>
-where
-    M: Math,
-{
+impl<T> ShiftTrajectory<T> {
     fn shift(&self, target: Target) -> Target {
-        let (sin_th, cos_th) = M::sincos(self.pose.theta);
+        let sin_th = self.pose.theta.value.sin();
+        let cos_th = self.pose.theta.value.cos();
         Target {
             x: LengthTarget {
                 x: target.x.x * cos_th - target.y.x * sin_th + self.pose.x,
@@ -110,10 +101,9 @@ where
     }
 }
 
-impl<T, M> Iterator for ShiftTrajectory<T, M>
+impl<T> Iterator for ShiftTrajectory<T>
 where
     T: Iterator<Item = Target>,
-    M: Math,
 {
     type Item = Target;
 
@@ -196,8 +186,6 @@ mod tests {
 
     #[test]
     fn test_shift_trajectory() {
-        use crate::utils::math::MathFake;
-
         let target = Target {
             x: LengthTarget {
                 x: Length::new::<meter>(1.0),
@@ -237,7 +225,7 @@ mod tests {
                 ..Default::default()
             },
         };
-        let mut trajectory = ShiftTrajectory::<_, MathFake>::new(pose, vec![target].into_iter());
+        let mut trajectory = ShiftTrajectory::new(pose, vec![target].into_iter());
         assert_target_relative_eq(trajectory.next().unwrap(), expected_target);
     }
 

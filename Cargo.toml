@@ -10,8 +10,8 @@ opt-level = 3
 
 [dependencies]
 nb = "0.1.2"
-libm = "0.2.1"
 typenum = "1.13.0"
+micromath = "1.1.1"
 
 [dependencies.heapless]
 git = "https://github.com/japaric/heapless"

@@ -19,7 +19,6 @@ use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
 use crate::trajectory_managers::SearchTrajectoryGenerator as ISearchTrajectoryGenerator;
 use crate::utils::builder::RequiredFieldEmptyError;
-use crate::utils::math::Math;
 use crate::{get_or_err, impl_setter};
 use crate::{impl_deconstruct_with_default, Construct};
 
@@ -33,14 +32,14 @@ pub enum SearchKind {
     Back,
 }
 
-pub enum SearchTrajectory<M> {
+pub enum SearchTrajectory {
     Straight(StraightTrajectory),
-    Slalom(SlalomTrajectory<M>),
-    Back(BackTrajectory<M>),
+    Slalom(SlalomTrajectory),
+    Back(BackTrajectory),
     SlowDown(SlowDownTrajectory),
 }
 
-impl<M: Math> Iterator for SearchTrajectory<M> {
+impl Iterator for SearchTrajectory {
     type Item = Target;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -67,38 +66,32 @@ impl<M: Math> Iterator for SearchTrajectory<M> {
     }
 }
 
-pub type BackTrajectory<M> = Chain<
+pub type BackTrajectory = Chain<
     Chain<
         Chain<
             Chain<
-                Chain<
-                    Chain<StraightTrajectory, StopTrajectory>,
-                    ShiftTrajectory<SpinTrajectory, M>,
-                >,
+                Chain<Chain<StraightTrajectory, StopTrajectory>, ShiftTrajectory<SpinTrajectory>>,
                 StopTrajectory,
             >,
-            ShiftTrajectory<SpinTrajectory, M>,
+            ShiftTrajectory<SpinTrajectory>,
         >,
         StopTrajectory,
     >,
-    ShiftTrajectory<StraightTrajectory, M>,
+    ShiftTrajectory<StraightTrajectory>,
 >;
 
 pub type SlowDownTrajectory = Chain<StraightTrajectory, StopTrajectory>;
 
-pub struct SearchTrajectoryGenerator<M> {
+pub struct SearchTrajectoryGenerator {
     initial_trajectory: StraightTrajectory,
     slow_down_trajectory: SlowDownTrajectory,
     front_trajectory: StraightTrajectory,
-    right_trajectory: SlalomTrajectory<M>,
-    left_trajectory: SlalomTrajectory<M>,
-    back_trajectory: BackTrajectory<M>,
+    right_trajectory: SlalomTrajectory,
+    left_trajectory: SlalomTrajectory,
+    back_trajectory: BackTrajectory,
 }
 
-impl<M> SearchTrajectoryGenerator<M>
-where
-    M: Math,
-{
+impl SearchTrajectoryGenerator {
     fn new<Generator>(
         parameters_generator: Generator,
         max_velocity: Velocity,
@@ -251,11 +244,9 @@ pub struct SearchTrajectoryGeneratorConfig {
     pub spin_angular_jerk: AngularJerk,
 }
 
-impl<Math, Config, State, Resource> Construct<Config, State, Resource>
-    for SearchTrajectoryGenerator<Math>
+impl<Config, State, Resource> Construct<Config, State, Resource> for SearchTrajectoryGenerator
 where
     Config: AsRef<SearchTrajectoryGeneratorConfig>,
-    Math: crate::utils::math::Math,
 {
     fn construct<'a>(config: &'a Config, _state: &'a State, _resource: &'a mut Resource) -> Self {
         let config = config.as_ref();
@@ -278,14 +269,11 @@ where
     }
 }
 
-impl_deconstruct_with_default!(SearchTrajectoryGenerator<Math>);
+impl_deconstruct_with_default!(SearchTrajectoryGenerator);
 
-impl<M> ISearchTrajectoryGenerator<(Pose, SearchKind)> for SearchTrajectoryGenerator<M>
-where
-    M: Math,
-{
+impl ISearchTrajectoryGenerator<(Pose, SearchKind)> for SearchTrajectoryGenerator {
     type Target = Target;
-    type Trajectory = ShiftTrajectory<SearchTrajectory<M>, M>;
+    type Trajectory = ShiftTrajectory<SearchTrajectory>;
 
     fn generate_search(&self, (pose, kind): &(Pose, SearchKind)) -> Self::Trajectory {
         self.generate_search_trajectory(pose, kind)
@@ -302,18 +290,15 @@ where
     }
 }
 
-impl<M> SearchTrajectoryGenerator<M>
-where
-    M: Math,
-{
+impl SearchTrajectoryGenerator {
     fn generate_search_trajectory(
         &self,
         pose: &Pose,
         kind: &SearchKind,
-    ) -> ShiftTrajectory<SearchTrajectory<M>, M> {
+    ) -> ShiftTrajectory<SearchTrajectory> {
         use SearchKind::*;
 
-        ShiftTrajectory::<_, M>::new(
+        ShiftTrajectory::new(
             *pose,
             match kind {
                 Init => SearchTrajectory::Straight(self.initial_trajectory.clone()),
@@ -327,7 +312,7 @@ where
     }
 }
 
-pub struct SearchTrajectoryGeneratorBuilder<M, Generator> {
+pub struct SearchTrajectoryGeneratorBuilder<Generator> {
     parameters_generator: Option<Generator>,
     max_velocity: Option<Velocity>,
     max_acceleration: Option<Acceleration>,
@@ -339,18 +324,15 @@ pub struct SearchTrajectoryGeneratorBuilder<M, Generator> {
     spin_angular_velocity: Option<AngularVelocity>,
     spin_angular_acceleration: Option<AngularAcceleration>,
     spin_angular_jerk: Option<AngularJerk>,
-    _math: PhantomData<fn() -> M>,
 }
 
-impl<Generator> Default
-    for SearchTrajectoryGeneratorBuilder<crate::utils::math::LibmMath, Generator>
-{
+impl<Generator> Default for SearchTrajectoryGeneratorBuilder<Generator> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<M, Generator> SearchTrajectoryGeneratorBuilder<M, Generator> {
+impl<Generator> SearchTrajectoryGeneratorBuilder<Generator> {
     const DEFAULT_FRONT_OFFSET: Length = Length {
         dimension: PhantomData,
         units: PhantomData,
@@ -375,13 +357,11 @@ impl<M, Generator> SearchTrajectoryGeneratorBuilder<M, Generator> {
             spin_angular_velocity: None,
             spin_angular_acceleration: None,
             spin_angular_jerk: None,
-            _math: PhantomData,
         }
     }
 
-    pub fn build(&mut self) -> Result<SearchTrajectoryGenerator<M>, RequiredFieldEmptyError>
+    pub fn build(&mut self) -> Result<SearchTrajectoryGenerator, RequiredFieldEmptyError>
     where
-        M: Math,
         Generator: SlalomParametersGenerator,
     {
         Ok(SearchTrajectoryGenerator::new(
@@ -416,7 +396,6 @@ impl<M, Generator> SearchTrajectoryGeneratorBuilder<M, Generator> {
 mod tests {
     use super::*;
     use crate::trajectory_generators::DefaultSlalomParametersGenerator;
-    use crate::utils::math::MathFake;
     use approx::assert_relative_eq;
     use uom::si::{
         acceleration::meter_per_second_squared, angle::radian,
@@ -425,7 +404,7 @@ mod tests {
         time::second, velocity::meter_per_second,
     };
 
-    fn build_generator() -> SearchTrajectoryGenerator<MathFake> {
+    fn build_generator() -> SearchTrajectoryGenerator {
         SearchTrajectoryGeneratorBuilder::new()
             .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
@@ -450,14 +429,13 @@ mod tests {
             #[test]
             fn $name() {
                 use crate::trajectory_generators::DefaultSlalomParametersGenerator;
-                use crate::utils::math::MathFake;
 
                 const EPSILON: f32 = 1e-3;
 
                 let period = Time::new::<second>(0.001);
                 let search_velocity = Velocity::new::<meter_per_second>(0.2);
 
-                let generator = SearchTrajectoryGeneratorBuilder::<MathFake, _>::new()
+                let generator = SearchTrajectoryGeneratorBuilder::new()
                     .period(period)
                     .max_velocity(Velocity::new::<meter_per_second>(2.0))
                     .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
