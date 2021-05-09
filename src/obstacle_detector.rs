@@ -1,5 +1,6 @@
 //! An implementation of [ObstacleDetector](crate::wall_detector::ObstacleDetector).
 
+use heapless::Vec;
 #[allow(unused_imports)]
 use micromath::F32Ext;
 use serde::{Deserialize, Serialize};
@@ -26,20 +27,28 @@ pub struct Obstacle {
 
 pub(crate) const SENSOR_SIZE_UPPER_BOUND: usize = 6;
 
-pub type Vec<T> = heapless::Vec<T, SENSOR_SIZE_UPPER_BOUND>;
+const POSE_HISTORY_LIMIT: usize = 15;
 
 //NOTE: the number of sensors is upper-bounded.
 pub struct ObstacleDetector<D> {
-    distance_sensors: Vec<D>,
+    distance_sensors: Vec<D, SENSOR_SIZE_UPPER_BOUND>,
+    pose_histories: Vec<Vec<Pose, POSE_HISTORY_LIMIT>, SENSOR_SIZE_UPPER_BOUND>,
 }
 
 impl<D> ObstacleDetector<D> {
     pub fn new<I: IntoIterator<Item = D>>(distance_sensors: I) -> Self {
-        let distance_sensors = distance_sensors.into_iter().collect();
-        Self { distance_sensors }
+        let distance_sensors: Vec<D, SENSOR_SIZE_UPPER_BOUND> =
+            distance_sensors.into_iter().collect();
+        let pose_histories = core::iter::repeat(Vec::new())
+            .take(distance_sensors.len())
+            .collect();
+        Self {
+            distance_sensors,
+            pose_histories,
+        }
     }
 
-    pub fn release(self) -> Vec<D> {
+    pub fn release(self) -> Vec<D, SENSOR_SIZE_UPPER_BOUND> {
         let Self {
             distance_sensors, ..
         } = self;
@@ -50,7 +59,7 @@ impl<D> ObstacleDetector<D> {
 /// Resource for [ObstacleDetector].
 #[derive(PartialEq, Eq, Debug)]
 pub struct ObstacleDetectorResource<DistanceSensor> {
-    pub distance_sensors: Vec<DistanceSensor>,
+    pub distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>,
 }
 
 impl<DistanceSensor, Config, State, Resource> Construct<Config, State, Resource>
@@ -85,23 +94,36 @@ where
     D: DistanceSensor,
 {
     type Obstacle = Obstacle;
-    type Obstacles = Vec<Obstacle>;
+    type Obstacles = Vec<Obstacle, SENSOR_SIZE_UPPER_BOUND>;
 
     fn detect(&mut self, state: &RobotState) -> Self::Obstacles {
         let mut obstacles = Vec::new();
-        let sin_th = state.theta.x.value.sin();
-        let cos_th = state.theta.x.value.cos();
-        for distance_sensor in &mut self.distance_sensors {
-            let pose = distance_sensor.pose();
+        let current_pose = Pose {
+            x: state.x.x,
+            y: state.y.x,
+            theta: state.theta.x,
+        };
+        for (i, distance_sensor) in self.distance_sensors.iter_mut().enumerate() {
             if let Ok(distance) = distance_sensor.get_distance() {
-                let x = state.x.x + pose.x * sin_th + pose.y * cos_th;
-                let y = state.y.x + pose.y * sin_th - pose.x * cos_th;
-                let theta = state.theta.x + pose.theta;
+                let sensor_pose = distance_sensor.pose();
+                // TODO: use configurable value as index (e.g. `self.pose_histories[i].len() / val`)
+                let machine_pose = self.pose_histories[i]
+                    .get(0)
+                    .cloned()
+                    .unwrap_or(current_pose);
+                let sin_th = machine_pose.theta.value.sin();
+                let cos_th = machine_pose.theta.value.cos();
+                let x = machine_pose.x + sensor_pose.x * sin_th + sensor_pose.y * cos_th;
+                let y = machine_pose.y + sensor_pose.y * sin_th - sensor_pose.x * cos_th;
+                let theta = machine_pose.theta + sensor_pose.theta;
                 let obstacle = Obstacle {
                     source: Pose { x, y, theta },
                     distance,
                 };
                 obstacles.push(obstacle).unwrap();
+                self.pose_histories[i].clear();
+            } else {
+                let _ = self.pose_histories[i].push(current_pose);
             }
         }
         obstacles
