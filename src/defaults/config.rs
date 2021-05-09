@@ -85,6 +85,7 @@ impl_with_getter! {
         spin_angular_velocity: AngularVelocity,
         spin_angular_acceleration: AngularAcceleration,
         spin_angular_jerk: AngularJerk,
+        slip_angle_const: Acceleration,
     }
 }
 
@@ -174,6 +175,7 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             spin_angular_velocity,
             spin_angular_acceleration,
             spin_angular_jerk,
+            slip_angle_const,
         } = self;
         ConfigContainer {
             command_converter: CommandConverterConfig {
@@ -219,6 +221,7 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
                 cut_off_frequency: estimator_cut_off_frequency,
                 wheel_interval,
                 correction_weight: estimator_correction_weight,
+                slip_angle_const,
             },
             tracker: TrackerConfig {
                 kx,
@@ -336,6 +339,7 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
 ///     ))
 ///     .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
 ///     .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
+///     .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
 ///     .build()
 ///     .unwrap();
 /// ```
@@ -382,6 +386,7 @@ pub struct ConfigBuilder<const N: usize> {
     spin_angular_velocity: Option<AngularVelocity>,
     spin_angular_acceleration: Option<AngularAcceleration>,
     spin_angular_jerk: Option<AngularJerk>,
+    slip_angle_const: Option<Acceleration>,
 }
 
 impl<const N: usize> ConfigBuilder<N> {
@@ -632,6 +637,11 @@ impl<const N: usize> ConfigBuilder<N> {
         /// Sets the max angular jerk for spin.
         spin_angular_jerk: AngularJerk
     );
+    impl_setter!(
+        /// **Required**,
+        /// Sets the constant value for estimating slip angle.
+        slip_angle_const: Acceleration
+    );
 
     /// Generates new builder whose values are set as None.
     pub fn new() -> Self {
@@ -677,6 +687,7 @@ impl<const N: usize> ConfigBuilder<N> {
             spin_angular_velocity: None,
             spin_angular_acceleration: None,
             spin_angular_jerk: None,
+            slip_angle_const: None,
         }
     }
 
@@ -742,6 +753,7 @@ impl<const N: usize> ConfigBuilder<N> {
             spin_angular_velocity: get!(spin_angular_velocity),
             spin_angular_acceleration: get!(spin_angular_acceleration),
             spin_angular_jerk: get!(spin_angular_jerk),
+            slip_angle_const: get!(slip_angle_const),
         })
     }
 }
@@ -810,6 +822,7 @@ mod tests {
             ))
             .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
             .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
+            .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
             .build()
             .unwrap()
     }

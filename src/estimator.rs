@@ -17,7 +17,7 @@ use crate::tracker::RobotState;
 use crate::utils::builder::{ok_or, BuilderResult};
 use crate::utils::math::{LibmMath, Math};
 use crate::wall_detector::CorrectInfo;
-use crate::{Construct, Deconstruct};
+use crate::{get_or_err, Construct, Deconstruct};
 
 pub trait IMU {
     type Error;
@@ -41,6 +41,8 @@ pub struct EstimatorInner<M> {
     wheel_interval: Option<Length>,
     state: RobotState,
     weight: f32,
+    slip_angle_const: Acceleration,
+    slip_angle: Angle,
     _phantom: PhantomData<fn() -> M>,
 }
 
@@ -51,6 +53,7 @@ impl<M> EstimatorInner<M> {
         wheel_interval: Option<Length>,
         correction_weight: f32,
         initial_state: RobotState,
+        slip_angle_const: Acceleration,
     ) -> Self {
         Self {
             period,
@@ -61,6 +64,8 @@ impl<M> EstimatorInner<M> {
             angular_velocity: Default::default(),
             bias: Default::default(),
             state: initial_state,
+            slip_angle_const,
+            slip_angle: Default::default(),
             _phantom: PhantomData,
         }
     }
@@ -104,16 +109,21 @@ where
 
         //pose estimation
         let trans_distance = trans_velocity * self.period;
-        let angle = Angle::from(angular_velocity * self.period);
-        let middle_theta = self.state.theta.x + angle / 2.0;
-        let (sin_mth, cos_mth) = M::sincos(middle_theta);
-        self.state.x.x += trans_distance * cos_mth;
-        self.state.y.x += trans_distance * sin_mth;
+        let delta_angle = Angle::from(angular_velocity * self.period);
+        self.slip_angle = {
+            let rev_period = 1.0 / self.period;
+            Angle::from(
+                (AngularVelocity::from(self.slip_angle * rev_period) + angular_velocity)
+                    / (rev_period + self.slip_angle_const / trans_velocity),
+            )
+        };
 
-        self.state.theta.x += angle;
+        self.state.theta.x += delta_angle;
+        let (sin_th, cos_th) = M::sincos(self.state.theta.x - self.slip_angle);
+        self.state.x.x += trans_distance * cos_th;
+        self.state.y.x += trans_distance * sin_th;
         //------
 
-        let (sin_th, cos_th) = M::sincos(self.state.theta.x);
         self.state.x.v = trans_velocity * cos_th;
         self.state.y.v = trans_velocity * sin_th;
         self.state.x.a = translational_acceleration * cos_th;
@@ -184,6 +194,7 @@ pub struct EstimatorConfig {
     pub cut_off_frequency: Frequency,
     pub wheel_interval: Option<Length>,
     pub correction_weight: f32,
+    pub slip_angle_const: Acceleration,
 }
 
 /// State for [Estimator].
@@ -228,6 +239,7 @@ where
             .wheel_interval(config.wheel_interval)
             .period(config.period)
             .cut_off_frequency(config.cut_off_frequency)
+            .slip_angle_const(config.slip_angle_const)
             .build()
             .expect("Should never panic")
     }
@@ -320,6 +332,7 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu, M = LibmMath> {
     initial_state: Option<RobotState>,
     wheel_interval: Option<Length>,
     correction_weight: Option<f32>,
+    slip_angle_const: Option<Acceleration>,
     _math: PhantomData<fn() -> M>,
 }
 
@@ -367,6 +380,7 @@ impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncod
             initial_state: None,
             wheel_interval: None,
             correction_weight: None,
+            slip_angle_const: None,
             _math: PhantomData,
         }
     }
@@ -395,6 +409,11 @@ impl<LeftEncoder, RightEncoder, Imu, M> EstimatorBuilder<LeftEncoder, RightEncod
         self.correction_weight = Some(weight);
         self
     }
+
+    pub fn slip_angle_const(&mut self, slip_angle_const: Acceleration) -> &mut Self {
+        self.slip_angle_const = Some(slip_angle_const);
+        self
+    }
 }
 
 impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU, M: Math>
@@ -407,17 +426,14 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU, M: Math>
             1.0 / (2.0 * core::f32::consts::PI * (period * cut_off_frequency).get::<ratio>() + 1.0);
 
         Ok(Estimator {
-            inner: EstimatorInner {
+            inner: EstimatorInner::new(
                 period,
                 alpha,
-                trans_velocity: Default::default(),
-                angular_velocity: Default::default(),
-                bias: Default::default(),
-                wheel_interval: self.wheel_interval.take(),
-                state: self.initial_state.take().unwrap_or(Default::default()),
-                weight: self.correction_weight.take().unwrap_or(0.0),
-                _phantom: PhantomData,
-            },
+                self.wheel_interval.take(),
+                self.correction_weight.take().unwrap_or(0.0),
+                self.initial_state.take().unwrap_or(Default::default()),
+                get_or_err!(self.slip_angle_const),
+            ),
             left_encoder: ok_or(self.left_encoder.take(), "left_encoder")?,
             right_encoder: ok_or(self.right_encoder.take(), "right_encoder")?,
             imu: ok_or(self.imu.take(), "imu")?,
@@ -622,6 +638,7 @@ mod tests {
                     .period(PERIOD)
                     .cut_off_frequency(Frequency::new::<hertz>(50.0))
                     .wheel_interval(Some(wheel_interval))
+                    .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
                     .build()
                     .unwrap();
 
