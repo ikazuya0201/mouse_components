@@ -131,7 +131,7 @@ pub mod sensors {
     pub use tracker::Motor;
 }
 
-const MAZE_WIDTH_UPPER_BOUND: usize = 32;
+const MAZE_WIDTH_UPPER_BOUND: usize = 16;
 
 /// A trait for constructing itself by config, state and resource.
 pub trait Construct<Config, State, Resource>: Sized {
