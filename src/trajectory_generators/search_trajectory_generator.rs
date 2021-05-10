@@ -67,16 +67,7 @@ impl Iterator for SearchTrajectory {
 }
 
 pub type BackTrajectory = Chain<
-    Chain<
-        Chain<
-            Chain<
-                Chain<Chain<StraightTrajectory, StopTrajectory>, ShiftTrajectory<SpinTrajectory>>,
-                StopTrajectory,
-            >,
-            ShiftTrajectory<SpinTrajectory>,
-        >,
-        StopTrajectory,
-    >,
+    Chain<StraightTrajectory, ShiftTrajectory<SpinTrajectory>>,
     ShiftTrajectory<StraightTrajectory>,
 >;
 
@@ -157,51 +148,17 @@ impl SearchTrajectoryGenerator {
         //TODO: use configurable value
         let front_trajectory =
             StraightTrajectoryGenerator::generate_constant(square_width, search_velocity, period);
-        use uom::si::time::{millisecond, second};
+        use uom::si::time::second;
         let back_trajectory = {
             let distance = square_width_half - front_offset; //TODO: use configurable value
             straight_generator
                 .generate(distance, search_velocity, Default::default())
-                .chain(StopTrajectory::new(
-                    Pose {
-                        x: distance,
-                        ..Default::default()
-                    },
-                    period,
-                    Time::new::<millisecond>(50.0),
-                ))
                 .chain(ShiftTrajectory::new(
                     Pose {
                         x: distance,
                         ..Default::default()
                     },
-                    spin_generator.generate(Angle::new::<degree>(90.0)),
-                ))
-                .chain(StopTrajectory::new(
-                    Pose {
-                        x: distance,
-                        y: Default::default(),
-                        theta: Angle::new::<degree>(90.0),
-                    },
-                    period,
-                    Time::new::<millisecond>(50.0),
-                ))
-                .chain(ShiftTrajectory::new(
-                    Pose {
-                        x: distance,
-                        y: Default::default(),
-                        theta: Angle::new::<degree>(90.0),
-                    },
-                    spin_generator.generate(Angle::new::<degree>(90.0)),
-                ))
-                .chain(StopTrajectory::new(
-                    Pose {
-                        x: distance,
-                        y: Default::default(),
-                        theta: Angle::new::<degree>(180.0),
-                    },
-                    period,
-                    Time::new::<millisecond>(50.0),
+                    spin_generator.generate(Angle::new::<degree>(180.0)),
                 ))
                 .chain(ShiftTrajectory::new(
                     Pose {
