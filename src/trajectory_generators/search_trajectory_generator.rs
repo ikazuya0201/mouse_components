@@ -94,7 +94,6 @@ pub struct SearchTrajectoryGenerator {
 impl SearchTrajectoryGenerator {
     fn new<Generator>(
         parameters_generator: Generator,
-        max_velocity: Velocity,
         max_acceleration: Acceleration,
         max_jerk: Jerk,
         period: Time,
@@ -109,11 +108,11 @@ impl SearchTrajectoryGenerator {
         Generator: SlalomParametersGenerator,
     {
         let straight_generator =
-            StraightTrajectoryGenerator::new(max_velocity, max_acceleration, max_jerk, period);
+            StraightTrajectoryGenerator::new(search_velocity, max_acceleration, max_jerk, period);
         let slalom_generator = SlalomGenerator::new(
             period,
             parameters_generator,
-            max_velocity,
+            search_velocity,
             max_acceleration,
             max_jerk,
         );
@@ -157,7 +156,7 @@ impl SearchTrajectoryGenerator {
         );
         //TODO: use configurable value
         let front_trajectory =
-            straight_generator.generate(square_width, search_velocity, search_velocity);
+            StraightTrajectoryGenerator::generate_constant(square_width, search_velocity, period);
         use uom::si::time::{millisecond, second};
         let back_trajectory = {
             let distance = square_width_half - front_offset; //TODO: use configurable value
@@ -232,7 +231,6 @@ impl SearchTrajectoryGenerator {
 /// Config for [SearchTrajectoryGenerator].
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct SearchTrajectoryGeneratorConfig {
-    pub max_velocity: Velocity,
     pub max_acceleration: Acceleration,
     pub max_jerk: Jerk,
     pub period: Time,
@@ -255,7 +253,6 @@ where
                 config.square_width,
                 config.front_offset,
             ),
-            config.max_velocity,
             config.max_acceleration,
             config.max_jerk,
             config.period,
@@ -314,7 +311,6 @@ impl SearchTrajectoryGenerator {
 
 pub struct SearchTrajectoryGeneratorBuilder<Generator> {
     parameters_generator: Option<Generator>,
-    max_velocity: Option<Velocity>,
     max_acceleration: Option<Acceleration>,
     max_jerk: Option<Jerk>,
     period: Option<Time>,
@@ -347,7 +343,6 @@ impl<Generator> SearchTrajectoryGeneratorBuilder<Generator> {
     pub fn new() -> Self {
         Self {
             parameters_generator: None,
-            max_velocity: None,
             max_acceleration: None,
             max_jerk: None,
             period: None,
@@ -366,7 +361,6 @@ impl<Generator> SearchTrajectoryGeneratorBuilder<Generator> {
     {
         Ok(SearchTrajectoryGenerator::new(
             get_or_err!(self.parameters_generator),
-            get_or_err!(self.max_velocity),
             get_or_err!(self.max_acceleration),
             get_or_err!(self.max_jerk),
             get_or_err!(self.period),
@@ -380,7 +374,6 @@ impl<Generator> SearchTrajectoryGeneratorBuilder<Generator> {
     }
 
     impl_setter!(parameters_generator: Generator);
-    impl_setter!(max_velocity: Velocity);
     impl_setter!(max_acceleration: Acceleration);
     impl_setter!(max_jerk: Jerk);
     impl_setter!(period: Time);
@@ -406,7 +399,6 @@ mod tests {
 
     fn build_generator() -> SearchTrajectoryGenerator {
         SearchTrajectoryGeneratorBuilder::new()
-            .max_velocity(Velocity::new::<meter_per_second>(1.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
             .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
             .parameters_generator(DefaultSlalomParametersGenerator::default())
@@ -437,7 +429,6 @@ mod tests {
 
                 let generator = SearchTrajectoryGeneratorBuilder::new()
                     .period(period)
-                    .max_velocity(Velocity::new::<meter_per_second>(2.0))
                     .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
                     .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
                     .search_velocity(search_velocity)
