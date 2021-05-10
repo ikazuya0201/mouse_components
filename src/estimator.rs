@@ -35,7 +35,6 @@ pub struct EstimatorInner {
     period: Time,
     alpha: f32,
     trans_velocity: Velocity,
-    angular_velocity: AngularVelocity,
     bias: AngularVelocity,
     wheel_interval: Option<Length>,
     state: RobotState,
@@ -59,7 +58,6 @@ impl EstimatorInner {
             wheel_interval,
             weight: correction_weight,
             trans_velocity: Default::default(),
-            angular_velocity: Default::default(),
             bias: Default::default(),
             state: initial_state,
             slip_angle_const,
@@ -96,23 +94,22 @@ impl EstimatorInner {
         };
 
         //complementary filter
-        let trans_velocity = self.alpha
+        self.trans_velocity = self.alpha
             * (self.trans_velocity + translational_acceleration * self.period)
             + (1.0 - self.alpha) * average_trans_velocity;
         //------
 
         //pose estimation
-        let trans_distance = trans_velocity * self.period;
-        let delta_angle = Angle::from(angular_velocity * self.period);
+        let trans_distance = self.trans_velocity * self.period;
         self.slip_angle = {
             let rev_period = 1.0 / self.period;
             Angle::from(
                 (AngularVelocity::from(self.slip_angle * rev_period) + angular_velocity)
-                    / (rev_period + self.slip_angle_const / trans_velocity),
+                    / (rev_period + self.slip_angle_const / self.trans_velocity),
             )
         };
 
-        self.state.theta.x += delta_angle;
+        self.state.theta.x += Angle::from(angular_velocity * self.period);
         let theta_m = self.state.theta.x - self.slip_angle;
         let sin_th = theta_m.value.sin();
         let cos_th = theta_m.value.cos();
@@ -120,17 +117,14 @@ impl EstimatorInner {
         self.state.y.x += trans_distance * sin_th;
         //------
 
-        self.state.x.v = trans_velocity * cos_th;
-        self.state.y.v = trans_velocity * sin_th;
+        self.state.x.v = self.trans_velocity * cos_th;
+        self.state.y.v = self.trans_velocity * sin_th;
         self.state.x.a = translational_acceleration * cos_th;
         self.state.y.a = translational_acceleration * sin_th;
 
-        self.state.theta.v = angular_velocity;
         self.state.theta.a =
-            AngularAcceleration::from((angular_velocity - self.angular_velocity) / self.period);
-
-        self.trans_velocity = trans_velocity;
-        self.angular_velocity = angular_velocity;
+            AngularAcceleration::from((angular_velocity - self.state.theta.v) / self.period);
+        self.state.theta.v = angular_velocity;
     }
 
     fn correct_state<Infos: IntoIterator<Item = CorrectInfo>>(&mut self, infos: Infos) {
@@ -162,10 +156,7 @@ impl<LE, RE, I> core::fmt::Debug for Estimator<LE, RE, I> {
         writeln!(
             f,
             "Estimator {{ state:{:?}, trans_velocity:{:?}, angular_velocity:{:?}, bias:{:?} }}",
-            self.inner.state,
-            self.inner.trans_velocity,
-            self.inner.angular_velocity,
-            self.inner.bias,
+            self.inner.state, self.inner.trans_velocity, self.inner.state.theta.v, self.inner.bias,
         )
     }
 }
