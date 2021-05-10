@@ -391,10 +391,9 @@ mod tests {
     use crate::trajectory_generators::DefaultSlalomParametersGenerator;
     use approx::assert_relative_eq;
     use uom::si::{
-        acceleration::meter_per_second_squared, angle::radian,
-        angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
-        angular_velocity::degree_per_second, jerk::meter_per_second_cubed, length::meter,
-        time::second, velocity::meter_per_second,
+        acceleration::meter_per_second_squared, angular_acceleration::degree_per_second_squared,
+        angular_jerk::degree_per_second_cubed, angular_velocity::degree_per_second,
+        jerk::meter_per_second_cubed, length::meter, time::second, velocity::meter_per_second,
     };
 
     fn build_generator() -> SearchTrajectoryGenerator {
@@ -426,11 +425,13 @@ mod tests {
 
                 let period = Time::new::<second>(0.001);
                 let search_velocity = Velocity::new::<meter_per_second>(0.2);
+                let max_acceleration = Acceleration::new::<meter_per_second_squared>(8.0);
+                let max_jerk = Jerk::new::<meter_per_second_cubed>(100.0);
 
                 let generator = SearchTrajectoryGeneratorBuilder::new()
                     .period(period)
-                    .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
-                    .max_jerk(Jerk::new::<meter_per_second_cubed>(1.0))
+                    .max_acceleration(max_acceleration)
+                    .max_jerk(max_jerk)
                     .search_velocity(search_velocity)
                     .parameters_generator(DefaultSlalomParametersGenerator::default())
                     .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(90.0))
@@ -454,12 +455,19 @@ mod tests {
 
                 let mut last = trajectory.next().unwrap();
                 for target in trajectory {
-                    let v = target.x.v * target.theta.x.get::<radian>().cos()
-                        + target.y.v * target.theta.x.get::<radian>().sin();
+                    let cos = target.theta.x.value.cos();
+                    let sin = target.theta.x.value.sin();
+                    let v = target.x.v * cos + target.y.v * sin;
+                    let a = target.x.a * cos + target.y.a * sin;
+                    let j = target.x.j * cos + target.y.j * sin;
+
+                    assert!(v.abs() < search_velocity + Velocity::new::<meter_per_second>(EPSILON));
                     assert!(
-                        v.get::<meter_per_second>()
-                            < search_velocity.get::<meter_per_second>() + EPSILON * 100.0,
+                        a.abs()
+                            < max_acceleration
+                                + Acceleration::new::<meter_per_second_squared>(EPSILON)
                     );
+                    assert!(j.abs() < max_jerk + Jerk::new::<meter_per_second_cubed>(EPSILON));
                     last = target;
                 }
                 assert_relative_eq!(last.x.x.get::<meter>(), last_x, epsilon = EPSILON);
@@ -473,4 +481,6 @@ mod tests {
     impl_search_trajectory_test!(test_search_trajectory_right: (SearchKind::Right, 0.09, 0.135, 0.0));
     impl_search_trajectory_test!(test_search_trajectory_left: (SearchKind::Left, 0.0, 0.135, 180.0));
     impl_search_trajectory_test!(test_search_trajectory_back: (SearchKind::Back, 0.045, 0.09, 270.0));
+    impl_search_trajectory_test!(test_search_trajectory_init: (SearchKind::Init, 0.045, 0.135, 90.0));
+    impl_search_trajectory_test!(test_search_trajectory_final: (SearchKind::Final, 0.045, 0.135, 90.0));
 }
