@@ -97,18 +97,18 @@ macro_rules! impl_construct_and_deconstruct_test {
 
             let distance_sensors_poses = vec![
                 Pose {
-                    x: Length::new::<millimeter>(0.0),
-                    y: Length::new::<millimeter>(23.0),
+                    x: Length::new::<millimeter>(23.0),
+                    y: Length::new::<millimeter>(0.0),
                     theta: Angle::new::<degree>(0.0),
                 },
                 Pose {
-                    x: Length::new::<millimeter>(-11.5),
-                    y: Length::new::<millimeter>(13.0),
+                    x: Length::new::<millimeter>(13.0),
+                    y: Length::new::<millimeter>(11.5),
                     theta: Angle::new::<degree>(90.0),
                 },
                 Pose {
-                    x: Length::new::<millimeter>(11.5),
-                    y: Length::new::<millimeter>(13.0),
+                    x: Length::new::<millimeter>(13.0),
+                    y: Length::new::<millimeter>(-11.5),
                     theta: Angle::new::<degree>(-90.0),
                 },
             ];

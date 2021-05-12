@@ -327,8 +327,8 @@ pub struct DistanceSensor<const N: usize> {
 impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
     type Error = ConversionError;
 
-    fn pose(&self) -> Pose {
-        self.pose
+    fn pose(&self) -> &Pose {
+        &self.pose
     }
 
     fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {
@@ -336,8 +336,8 @@ impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
         let sin_th = state.theta.x.value.sin();
         let cos_th = state.theta.x.value.cos();
         let pose = Pose {
-            x: state.x.x + self.pose.x * sin_th + self.pose.y * cos_th,
-            y: state.y.x + self.pose.y * sin_th - self.pose.x * cos_th,
+            x: state.x.x + self.pose.x * cos_th - self.pose.y * sin_th,
+            y: state.y.x + self.pose.x * sin_th + self.pose.y * cos_th,
             theta: state.theta.x + self.pose.theta,
         };
         let wall_info = self.pose_converter.convert(&pose)?;

@@ -12,10 +12,13 @@ use crate::utils::sample::Sample;
 use crate::wall_detector::ObstacleDetector as IObstacleDetector;
 use crate::{Construct, Deconstruct};
 
+/// A trait that measures the distance from this sensor to an obstacle in front of the sensor.
 pub trait DistanceSensor {
     type Error;
 
-    fn pose(&self) -> Pose;
+    /// Return the relative pose of the sensor from the center of the machine.
+    /// The x axis is directed from the center of the machine to the front of the machine.
+    fn pose(&self) -> &Pose;
     fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error>;
 }
 
@@ -113,8 +116,8 @@ where
                     .unwrap_or(current_pose);
                 let sin_th = machine_pose.theta.value.sin();
                 let cos_th = machine_pose.theta.value.cos();
-                let x = machine_pose.x + sensor_pose.x * sin_th + sensor_pose.y * cos_th;
-                let y = machine_pose.y + sensor_pose.y * sin_th - sensor_pose.x * cos_th;
+                let x = machine_pose.x + sensor_pose.x * cos_th - sensor_pose.y * sin_th;
+                let y = machine_pose.y + sensor_pose.x * sin_th + sensor_pose.y * cos_th;
                 let theta = machine_pose.theta + sensor_pose.theta;
                 let obstacle = Obstacle {
                     source: Pose { x, y, theta },
@@ -152,8 +155,8 @@ mod tests {
     impl DistanceSensor for IDistanceSensor {
         type Error = ();
 
-        fn pose(&self) -> Pose {
-            self.pose
+        fn pose(&self) -> &Pose {
+            &self.pose
         }
 
         fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {
@@ -168,7 +171,7 @@ mod tests {
             IDistanceSensor::new(
                 Pose {
                     x: Length::new::<meter>(0.015),
-                    y: Length::new::<meter>(0.015),
+                    y: Length::new::<meter>(-0.015),
                     theta: Angle::new::<degree>(-90.0),
                 },
                 Some(Sample {
@@ -178,7 +181,7 @@ mod tests {
             ),
             IDistanceSensor::new(
                 Pose {
-                    x: Length::new::<meter>(-0.015),
+                    x: Length::new::<meter>(0.015),
                     y: Length::new::<meter>(0.015),
                     theta: Angle::new::<degree>(90.0),
                 },
@@ -186,8 +189,8 @@ mod tests {
             ),
             IDistanceSensor::new(
                 Pose {
-                    x: Length::new::<meter>(0.0),
-                    y: Length::new::<meter>(0.025),
+                    x: Length::new::<meter>(0.025),
+                    y: Length::new::<meter>(0.0),
                     theta: Angle::new::<degree>(0.0),
                 },
                 Some(Sample {

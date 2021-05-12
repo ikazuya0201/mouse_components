@@ -285,28 +285,28 @@ macro_rules! impl_search_operator_test {
                     Default::default(),
                     vec![
                         Pose {
-                            x: Length::new::<millimeter>(0.0),
-                            y: Length::new::<millimeter>(23.0),
+                            x: Length::new::<millimeter>(23.0),
+                            y: Length::new::<millimeter>(0.0),
                             theta: Angle::new::<degree>(0.0),
                         },
                         Pose {
-                            x: Length::new::<millimeter>(8.0),
-                            y: Length::new::<millimeter>(20.0),
+                            x: Length::new::<millimeter>(20.0),
+                            y: Length::new::<millimeter>(-8.0),
                             theta: Angle::new::<degree>(-45.0),
                         },
                         Pose {
-                            x: Length::new::<millimeter>(-8.0),
-                            y: Length::new::<millimeter>(20.0),
+                            x: Length::new::<millimeter>(20.0),
+                            y: Length::new::<millimeter>(8.0),
                             theta: Angle::new::<degree>(45.0),
                         },
                         Pose {
-                            x: Length::new::<millimeter>(-11.5),
-                            y: Length::new::<millimeter>(13.0),
+                            x: Length::new::<millimeter>(13.0),
+                            y: Length::new::<millimeter>(11.5),
                             theta: Angle::new::<degree>(90.0),
                         },
                         Pose {
-                            x: Length::new::<millimeter>(11.5),
-                            y: Length::new::<millimeter>(13.0),
+                            x: Length::new::<millimeter>(13.0),
+                            y: Length::new::<millimeter>(-11.5),
                             theta: Angle::new::<degree>(-90.0),
                         },
                     ],
@@ -320,18 +320,18 @@ macro_rules! impl_search_operator_test {
                     Length::new::<millimeter>(10.0),
                     vec![
                         Pose {
-                            x: Length::new::<millimeter>(0.0),
-                            y: Length::new::<millimeter>(23.0),
+                            x: Length::new::<millimeter>(23.0),
+                            y: Length::new::<millimeter>(0.0),
                             theta: Angle::new::<degree>(0.0),
                         },
                         Pose {
-                            x: Length::new::<millimeter>(-11.5),
-                            y: Length::new::<millimeter>(13.0),
+                            x: Length::new::<millimeter>(13.0),
+                            y: Length::new::<millimeter>(11.5),
                             theta: Angle::new::<degree>(90.0),
                         },
                         Pose {
-                            x: Length::new::<millimeter>(11.5),
-                            y: Length::new::<millimeter>(13.0),
+                            x: Length::new::<millimeter>(13.0),
+                            y: Length::new::<millimeter>(-11.5),
                             theta: Angle::new::<degree>(-90.0),
                         },
                     ],

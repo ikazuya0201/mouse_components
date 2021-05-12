@@ -72,28 +72,28 @@ macro_rules! impl_run_operator_test {
             let rot_model_time_constant = Time::new::<second>(0.1499);
             let distance_sensors_poses = vec![
                 Pose {
-                    x: Length::new::<millimeter>(0.0),
-                    y: Length::new::<millimeter>(23.0),
+                    x: Length::new::<millimeter>(23.0),
+                    y: Length::new::<millimeter>(0.0),
                     theta: Angle::new::<degree>(0.0),
                 },
                 Pose {
-                    x: Length::new::<millimeter>(8.0),
-                    y: Length::new::<millimeter>(20.0),
+                    x: Length::new::<millimeter>(20.0),
+                    y: Length::new::<millimeter>(-8.0),
                     theta: Angle::new::<degree>(-45.0),
                 },
                 Pose {
-                    x: Length::new::<millimeter>(-8.0),
-                    y: Length::new::<millimeter>(20.0),
+                    x: Length::new::<millimeter>(20.0),
+                    y: Length::new::<millimeter>(8.0),
                     theta: Angle::new::<degree>(45.0),
                 },
                 Pose {
-                    x: Length::new::<millimeter>(-11.5),
-                    y: Length::new::<millimeter>(13.0),
+                    x: Length::new::<millimeter>(13.0),
+                    y: Length::new::<millimeter>(11.5),
                     theta: Angle::new::<degree>(90.0),
                 },
                 Pose {
-                    x: Length::new::<millimeter>(11.5),
-                    y: Length::new::<millimeter>(13.0),
+                    x: Length::new::<millimeter>(13.0),
+                    y: Length::new::<millimeter>(-11.5),
                     theta: Angle::new::<degree>(-90.0),
                 },
             ];
