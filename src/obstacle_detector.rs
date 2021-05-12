@@ -12,9 +12,12 @@ use crate::utils::sample::Sample;
 use crate::wall_detector::ObstacleDetector as IObstacleDetector;
 use crate::{Construct, Deconstruct};
 
+/// A trait that measures the distance from this sensor to an obstacle in front of the sensor.
 pub trait DistanceSensor {
     type Error;
 
+    /// Return the relative pose of the sensor from the center of the machine.
+    /// The x axis is directed from the center of the machine to the front of the machine.
     fn pose(&self) -> &Pose;
     fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error>;
 }
