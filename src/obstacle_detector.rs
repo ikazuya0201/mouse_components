@@ -15,7 +15,7 @@ use crate::{Construct, Deconstruct};
 pub trait DistanceSensor {
     type Error;
 
-    fn pose(&self) -> Pose;
+    fn pose(&self) -> &Pose;
     fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error>;
 }
 
@@ -152,8 +152,8 @@ mod tests {
     impl DistanceSensor for IDistanceSensor {
         type Error = ();
 
-        fn pose(&self) -> Pose {
-            self.pose
+        fn pose(&self) -> &Pose {
+            &self.pose
         }
 
         fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {

@@ -327,8 +327,8 @@ pub struct DistanceSensor<const N: usize> {
 impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
     type Error = ConversionError;
 
-    fn pose(&self) -> Pose {
-        self.pose
+    fn pose(&self) -> &Pose {
+        &self.pose
     }
 
     fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {
