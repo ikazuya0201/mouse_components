@@ -6,7 +6,7 @@ use components::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
     commanders::SearchCommander,
-    controllers::{RotationalControllerBuilder, TranslationalControllerBuilder},
+    controllers::MultiSisoController,
     estimator::EstimatorBuilder,
     mazes::Maze,
     nodes::{Node, RunNode, SearchNode},
@@ -17,7 +17,9 @@ use components::{
     tracker::TrackerBuilder,
     trajectory_generators::{DefaultSlalomParametersGenerator, SearchTrajectoryGeneratorBuilder},
     trajectory_managers::SearchTrajectoryManager,
-    types::data::{AbsoluteDirection, AngleState, LengthState, Pose, RobotState, SearchKind},
+    types::data::{
+        AbsoluteDirection, AngleState, ControlParameters, LengthState, Pose, RobotState, SearchKind,
+    },
     utils::probability::Probability,
     wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
@@ -140,35 +142,32 @@ macro_rules! impl_search_operator_test {
                         };
 
                         let tracker = {
-                            let trans_controller = TranslationalControllerBuilder::new()
-                                .kp(1.0)
-                                .ki(0.05)
-                                .kd(0.01)
-                                .period(period)
-                                .model_gain(trans_model_gain)
-                                .model_time_constant(trans_model_time_constant)
-                                .build()
-                                .unwrap();
+                            let controller = MultiSisoController::new(
+                                left_motor,
+                                right_motor,
+                                ControlParameters {
+                                    kp: 1.0,
+                                    ki: 0.05,
+                                    kd: 0.01,
+                                    model_k: trans_model_gain,
+                                    model_t1: trans_model_time_constant.value,
+                                },
+                                ControlParameters {
+                                    kp: 1.0,
+                                    ki: 0.2,
+                                    kd: 0.01,
+                                    model_k: rot_model_gain,
+                                    model_t1: rot_model_time_constant.value,
+                                },
+                                period,
+                            );
 
-                            let rot_controller = RotationalControllerBuilder::new()
-                                .kp(1.0)
-                                .ki(0.2)
-                                .kd(0.01)
-                                .period(period)
-                                .model_gain(rot_model_gain)
-                                .model_time_constant(rot_model_time_constant)
-                                .build()
-                                .unwrap();
-
-                            let tracker = TrackerBuilder::default()
-                                .right_motor(right_motor)
-                                .left_motor(left_motor)
+                            let tracker = TrackerBuilder::new()
                                 .period(period)
                                 .gain(15.0)
                                 .dgain(4.0)
                                 .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.05))
-                                .translation_controller(trans_controller)
-                                .rotation_controller(rot_controller)
+                                .controller(controller)
                                 .low_zeta(1.0)
                                 .low_b(1e-3)
                                 .fail_safe_distance(Length::new::<meter>(0.05))

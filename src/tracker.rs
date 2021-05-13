@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use uom::si::{
     angle::radian,
     f32::{
-        Acceleration, Angle, AngularAcceleration, AngularVelocity, ElectricPotential, Frequency,
-        Length, Time, Velocity,
+        Acceleration, Angle, AngularAcceleration, AngularVelocity, Frequency, Length, Time,
+        Velocity,
     },
     frequency::hertz,
     Quantity, ISQ, SI,
@@ -20,50 +20,43 @@ use uom::{typenum::*, Kind};
 
 use super::robot::Tracker as ITracker;
 use super::trajectory_generators::Target;
-use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
+use crate::get_or_err;
+use crate::utils::builder::RequiredFieldEmptyError;
 use crate::{Construct, Deconstruct};
 pub use state::{AngleState, LengthState, RobotState};
-
-pub trait Motor {
-    fn apply(&mut self, electric_potential: ElectricPotential);
-}
 
 type GainType = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 type BType = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 
-pub trait Controller<T, U> {
-    fn calculate(&mut self, r: T, dr: U, y: T, dy: U) -> ElectricPotential;
+#[derive(Clone, PartialEq, Debug)]
+pub struct ControlTarget {
+    pub v: Velocity,
+    pub a: Acceleration,
+    pub omega: AngularVelocity,
+    pub alpha: AngularAcceleration,
+}
+
+pub trait Controller {
+    fn control(&mut self, r: &ControlTarget, y: &ControlTarget);
 }
 
 /// An implementation of [Tracker](crate::robot::Tracker).
-pub struct Tracker<
-    LM,
-    RM,
-    TC = crate::controllers::TranslationalController,
-    RC = crate::controllers::RotationalController,
-> {
+pub struct Tracker<Controller> {
     gain: GainType,
     dgain: Frequency,
     xi: Velocity,
     period: Time,
     xi_threshold: Velocity,
     fail_safe_distance: Length,
-    translation_controller: TC,
-    rotation_controller: RC,
-    left_motor: LM,
-    right_motor: RM,
+    controller: Controller,
     zeta: f32,
     b: BType,
 }
 
-impl<LM, RM, TC, RC> Tracker<LM, RM, TC, RC> {
-    pub fn release(self) -> (LM, RM) {
-        let Self {
-            left_motor,
-            right_motor,
-            ..
-        } = self;
-        (left_motor, right_motor)
+impl<Controller> Tracker<Controller> {
+    pub fn release(self) -> Controller {
+        let Self { controller, .. } = self;
+        controller
     }
 }
 
@@ -79,36 +72,17 @@ pub struct TrackerConfig {
     pub low_b: f32,
 }
 
-/// Resource for [Tracker].
-#[derive(PartialEq, Debug)]
-pub struct TrackerResource<LeftMotor, RightMotor> {
-    pub left_motor: LeftMotor,
-    pub right_motor: RightMotor,
-}
-
-impl<LeftMotor, RightMotor, TC, RC, Config, State, Resource> Construct<Config, State, Resource>
-    for Tracker<LeftMotor, RightMotor, TC, RC>
+impl<ControllerType, Config, State, Resource> Construct<Config, State, Resource>
+    for Tracker<ControllerType>
 where
-    TC: Construct<Config, State, Resource> + Controller<Velocity, Acceleration>,
-    RC: Construct<Config, State, Resource> + Controller<AngularVelocity, AngularAcceleration>,
-    LeftMotor: Motor,
-    RightMotor: Motor,
+    ControllerType: Construct<Config, State, Resource> + Controller,
     Config: AsRef<TrackerConfig>,
-    Resource: AsMut<Option<TrackerResource<LeftMotor, RightMotor>>>,
 {
     fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
-        let translation_controller = TC::construct(config, state, resource);
-        let rotation_controller = RC::construct(config, state, resource);
+        let controller = ControllerType::construct(config, state, resource);
         let config = config.as_ref();
-        let TrackerResource {
-            left_motor,
-            right_motor,
-        } = resource.as_mut().take().unwrap_or_else(|| unimplemented!());
         TrackerBuilder::new()
-            .translation_controller(translation_controller)
-            .rotation_controller(rotation_controller)
-            .left_motor(left_motor)
-            .right_motor(right_motor)
+            .controller(controller)
             .gain(config.gain)
             .dgain(config.dgain)
             .period(config.period)
@@ -121,26 +95,18 @@ where
     }
 }
 
-impl<LeftMotor, RightMotor, TC, RC, State, Resource> Deconstruct<State, Resource>
-    for Tracker<LeftMotor, RightMotor, TC, RC>
+impl<Controller, State, Resource> Deconstruct<State, Resource> for Tracker<Controller>
 where
     State: Default,
-    Resource: From<TrackerResource<LeftMotor, RightMotor>>,
+    Controller: Deconstruct<State, Resource>,
 {
     fn deconstruct(self) -> (State, Resource) {
-        let (left_motor, right_motor) = self.release();
-        (
-            Default::default(),
-            TrackerResource {
-                left_motor,
-                right_motor,
-            }
-            .into(),
-        )
+        let controller = self.release();
+        controller.deconstruct()
     }
 }
 
-impl<LM, RM, TC, RC> core::fmt::Debug for Tracker<LM, RM, TC, RC> {
+impl<Controller> core::fmt::Debug for Tracker<Controller> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "Tracker{{ xi:{:?} }}", self.xi)
     }
@@ -153,80 +119,13 @@ pub struct FailSafeError {
     target: Target,
 }
 
-impl<LM, RM, TC, RC> ITracker<RobotState, Target> for Tracker<LM, RM, TC, RC>
+impl<ControllerType> ITracker<RobotState, Target> for Tracker<ControllerType>
 where
-    LM: Motor,
-    RM: Motor,
-    TC: Controller<Velocity, Acceleration>,
-    RC: Controller<AngularVelocity, AngularAcceleration>,
+    ControllerType: Controller,
 {
     type Error = FailSafeError;
 
     fn track(&mut self, state: &RobotState, target: &Target) -> Result<(), Self::Error> {
-        let (left, right) = self.track_move(state, target)?;
-        self.left_motor.apply(left);
-        self.right_motor.apply(right);
-        Ok(())
-    }
-}
-
-// normalize angle to [-pi, pi].
-fn normalize_angle(angle: Angle) -> Angle {
-    use core::f32::consts::{PI, TAU};
-
-    let raw_angle = angle.value.rem_euclid(TAU);
-
-    Angle::new::<radian>(if raw_angle > PI {
-        raw_angle - TAU
-    } else {
-        raw_angle
-    })
-}
-
-// calculate sin(x)/x
-fn sinc(x: f32) -> f32 {
-    let xx = x * x;
-    let xxxx = xx * xx;
-    xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
-}
-
-impl<LM, RM, TC, RC> Tracker<LM, RM, TC, RC>
-where
-    LM: Motor,
-    RM: Motor,
-    TC: Controller<Velocity, Acceleration>,
-    RC: Controller<AngularVelocity, AngularAcceleration>,
-{
-    pub fn stop(&mut self)
-    where
-        LM: Motor,
-        RM: Motor,
-    {
-        self.left_motor.apply(Default::default());
-        self.right_motor.apply(Default::default());
-    }
-
-    fn fail_safe(&mut self, state: &RobotState, target: &Target) -> Result<(), FailSafeError> {
-        let x_diff = state.x.x - target.x.x;
-        let y_diff = state.y.x - target.y.x;
-
-        let distance =
-            Length::new::<uom::si::length::meter>((x_diff * x_diff + y_diff * y_diff).value.sqrt());
-        if distance >= self.fail_safe_distance {
-            Err(FailSafeError {
-                state: state.clone(),
-                target: target.clone(),
-            })
-        } else {
-            Ok(())
-        }
-    }
-
-    fn track_move(
-        &mut self,
-        state: &RobotState,
-        target: &Target,
-    ) -> Result<(ElectricPotential, ElectricPotential), FailSafeError> {
         self.fail_safe(state, target)?;
 
         let sin_th = state.theta.x.value.sin();
@@ -289,42 +188,81 @@ where
         };
 
         self.xi += self.period * dxi;
-        //calculate motor voltage
-        let vol_v = self.translation_controller.calculate(uv, duv, vv, va);
-        let vol_w = self
-            .rotation_controller
-            .calculate(uw, duw, state.theta.v, state.theta.a);
-        Ok((vol_v - vol_w, vol_v + vol_w))
+        self.controller.control(
+            &ControlTarget {
+                v: uv,
+                a: duv,
+                omega: uw,
+                alpha: duw,
+            },
+            &ControlTarget {
+                v: vv,
+                a: va,
+                omega: state.theta.v,
+                alpha: state.theta.a,
+            },
+        );
+        Ok(())
     }
 }
 
-pub struct TrackerBuilder<TC, RC, LM, RM> {
+// normalize angle to [-pi, pi].
+fn normalize_angle(angle: Angle) -> Angle {
+    use core::f32::consts::{PI, TAU};
+
+    let raw_angle = angle.value.rem_euclid(TAU);
+
+    Angle::new::<radian>(if raw_angle > PI {
+        raw_angle - TAU
+    } else {
+        raw_angle
+    })
+}
+
+// calculate sin(x)/x
+fn sinc(x: f32) -> f32 {
+    let xx = x * x;
+    let xxxx = xx * xx;
+    xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
+}
+
+impl<Controller> Tracker<Controller> {
+    fn fail_safe(&mut self, state: &RobotState, target: &Target) -> Result<(), FailSafeError> {
+        let x_diff = state.x.x - target.x.x;
+        let y_diff = state.y.x - target.y.x;
+
+        let distance =
+            Length::new::<uom::si::length::meter>((x_diff * x_diff + y_diff * y_diff).value.sqrt());
+        if distance >= self.fail_safe_distance {
+            Err(FailSafeError {
+                state: state.clone(),
+                target: target.clone(),
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub struct TrackerBuilder<Controller> {
     gain: Option<GainType>,
     dgain: Option<Frequency>,
     xi_threshold: Option<Velocity>,
-    translation_controller: Option<TC>,
-    rotation_controller: Option<RC>,
-    left_motor: Option<LM>,
-    right_motor: Option<RM>,
+    controller: Option<Controller>,
     period: Option<Time>,
-    xi: Option<Velocity>,
     fail_safe_distance: Option<Length>,
     zeta: Option<f32>,
     b: Option<BType>,
 }
 
-impl<TC, RC, LM, RM> TrackerBuilder<TC, RC, LM, RM> {
+impl<ControllerType> TrackerBuilder<ControllerType> {
     pub fn new() -> Self {
         Self {
             gain: None,
             dgain: None,
             xi_threshold: None,
-            translation_controller: None,
-            rotation_controller: None,
-            left_motor: None,
-            right_motor: None,
+            controller: None,
             period: None,
-            xi: Some(Default::default()),
             fail_safe_distance: None,
             zeta: None,
             b: None,
@@ -350,45 +288,16 @@ impl<TC, RC, LM, RM> TrackerBuilder<TC, RC, LM, RM> {
         self
     }
 
-    pub fn translation_controller(&mut self, translation_controller: TC) -> &mut Self
+    pub fn controller(&mut self, controller: ControllerType) -> &mut Self
     where
-        TC: Controller<Velocity, Acceleration>,
+        ControllerType: Controller,
     {
-        self.translation_controller = Some(translation_controller);
-        self
-    }
-
-    pub fn rotation_controller(&mut self, rotation_controller: RC) -> &mut Self
-    where
-        RC: Controller<AngularVelocity, AngularAcceleration>,
-    {
-        self.rotation_controller = Some(rotation_controller);
-        self
-    }
-
-    pub fn left_motor(&mut self, left_motor: LM) -> &mut Self
-    where
-        LM: Motor,
-    {
-        self.left_motor = Some(left_motor);
-        self
-    }
-
-    pub fn right_motor(&mut self, right_motor: RM) -> &mut Self
-    where
-        RM: Motor,
-    {
-        self.right_motor = Some(right_motor);
+        self.controller = Some(controller);
         self
     }
 
     pub fn period(&mut self, period: Time) -> &mut Self {
         self.period = Some(period);
-        self
-    }
-
-    pub fn initial_velocity(&mut self, xi: Velocity) -> &mut Self {
-        self.xi = Some(xi);
         self
     }
 
@@ -410,65 +319,39 @@ impl<TC, RC, LM, RM> TrackerBuilder<TC, RC, LM, RM> {
         self
     }
 
-    pub fn build(&mut self) -> Result<Tracker<LM, RM, TC, RC>, RequiredFieldEmptyError> {
+    pub fn build(&mut self) -> Result<Tracker<ControllerType>, RequiredFieldEmptyError> {
         Ok(Tracker {
-            gain: ok_or(self.gain, "gain")?,
-            dgain: ok_or(self.dgain, "dgain")?,
-            xi_threshold: ok_or(self.xi_threshold, "xi_threshold")?,
-            translation_controller: ok_or(
-                self.translation_controller.take(),
-                "translation_controller",
-            )?,
-            rotation_controller: ok_or(self.rotation_controller.take(), "rotation_controller")?,
-            left_motor: ok_or(self.left_motor.take(), "left_motor")?,
-            right_motor: ok_or(self.right_motor.take(), "right_motor")?,
-            period: ok_or(self.period, "period")?,
-            xi: self.xi.expect("Should never None"),
-            fail_safe_distance: ok_or(self.fail_safe_distance, "fail_safe_distance")?,
-            zeta: ok_or(self.zeta, "zeta")?,
-            b: ok_or(self.b, "b")?,
+            gain: get_or_err!(self.gain),
+            dgain: get_or_err!(self.dgain),
+            xi_threshold: get_or_err!(self.xi_threshold),
+            controller: get_or_err!(self.controller),
+            period: get_or_err!(self.period),
+            fail_safe_distance: get_or_err!(self.fail_safe_distance),
+            zeta: get_or_err!(self.zeta),
+            b: get_or_err!(self.b),
+            xi: Default::default(),
         })
-    }
-}
-
-impl<TC, RC, LM, RM> Default for TrackerBuilder<TC, RC, LM, RM> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uom::si::{
-        electric_potential::volt, length::meter, time::second, velocity::meter_per_second,
-    };
-
-    struct IMotor;
-
-    impl Motor for IMotor {
-        fn apply(&mut self, _voltage: ElectricPotential) {}
-    }
+    use uom::si::{length::meter, time::second, velocity::meter_per_second};
 
     struct IController;
 
-    impl<T, U> Controller<T, U> for IController {
-        fn calculate(&mut self, _: T, _: U, _: T, _: U) -> ElectricPotential {
-            ElectricPotential::new::<volt>(1.0)
-        }
+    impl Controller for IController {
+        fn control(&mut self, _r: &ControlTarget, _y: &ControlTarget) {}
     }
 
-    fn build_tracker() -> Tracker<IMotor, IMotor, IController, IController> {
-        TrackerBuilder::default()
+    fn build_tracker() -> Tracker<IController> {
+        TrackerBuilder::new()
             .gain(1.0)
             .dgain(1.0)
-            .initial_velocity(Velocity::new::<meter_per_second>(0.0))
             .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.001))
-            .right_motor(IMotor)
-            .left_motor(IMotor)
             .period(Time::new::<second>(0.001))
-            .translation_controller(IController)
-            .rotation_controller(IController)
+            .controller(IController)
             .low_zeta(1.0)
             .low_b(1e-3)
             .fail_safe_distance(Length::new::<meter>(0.02))

@@ -57,7 +57,7 @@ impl_from! {
 }
 
 impl_from! {
-    TrackerResource<LeftMotor, RightMotor> {
+    MultiSisoControllerResource<LeftMotor, RightMotor> {
         left_motor,
         right_motor,
     }
@@ -90,7 +90,7 @@ pub struct ResourceContainer<
     const N: usize,
 > {
     pub estimator: Option<EstimatorResource<LeftEncoder, RightEncoder, Imu>>,
-    pub tracker: Option<TrackerResource<LeftMotor, RightMotor>>,
+    pub controller: Option<MultiSisoControllerResource<LeftMotor, RightMotor>>,
     pub obstacle_detector: Option<ObstacleDetectorResource<DistanceSensor>>,
     pub wall_manager: Rc<WallManager<N>>,
 }
@@ -124,7 +124,7 @@ macro_rules! impl_as_mut {
 }
 
 impl_as_mut!(estimator: EstimatorResource<LeftEncoder, RightEncoder, Imu>);
-impl_as_mut!(tracker: TrackerResource<LeftMotor, RightMotor>);
+impl_as_mut!(controller: MultiSisoControllerResource<LeftMotor, RightMotor>);
 impl_as_mut!(obstacle_detector: ObstacleDetectorResource<DistanceSensor>);
 
 impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, const N: usize>
@@ -160,7 +160,7 @@ impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, cons
                 right_encoder,
                 imu,
             }),
-            tracker: Some(TrackerResource {
+            controller: Some(MultiSisoControllerResource {
                 left_motor,
                 right_motor,
             }),
