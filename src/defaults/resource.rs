@@ -20,13 +20,13 @@ pub struct Resource<
     DistanceSensor,
     const N: usize,
 > {
-    left_encoder: LeftEncoder,
-    right_encoder: RightEncoder,
-    imu: Imu,
-    left_motor: LeftMotor,
-    right_motor: RightMotor,
-    distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>,
-    wall_manager: Rc<WallManager<N>>,
+    pub left_encoder: LeftEncoder,
+    pub right_encoder: RightEncoder,
+    pub imu: Imu,
+    pub left_motor: LeftMotor,
+    pub right_motor: RightMotor,
+    pub distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>,
+    pub wall_manager: Rc<WallManager<N>>,
 }
 
 macro_rules! impl_from {
