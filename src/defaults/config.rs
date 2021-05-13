@@ -69,10 +69,8 @@ impl_with_getter! {
         ignore_radius_from_pillar: Length,
         #[serde(default = "default_ignore_length_from_wall")]
         ignore_length_from_wall: Length,
-        kx: f32,
-        kdx: f32,
-        ky: f32,
-        kdy: f32,
+        tracker_gain: f32,
+        tracker_dgain: f32,
         valid_control_lower_bound: Velocity,
         fail_safe_distance: Length,
         low_zeta: f32,
@@ -159,10 +157,8 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             wall_width,
             ignore_radius_from_pillar,
             ignore_length_from_wall,
-            kx,
-            kdx,
-            ky,
-            kdy,
+            tracker_gain,
+            tracker_dgain,
             valid_control_lower_bound,
             fail_safe_distance,
             low_zeta,
@@ -224,10 +220,8 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
                 slip_angle_const,
             },
             tracker: TrackerConfig {
-                kx,
-                kdx,
-                ky,
-                kdy,
+                gain: tracker_gain,
+                dgain: tracker_dgain,
                 period,
                 valid_control_lower_bound,
                 fail_safe_distance,
@@ -320,10 +314,8 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
 ///     .rotational_kd(0.0)
 ///     .rotational_model_gain(1.0)
 ///     .rotational_model_time_constant(Time::new::<second>(0.001))
-///     .tracker_kx(15.0)
-///     .tracker_kdx(4.0)
-///     .tracker_ky(15.0)
-///     .tracker_kdy(4.0)
+///     .tracker_gain(15.0)
+///     .tracker_dgain(4.0)
 ///     .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
 ///     .low_zeta(1.0)
 ///     .low_b(1e-3)
@@ -369,10 +361,8 @@ pub struct ConfigBuilder<const N: usize> {
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
     ignore_length_from_wall: Option<Length>,
-    kx: Option<f32>,
-    kdx: Option<f32>,
-    ky: Option<f32>,
-    kdy: Option<f32>,
+    tracker_gain: Option<f32>,
+    tracker_dgain: Option<f32>,
     valid_control_lower_bound: Option<Velocity>,
     fail_safe_distance: Option<Length>,
     low_zeta: Option<f32>,
@@ -553,22 +543,12 @@ impl<const N: usize> ConfigBuilder<N> {
     impl_setter!(
         /// **Required**,
         /// Sets a control gain for tracking.
-        tracker_kx: kx: f32
+        tracker_gain: f32
     );
     impl_setter!(
         /// **Required**,
         /// Sets a control gain for tracking.
-        tracker_kdx: kdx: f32
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets a control gain for tracking.
-        tracker_ky: ky: f32
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets a control gain for tracking.
-        tracker_kdy: kdy: f32
+        tracker_dgain: f32
     );
     impl_setter!(
         /// **Required**,
@@ -670,10 +650,8 @@ impl<const N: usize> ConfigBuilder<N> {
             wall_width: None,
             ignore_radius_from_pillar: None,
             ignore_length_from_wall: None,
-            kx: None,
-            kdx: None,
-            ky: None,
-            kdy: None,
+            tracker_gain: None,
+            tracker_dgain: None,
             valid_control_lower_bound: None,
             fail_safe_distance: None,
             low_zeta: None,
@@ -736,10 +714,8 @@ impl<const N: usize> ConfigBuilder<N> {
             ignore_length_from_wall: self
                 .ignore_length_from_wall
                 .unwrap_or(DEFAULT_IGNORE_LENGTH),
-            kx: get!(kx),
-            kdx: get!(kdx),
-            ky: get!(ky),
-            kdy: get!(kdy),
+            tracker_gain: get!(tracker_gain),
+            tracker_dgain: get!(tracker_dgain),
             valid_control_lower_bound: get!(valid_control_lower_bound),
             fail_safe_distance: get!(fail_safe_distance),
             low_zeta: get!(low_zeta),
@@ -803,10 +779,8 @@ mod tests {
             .rotational_kd(0.0)
             .rotational_model_gain(1.0)
             .rotational_model_time_constant(Time::new::<second>(0.001))
-            .tracker_kx(15.0)
-            .tracker_kdx(4.0)
-            .tracker_ky(15.0)
-            .tracker_kdy(4.0)
+            .tracker_gain(15.0)
+            .tracker_dgain(4.0)
             .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
             .low_zeta(1.0)
             .low_b(1e-3)
