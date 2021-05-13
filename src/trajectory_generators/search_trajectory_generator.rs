@@ -32,6 +32,7 @@ pub enum SearchKind {
     Back,
 }
 
+#[derive(Clone)]
 pub enum SearchTrajectory {
     Straight(StraightTrajectory),
     Slalom(SlalomTrajectory),
