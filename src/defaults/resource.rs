@@ -89,10 +89,10 @@ pub struct ResourceContainer<
     DistanceSensor,
     const N: usize,
 > {
-    estimator: Option<EstimatorResource<LeftEncoder, RightEncoder, Imu>>,
-    tracker: Option<TrackerResource<LeftMotor, RightMotor>>,
-    obstacle_detector: Option<ObstacleDetectorResource<DistanceSensor>>,
-    wall_manager: Rc<WallManager<N>>,
+    pub estimator: Option<EstimatorResource<LeftEncoder, RightEncoder, Imu>>,
+    pub tracker: Option<TrackerResource<LeftMotor, RightMotor>>,
+    pub obstacle_detector: Option<ObstacleDetectorResource<DistanceSensor>>,
+    pub wall_manager: Rc<WallManager<N>>,
 }
 
 macro_rules! impl_as_mut {
