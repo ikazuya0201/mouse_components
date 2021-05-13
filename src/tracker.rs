@@ -42,10 +42,8 @@ pub struct Tracker<
     TC = crate::controllers::TranslationalController,
     RC = crate::controllers::RotationalController,
 > {
-    kx: GainType,
-    kdx: Frequency,
-    ky: GainType,
-    kdy: Frequency,
+    gain: GainType,
+    dgain: Frequency,
     xi: Velocity,
     period: Time,
     xi_threshold: Velocity,
@@ -72,10 +70,8 @@ impl<LM, RM, TC, RC> Tracker<LM, RM, TC, RC> {
 /// Config for [Tracker].
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TrackerConfig {
-    pub kx: f32,
-    pub kdx: f32,
-    pub ky: f32,
-    pub kdy: f32,
+    pub gain: f32,
+    pub dgain: f32,
     pub period: Time,
     pub valid_control_lower_bound: Velocity,
     pub fail_safe_distance: Length,
@@ -113,10 +109,8 @@ where
             .rotation_controller(rotation_controller)
             .left_motor(left_motor)
             .right_motor(right_motor)
-            .kx(config.kx)
-            .kdx(config.kdx)
-            .ky(config.ky)
-            .kdy(config.kdy)
+            .gain(config.gain)
+            .dgain(config.dgain)
             .period(config.period)
             .valid_control_lower_bound(config.valid_control_lower_bound)
             .fail_safe_distance(config.fail_safe_distance)
@@ -242,14 +236,18 @@ where
         let va = state.x.a * cos_th + state.y.a * sin_th;
 
         //calculate control input for (x,y)
-        let ux =
-            target.x.a + self.kdx * (target.x.v - state.x.v) + self.kx * (target.x.x - state.x.x);
-        let uy =
-            target.y.a + self.kdy * (target.y.v - state.y.v) + self.ky * (target.y.x - state.y.x);
-        let dux =
-            target.x.j + self.kdx * (target.x.a - state.x.a) + self.kx * (target.x.v - state.x.v);
-        let duy =
-            target.y.j + self.kdy * (target.y.a - state.y.a) + self.ky * (target.y.v - state.y.v);
+        let ux = target.x.a
+            + self.dgain * (target.x.v - state.x.v)
+            + self.gain * (target.x.x - state.x.x);
+        let uy = target.y.a
+            + self.dgain * (target.y.v - state.y.v)
+            + self.gain * (target.y.x - state.y.x);
+        let dux = target.x.j
+            + self.dgain * (target.x.a - state.x.a)
+            + self.gain * (target.x.v - state.x.v);
+        let duy = target.y.j
+            + self.dgain * (target.y.a - state.y.a)
+            + self.gain * (target.y.v - state.y.v);
 
         let dxi = ux * cos_th + uy * sin_th;
         let (uv, uw, duv, duw) = if self.xi.abs() > self.xi_threshold {
@@ -301,10 +299,8 @@ where
 }
 
 pub struct TrackerBuilder<TC, RC, LM, RM> {
-    kx: Option<GainType>,
-    kdx: Option<Frequency>,
-    ky: Option<GainType>,
-    kdy: Option<Frequency>,
+    gain: Option<GainType>,
+    dgain: Option<Frequency>,
     xi_threshold: Option<Velocity>,
     translation_controller: Option<TC>,
     rotation_controller: Option<RC>,
@@ -320,10 +316,8 @@ pub struct TrackerBuilder<TC, RC, LM, RM> {
 impl<TC, RC, LM, RM> TrackerBuilder<TC, RC, LM, RM> {
     pub fn new() -> Self {
         Self {
-            kx: None,
-            kdx: None,
-            ky: None,
-            kdy: None,
+            gain: None,
+            dgain: None,
             xi_threshold: None,
             translation_controller: None,
             rotation_controller: None,
@@ -337,31 +331,17 @@ impl<TC, RC, LM, RM> TrackerBuilder<TC, RC, LM, RM> {
         }
     }
 
-    pub fn kx(&mut self, kx: f32) -> &mut Self {
-        self.kx = Some(GainType {
-            value: kx,
+    pub fn gain(&mut self, gain: f32) -> &mut Self {
+        self.gain = Some(GainType {
+            value: gain,
             dimension: PhantomData,
             units: PhantomData,
         });
         self
     }
 
-    pub fn kdx(&mut self, kdx: f32) -> &mut Self {
-        self.kdx = Some(Frequency::new::<hertz>(kdx));
-        self
-    }
-
-    pub fn ky(&mut self, ky: f32) -> &mut Self {
-        self.ky = Some(GainType {
-            value: ky,
-            dimension: PhantomData,
-            units: PhantomData,
-        });
-        self
-    }
-
-    pub fn kdy(&mut self, kdy: f32) -> &mut Self {
-        self.kdy = Some(Frequency::new::<hertz>(kdy));
+    pub fn dgain(&mut self, dgain: f32) -> &mut Self {
+        self.dgain = Some(Frequency::new::<hertz>(dgain));
         self
     }
 
@@ -432,10 +412,8 @@ impl<TC, RC, LM, RM> TrackerBuilder<TC, RC, LM, RM> {
 
     pub fn build(&mut self) -> Result<Tracker<LM, RM, TC, RC>, RequiredFieldEmptyError> {
         Ok(Tracker {
-            kx: ok_or(self.kx, "kx")?,
-            kdx: ok_or(self.kdx, "kdx")?,
-            ky: ok_or(self.ky, "ky")?,
-            kdy: ok_or(self.kdy, "kdy")?,
+            gain: ok_or(self.gain, "gain")?,
+            dgain: ok_or(self.dgain, "dgain")?,
             xi_threshold: ok_or(self.xi_threshold, "xi_threshold")?,
             translation_controller: ok_or(
                 self.translation_controller.take(),
@@ -482,10 +460,8 @@ mod tests {
 
     fn build_tracker() -> Tracker<IMotor, IMotor, IController, IController> {
         TrackerBuilder::default()
-            .kx(1.0)
-            .kdx(1.0)
-            .ky(1.0)
-            .kdy(1.0)
+            .gain(1.0)
+            .dgain(1.0)
             .initial_velocity(Velocity::new::<meter_per_second>(0.0))
             .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.001))
             .right_motor(IMotor)
