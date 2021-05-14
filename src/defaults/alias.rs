@@ -10,7 +10,7 @@ use crate::{
     nodes::{Node, RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
-    pattern_converters::LinearPatternConverter,
+    pattern_converters::DefaultPatternConverter,
     robot::Robot,
     tracker::Tracker,
     trajectory_generators::{
@@ -38,7 +38,7 @@ pub type SearchOperator<
         RunNode<N>,
         SearchNode<N>,
         SearchKind,
-        Maze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+        Maze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
     >,
     TrackingAgent<
         SearchTrajectoryManager<
@@ -66,7 +66,7 @@ pub type RunOperator<
 > = TrackingOperator<
     RunCommander<
         RunNode<N>,
-        CheckedMaze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
@@ -94,7 +94,7 @@ pub type ReturnSetupOperator<
 > = TrackingOperator<
     ReturnSetupCommander<
         RunNode<N>,
-        CheckedMaze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
@@ -122,7 +122,7 @@ pub type ReturnOperator<
 > = TrackingOperator<
     ReturnCommander<
         RunNode<N>,
-        CheckedMaze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
@@ -150,7 +150,7 @@ pub type RunSetupOperator<
 > = TrackingOperator<
     RunSetupCommander<
         RunNode<N>,
-        CheckedMaze<WallManager<N>, LinearPatternConverter<u16>, SearchNode<N>>,
+        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<

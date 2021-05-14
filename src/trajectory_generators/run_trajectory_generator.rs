@@ -57,13 +57,14 @@ where
         generator: Generator,
         period: Time,
         square_width: Length,
+        initial_velocity: Velocity,
     ) -> Self {
         let straight_generator =
             StraightTrajectoryGenerator::new(max_velocity, max_acceleration, max_jerk, period);
         let slalom_generator =
             SlalomGenerator::new(period, generator, max_velocity, max_acceleration, max_jerk);
         Self {
-            current_velocity: Mutex::new(Default::default()),
+            current_velocity: Mutex::new(initial_velocity),
             run_slalom_velocity,
             straight_generator,
             slalom_generator,
@@ -100,6 +101,7 @@ where
             DefaultSlalomParametersGenerator::new(config.square_width, config.front_offset),
             config.period,
             config.square_width,
+            Default::default(),
         )
     }
 }
@@ -187,6 +189,7 @@ pub struct RunTrajectoryGeneratorBuilder<Generator> {
     parameters_generator: Option<Generator>,
     period: Option<Time>,
     square_width: Option<Length>,
+    initial_velocity: Option<Velocity>,
 }
 
 impl<Generator> Default for RunTrajectoryGeneratorBuilder<Generator> {
@@ -205,6 +208,7 @@ impl<Generator> RunTrajectoryGeneratorBuilder<Generator> {
             parameters_generator: None,
             period: None,
             square_width: None,
+            initial_velocity: None,
         }
     }
 
@@ -220,6 +224,7 @@ impl<Generator> RunTrajectoryGeneratorBuilder<Generator> {
             get_or_err!(self.parameters_generator),
             get_or_err!(self.period),
             get_or_err!(self.square_width),
+            self.initial_velocity.unwrap_or(Default::default()),
         ))
     }
 
@@ -230,4 +235,5 @@ impl<Generator> RunTrajectoryGeneratorBuilder<Generator> {
     impl_setter!(period: Time);
     impl_setter!(parameters_generator: Generator);
     impl_setter!(square_width: Length);
+    impl_setter!(initial_velocity: Velocity);
 }
