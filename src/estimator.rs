@@ -1,5 +1,7 @@
 //! An implementation of [StateEstimator](crate::robot::StateEstimator).
 
+use core::marker::PhantomData;
+
 #[allow(unused_imports)]
 use micromath::F32Ext;
 use nb::block;
@@ -41,9 +43,16 @@ pub struct EstimatorInner {
     weight: f32,
     slip_angle_const: Acceleration,
     slip_angle: Angle,
+    approximation_threshold: AngularVelocity,
 }
 
 impl EstimatorInner {
+    pub const DEFAULT_APPROXIMATION_THRESHOLD: AngularVelocity = AngularVelocity {
+        value: 0.1,
+        dimension: PhantomData,
+        units: PhantomData,
+    };
+
     pub fn new(
         period: Time,
         alpha: f32,
@@ -51,6 +60,7 @@ impl EstimatorInner {
         correction_weight: f32,
         initial_state: RobotState,
         slip_angle_const: Acceleration,
+        approximation_threshold: AngularVelocity,
     ) -> Self {
         Self {
             period,
@@ -62,11 +72,10 @@ impl EstimatorInner {
             state: initial_state,
             slip_angle_const,
             slip_angle: Default::default(),
+            approximation_threshold,
         }
     }
-}
 
-impl EstimatorInner {
     pub fn estimate(
         &mut self,
         left_distance: Length,
@@ -100,7 +109,6 @@ impl EstimatorInner {
         //------
 
         //pose estimation
-        let trans_distance = self.trans_velocity * self.period;
         self.slip_angle = {
             let rev_period = 1.0 / self.period;
             Angle::from(
@@ -109,12 +117,21 @@ impl EstimatorInner {
             )
         };
 
-        self.state.theta.x += Angle::from(angular_velocity * self.period);
-        let theta_m = self.state.theta.x - self.slip_angle;
+        let dtheta = Angle::from(angular_velocity * self.period);
+        let trans_distance = if angular_velocity.abs() < self.approximation_threshold {
+            // straight approximation
+            self.trans_velocity * self.period
+        } else {
+            // arc approximation
+            2.0 * self.trans_velocity * (dtheta / 2.0).value.sin() / angular_velocity
+        };
+
+        let theta_m = self.state.theta.x - self.slip_angle + dtheta / 2.0;
         let sin_th = theta_m.value.sin();
         let cos_th = theta_m.value.cos();
         self.state.x.x += trans_distance * cos_th;
         self.state.y.x += trans_distance * sin_th;
+        self.state.theta.x += dtheta;
         //------
 
         self.state.x.v = self.trans_velocity * cos_th;
@@ -183,6 +200,7 @@ pub struct EstimatorConfig {
     pub wheel_interval: Option<Length>,
     pub correction_weight: f32,
     pub slip_angle_const: Acceleration,
+    pub approximation_threshold: AngularVelocity,
 }
 
 /// State for [Estimator].
@@ -227,6 +245,7 @@ where
             .period(config.period)
             .cut_off_frequency(config.cut_off_frequency)
             .slip_angle_const(config.slip_angle_const)
+            .approximation_threshold(config.approximation_threshold)
             .build()
             .expect("Should never panic")
     }
@@ -319,6 +338,7 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     wheel_interval: Option<Length>,
     correction_weight: Option<f32>,
     slip_angle_const: Option<Acceleration>,
+    approximation_threshold: Option<AngularVelocity>,
 }
 
 impl<LeftEncoder: Encoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
@@ -360,6 +380,7 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
             wheel_interval: None,
             correction_weight: None,
             slip_angle_const: None,
+            approximation_threshold: None,
         }
     }
 
@@ -392,6 +413,14 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
         self.slip_angle_const = Some(slip_angle_const);
         self
     }
+
+    pub fn approximation_threshold(
+        &mut self,
+        approximation_threshold: AngularVelocity,
+    ) -> &mut Self {
+        self.approximation_threshold = Some(approximation_threshold);
+        self
+    }
 }
 
 impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
@@ -411,6 +440,8 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
                 self.correction_weight.take().unwrap_or(0.0),
                 self.initial_state.take().unwrap_or(Default::default()),
                 get_or_err!(self.slip_angle_const),
+                self.approximation_threshold
+                    .unwrap_or(EstimatorInner::DEFAULT_APPROXIMATION_THRESHOLD),
             ),
             left_encoder: ok_or(self.left_encoder.take(), "left_encoder")?,
             right_encoder: ok_or(self.right_encoder.take(), "right_encoder")?,
