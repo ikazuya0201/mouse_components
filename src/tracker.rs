@@ -9,10 +9,7 @@ use micromath::F32Ext;
 use serde::{Deserialize, Serialize};
 use uom::si::{
     angle::radian,
-    f32::{
-        Acceleration, Angle, AngularAcceleration, AngularVelocity, Frequency, Length, Time,
-        Velocity,
-    },
+    f32::{Acceleration, Angle, AngularAcceleration, AngularVelocity, Frequency, Time, Velocity},
     frequency::hertz,
     Quantity, ISQ, SI,
 };
@@ -37,7 +34,9 @@ pub struct ControlTarget {
 }
 
 pub trait Controller {
-    fn control(&mut self, r: &ControlTarget, y: &ControlTarget);
+    type Error;
+
+    fn control(&mut self, r: &ControlTarget, y: &ControlTarget) -> Result<(), Self::Error>;
 }
 
 /// An implementation of [Tracker](crate::robot::Tracker).
@@ -47,7 +46,6 @@ pub struct Tracker<Controller> {
     xi: Velocity,
     period: Time,
     xi_threshold: Velocity,
-    fail_safe_distance: Length,
     controller: Controller,
     zeta: f32,
     b: BType,
@@ -67,7 +65,6 @@ pub struct TrackerConfig {
     pub dgain: f32,
     pub period: Time,
     pub valid_control_lower_bound: Velocity,
-    pub fail_safe_distance: Length,
     pub low_zeta: f32,
     pub low_b: f32,
 }
@@ -87,7 +84,6 @@ where
             .dgain(config.dgain)
             .period(config.period)
             .valid_control_lower_bound(config.valid_control_lower_bound)
-            .fail_safe_distance(config.fail_safe_distance)
             .low_zeta(config.low_zeta)
             .low_b(config.low_b)
             .build()
@@ -112,22 +108,13 @@ impl<Controller> core::fmt::Debug for Tracker<Controller> {
     }
 }
 
-/// Error on [Tracker](Tracker).
-#[derive(Clone, PartialEq, Debug)]
-pub struct FailSafeError {
-    state: RobotState,
-    target: Target,
-}
-
 impl<ControllerType> ITracker<RobotState, Target> for Tracker<ControllerType>
 where
     ControllerType: Controller,
 {
-    type Error = FailSafeError;
+    type Error = ControllerType::Error;
 
     fn track(&mut self, state: &RobotState, target: &Target) -> Result<(), Self::Error> {
-        self.fail_safe(state, target)?;
-
         let sin_th = state.theta.x.value.sin();
         let cos_th = state.theta.x.value.cos();
 
@@ -201,8 +188,7 @@ where
                 omega: state.theta.v,
                 alpha: state.theta.a,
             },
-        );
-        Ok(())
+        )
     }
 }
 
@@ -226,31 +212,12 @@ fn sinc(x: f32) -> f32 {
     xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
 }
 
-impl<Controller> Tracker<Controller> {
-    fn fail_safe(&mut self, state: &RobotState, target: &Target) -> Result<(), FailSafeError> {
-        let x_diff = state.x.x - target.x.x;
-        let y_diff = state.y.x - target.y.x;
-
-        let distance =
-            Length::new::<uom::si::length::meter>((x_diff * x_diff + y_diff * y_diff).value.sqrt());
-        if distance >= self.fail_safe_distance {
-            Err(FailSafeError {
-                state: state.clone(),
-                target: target.clone(),
-            })
-        } else {
-            Ok(())
-        }
-    }
-}
-
 pub struct TrackerBuilder<Controller> {
     gain: Option<GainType>,
     dgain: Option<Frequency>,
     xi_threshold: Option<Velocity>,
     controller: Option<Controller>,
     period: Option<Time>,
-    fail_safe_distance: Option<Length>,
     zeta: Option<f32>,
     b: Option<BType>,
 }
@@ -263,7 +230,6 @@ impl<ControllerType> TrackerBuilder<ControllerType> {
             xi_threshold: None,
             controller: None,
             period: None,
-            fail_safe_distance: None,
             zeta: None,
             b: None,
         }
@@ -301,11 +267,6 @@ impl<ControllerType> TrackerBuilder<ControllerType> {
         self
     }
 
-    pub fn fail_safe_distance(&mut self, fail_safe_distance: Length) -> &mut Self {
-        self.fail_safe_distance = Some(fail_safe_distance);
-        self
-    }
-
     pub fn low_zeta(&mut self, zeta: f32) -> &mut Self {
         self.zeta = Some(zeta);
         self
@@ -326,7 +287,6 @@ impl<ControllerType> TrackerBuilder<ControllerType> {
             xi_threshold: get_or_err!(self.xi_threshold),
             controller: get_or_err!(self.controller),
             period: get_or_err!(self.period),
-            fail_safe_distance: get_or_err!(self.fail_safe_distance),
             zeta: get_or_err!(self.zeta),
             b: get_or_err!(self.b),
             xi: Default::default(),
@@ -337,12 +297,16 @@ impl<ControllerType> TrackerBuilder<ControllerType> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uom::si::{length::meter, time::second, velocity::meter_per_second};
+    use uom::si::{time::second, velocity::meter_per_second};
 
     struct IController;
 
     impl Controller for IController {
-        fn control(&mut self, _r: &ControlTarget, _y: &ControlTarget) {}
+        type Error = core::convert::Infallible;
+
+        fn control(&mut self, _r: &ControlTarget, _y: &ControlTarget) -> Result<(), Self::Error> {
+            Ok(())
+        }
     }
 
     fn build_tracker() -> Tracker<IController> {
@@ -354,7 +318,6 @@ mod tests {
             .controller(IController)
             .low_zeta(1.0)
             .low_b(1e-3)
-            .fail_safe_distance(Length::new::<meter>(0.02))
             .build()
             .unwrap()
     }

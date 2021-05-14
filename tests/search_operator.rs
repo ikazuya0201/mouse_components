@@ -74,10 +74,10 @@ macro_rules! impl_search_operator_test {
                     },
                 };
                 let period = Time::new::<millisecond>(1.0);
-                let trans_model_gain = 1.0;
-                let trans_model_time_constant = Time::new::<second>(0.3694);
-                let rot_model_gain = 10.0;
-                let rot_model_time_constant = Time::new::<second>(0.1499);
+                let trans_model_k = 1.0;
+                let trans_model_t1 = Time::new::<second>(0.3694);
+                let rot_model_k = 10.0;
+                let rot_model_t1 = Time::new::<second>(0.1499);
                 let existence_threshold = Probability::new(0.1).unwrap();
                 let wheel_interval = Length::new::<millimeter>(33.5);
 
@@ -93,10 +93,10 @@ macro_rules! impl_search_operator_test {
                 let simulator = AgentSimulator::new(
                     start_state.clone(),
                     period,
-                    trans_model_gain,
-                    trans_model_time_constant,
-                    rot_model_gain,
-                    rot_model_time_constant,
+                    trans_model_k,
+                    trans_model_t1,
+                    rot_model_k,
+                    rot_model_t1,
                     WallManager::<N>::with_str(existence_threshold, input_str),
                     distance_sensors_poses,
                 );
@@ -147,28 +147,28 @@ macro_rules! impl_search_operator_test {
                                     kp: 1.0,
                                     ki: 0.05,
                                     kd: 0.01,
-                                    model_k: trans_model_gain,
-                                    model_t1: trans_model_time_constant.value,
+                                    model_k: trans_model_k,
+                                    model_t1: trans_model_t1.value,
                                 },
                                 ControlParameters {
                                     kp: 1.0,
                                     ki: 0.2,
-                                    kd: 0.01,
-                                    model_k: rot_model_gain,
-                                    model_t1: rot_model_time_constant.value,
+                                    kd: 0.0,
+                                    model_k: rot_model_k,
+                                    model_t1: rot_model_t1.value,
                                 },
                                 period,
+                                ElectricPotential::new::<volt>(10.0),
                             );
 
                             let tracker = TrackerBuilder::new()
                                 .period(period)
-                                .gain(15.0)
+                                .gain(40.0)
                                 .dgain(4.0)
-                                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.05))
+                                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.2))
                                 .controller(controller)
                                 .low_zeta(1.0)
-                                .low_b(1e-3)
-                                .fail_safe_distance(Length::new::<meter>(0.05))
+                                .low_b(1.0)
                                 .build()
                                 .unwrap();
 
@@ -193,23 +193,23 @@ macro_rules! impl_search_operator_test {
                         Robot::new(estimator, tracker, wall_detector)
                     };
 
-                    let search_velocity = Velocity::new::<meter_per_second>(0.12);
+                    let search_velocity = Velocity::new::<meter_per_second>(0.3);
 
                     let trajectory_generator = SearchTrajectoryGeneratorBuilder::default()
                         .period(period)
-                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(20.0))
-                        .max_jerk(Jerk::new::<meter_per_second_cubed>(40.0))
+                        .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
+                        .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
                         .search_velocity(search_velocity)
                         .parameters_generator(DefaultSlalomParametersGenerator::new(
                             square_width,
                             front_offset,
                         ))
                         .front_offset(front_offset)
-                        .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(180.0))
+                        .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(1440.0))
                         .spin_angular_acceleration(AngularAcceleration::new::<
                             degree_per_second_squared,
-                        >(1800.0))
-                        .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
+                        >(14400.0))
+                        .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(28800.0))
                         .build()
                         .expect("Should never panic");
 

@@ -116,6 +116,12 @@ where
                     .unwrap_or(current_pose);
                 let sin_th = machine_pose.theta.value.sin();
                 let cos_th = machine_pose.theta.value.cos();
+
+                debug_assert!(!machine_pose.x.is_nan());
+                debug_assert!(!machine_pose.y.is_nan());
+                debug_assert!(!sensor_pose.x.is_nan());
+                debug_assert!(!sensor_pose.y.is_nan());
+
                 let x = machine_pose.x + sensor_pose.x * cos_th - sensor_pose.y * sin_th;
                 let y = machine_pose.y + sensor_pose.x * sin_th + sensor_pose.y * cos_th;
                 let theta = machine_pose.theta + sensor_pose.theta;

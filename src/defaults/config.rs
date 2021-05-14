@@ -3,8 +3,8 @@
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 use uom::si::f32::{
-    Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, Frequency, Jerk, Length, Time,
-    Velocity,
+    Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, ElectricPotential, Frequency,
+    Jerk, Length, Time, Velocity,
 };
 
 use crate::commanders::GOAL_SIZE_UPPER_BOUND;
@@ -62,7 +62,6 @@ impl_with_getter! {
         tracker_gain: f32,
         tracker_dgain: f32,
         valid_control_lower_bound: Velocity,
-        fail_safe_distance: Length,
         low_zeta: f32,
         low_b: f32,
         run_slalom_velocity: Velocity,
@@ -75,6 +74,7 @@ impl_with_getter! {
         spin_angular_jerk: AngularJerk,
         slip_angle_const: Acceleration,
         estimator_approximation_threshold: AngularVelocity,
+        fail_safe_voltage_threshold: ElectricPotential,
     }
 }
 
@@ -140,7 +140,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             tracker_gain,
             tracker_dgain,
             valid_control_lower_bound,
-            fail_safe_distance,
             low_zeta,
             low_b,
             run_slalom_velocity,
@@ -153,6 +152,7 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             spin_angular_jerk,
             slip_angle_const,
             estimator_approximation_threshold,
+            fail_safe_voltage_threshold,
         } = self;
         ConfigContainer {
             command_converter: CommandConverterConfig {
@@ -181,6 +181,7 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
                 period,
                 translational_parameters,
                 rotational_parameters,
+                fail_safe_voltage_threshold,
             },
             estimator: EstimatorConfig {
                 period,
@@ -193,7 +194,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
                 dgain: tracker_dgain,
                 period,
                 valid_control_lower_bound,
-                fail_safe_distance,
                 low_zeta,
                 low_b,
             },
@@ -241,13 +241,13 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
 /// use typenum::*;
 /// use uom::si::f32::{
 ///     Length, Velocity, Acceleration, Jerk, AngularVelocity, AngularAcceleration, AngularJerk,
-///     Time, Frequency,
+///     Time, Frequency, ElectricPotential,
 /// };
 /// use uom::si::{
 ///     acceleration::meter_per_second_squared,
 ///     angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
 ///     angular_velocity::degree_per_second, jerk::meter_per_second_cubed, length::meter,
-///     time::second, velocity::meter_per_second, frequency::hertz,
+///     time::second, velocity::meter_per_second, frequency::hertz, electric_potential::volt,
 /// };
 /// use components::nodes::RunNode;
 /// use components::types::data::{AbsoluteDirection, Pattern, SearchKind, ControlParameters};
@@ -291,7 +291,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
 ///     .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
 ///     .low_zeta(1.0)
 ///     .low_b(1e-3)
-///     .fail_safe_distance(uom::si::f32::Length::new::<meter>(0.05))
 ///     .search_velocity(Velocity::new::<meter_per_second>(0.12))
 ///     .max_velocity(Velocity::new::<meter_per_second>(2.0))
 ///     .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))
@@ -303,6 +302,7 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
 ///     .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
 ///     .run_slalom_velocity(Velocity::new::<meter_per_second>(1.0))
 ///     .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
+///     .fail_safe_voltage_threshold(ElectricPotential::new::<volt>(4.0))
 ///     .build()
 ///     .unwrap();
 /// ```
@@ -326,7 +326,6 @@ pub struct ConfigBuilder<const N: usize> {
     tracker_gain: Option<f32>,
     tracker_dgain: Option<f32>,
     valid_control_lower_bound: Option<Velocity>,
-    fail_safe_distance: Option<Length>,
     low_zeta: Option<f32>,
     low_b: Option<f32>,
     run_slalom_velocity: Option<Velocity>,
@@ -339,6 +338,7 @@ pub struct ConfigBuilder<const N: usize> {
     spin_angular_jerk: Option<AngularJerk>,
     slip_angle_const: Option<Acceleration>,
     estimator_approximation_threshold: Option<AngularVelocity>,
+    fail_safe_voltage_threshold: Option<ElectricPotential>,
 }
 
 impl<const N: usize> ConfigBuilder<N> {
@@ -451,14 +451,6 @@ impl<const N: usize> ConfigBuilder<N> {
     );
     impl_setter!(
         /// **Required**,
-        /// Sets the fail safe distance.
-        ///
-        /// [Tracker](crate::tracker::Tracker) fails when the length between the target and the
-        /// estimated state exceed this value.
-        fail_safe_distance: Length
-    );
-    impl_setter!(
-        /// **Required**,
         /// Sets a control value for the algorithm in low velocity.
         low_zeta: f32
     );
@@ -522,6 +514,13 @@ impl<const N: usize> ConfigBuilder<N> {
         /// approximation. Otherwise, it uses arc approximation.
         estimator_approximation_threshold: AngularVelocity
     );
+    impl_setter!(
+        /// **Required**,
+        /// Sets the threshold for fail-safe.
+        /// If a voltage applied to a motor is larger than this threshold, controller returns error
+        /// and stops all motors.
+        fail_safe_voltage_threshold: ElectricPotential
+    );
 
     /// Generates new builder whose values are set as None.
     pub fn new() -> Self {
@@ -544,7 +543,6 @@ impl<const N: usize> ConfigBuilder<N> {
             tracker_gain: None,
             tracker_dgain: None,
             valid_control_lower_bound: None,
-            fail_safe_distance: None,
             low_zeta: None,
             low_b: None,
             run_slalom_velocity: None,
@@ -557,6 +555,7 @@ impl<const N: usize> ConfigBuilder<N> {
             spin_angular_jerk: None,
             slip_angle_const: None,
             estimator_approximation_threshold: None,
+            fail_safe_voltage_threshold: None,
         }
     }
 
@@ -597,7 +596,6 @@ impl<const N: usize> ConfigBuilder<N> {
             tracker_gain: get!(tracker_gain),
             tracker_dgain: get!(tracker_dgain),
             valid_control_lower_bound: get!(valid_control_lower_bound),
-            fail_safe_distance: get!(fail_safe_distance),
             low_zeta: get!(low_zeta),
             low_b: get!(low_b),
             run_slalom_velocity: get!(run_slalom_velocity),
@@ -612,6 +610,7 @@ impl<const N: usize> ConfigBuilder<N> {
             estimator_approximation_threshold: self
                 .estimator_approximation_threshold
                 .unwrap_or(crate::estimator::EstimatorInner::DEFAULT_APPROXIMATION_THRESHOLD),
+            fail_safe_voltage_threshold: get!(fail_safe_voltage_threshold),
         })
     }
 }
@@ -627,8 +626,8 @@ mod tests {
         use uom::si::{
             acceleration::meter_per_second_squared,
             angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
-            angular_velocity::degree_per_second, frequency::hertz, jerk::meter_per_second_cubed,
-            length::meter, time::second, velocity::meter_per_second,
+            angular_velocity::degree_per_second, electric_potential::volt, frequency::hertz,
+            jerk::meter_per_second_cubed, time::second, velocity::meter_per_second,
         };
 
         use crate::types::data::AbsoluteDirection;
@@ -670,7 +669,7 @@ mod tests {
             .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
             .low_zeta(1.0)
             .low_b(1e-3)
-            .fail_safe_distance(uom::si::f32::Length::new::<meter>(0.05))
+            .fail_safe_voltage_threshold(ElectricPotential::new::<volt>(4.0))
             .search_velocity(Velocity::new::<meter_per_second>(0.12))
             .max_velocity(Velocity::new::<meter_per_second>(2.0))
             .max_acceleration(Acceleration::new::<meter_per_second_squared>(0.7))

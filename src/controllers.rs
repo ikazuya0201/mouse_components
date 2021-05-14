@@ -93,6 +93,7 @@ pub struct MultiSisoController<LeftMotor, RightMotor> {
     right_motor: RightMotor,
     translational_controller: SisoController<Length>,
     rotational_controller: SisoController<Ratio>,
+    fail_safe_voltage_threshold: ElectricPotential,
 }
 
 impl<LeftMotor, RightMotor> MultiSisoController<LeftMotor, RightMotor> {
@@ -102,6 +103,7 @@ impl<LeftMotor, RightMotor> MultiSisoController<LeftMotor, RightMotor> {
         trans_param: ControlParameters,
         rot_param: ControlParameters,
         period: Time,
+        fail_safe_voltage_threshold: ElectricPotential,
     ) -> Self {
         Self {
             left_motor,
@@ -154,6 +156,7 @@ impl<LeftMotor, RightMotor> MultiSisoController<LeftMotor, RightMotor> {
                 },
                 period,
             },
+            fail_safe_voltage_threshold,
         }
     }
 
@@ -167,12 +170,21 @@ impl<LeftMotor, RightMotor> MultiSisoController<LeftMotor, RightMotor> {
     }
 }
 
+/// Error on fail-safe.
+#[derive(Clone, PartialEq, Debug)]
+pub struct FailSafeError {
+    left_motor_voltage: ElectricPotential,
+    right_motor_voltage: ElectricPotential,
+}
+
 impl<LeftMotor, RightMotor> Controller for MultiSisoController<LeftMotor, RightMotor>
 where
     LeftMotor: Motor,
     RightMotor: Motor,
 {
-    fn control(&mut self, r: &ControlTarget, y: &ControlTarget) {
+    type Error = FailSafeError;
+
+    fn control(&mut self, r: &ControlTarget, y: &ControlTarget) -> Result<(), Self::Error> {
         let vol_t = self.translational_controller.calculate(r.v, r.a, y.v, y.a);
         let vol_r = self.rotational_controller.calculate(
             r.omega.into(),
@@ -180,8 +192,22 @@ where
             y.omega.into(),
             y.alpha.into(),
         );
+        let left_motor_voltage = vol_t - vol_r;
+        let right_motor_voltage = vol_t + vol_r;
+        if left_motor_voltage.abs() > self.fail_safe_voltage_threshold
+            || right_motor_voltage.abs() > self.fail_safe_voltage_threshold
+        {
+            // stop motor
+            self.left_motor.apply(Default::default());
+            self.right_motor.apply(Default::default());
+            return Err(FailSafeError {
+                left_motor_voltage,
+                right_motor_voltage,
+            });
+        }
         self.left_motor.apply(vol_t - vol_r);
         self.right_motor.apply(vol_t + vol_r);
+        Ok(())
     }
 }
 
@@ -191,6 +217,7 @@ pub struct MultiSisoControllerConfig {
     pub translational_parameters: ControlParameters,
     pub rotational_parameters: ControlParameters,
     pub period: Time,
+    pub fail_safe_voltage_threshold: ElectricPotential,
 }
 
 /// Resource for [MultiSisoController].
@@ -217,6 +244,7 @@ where
             config.translational_parameters.clone(),
             config.rotational_parameters.clone(),
             config.period,
+            config.fail_safe_voltage_threshold,
         )
     }
 }
