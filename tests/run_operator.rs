@@ -149,7 +149,6 @@ macro_rules! impl_run_operator_test {
                             .period(period)
                             .cut_off_frequency(Frequency::new::<hertz>(50.0))
                             .initial_state(start_state)
-                            .wheel_interval(Some(wheel_interval))
                             .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
                             .build()
                             .unwrap()

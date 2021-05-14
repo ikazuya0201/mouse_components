@@ -1,4 +1,4 @@
-//! An implementation of [StateEstimator](crate::robot::StateEstimator).
+//! An implementation of [Estimator](crate::robot::Estimator).
 
 use core::marker::PhantomData;
 
@@ -14,10 +14,9 @@ use uom::si::{
     ratio::ratio,
 };
 
-use crate::robot::StateEstimator;
+use crate::robot::Estimator as IEstimator;
 use crate::tracker::RobotState;
 use crate::utils::builder::{ok_or, BuilderResult};
-use crate::wall_detector::CorrectInfo;
 use crate::{get_or_err, Construct, Deconstruct};
 
 pub trait IMU {
@@ -37,10 +36,7 @@ pub struct EstimatorInner {
     period: Time,
     alpha: f32,
     trans_velocity: Velocity,
-    bias: AngularVelocity,
-    wheel_interval: Option<Length>,
     state: RobotState,
-    weight: f32,
     slip_angle_const: Acceleration,
     slip_angle: Angle,
     approximation_threshold: AngularVelocity,
@@ -56,8 +52,6 @@ impl EstimatorInner {
     pub fn new(
         period: Time,
         alpha: f32,
-        wheel_interval: Option<Length>,
-        correction_weight: f32,
         initial_state: RobotState,
         slip_angle_const: Acceleration,
         approximation_threshold: AngularVelocity,
@@ -65,10 +59,7 @@ impl EstimatorInner {
         Self {
             period,
             alpha,
-            wheel_interval,
-            weight: correction_weight,
             trans_velocity: Default::default(),
-            bias: Default::default(),
             state: initial_state,
             slip_angle_const,
             slip_angle: Default::default(),
@@ -88,19 +79,6 @@ impl EstimatorInner {
         let average_right_velocity = right_distance / self.period;
 
         let average_trans_velocity = (average_left_velocity + average_right_velocity) / 2.0;
-
-        let angular_velocity = if let Some(wheel_interval) = self.wheel_interval {
-            let average_angular_velocity = AngularVelocity::from(
-                (average_right_velocity - average_left_velocity) / wheel_interval,
-            );
-
-            self.bias = self.alpha * self.bias
-                + (1.0 - self.alpha) * (angular_velocity - average_angular_velocity);
-
-            angular_velocity - self.bias
-        } else {
-            angular_velocity
-        };
 
         //complementary filter
         self.trans_velocity = self.alpha
@@ -143,22 +121,9 @@ impl EstimatorInner {
             AngularAcceleration::from((angular_velocity - self.state.theta.v) / self.period);
         self.state.theta.v = angular_velocity;
     }
-
-    fn correct_state<Infos: IntoIterator<Item = CorrectInfo>>(&mut self, infos: Infos) {
-        let mut sum_x = Length::default();
-        let mut sum_y = Length::default();
-        for info in infos {
-            let sin = info.obstacle.source.theta.value.sin();
-            let cos = info.obstacle.source.theta.value.cos();
-            sum_x += info.diff_from_expected * cos;
-            sum_y += info.diff_from_expected * sin;
-        }
-        self.state.x.x -= self.weight * sum_x;
-        self.state.y.x -= self.weight * sum_y;
-    }
 }
 
-/// An implementation of [StateEstimator](crate::robot::StateEstimator).
+/// An implementation of [Estimator](crate::robot::Estimator).
 ///
 /// This should be created by [EstimatorBuilder](EstimatorBuilder).
 pub struct Estimator<LE, RE, I> {
@@ -172,8 +137,8 @@ impl<LE, RE, I> core::fmt::Debug for Estimator<LE, RE, I> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(
             f,
-            "Estimator {{ state:{:?}, trans_velocity:{:?}, angular_velocity:{:?}, bias:{:?} }}",
-            self.inner.state, self.inner.trans_velocity, self.inner.state.theta.v, self.inner.bias,
+            "Estimator {{ state:{:?}, trans_velocity:{:?}, angular_velocity:{:?} }}",
+            self.inner.state, self.inner.trans_velocity, self.inner.state.theta.v,
         )
     }
 }
@@ -197,8 +162,6 @@ impl<LE, RE, I> Estimator<LE, RE, I> {
 pub struct EstimatorConfig {
     pub period: Time,
     pub cut_off_frequency: Frequency,
-    pub wheel_interval: Option<Length>,
-    pub correction_weight: f32,
     pub slip_angle_const: Acceleration,
     pub approximation_threshold: AngularVelocity,
 }
@@ -240,8 +203,6 @@ where
             .right_encoder(right_encoder)
             .imu(imu)
             .initial_state(state.robot_state.clone())
-            .correction_weight(config.correction_weight)
-            .wheel_interval(config.wheel_interval)
             .period(config.period)
             .cut_off_frequency(config.cut_off_frequency)
             .slip_angle_const(config.slip_angle_const)
@@ -271,7 +232,7 @@ where
     }
 }
 
-impl<LE, RE, I> StateEstimator<CorrectInfo> for Estimator<LE, RE, I>
+impl<LE, RE, I> IEstimator for Estimator<LE, RE, I>
 where
     LE: Encoder,
     RE: Encoder,
@@ -301,10 +262,6 @@ where
             imu_angular_velocity,
         )
     }
-
-    fn correct_state<Infos: IntoIterator<Item = CorrectInfo>>(&mut self, infos: Infos) {
-        self.inner.correct_state(infos)
-    }
 }
 
 //TODO: Use a testable example.
@@ -323,7 +280,6 @@ where
 ///     .imu(imu)
 ///     .period(Time::new::<second>(0.001))
 ///     .cut_off_frequency(Frequency::new::<hertz>(50.0))
-///     .wheel_interval(Length::new::<meter>(0.035))
 ///     .correction_weight(0.1)
 ///     .build::<Math>()
 ///     .unwrap();
@@ -335,8 +291,6 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     period: Option<Time>,
     cut_off_frequency: Option<Frequency>,
     initial_state: Option<RobotState>,
-    wheel_interval: Option<Length>,
-    correction_weight: Option<f32>,
     slip_angle_const: Option<Acceleration>,
     approximation_threshold: Option<AngularVelocity>,
 }
@@ -377,8 +331,6 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
             period: None,
             cut_off_frequency: None,
             initial_state: None,
-            wheel_interval: None,
-            correction_weight: None,
             slip_angle_const: None,
             approximation_threshold: None,
         }
@@ -396,16 +348,6 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
 
     pub fn initial_state(&mut self, initial_state: RobotState) -> &mut Self {
         self.initial_state = Some(initial_state);
-        self
-    }
-
-    pub fn wheel_interval(&mut self, wheel_interval: Option<Length>) -> &mut Self {
-        self.wheel_interval = wheel_interval;
-        self
-    }
-
-    pub fn correction_weight(&mut self, weight: f32) -> &mut Self {
-        self.correction_weight = Some(weight);
         self
     }
 
@@ -436,8 +378,6 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
             inner: EstimatorInner::new(
                 period,
                 alpha,
-                self.wheel_interval.take(),
-                self.correction_weight.take().unwrap_or(0.0),
                 self.initial_state.take().unwrap_or(Default::default()),
                 get_or_err!(self.slip_angle_const),
                 self.approximation_threshold
@@ -472,7 +412,7 @@ mod tests {
         jerk::meter_per_second_cubed, length::meter, velocity::meter_per_second,
     };
 
-    const EPSILON: f32 = 1e-2;
+    const EPSILON: f32 = 2e-2;
 
     struct AgentSimulator<T> {
         inner: Rc<RefCell<AgentSimulatorInner<T>>>,
@@ -644,7 +584,6 @@ mod tests {
                     .imu(imu)
                     .period(PERIOD)
                     .cut_off_frequency(Frequency::new::<hertz>(50.0))
-                    .wheel_interval(Some(wheel_interval))
                     .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
                     .build()
                     .unwrap();
