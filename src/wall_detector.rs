@@ -15,19 +15,11 @@ use crate::robot::WallDetector as IWallDetector;
 use crate::types::data::{Obstacle, Pose};
 use crate::utils::{
     builder::{ok_or, BuilderResult},
-    forced_vec::ForcedVec,
     probability::Probability,
     total::Total,
 };
 use crate::wall_manager::Wall;
 use crate::{Construct, Deconstruct, Merge};
-
-/// An info for corrects the state of robot.
-#[derive(Debug, Clone)]
-pub struct CorrectInfo {
-    pub obstacle: Obstacle,
-    pub diff_from_expected: Length,
-}
 
 /// An info for wall state.
 pub struct WallInfo<Wall> {
@@ -120,35 +112,21 @@ where
     }
 }
 
-const OBSTACLE_SIZE_UPPER_BOUND: usize = 6;
-
 impl<Manager, Detector, State, const N: usize> IWallDetector<State>
     for WallDetector<Manager, Detector, N>
 where
     Manager: WallProbabilityManager<Wall<N>>,
     Detector: ObstacleDetector<State, Obstacle = Obstacle>,
 {
-    type Info = CorrectInfo;
-    type Infos = Vec<CorrectInfo, OBSTACLE_SIZE_UPPER_BOUND>;
-
-    fn detect_and_update(&mut self, state: &State) -> Self::Infos {
+    fn detect_and_update(&mut self, state: &State) {
         use uom::si::ratio::ratio;
 
         let obstacles = self.detector.detect(state);
 
-        let mut infos = ForcedVec::new();
         for obstacle in obstacles {
             if let Ok(wall_info) = self.converter.convert(&obstacle.source) {
                 if let Ok(existence) = self.manager.try_existence_probability(&wall_info.wall) {
-                    if existence.is_zero() {
-                        continue;
-                    } else if existence.is_one() {
-                        let diff_from_expected =
-                            obstacle.distance.mean - wall_info.existing_distance;
-                        infos.push(CorrectInfo {
-                            obstacle,
-                            diff_from_expected,
-                        });
+                    if existence.is_zero() || existence.is_one() {
                         continue;
                     }
 
@@ -190,7 +168,6 @@ where
                 }
             }
         }
-        infos.into()
     }
 }
 

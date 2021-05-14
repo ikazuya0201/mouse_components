@@ -6,12 +6,11 @@ use crate::agents::Robot as IRobot;
 use crate::{Construct, Deconstruct, Merge};
 
 /// A trait that estimates the state of robot.
-pub trait StateEstimator<Info> {
+pub trait StateEstimator {
     type State;
 
     fn estimate(&mut self);
     fn state(&self) -> &Self::State;
-    fn correct_state<Infos: IntoIterator<Item = Info>>(&mut self, infos: Infos);
 }
 
 /// A trait that tracks the given target with the given robot state.
@@ -24,10 +23,7 @@ pub trait Tracker<State, Target> {
 /// A trait that detects obstacles, updates the states of wall and gives feedbacks for state
 /// estimation.
 pub trait WallDetector<State> {
-    type Info;
-    type Infos: IntoIterator<Item = Self::Info>;
-
-    fn detect_and_update(&mut self, state: &State) -> Self::Infos;
+    fn detect_and_update(&mut self, state: &State);
 }
 
 /// An implementation of [Robot](crate::agents::Robot).
@@ -116,7 +112,7 @@ where
 impl<Estimator, TrackerType, Detector, Target, State> IRobot<Target>
     for Robot<Estimator, TrackerType, Detector, State>
 where
-    Estimator: StateEstimator<Detector::Info, State = State>,
+    Estimator: StateEstimator<State = State>,
     TrackerType: Tracker<State, Target>,
     Detector: WallDetector<State>,
 {
@@ -124,9 +120,9 @@ where
 
     fn track_and_update(&mut self, target: &Target) -> Result<(), Self::Error> {
         self.estimator.estimate();
-        let infos = self.detector.detect_and_update(self.estimator.state());
-        self.estimator.correct_state(infos);
-        self.tracker.track(self.estimator.state(), target)
+        self.tracker.track(self.estimator.state(), target)?;
+        self.detector.detect_and_update(self.estimator.state());
+        Ok(())
     }
 }
 
@@ -139,10 +135,9 @@ mod tests {
         #[derive(PartialEq, Eq, Debug)]
         struct EstimatorType {
             state: usize,
-            infos: Vec<usize>,
         }
 
-        impl StateEstimator<usize> for EstimatorType {
+        impl StateEstimator for EstimatorType {
             type State = usize;
 
             fn estimate(&mut self) {
@@ -152,31 +147,16 @@ mod tests {
             fn state(&self) -> &Self::State {
                 &self.state
             }
-
-            fn correct_state<Infos: IntoIterator<Item = usize>>(&mut self, infos: Infos) {
-                self.infos = infos.into_iter().collect();
-            }
         }
 
         #[derive(PartialEq, Eq, Debug)]
         struct DetectorType {
             state: Option<usize>,
-            infos: Vec<usize>,
         }
 
         impl WallDetector<usize> for DetectorType {
-            type Info = usize;
-            type Infos = Vec<usize>;
-
-            fn detect_and_update(&mut self, state: &usize) -> Self::Infos {
+            fn detect_and_update(&mut self, state: &usize) {
                 self.state = Some(*state);
-                self.infos = self
-                    .infos
-                    .clone()
-                    .into_iter()
-                    .map(|info| info + state)
-                    .collect();
-                self.infos.clone()
             }
         }
 
@@ -197,18 +177,12 @@ mod tests {
         }
 
         let mut robot = Robot::new(
-            EstimatorType {
-                state: 0,
-                infos: Vec::new(),
-            },
+            EstimatorType { state: 0 },
             TrackerType {
                 state: None,
                 target: None,
             },
-            DetectorType {
-                state: None,
-                infos: vec![0, 1, 2],
-            },
+            DetectorType { state: None },
         );
 
         robot.track_and_update(&3).expect("This is a bug of test");
@@ -219,13 +193,7 @@ mod tests {
             ..
         } = robot;
 
-        assert_eq!(
-            estimator,
-            EstimatorType {
-                state: 1,
-                infos: vec![1, 2, 3]
-            }
-        );
+        assert_eq!(estimator, EstimatorType { state: 1 });
         assert_eq!(
             tracker,
             TrackerType {
@@ -233,12 +201,6 @@ mod tests {
                 target: Some(3)
             }
         );
-        assert_eq!(
-            detector,
-            DetectorType {
-                state: Some(1),
-                infos: vec![1, 2, 3]
-            }
-        );
+        assert_eq!(detector, DetectorType { state: Some(1) });
     }
 }

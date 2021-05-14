@@ -17,7 +17,6 @@ use uom::si::{
 use crate::robot::StateEstimator;
 use crate::tracker::RobotState;
 use crate::utils::builder::{ok_or, BuilderResult};
-use crate::wall_detector::CorrectInfo;
 use crate::{get_or_err, Construct, Deconstruct};
 
 pub trait IMU {
@@ -38,7 +37,6 @@ pub struct EstimatorInner {
     alpha: f32,
     trans_velocity: Velocity,
     state: RobotState,
-    weight: f32,
     slip_angle_const: Acceleration,
     slip_angle: Angle,
     approximation_threshold: AngularVelocity,
@@ -54,7 +52,6 @@ impl EstimatorInner {
     pub fn new(
         period: Time,
         alpha: f32,
-        correction_weight: f32,
         initial_state: RobotState,
         slip_angle_const: Acceleration,
         approximation_threshold: AngularVelocity,
@@ -62,7 +59,6 @@ impl EstimatorInner {
         Self {
             period,
             alpha,
-            weight: correction_weight,
             trans_velocity: Default::default(),
             state: initial_state,
             slip_angle_const,
@@ -125,19 +121,6 @@ impl EstimatorInner {
             AngularAcceleration::from((angular_velocity - self.state.theta.v) / self.period);
         self.state.theta.v = angular_velocity;
     }
-
-    fn correct_state<Infos: IntoIterator<Item = CorrectInfo>>(&mut self, infos: Infos) {
-        let mut sum_x = Length::default();
-        let mut sum_y = Length::default();
-        for info in infos {
-            let sin = info.obstacle.source.theta.value.sin();
-            let cos = info.obstacle.source.theta.value.cos();
-            sum_x += info.diff_from_expected * cos;
-            sum_y += info.diff_from_expected * sin;
-        }
-        self.state.x.x -= self.weight * sum_x;
-        self.state.y.x -= self.weight * sum_y;
-    }
 }
 
 /// An implementation of [StateEstimator](crate::robot::StateEstimator).
@@ -179,7 +162,6 @@ impl<LE, RE, I> Estimator<LE, RE, I> {
 pub struct EstimatorConfig {
     pub period: Time,
     pub cut_off_frequency: Frequency,
-    pub correction_weight: f32,
     pub slip_angle_const: Acceleration,
     pub approximation_threshold: AngularVelocity,
 }
@@ -221,7 +203,6 @@ where
             .right_encoder(right_encoder)
             .imu(imu)
             .initial_state(state.robot_state.clone())
-            .correction_weight(config.correction_weight)
             .period(config.period)
             .cut_off_frequency(config.cut_off_frequency)
             .slip_angle_const(config.slip_angle_const)
@@ -251,7 +232,7 @@ where
     }
 }
 
-impl<LE, RE, I> StateEstimator<CorrectInfo> for Estimator<LE, RE, I>
+impl<LE, RE, I> StateEstimator for Estimator<LE, RE, I>
 where
     LE: Encoder,
     RE: Encoder,
@@ -280,10 +261,6 @@ where
             trans_acceleration,
             imu_angular_velocity,
         )
-    }
-
-    fn correct_state<Infos: IntoIterator<Item = CorrectInfo>>(&mut self, infos: Infos) {
-        self.inner.correct_state(infos)
     }
 }
 
@@ -314,7 +291,6 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     period: Option<Time>,
     cut_off_frequency: Option<Frequency>,
     initial_state: Option<RobotState>,
-    correction_weight: Option<f32>,
     slip_angle_const: Option<Acceleration>,
     approximation_threshold: Option<AngularVelocity>,
 }
@@ -355,7 +331,6 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
             period: None,
             cut_off_frequency: None,
             initial_state: None,
-            correction_weight: None,
             slip_angle_const: None,
             approximation_threshold: None,
         }
@@ -373,11 +348,6 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
 
     pub fn initial_state(&mut self, initial_state: RobotState) -> &mut Self {
         self.initial_state = Some(initial_state);
-        self
-    }
-
-    pub fn correction_weight(&mut self, weight: f32) -> &mut Self {
-        self.correction_weight = Some(weight);
         self
     }
 
@@ -408,7 +378,6 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
             inner: EstimatorInner::new(
                 period,
                 alpha,
-                self.correction_weight.take().unwrap_or(0.0),
                 self.initial_state.take().unwrap_or(Default::default()),
                 get_or_err!(self.slip_angle_const),
                 self.approximation_threshold

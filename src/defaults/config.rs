@@ -50,8 +50,6 @@ impl_with_getter! {
         rotational_parameters: ControlParameters,
         period: Time,
         #[serde(default)]
-        estimator_correction_weight: f32,
-        #[serde(default)]
         estimator_cut_off_frequency: Frequency,
         #[serde(default)]
         pattern_converter: LinearPatternConverter<u16>,
@@ -134,7 +132,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             period,
             translational_parameters,
             rotational_parameters,
-            estimator_correction_weight,
             estimator_cut_off_frequency,
             pattern_converter,
             wall_width,
@@ -188,7 +185,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             estimator: EstimatorConfig {
                 period,
                 cut_off_frequency: estimator_cut_off_frequency,
-                correction_weight: estimator_correction_weight,
                 slip_angle_const,
                 approximation_threshold: estimator_approximation_threshold,
             },
@@ -276,7 +272,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
 ///     .pattern_converter(LinearPatternConverter::default())
 ///     .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
 ///     .period(Time::new::<second>(0.001))
-///     .estimator_correction_weight(0.1)
 ///     .translational_parameters(ControlParameters {
 ///         kp: 0.9,
 ///         ki: 0.05,
@@ -323,7 +318,6 @@ pub struct ConfigBuilder<const N: usize> {
     period: Option<Time>,
     translational_parameters: Option<ControlParameters>,
     rotational_parameters: Option<ControlParameters>,
-    estimator_correction_weight: Option<f32>,
     estimator_cut_off_frequency: Option<Frequency>,
     pattern_converter: Option<LinearPatternConverter<u16>>,
     wall_width: Option<Length>,
@@ -401,14 +395,6 @@ impl<const N: usize> ConfigBuilder<N> {
         /// **Required**,
         /// Sets the control parameters for translation.
         rotational_parameters: ControlParameters
-    );
-    impl_setter!(
-        /// **Optional**,
-        /// Default: 0.0.
-        ///
-        /// Sets the weight for correcting the estimated state by the information of distance
-        /// sensor.
-        estimator_correction_weight: f32
     );
     impl_setter!(
         /// **Required**,
@@ -550,7 +536,6 @@ impl<const N: usize> ConfigBuilder<N> {
             period: None,
             translational_parameters: None,
             rotational_parameters: None,
-            estimator_correction_weight: None,
             estimator_cut_off_frequency: None,
             pattern_converter: None,
             wall_width: None,
@@ -600,9 +585,6 @@ impl<const N: usize> ConfigBuilder<N> {
             period: get!(period),
             translational_parameters: get!(translational_parameters),
             rotational_parameters: get!(rotational_parameters),
-            estimator_correction_weight: self
-                .estimator_correction_weight
-                .unwrap_or(Default::default()),
             estimator_cut_off_frequency: get!(estimator_cut_off_frequency),
             pattern_converter: self.pattern_converter.take().unwrap_or(Default::default()),
             wall_width: self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
@@ -669,7 +651,6 @@ mod tests {
             .pattern_converter(LinearPatternConverter::default())
             .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
             .period(Time::new::<second>(0.001))
-            .estimator_correction_weight(0.1)
             .translational_parameters(ControlParameters {
                 kp: 0.9,
                 ki: 0.05,

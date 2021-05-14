@@ -132,7 +132,6 @@ macro_rules! impl_search_operator_test {
                                 .period(period)
                                 .cut_off_frequency(Frequency::new::<hertz>(50.0))
                                 .initial_state(start_state)
-                                .correction_weight(0.0)
                                 .slip_angle_const(Acceleration::new::<meter_per_second_squared>(
                                     100.0,
                                 ))

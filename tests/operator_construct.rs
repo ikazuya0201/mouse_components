@@ -62,7 +62,6 @@ macro_rules! impl_construct_and_deconstruct_test {
                 .pattern_converter(LinearPatternConverter::default())
                 .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
                 .period(Time::new::<second>(0.001))
-                .estimator_correction_weight(0.1)
                 .translational_parameters(ControlParameters {
                     kp: 1.0,
                     ki: 0.05,
