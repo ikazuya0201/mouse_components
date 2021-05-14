@@ -52,7 +52,6 @@ impl_with_getter! {
         #[serde(default)]
         estimator_correction_weight: f32,
         #[serde(default)]
-        wheel_interval: Option<Length>,
         estimator_cut_off_frequency: Frequency,
         #[serde(default)]
         pattern_converter: LinearPatternConverter<u16>,
@@ -136,7 +135,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             translational_parameters,
             rotational_parameters,
             estimator_correction_weight,
-            wheel_interval,
             estimator_cut_off_frequency,
             pattern_converter,
             wall_width,
@@ -190,7 +188,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             estimator: EstimatorConfig {
                 period,
                 cut_off_frequency: estimator_cut_off_frequency,
-                wheel_interval,
                 correction_weight: estimator_correction_weight,
                 slip_angle_const,
                 approximation_threshold: estimator_approximation_threshold,
@@ -327,7 +324,6 @@ pub struct ConfigBuilder<const N: usize> {
     translational_parameters: Option<ControlParameters>,
     rotational_parameters: Option<ControlParameters>,
     estimator_correction_weight: Option<f32>,
-    wheel_interval: Option<Length>,
     estimator_cut_off_frequency: Option<Frequency>,
     pattern_converter: Option<LinearPatternConverter<u16>>,
     wall_width: Option<Length>,
@@ -413,14 +409,6 @@ impl<const N: usize> ConfigBuilder<N> {
         /// Sets the weight for correcting the estimated state by the information of distance
         /// sensor.
         estimator_correction_weight: f32
-    );
-    impl_setter!(
-        /// **Optional**,
-        /// Default: None,
-        ///
-        /// Sets the interval of 2 (or 4) wheels.
-        /// This value is used for estimation of the machine's posture.
-        wheel_interval: Length
     );
     impl_setter!(
         /// **Required**,
@@ -563,7 +551,6 @@ impl<const N: usize> ConfigBuilder<N> {
             translational_parameters: None,
             rotational_parameters: None,
             estimator_correction_weight: None,
-            wheel_interval: None,
             estimator_cut_off_frequency: None,
             pattern_converter: None,
             wall_width: None,
@@ -616,7 +603,6 @@ impl<const N: usize> ConfigBuilder<N> {
             estimator_correction_weight: self
                 .estimator_correction_weight
                 .unwrap_or(Default::default()),
-            wheel_interval: self.wheel_interval,
             estimator_cut_off_frequency: get!(estimator_cut_off_frequency),
             pattern_converter: self.pattern_converter.take().unwrap_or(Default::default()),
             wall_width: self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
