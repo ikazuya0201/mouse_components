@@ -32,7 +32,7 @@ use uom::si::{
     },
     frequency::hertz,
     jerk::meter_per_second_cubed,
-    length::{meter, millimeter},
+    length::millimeter,
     time::second,
     velocity::meter_per_second,
 };
@@ -78,11 +78,10 @@ macro_rules! impl_construct_and_deconstruct_test {
                 })
                 .tracker_gain(40.0)
                 .tracker_dgain(4.0)
-                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
+                .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.15))
                 .low_zeta(1.0)
                 .low_b(1e-3)
-                .fail_safe_distance(uom::si::f32::Length::new::<meter>(0.05))
-                .search_velocity(Velocity::new::<meter_per_second>(0.12))
+                .search_velocity(Velocity::new::<meter_per_second>(0.3))
                 .max_velocity(Velocity::new::<meter_per_second>(1.0))
                 .max_acceleration(Acceleration::new::<meter_per_second_squared>(50.0))
                 .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
@@ -93,6 +92,7 @@ macro_rules! impl_construct_and_deconstruct_test {
                 .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
                 .run_slalom_velocity(Velocity::new::<meter_per_second>(0.5))
                 .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
+                .fail_safe_voltage_threshold(ElectricPotential::new::<volt>(10.0))
                 .build()
                 .unwrap();
 

@@ -159,31 +159,31 @@ macro_rules! impl_run_operator_test {
                             left_motor,
                             right_motor,
                             ControlParameters {
-                                kp: 1.0,
-                                ki: 0.05,
-                                kd: 0.01,
-                                model_k: trans_model_gain,
-                                model_t1: trans_model_time_constant.value,
+                                kp: 4.8497,
+                                ki: 29.5783,
+                                kd: 0.0,
+                                model_k: 1.865,
+                                model_t1: 0.4443,
                             },
                             ControlParameters {
-                                kp: 1.0,
-                                ki: 0.05,
-                                kd: 0.01,
-                                model_k: rot_model_gain,
-                                model_t1: rot_model_time_constant.value,
+                                kp: 0.21134,
+                                ki: 2.9317,
+                                kd: 0.0,
+                                model_k: 82.39,
+                                model_t1: 0.2855,
                             },
                             period,
+                            ElectricPotential::new::<volt>(10.0),
                         );
 
                         let tracker = TrackerBuilder::new()
                             .period(period)
                             .gain(40.0)
                             .dgain(4.0)
-                            .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.05))
+                            .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.15))
                             .controller(controller)
                             .low_zeta(1.0)
                             .low_b(1e-3)
-                            .fail_safe_distance(Length::new::<meter>(0.05))
                             .build()
                             .unwrap();
 

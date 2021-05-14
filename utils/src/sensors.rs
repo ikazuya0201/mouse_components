@@ -324,8 +324,14 @@ pub struct DistanceSensor<const N: usize> {
     pose_converter: PoseConverter<N>,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum DistanceSensorError {
+    PoseConverter(ConversionError),
+    DistanceIsNaN,
+}
+
 impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
-    type Error = ConversionError;
+    type Error = DistanceSensorError;
 
     fn pose(&self) -> &Pose {
         &self.pose
@@ -340,12 +346,18 @@ impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
             y: state.y.x + self.pose.x * sin_th + self.pose.y * cos_th,
             theta: state.theta.x + self.pose.theta,
         };
-        let wall_info = self.pose_converter.convert(&pose)?;
+        let wall_info = self
+            .pose_converter
+            .convert(&pose)
+            .map_err(|err| DistanceSensorError::PoseConverter(err))?;
         let distance = if self.wall_storage.exists(&wall_info.wall) {
             wall_info.existing_distance
         } else {
             wall_info.not_existing_distance
         };
+        if distance.is_nan() {
+            return Err(nb::Error::Other(DistanceSensorError::DistanceIsNaN));
+        }
         Ok(Sample {
             mean: distance,
             standard_deviation: Length::new::<meter>(0.001),

@@ -74,6 +74,11 @@ impl EstimatorInner {
         translational_acceleration: Acceleration,
         angular_velocity: AngularVelocity,
     ) {
+        debug_assert!(!left_distance.is_nan());
+        debug_assert!(!right_distance.is_nan());
+        debug_assert!(!translational_acceleration.is_nan());
+        debug_assert!(!angular_velocity.is_nan());
+
         //velocity estimation
         let average_left_velocity = left_distance / self.period;
         let average_right_velocity = right_distance / self.period;
@@ -91,7 +96,7 @@ impl EstimatorInner {
             let rev_period = 1.0 / self.period;
             Angle::from(
                 (AngularVelocity::from(self.slip_angle * rev_period) + angular_velocity)
-                    / (rev_period + self.slip_angle_const / self.trans_velocity),
+                    / (rev_period + self.slip_angle_const / self.trans_velocity.abs()),
             )
         };
 
