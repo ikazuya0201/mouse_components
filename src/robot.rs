@@ -1,7 +1,5 @@
 //! An implementation of [Robot](crate::agents::Robot) and its dependencies.
 
-use core::marker::PhantomData;
-
 use crate::agents::Robot as IRobot;
 use crate::{Construct, Deconstruct, Merge};
 
@@ -28,15 +26,13 @@ pub trait WallDetector<State> {
 
 /// An implementation of [Robot](crate::agents::Robot).
 #[derive(Clone, PartialEq, Eq)]
-pub struct Robot<Estimator, Tracker, Detector, State> {
+pub struct Robot<Estimator, Tracker, Detector> {
     estimator: Estimator,
     tracker: Tracker,
     detector: Detector,
-    _state: PhantomData<fn() -> State>,
 }
 
-impl<Estimator, Tracker, Detector, State> core::fmt::Debug
-    for Robot<Estimator, Tracker, Detector, State>
+impl<Estimator, Tracker, Detector> core::fmt::Debug for Robot<Estimator, Tracker, Detector>
 where
     Estimator: core::fmt::Debug,
     Tracker: core::fmt::Debug,
@@ -49,14 +45,13 @@ where
     }
 }
 
-impl<Estimator, Tracker, Detector, State> Robot<Estimator, Tracker, Detector, State> {
+impl<Estimator, Tracker, Detector> Robot<Estimator, Tracker, Detector> {
     /// Makes a new Robot with given args.
     pub fn new(estimator: Estimator, tracker: Tracker, detector: Detector) -> Self {
         Self {
             estimator,
             tracker,
             detector,
-            _state: PhantomData,
         }
     }
 
@@ -71,8 +66,8 @@ impl<Estimator, Tracker, Detector, State> Robot<Estimator, Tracker, Detector, St
     }
 }
 
-impl<Estimator, Tracker, Detector, RobotState, Config, State, Resource>
-    Construct<Config, State, Resource> for Robot<Estimator, Tracker, Detector, RobotState>
+impl<Estimator, Tracker, Detector, Config, State, Resource> Construct<Config, State, Resource>
+    for Robot<Estimator, Tracker, Detector>
 where
     Estimator: Construct<Config, State, Resource>,
     Tracker: Construct<Config, State, Resource>,
@@ -86,8 +81,8 @@ where
     }
 }
 
-impl<Estimator, Tracker, Detector, RobotState, State, Resource> Deconstruct<State, Resource>
-    for Robot<Estimator, Tracker, Detector, RobotState>
+impl<Estimator, Tracker, Detector, State, Resource> Deconstruct<State, Resource>
+    for Robot<Estimator, Tracker, Detector>
 where
     Estimator: Deconstruct<State, Resource>,
     Tracker: Deconstruct<State, Resource>,
@@ -109,12 +104,12 @@ where
     }
 }
 
-impl<EstimatorType, TrackerType, Detector, Target, State> IRobot<Target>
-    for Robot<EstimatorType, TrackerType, Detector, State>
+impl<EstimatorType, TrackerType, Detector, Target> IRobot<Target>
+    for Robot<EstimatorType, TrackerType, Detector>
 where
-    EstimatorType: Estimator<State = State>,
-    TrackerType: Tracker<State, Target>,
-    Detector: WallDetector<State>,
+    EstimatorType: Estimator,
+    TrackerType: Tracker<EstimatorType::State, Target>,
+    Detector: WallDetector<EstimatorType::State>,
 {
     type Error = TrackerType::Error;
 

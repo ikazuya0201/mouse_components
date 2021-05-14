@@ -12,7 +12,7 @@ use crate::{
     operators::TrackingOperator,
     pattern_converters::LinearPatternConverter,
     robot::Robot,
-    tracker::{RobotState, Tracker},
+    tracker::Tracker,
     trajectory_generators::{
         DefaultSlalomParametersGenerator, ReturnSetupTrajectoryGenerator, RunTrajectory,
         RunTrajectoryGenerator, SearchTrajectory, SearchTrajectoryGenerator, SetupTrajectory,
@@ -51,7 +51,6 @@ pub type SearchOperator<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
-            RobotState,
         >,
     >,
 >;
@@ -80,7 +79,6 @@ pub type RunOperator<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
-            RobotState,
         >,
     >,
 >;
@@ -109,7 +107,6 @@ pub type ReturnSetupOperator<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
-            RobotState,
         >,
     >,
 >;
@@ -138,7 +135,6 @@ pub type ReturnOperator<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
-            RobotState,
         >,
     >,
 >;
@@ -167,7 +163,6 @@ pub type RunSetupOperator<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
-            RobotState,
         >,
     >,
 >;
