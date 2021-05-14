@@ -1,4 +1,4 @@
-//! An implementation of [StateEstimator](crate::robot::StateEstimator).
+//! An implementation of [Estimator](crate::robot::Estimator).
 
 use core::marker::PhantomData;
 
@@ -14,7 +14,7 @@ use uom::si::{
     ratio::ratio,
 };
 
-use crate::robot::StateEstimator;
+use crate::robot::Estimator as IEstimator;
 use crate::tracker::RobotState;
 use crate::utils::builder::{ok_or, BuilderResult};
 use crate::{get_or_err, Construct, Deconstruct};
@@ -123,7 +123,7 @@ impl EstimatorInner {
     }
 }
 
-/// An implementation of [StateEstimator](crate::robot::StateEstimator).
+/// An implementation of [Estimator](crate::robot::Estimator).
 ///
 /// This should be created by [EstimatorBuilder](EstimatorBuilder).
 pub struct Estimator<LE, RE, I> {
@@ -232,7 +232,7 @@ where
     }
 }
 
-impl<LE, RE, I> StateEstimator for Estimator<LE, RE, I>
+impl<LE, RE, I> IEstimator for Estimator<LE, RE, I>
 where
     LE: Encoder,
     RE: Encoder,

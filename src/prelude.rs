@@ -28,7 +28,7 @@ pub use crate::commanders::{
 
 #[doc(no_inline)]
 pub use crate::robot::{
-    StateEstimator as _components_robot_StateEstimator, Tracker as _components_robot_Tracker,
+    Estimator as _components_robot_StateEstimator, Tracker as _components_robot_Tracker,
 };
 
 #[doc(no_inline)]

@@ -6,7 +6,7 @@ use crate::agents::Robot as IRobot;
 use crate::{Construct, Deconstruct, Merge};
 
 /// A trait that estimates the state of robot.
-pub trait StateEstimator {
+pub trait Estimator {
     type State;
 
     fn estimate(&mut self);
@@ -109,10 +109,10 @@ where
     }
 }
 
-impl<Estimator, TrackerType, Detector, Target, State> IRobot<Target>
-    for Robot<Estimator, TrackerType, Detector, State>
+impl<EstimatorType, TrackerType, Detector, Target, State> IRobot<Target>
+    for Robot<EstimatorType, TrackerType, Detector, State>
 where
-    Estimator: StateEstimator<State = State>,
+    EstimatorType: Estimator<State = State>,
     TrackerType: Tracker<State, Target>,
     Detector: WallDetector<State>,
 {
@@ -137,7 +137,7 @@ mod tests {
             state: usize,
         }
 
-        impl StateEstimator for EstimatorType {
+        impl Estimator for EstimatorType {
             type State = usize;
 
             fn estimate(&mut self) {
