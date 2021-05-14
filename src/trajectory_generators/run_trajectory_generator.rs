@@ -14,6 +14,17 @@ use crate::utils::builder::BuilderResult;
 use crate::{get_or_err, impl_setter};
 use crate::{impl_deconstruct_with_default, Construct};
 
+/// An enum for describing a state of run.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum RunState {
+    Acceleration,
+    Constant,
+    // First phase of deceleration.
+    Deceleration1,
+    // Second phase of deceleration.
+    Deceleration2,
+}
+
 /// An enum for specifying a kind of trajectory of fast run.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RunKind {
@@ -100,7 +111,7 @@ impl_deconstruct_with_default!(RunTrajectoryGenerator<DefaultSlalomParametersGen
 pub struct RunTrajectoryParameters {
     pub pose: Pose,
     pub kind: RunKind,
-    pub should_stop: bool,
+    pub state: RunState,
 }
 
 //NOTO: this code doesn't work if the initial command is slalom
@@ -119,19 +130,36 @@ where
 
     fn generate(&self, parameters: &RunTrajectoryParameters) -> Self::Trajectory {
         let mut current_velocity = self.current_velocity.lock();
-        let target_velocity = if parameters.should_stop {
-            Default::default()
-        } else {
-            self.run_slalom_velocity
+        let (start, end) = match parameters.state {
+            RunState::Acceleration => (*current_velocity, self.run_slalom_velocity),
+            RunState::Constant => (self.run_slalom_velocity, self.run_slalom_velocity),
+            RunState::Deceleration1 => (*current_velocity, *current_velocity / 2.0),
+            RunState::Deceleration2 => (*current_velocity, Default::default()),
         };
-        let (trajectory, terminal_velocity) = self.generate_run_trajectory_and_terminal_velocity(
-            parameters.pose,
-            parameters.kind,
-            *current_velocity,
-            target_velocity,
-        );
+        let generate_straight = |distance: Length| {
+            let (trajectory, terminal_velocity) = self
+                .straight_generator
+                .generate_with_terminal_velocity(distance, start, end);
+            (RunTrajectory::Straight(trajectory), terminal_velocity)
+        };
+        let (trajectory, terminal_velocity) = match parameters.kind {
+            RunKind::Straight(len) => {
+                let distance = len as f32 * self.square_width;
+                generate_straight(distance)
+            }
+            RunKind::StraightDiagonal(len) => {
+                let distance = len as f32 * self.square_diagonal_half;
+                generate_straight(distance)
+            }
+            RunKind::Slalom(kind, dir) => {
+                let (trajectory, terminal_velocity) = self
+                    .slalom_generator
+                    .generate_slalom_with_terminal_velocity(kind, dir, start, end);
+                (RunTrajectory::Slalom(trajectory), terminal_velocity)
+            }
+        };
         *current_velocity = terminal_velocity;
-        trajectory
+        ShiftTrajectory::new(parameters.pose, trajectory)
     }
 }
 
@@ -148,48 +176,6 @@ impl Iterator for RunTrajectory {
             RunTrajectory::Straight(inner) => inner.next(),
             RunTrajectory::Slalom(inner) => inner.next(),
         }
-    }
-}
-
-impl<Generator> RunTrajectoryGenerator<Generator>
-where
-    Generator: SlalomParametersGenerator,
-{
-    fn generate_run_trajectory_and_terminal_velocity(
-        &self,
-        pose: Pose,
-        kind: RunKind,
-        start_velocity: Velocity,
-        end_velocity: Velocity,
-    ) -> (ShiftTrajectory<RunTrajectory>, Velocity) {
-        let generate_straight = |distance: Length| {
-            let (trajectory, terminal_velocity) = self
-                .straight_generator
-                .generate_with_terminal_velocity(distance, start_velocity, end_velocity);
-            (RunTrajectory::Straight(trajectory), terminal_velocity)
-        };
-        let (trajectory, terminal_velocity) = match kind {
-            RunKind::Straight(len) => {
-                let distance = len as f32 * self.square_width;
-                generate_straight(distance)
-            }
-            RunKind::StraightDiagonal(len) => {
-                let distance = len as f32 * self.square_diagonal_half;
-                generate_straight(distance)
-            }
-            RunKind::Slalom(kind, dir) => {
-                let (trajectory, terminal_velocity) = self
-                    .slalom_generator
-                    .generate_slalom_with_terminal_velocity(
-                        kind,
-                        dir,
-                        start_velocity,
-                        end_velocity,
-                    );
-                (RunTrajectory::Slalom(trajectory), terminal_velocity)
-            }
-        };
-        (ShiftTrajectory::new(pose, trajectory), terminal_velocity)
     }
 }
 

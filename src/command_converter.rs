@@ -150,7 +150,7 @@ impl<const N: usize> ICommandConverter<RunCommand<RunNode<N>, RunKind>> for Comm
         RunTrajectoryParameters {
             pose,
             kind: command.route,
-            should_stop: command.is_final,
+            state: command.state,
         }
     }
 }

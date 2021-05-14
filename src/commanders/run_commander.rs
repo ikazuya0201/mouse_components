@@ -10,6 +10,7 @@ use super::{
     PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
+use crate::trajectory_generators::RunState;
 use crate::{Construct, Deconstruct, Merge};
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander).
@@ -102,7 +103,7 @@ pub enum RunCommanderError {
 pub struct RunCommand<Node, Route> {
     pub node: Node,
     pub route: Route,
-    pub is_final: bool,
+    pub state: RunState,
 }
 
 //TODO: write test
@@ -118,13 +119,23 @@ where
         if iter + 1 >= self.path.len() {
             return Err(TrackingCommanderError::TrackingFinish);
         }
+        // NOTE: Ignores cases where self.path.len() <= 5.
+        let state = if iter <= 1 {
+            RunState::Acceleration
+        } else if iter + 2 == self.path.len() {
+            RunState::Deceleration2
+        } else if iter + 3 == self.path.len() {
+            RunState::Deceleration1
+        } else {
+            RunState::Constant
+        };
         self.iter.fetch_add(1, Ordering::AcqRel);
         Ok(RunCommand {
             node: self.path[iter].clone(),
             route: self.path[iter]
                 .route(&self.path[iter + 1])
                 .map_err(|_| TrackingCommanderError::Other(RunCommanderError::ConversionError))?,
-            is_final: iter + 2 == self.path.len(),
+            state,
         })
     }
 }

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use uom::si::f32::{Angle, Length};
 
 pub use run_trajectory_generator::{
-    RunKind, RunTrajectory, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
+    RunKind, RunState, RunTrajectory, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
     RunTrajectoryGeneratorConfig, RunTrajectoryParameters,
 };
 pub use search_trajectory_generator::{

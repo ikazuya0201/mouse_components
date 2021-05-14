@@ -65,7 +65,7 @@ pub mod types {
         pub use trajectory_generators::Pose;
         #[doc(no_inline)]
         pub use trajectory_generators::{
-            AngleTarget, LengthTarget, RunKind, SearchKind, SlalomDirection, SlalomKind,
+            AngleTarget, LengthTarget, RunKind, RunState, SearchKind, SlalomDirection, SlalomKind,
             SlalomParameters, Target,
         };
         #[doc(no_inline)]
