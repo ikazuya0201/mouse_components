@@ -15,7 +15,7 @@ use components::{
     nodes::RunNode,
     pattern_converters::LinearPatternConverter,
     prelude::*,
-    types::data::{AbsoluteDirection, Pose, SearchKind},
+    types::data::{AbsoluteDirection, ControlParameters, Pose, SearchKind},
     utils::probability::Probability,
     wall_manager::WallManager,
 };
@@ -63,16 +63,20 @@ macro_rules! impl_construct_and_deconstruct_test {
                 .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
                 .period(Time::new::<second>(0.001))
                 .estimator_correction_weight(0.1)
-                .translational_kp(1.0)
-                .translational_ki(0.05)
-                .translational_kd(0.01)
-                .translational_model_gain(1.0)
-                .translational_model_time_constant(Time::new::<second>(0.3694))
-                .rotational_kp(1.0)
-                .rotational_ki(0.2)
-                .rotational_kd(0.0)
-                .rotational_model_gain(10.0)
-                .rotational_model_time_constant(Time::new::<second>(0.1499))
+                .translational_parameters(ControlParameters {
+                    kp: 1.0,
+                    ki: 0.05,
+                    kd: 0.01,
+                    model_k: 1.0,
+                    model_t1: 0.3694,
+                })
+                .rotational_parameters(ControlParameters {
+                    kp: 1.0,
+                    ki: 0.2,
+                    kd: 0.0,
+                    model_k: 10.0,
+                    model_t1: 0.1499,
+                })
                 .tracker_gain(40.0)
                 .tracker_dgain(4.0)
                 .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
@@ -116,10 +120,10 @@ macro_rules! impl_construct_and_deconstruct_test {
             let simulator = AgentSimulator::new(
                 $state.robot_state().clone(),
                 *config.period(),
-                *config.translational_model_gain(),
-                *config.translational_model_time_constant(),
-                *config.rotational_model_gain(),
-                *config.rotational_model_time_constant(),
+                config.translational_parameters().model_k,
+                Time::new::<second>(config.translational_parameters().model_t1),
+                config.rotational_parameters().model_k,
+                Time::new::<second>(config.rotational_parameters().model_t1),
                 WallManager::<$maze_width>::with_str(
                     existence_threshold,
                     include_str!("../mazes/maze1.dat"),

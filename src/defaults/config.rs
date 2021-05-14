@@ -8,6 +8,7 @@ use uom::si::f32::{
 };
 
 use crate::commanders::GOAL_SIZE_UPPER_BOUND;
+use crate::controllers::ControlParameters;
 use crate::impl_setter;
 use crate::impl_with_getter;
 use crate::nodes::RunNode;
@@ -45,17 +46,9 @@ impl_with_getter! {
         goals: Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>,
         search_initial_route: SearchKind,
         search_final_route: SearchKind,
-        translational_kp: f32,
-        translational_ki: f32,
-        translational_kd: f32,
+        translational_parameters: ControlParameters,
+        rotational_parameters: ControlParameters,
         period: Time,
-        translational_model_gain: f32,
-        translational_model_time_constant: Time,
-        rotational_kp: f32,
-        rotational_ki: f32,
-        rotational_kd: f32,
-        rotational_model_gain: f32,
-        rotational_model_time_constant: Time,
         #[serde(default)]
         estimator_correction_weight: f32,
         #[serde(default)]
@@ -117,8 +110,7 @@ impl_with_as_ref! {
         run_setup_commander: RunSetupCommanderConfig<RunNode<N>>,
         return_setup_commander: ReturnSetupCommanderConfig<RunNode<N>>,
         return_commander: ReturnCommanderConfig<RunNode<N>>,
-        translational_controller: TranslationalControllerConfig,
-        rotational_controller: RotationalControllerConfig,
+        controller: MultiSisoControllerConfig,
         estimator: EstimatorConfig,
         tracker: TrackerConfig,
         search_trajectory_generator: SearchTrajectoryGeneratorConfig,
@@ -139,17 +131,9 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             goals,
             search_initial_route,
             search_final_route,
-            translational_kp,
-            translational_ki,
-            translational_kd,
             period,
-            translational_model_gain,
-            translational_model_time_constant,
-            rotational_kp,
-            rotational_ki,
-            rotational_kd,
-            rotational_model_gain,
-            rotational_model_time_constant,
+            translational_parameters,
+            rotational_parameters,
             estimator_correction_weight,
             wheel_interval,
             estimator_cut_off_frequency,
@@ -196,21 +180,10 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             return_commander: ReturnCommanderConfig {
                 return_goal: return_goal.clone(),
             },
-            translational_controller: TranslationalControllerConfig {
-                model_gain: translational_model_gain,
-                model_time_constant: translational_model_time_constant,
-                kp: translational_kp,
-                ki: translational_ki,
-                kd: translational_kd,
+            controller: MultiSisoControllerConfig {
                 period,
-            },
-            rotational_controller: RotationalControllerConfig {
-                model_gain: rotational_model_gain,
-                model_time_constant: rotational_model_time_constant,
-                kp: rotational_kp,
-                ki: rotational_ki,
-                kd: rotational_kd,
-                period,
+                translational_parameters,
+                rotational_parameters,
             },
             estimator: EstimatorConfig {
                 period,
@@ -281,7 +254,7 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
 ///     time::second, velocity::meter_per_second, frequency::hertz,
 /// };
 /// use components::nodes::RunNode;
-/// use components::types::data::{AbsoluteDirection, Pattern, SearchKind};
+/// use components::types::data::{AbsoluteDirection, Pattern, SearchKind, ControlParameters};
 /// use components::defaults::config::ConfigBuilder;
 /// use components::pattern_converters::LinearPatternConverter;
 ///
@@ -304,16 +277,20 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
 ///     .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
 ///     .period(Time::new::<second>(0.001))
 ///     .estimator_correction_weight(0.1)
-///     .translational_kp(0.9)
-///     .translational_ki(0.05)
-///     .translational_kd(0.01)
-///     .translational_model_gain(1.0)
-///     .translational_model_time_constant(Time::new::<second>(0.001))
-///     .rotational_kp(0.2)
-///     .rotational_ki(0.2)
-///     .rotational_kd(0.0)
-///     .rotational_model_gain(1.0)
-///     .rotational_model_time_constant(Time::new::<second>(0.001))
+///     .translational_parameters(ControlParameters {
+///         kp: 0.9,
+///         ki: 0.05,
+///         kd: 0.01,
+///         model_k: 1.0,
+///         model_t1: 0.001,
+///     })
+///     .rotational_parameters(ControlParameters {
+///         kp: 0.2,
+///         ki: 0.2,
+///         kd: 0.01,
+///         model_k: 1.0,
+///         model_t1: 0.001,
+///     })
 ///     .tracker_gain(15.0)
 ///     .tracker_dgain(4.0)
 ///     .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))
@@ -343,17 +320,9 @@ pub struct ConfigBuilder<const N: usize> {
     goals: Option<Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>>,
     search_initial_route: Option<SearchKind>,
     search_final_route: Option<SearchKind>,
-    translational_kp: Option<f32>,
-    translational_ki: Option<f32>,
-    translational_kd: Option<f32>,
     period: Option<Time>,
-    translational_model_gain: Option<f32>,
-    translational_model_time_constant: Option<Time>,
-    rotational_kp: Option<f32>,
-    rotational_ki: Option<f32>,
-    rotational_kd: Option<f32>,
-    rotational_model_gain: Option<f32>,
-    rotational_model_time_constant: Option<Time>,
+    translational_parameters: Option<ControlParameters>,
+    rotational_parameters: Option<ControlParameters>,
     estimator_correction_weight: Option<f32>,
     wheel_interval: Option<Length>,
     estimator_cut_off_frequency: Option<Frequency>,
@@ -425,69 +394,13 @@ impl<const N: usize> ConfigBuilder<N> {
     );
     impl_setter!(
         /// **Required**,
-        /// Sets the P gain for translation.
-        translational_kp: translational_kp: f32
+        /// Sets the control parameters for translation.
+        translational_parameters: ControlParameters
     );
     impl_setter!(
         /// **Required**,
-        /// Sets the I gain for translation.
-        translational_ki: translational_ki: f32
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets the D gain for translation.
-        translational_kd: translational_kd: f32
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets the model gain for translation.
-        ///
-        /// The model is used for the input of feed-forward.
-        ///
-        /// Assumes the model is the first-order delay system.
-        translational_model_gain: translational_model_gain: f32
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets the model time constant for translation.
-        ///
-        /// The model is used for the input of feed-forward.
-        ///
-        /// Assumes the model is the first-order delay system.
-        translational_model_time_constant: translational_model_time_constant: Time
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets the P gain for rotation.
-        rotational_kp: rotational_kp: f32
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets the I gain for rotation.
-        rotational_ki: rotational_ki: f32
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets the D gain for rotation.
-        rotational_kd: rotational_kd: f32
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets the model gain for rotation.
-        ///
-        /// The model is used for the input of feed-forward.
-        ///
-        /// Assumes the model is the first-order delay system.
-        rotational_model_gain: rotational_model_gain: f32
-    );
-    impl_setter!(
-        /// **Required**,
-        /// Sets the model time constant for rotation.
-        ///
-        /// The model is used for the input of feed-forward.
-        ///
-        /// Assumes the model is the first-order delay system.
-        rotational_model_time_constant: rotational_model_time_constant: Time
+        /// Sets the control parameters for translation.
+        rotational_parameters: ControlParameters
     );
     impl_setter!(
         /// **Optional**,
@@ -632,17 +545,9 @@ impl<const N: usize> ConfigBuilder<N> {
             goals: None,
             search_initial_route: None,
             search_final_route: None,
-            translational_kp: None,
-            translational_ki: None,
-            translational_kd: None,
             period: None,
-            translational_model_gain: None,
-            translational_model_time_constant: None,
-            rotational_kp: None,
-            rotational_ki: None,
-            rotational_kd: None,
-            rotational_model_gain: None,
-            rotational_model_time_constant: None,
+            translational_parameters: None,
+            rotational_parameters: None,
             estimator_correction_weight: None,
             wheel_interval: None,
             estimator_cut_off_frequency: None,
@@ -690,17 +595,9 @@ impl<const N: usize> ConfigBuilder<N> {
             goals: get!(goals),
             search_initial_route: get!(search_initial_route),
             search_final_route: get!(search_final_route),
-            translational_kp: get!(translational_kp),
-            translational_ki: get!(translational_ki),
-            translational_kd: get!(translational_kd),
             period: get!(period),
-            translational_model_gain: get!(translational_model_gain),
-            translational_model_time_constant: get!(translational_model_time_constant),
-            rotational_kp: get!(rotational_kp),
-            rotational_ki: get!(rotational_ki),
-            rotational_kd: get!(rotational_kd),
-            rotational_model_gain: get!(rotational_model_gain),
-            rotational_model_time_constant: get!(rotational_model_time_constant),
+            translational_parameters: get!(translational_parameters),
+            rotational_parameters: get!(rotational_parameters),
             estimator_correction_weight: self
                 .estimator_correction_weight
                 .unwrap_or(Default::default()),
@@ -769,16 +666,20 @@ mod tests {
             .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
             .period(Time::new::<second>(0.001))
             .estimator_correction_weight(0.1)
-            .translational_kp(0.9)
-            .translational_ki(0.05)
-            .translational_kd(0.01)
-            .translational_model_gain(1.0)
-            .translational_model_time_constant(Time::new::<second>(0.001))
-            .rotational_kp(0.2)
-            .rotational_ki(0.2)
-            .rotational_kd(0.0)
-            .rotational_model_gain(1.0)
-            .rotational_model_time_constant(Time::new::<second>(0.001))
+            .translational_parameters(ControlParameters {
+                kp: 0.9,
+                ki: 0.05,
+                kd: 0.01,
+                model_k: 1.0,
+                model_t1: 0.001,
+            })
+            .rotational_parameters(ControlParameters {
+                kp: 0.2,
+                ki: 0.2,
+                kd: 0.01,
+                model_k: 1.0,
+                model_t1: 0.001,
+            })
             .tracker_gain(15.0)
             .tracker_dgain(4.0)
             .valid_control_lower_bound(Velocity::new::<meter_per_second>(0.03))

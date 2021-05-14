@@ -4,19 +4,18 @@ use core::ops::{Add, Div, Mul, Sub};
 
 use serde::{Deserialize, Serialize};
 use uom::si::{
-    f32::{
-        Acceleration, AngularAcceleration, AngularVelocity, ElectricPotential, Length, Ratio, Time,
-        Velocity,
-    },
+    f32::{ElectricPotential, Length, Ratio, Time},
     Quantity,
 };
 
-use crate::impl_setter;
-use crate::tracker::Controller as IController;
-use crate::utils::builder::{ok_or, BuilderResult};
-use crate::{impl_deconstruct_with_default, Construct};
+use crate::tracker::{ControlTarget, Controller};
+use crate::{Construct, Deconstruct};
 
-struct Controller<T>
+pub trait Motor {
+    fn apply(&mut self, electric_potential: ElectricPotential);
+}
+
+struct SisoController<T>
 where
     T: Div<Time>,
     <T as Div<Time>>::Output: Div<ElectricPotential> + Div<Time>,
@@ -33,7 +32,7 @@ where
     period: Time,
 }
 
-impl<T> Controller<T>
+impl<T> SisoController<T>
 where
     T: Div<Time> + Copy + Add<T, Output = T>,
     <T as Div<Time>>::Output: Div<Time>
@@ -76,288 +75,167 @@ where
     }
 }
 
-macro_rules! impl_controller {
-    ($controller: ident, $builder: ident, $config: ident, $dt: ty, $ddt: ty) => {
-        impl $controller {
-            pub fn new(
-                model_gain: f32,
-                model_time_constant: Time,
-                kp: f32,
-                ki: f32,
-                kd: f32,
-                period: Time,
-            ) -> Self {
-                Self(Controller {
-                    error_sum: Default::default(),
-                    model_gain: Quantity {
-                        value: model_gain,
-                        ..Default::default()
-                    },
-                    time_constant: model_time_constant,
-                    kp: Quantity {
-                        value: kp,
-                        ..Default::default()
-                    },
-                    ki: Quantity {
-                        value: ki,
-                        ..Default::default()
-                    },
-                    kd: Quantity {
-                        value: kd,
-                        ..Default::default()
-                    },
-                    period,
-                })
-            }
-        }
-
-        impl IController<$dt, $ddt> for $controller {
-            fn calculate(&mut self, r: $dt, dr: $ddt, y: $dt, dy: $ddt) -> ElectricPotential {
-                self.0.calculate(r.into(), dr.into(), y.into(), dy.into())
-            }
-        }
-
-        pub struct $builder {
-            model_gain: Option<f32>,
-            model_time_constant: Option<Time>,
-            kp: Option<f32>,
-            ki: Option<f32>,
-            kd: Option<f32>,
-            period: Option<Time>,
-        }
-
-        impl $builder {
-            pub fn new() -> Self {
-                Self {
-                    model_gain: None,
-                    model_time_constant: None,
-                    kp: None,
-                    ki: None,
-                    kd: None,
-                    period: None,
-                }
-            }
-
-            impl_setter!(model_gain: f32);
-            impl_setter!(model_time_constant: Time);
-            impl_setter!(kp: f32);
-            impl_setter!(ki: f32);
-            impl_setter!(kd: f32);
-            impl_setter!(period: Time);
-
-            pub fn build(&mut self) -> BuilderResult<$controller> {
-                macro_rules! get {
-                    ($name: ident) => {
-                        ok_or(self.$name, core::stringify!($name))?
-                    };
-                }
-                Ok($controller::new(
-                    get!(model_gain),
-                    get!(model_time_constant),
-                    get!(kp),
-                    get!(ki),
-                    get!(kd),
-                    get!(period),
-                ))
-            }
-        }
-
-        /// Config for a controller.
-        #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
-        pub struct $config {
-            pub model_gain: f32,
-            pub model_time_constant: Time,
-            pub kp: f32,
-            pub ki: f32,
-            pub kd: f32,
-            pub period: Time,
-        }
-
-        impl<Config, State, Resource> Construct<Config, State, Resource> for $controller
-        where
-            Config: AsRef<$config>,
-        {
-            fn construct<'a>(
-                config: &'a Config,
-                _state: &'a State,
-                _resource: &'a mut Resource,
-            ) -> Self {
-                let config = config.as_ref();
-                Self::new(
-                    config.model_gain,
-                    config.model_time_constant,
-                    config.kp,
-                    config.ki,
-                    config.kd,
-                    config.period,
-                )
-            }
-        }
-
-        impl_deconstruct_with_default!($controller);
-    };
+/// Parameter for control SISO system.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct ControlParameters {
+    pub kp: f32,
+    pub ki: f32,
+    pub kd: f32,
+    pub model_k: f32,
+    pub model_t1: f32,
 }
 
-pub struct TranslationalController(Controller<Length>);
-impl_controller!(
-    TranslationalController,
-    TranslationalControllerBuilder,
-    TranslationalControllerConfig,
-    Velocity,
-    Acceleration
-);
+// TODO: Write test.
+/// An implementation of [Controller](crate::tracker::Controller).
+/// This controls the plant as 2 SISO system.
+pub struct MultiSisoController<LeftMotor, RightMotor> {
+    left_motor: LeftMotor,
+    right_motor: RightMotor,
+    translational_controller: SisoController<Length>,
+    rotational_controller: SisoController<Ratio>,
+}
 
-pub struct RotationalController(Controller<Ratio>);
-impl_controller!(
-    RotationalController,
-    RotationalControllerBuilder,
-    RotationalControllerConfig,
-    AngularVelocity,
-    AngularAcceleration
-);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use typenum::consts::*;
-    use uom::si::{time::second, Quantity, ISQ, SI};
-
-    fn build_translation_controller() -> TranslationalController {
-        TranslationalControllerBuilder::new()
-            .period(Time::new::<second>(0.001))
-            .model_gain(1.0)
-            .model_time_constant(Time::new::<second>(0.01))
-            .kp(1.0)
-            .ki(0.1)
-            .kd(0.2)
-            .build()
-            .unwrap()
+impl<LeftMotor, RightMotor> MultiSisoController<LeftMotor, RightMotor> {
+    pub fn new(
+        left_motor: LeftMotor,
+        right_motor: RightMotor,
+        trans_param: ControlParameters,
+        rot_param: ControlParameters,
+        period: Time,
+    ) -> Self {
+        Self {
+            left_motor,
+            right_motor,
+            translational_controller: SisoController {
+                error_sum: Default::default(),
+                model_gain: Quantity {
+                    value: trans_param.model_k,
+                    ..Default::default()
+                },
+                time_constant: Quantity {
+                    value: trans_param.model_t1,
+                    ..Default::default()
+                },
+                kp: Quantity {
+                    value: trans_param.kp,
+                    ..Default::default()
+                },
+                ki: Quantity {
+                    value: trans_param.ki,
+                    ..Default::default()
+                },
+                kd: Quantity {
+                    value: trans_param.kd,
+                    ..Default::default()
+                },
+                period,
+            },
+            rotational_controller: SisoController {
+                error_sum: Default::default(),
+                model_gain: Quantity {
+                    value: rot_param.model_k,
+                    ..Default::default()
+                },
+                time_constant: Quantity {
+                    value: rot_param.model_t1,
+                    ..Default::default()
+                },
+                kp: Quantity {
+                    value: rot_param.kp,
+                    ..Default::default()
+                },
+                ki: Quantity {
+                    value: rot_param.ki,
+                    ..Default::default()
+                },
+                kd: Quantity {
+                    value: rot_param.kd,
+                    ..Default::default()
+                },
+                period,
+            },
+        }
     }
 
-    #[test]
-    fn test_build() {
-        let _controller = build_translation_controller();
+    pub fn release(self) -> (LeftMotor, RightMotor) {
+        let Self {
+            left_motor,
+            right_motor,
+            ..
+        } = self;
+        (left_motor, right_motor)
     }
+}
 
-    use uom::si::{
-        acceleration::meter_per_second_squared, angular_acceleration::radian_per_second_squared,
-        angular_velocity::radian_per_second, velocity::meter_per_second,
-    };
+impl<LeftMotor, RightMotor> Controller for MultiSisoController<LeftMotor, RightMotor>
+where
+    LeftMotor: Motor,
+    RightMotor: Motor,
+{
+    fn control(&mut self, r: &ControlTarget, y: &ControlTarget) {
+        let vol_t = self.translational_controller.calculate(r.v, r.a, y.v, y.a);
+        let vol_r = self.rotational_controller.calculate(
+            r.omega.into(),
+            r.alpha.into(),
+            y.omega.into(),
+            y.alpha.into(),
+        );
+        self.left_motor.apply(vol_t - vol_r);
+        self.right_motor.apply(vol_t + vol_r);
+    }
+}
 
-    macro_rules! impl_model_simulator {
-        ($mod: ident: $builder: ident, $gain: ident, $t: ty, $dt: ty, $tunit: ty, $dtunit: ty) => {
-            mod $mod {
-                use super::*;
-                struct ModelSimulator {
-                    gain: $gain,
-                    time_constant: Time,
-                    period: Time,
-                    max_vol: ElectricPotential,
-                    prev_vel: $t,
-                    prev_accel: $dt,
-                    prev_vol: ElectricPotential,
-                }
+/// Config for [MultiSisoController].
+#[derive(Clone, PartialEq, Debug)]
+pub struct MultiSisoControllerConfig {
+    pub translational_parameters: ControlParameters,
+    pub rotational_parameters: ControlParameters,
+    pub period: Time,
+}
 
-                impl ModelSimulator {
-                    fn new(
-                        gain: f32,
-                        time_constant: f32,
-                        period: f32,
-                        max_vol: ElectricPotential,
-                    ) -> Self {
-                        Self {
-                            gain: $gain {
-                                value: gain,
-                                ..Default::default()
-                            },
-                            time_constant: Time::new::<second>(time_constant),
-                            period: Time::new::<second>(period),
-                            prev_vel: Default::default(),
-                            prev_accel: Default::default(),
-                            prev_vol: Default::default(),
-                            max_vol,
-                        }
-                    }
+/// Resource for [MultiSisoController].
+pub struct MultiSisoControllerResource<LeftMotor, RightMotor> {
+    pub left_motor: LeftMotor,
+    pub right_motor: RightMotor,
+}
 
-                    fn step(&mut self, vol: ElectricPotential) -> ($t, $dt) {
-                        let vol = if vol > self.max_vol {
-                            self.max_vol
-                        } else if vol < -self.max_vol {
-                            -self.max_vol
-                        } else {
-                            vol
-                        };
-                        let vel = <$t>::from(
-                            (self.time_constant * self.prev_vel + self.gain * self.period * vol)
-                                / (self.period + self.time_constant),
-                        );
-                        let accel = <$dt>::from(
-                            (self.time_constant * self.prev_accel
-                                + self.gain * (vol - self.prev_vol))
-                                / (self.period + self.time_constant),
-                        );
-                        self.prev_vel = vel;
-                        self.prev_accel = accel;
-                        self.prev_vol = vol;
-                        (vel, accel)
-                    }
-                }
+impl<LeftMotor, RightMotor, Config, State, Resource> Construct<Config, State, Resource>
+    for MultiSisoController<LeftMotor, RightMotor>
+where
+    Config: AsRef<MultiSisoControllerConfig>,
+    Resource: AsMut<Option<MultiSisoControllerResource<LeftMotor, RightMotor>>>,
+{
+    fn construct<'a>(config: &'a Config, _state: &'a State, resource: &'a mut Resource) -> Self {
+        let config = config.as_ref();
+        let MultiSisoControllerResource {
+            left_motor,
+            right_motor,
+        } = resource.as_mut().take().expect("Should never panic");
+        Self::new(
+            left_motor,
+            right_motor,
+            config.translational_parameters.clone(),
+            config.rotational_parameters.clone(),
+            config.period,
+        )
+    }
+}
 
-                #[test]
-                fn test_controller() {
-                    use uom::si::electric_potential::volt;
-
-                    let period = 0.001;
-                    let time_constant = 0.3694;
-                    let gain = 3.3;
-                    let mut controller = $builder::new()
-                        .period(Time::new::<second>(period))
-                        .model_gain(gain)
-                        .model_time_constant(Time::new::<second>(time_constant))
-                        .kp(0.9)
-                        .ki(0.05)
-                        .kd(0.01)
-                        .build()
-                        .unwrap();
-                    let mut simulator = ModelSimulator::new(
-                        gain,
-                        time_constant,
-                        period,
-                        ElectricPotential::new::<volt>(3.3),
-                    );
-
-                    let target_vel = <$t>::new::<$tunit>(1.0);
-                    let target_accel = <$dt>::new::<$dtunit>(0.0);
-                    let mut cur_vel = Default::default();
-                    let mut cur_accel = Default::default();
-                    for _ in 0..1000 {
-                        let vol =
-                            controller.calculate(target_vel, target_accel, cur_vel, cur_accel);
-                        let (vel, accel) = simulator.step(vol);
-                        cur_vel = vel;
-                        cur_accel = accel;
-                    }
-                }
+impl<LeftMotor, RightMotor, State, Resource> Deconstruct<State, Resource>
+    for MultiSisoController<LeftMotor, RightMotor>
+where
+    State: Default,
+    Resource: From<MultiSisoControllerResource<LeftMotor, RightMotor>>,
+{
+    fn deconstruct(self) -> (State, Resource) {
+        let (left_motor, right_motor) = self.release();
+        (
+            Default::default(),
+            MultiSisoControllerResource {
+                left_motor,
+                right_motor,
             }
-        };
+            .into(),
+        )
     }
-
-    type TransGain = Quantity<ISQ<N1, N1, P2, P1, Z0, Z0, Z0>, SI<f32>, f32>;
-    type RotGain = Quantity<ISQ<N2, N1, P2, P1, Z0, Z0, Z0>, SI<f32>, f32>;
-    impl_model_simulator!(
-        trans_controller: TranslationalControllerBuilder,
-        TransGain,
-        Velocity,
-        Acceleration,
-        meter_per_second,
-        meter_per_second_squared
-    );
-    impl_model_simulator!(
-        rot_controller: RotationalControllerBuilder,
-        RotGain,
-        AngularVelocity,
-        AngularAcceleration,
-        radian_per_second,
-        radian_per_second_squared
-    );
 }

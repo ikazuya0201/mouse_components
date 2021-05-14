@@ -4,7 +4,7 @@ use crate::{
     commanders::{
         ReturnCommander, ReturnSetupCommander, RunCommander, RunSetupCommander, SearchCommander,
     },
-    controllers::{RotationalController, TranslationalController},
+    controllers::MultiSisoController,
     estimator::Estimator,
     mazes::{CheckedMaze, Maze},
     nodes::{Node, RunNode, SearchNode},
@@ -49,7 +49,7 @@ pub type SearchOperator<
         >,
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
-            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,
@@ -78,7 +78,7 @@ pub type RunOperator<
         >,
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
-            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,
@@ -107,7 +107,7 @@ pub type ReturnSetupOperator<
         >,
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
-            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,
@@ -136,7 +136,7 @@ pub type ReturnOperator<
         >,
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
-            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,
@@ -165,7 +165,7 @@ pub type RunSetupOperator<
         >,
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
-            Tracker<LeftMotor, RightMotor, TranslationalController, RotationalController>,
+            Tracker<MultiSisoController<LeftMotor, RightMotor>>,
             WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
             RobotState,
         >,

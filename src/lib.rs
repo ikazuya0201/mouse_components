@@ -54,11 +54,13 @@ pub mod types {
         use super::*;
 
         #[doc(no_inline)]
+        pub use controllers::ControlParameters;
+        #[doc(no_inline)]
         pub use nodes::{AbsoluteDirection, Pattern, RelativeDirection, RotationKind};
         #[doc(no_inline)]
         pub use obstacle_detector::Obstacle;
         #[doc(no_inline)]
-        pub use tracker::{AngleState, LengthState, RobotState};
+        pub use tracker::{AngleState, ControlTarget, LengthState, RobotState};
         #[doc(no_inline)]
         pub use trajectory_generators::Pose;
         #[doc(no_inline)]
@@ -82,7 +84,7 @@ pub mod types {
             RunSetupCommanderConfig, SearchCommanderConfig,
         };
         #[doc(no_inline)]
-        pub use controllers::{RotationalControllerConfig, TranslationalControllerConfig};
+        pub use controllers::MultiSisoControllerConfig;
         #[doc(no_inline)]
         pub use estimator::EstimatorConfig;
         #[doc(no_inline)]
@@ -111,11 +113,11 @@ pub mod types {
         use super::*;
 
         #[doc(no_inline)]
+        pub use controllers::MultiSisoControllerResource;
+        #[doc(no_inline)]
         pub use estimator::EstimatorResource;
         #[doc(no_inline)]
         pub use obstacle_detector::ObstacleDetectorResource;
-        #[doc(no_inline)]
-        pub use tracker::TrackerResource;
     }
 }
 
@@ -124,11 +126,11 @@ pub mod sensors {
     use super::*;
 
     #[doc(no_inline)]
+    pub use controllers::Motor;
+    #[doc(no_inline)]
     pub use estimator::{Encoder, IMU};
     #[doc(no_inline)]
     pub use obstacle_detector::DistanceSensor;
-    #[doc(no_inline)]
-    pub use tracker::Motor;
 }
 
 const MAZE_WIDTH_UPPER_BOUND: usize = 16;
