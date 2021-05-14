@@ -77,6 +77,7 @@ impl_with_getter! {
         spin_angular_acceleration: AngularAcceleration,
         spin_angular_jerk: AngularJerk,
         slip_angle_const: Acceleration,
+        estimator_approximation_threshold: AngularVelocity,
     }
 }
 
@@ -156,6 +157,7 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             spin_angular_acceleration,
             spin_angular_jerk,
             slip_angle_const,
+            estimator_approximation_threshold,
         } = self;
         ConfigContainer {
             command_converter: CommandConverterConfig {
@@ -191,6 +193,7 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
                 wheel_interval,
                 correction_weight: estimator_correction_weight,
                 slip_angle_const,
+                approximation_threshold: estimator_approximation_threshold,
             },
             tracker: TrackerConfig {
                 gain: tracker_gain,
@@ -345,6 +348,7 @@ pub struct ConfigBuilder<const N: usize> {
     spin_angular_acceleration: Option<AngularAcceleration>,
     spin_angular_jerk: Option<AngularJerk>,
     slip_angle_const: Option<Acceleration>,
+    estimator_approximation_threshold: Option<AngularVelocity>,
 }
 
 impl<const N: usize> ConfigBuilder<N> {
@@ -534,6 +538,16 @@ impl<const N: usize> ConfigBuilder<N> {
         /// Sets the constant value for estimating slip angle.
         slip_angle_const: Acceleration
     );
+    impl_setter!(
+        /// **Optional**,
+        /// Default: 0.1 \[rad/s\]
+        ///
+        /// Sets the threshold for switching methods of approximation.
+        ///
+        /// If estimated angular velocity is smaller than this value, the estimator uses straight
+        /// approximation. Otherwise, it uses arc approximation.
+        estimator_approximation_threshold: AngularVelocity
+    );
 
     /// Generates new builder whose values are set as None.
     pub fn new() -> Self {
@@ -570,6 +584,7 @@ impl<const N: usize> ConfigBuilder<N> {
             spin_angular_acceleration: None,
             spin_angular_jerk: None,
             slip_angle_const: None,
+            estimator_approximation_threshold: None,
         }
     }
 
@@ -626,6 +641,9 @@ impl<const N: usize> ConfigBuilder<N> {
             spin_angular_acceleration: get!(spin_angular_acceleration),
             spin_angular_jerk: get!(spin_angular_jerk),
             slip_angle_const: get!(slip_angle_const),
+            estimator_approximation_threshold: self
+                .estimator_approximation_threshold
+                .unwrap_or(crate::estimator::EstimatorInner::DEFAULT_APPROXIMATION_THRESHOLD),
         })
     }
 }
