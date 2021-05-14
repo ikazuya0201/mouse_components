@@ -13,7 +13,6 @@ use components::{
         state::{State, StateBuilder, StateContainer},
     },
     nodes::RunNode,
-    pattern_converters::LinearPatternConverter,
     prelude::*,
     types::data::{AbsoluteDirection, ControlParameters, Pose, SearchKind},
     utils::probability::Probability,
@@ -59,7 +58,6 @@ macro_rules! impl_construct_and_deconstruct_test {
                 )
                 .search_initial_route(SearchKind::Init)
                 .search_final_route(SearchKind::Final)
-                .pattern_converter(LinearPatternConverter::default())
                 .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
                 .period(Time::new::<second>(0.001))
                 .translational_parameters(ControlParameters {

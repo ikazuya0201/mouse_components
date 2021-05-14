@@ -12,7 +12,7 @@ use crate::controllers::ControlParameters;
 use crate::impl_setter;
 use crate::impl_with_getter;
 use crate::nodes::RunNode;
-use crate::pattern_converters::LinearPatternConverter;
+use crate::pattern_converters::DefaultPatternConverter;
 use crate::types::configs::*;
 use crate::types::data::SearchKind;
 use crate::utils::builder::{ok_or, BuilderResult};
@@ -52,7 +52,7 @@ impl_with_getter! {
         #[serde(default)]
         estimator_cut_off_frequency: Frequency,
         #[serde(default)]
-        pattern_converter: LinearPatternConverter<u16>,
+        pattern_converter: DefaultPatternConverter<u16, N>,
         #[serde(default = "default_wall_width")]
         wall_width: Length,
         #[serde(default = "default_ignore_radius_from_pillar")]
@@ -115,7 +115,7 @@ impl_with_as_ref! {
         run_trajectory_generator: RunTrajectoryGeneratorConfig,
         return_setup_generator: ReturnSetupTrajectoryGeneratorConfig,
         wall_detector: WallDetectorConfig,
-        pattern_converter: LinearPatternConverter<u16>,
+        pattern_converter: DefaultPatternConverter<u16, N>,
     }
 }
 
@@ -269,7 +269,6 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
 ///     .goals(goals.into_iter().collect())
 ///     .search_initial_route(SearchKind::Init)
 ///     .search_final_route(SearchKind::Final)
-///     .pattern_converter(LinearPatternConverter::default())
 ///     .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
 ///     .period(Time::new::<second>(0.001))
 ///     .translational_parameters(ControlParameters {
@@ -319,7 +318,7 @@ pub struct ConfigBuilder<const N: usize> {
     translational_parameters: Option<ControlParameters>,
     rotational_parameters: Option<ControlParameters>,
     estimator_cut_off_frequency: Option<Frequency>,
-    pattern_converter: Option<LinearPatternConverter<u16>>,
+    pattern_converter: Option<DefaultPatternConverter<u16, N>>,
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
     ignore_length_from_wall: Option<Length>,
@@ -404,7 +403,7 @@ impl<const N: usize> ConfigBuilder<N> {
     impl_setter!(
         /// **Required**,
         /// Sets a pattern converter.
-        pattern_converter: LinearPatternConverter<u16>
+        pattern_converter: DefaultPatternConverter<u16, N>
     );
     impl_setter!(
         /// **Optional**,
@@ -647,7 +646,6 @@ mod tests {
             .goals(goals.into_iter().collect())
             .search_initial_route(SearchKind::Init)
             .search_final_route(SearchKind::Final)
-            .pattern_converter(LinearPatternConverter::default())
             .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
             .period(Time::new::<second>(0.001))
             .translational_parameters(ControlParameters {
