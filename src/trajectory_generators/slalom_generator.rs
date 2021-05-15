@@ -167,6 +167,7 @@ where
     }
 
     #[inline]
+    #[allow(clippy::too_many_arguments)]
     fn generate_curve(
         &self,
         x: Length,
@@ -209,12 +210,12 @@ impl Clone for CurveTrajectory {
     fn clone(&self) -> Self {
         Self {
             angle_calculator: self.angle_calculator.clone(),
-            t: self.t.clone(),
-            t_end: self.t_end.clone(),
-            period: self.period.clone(),
-            x: self.x.clone(),
-            y: self.y.clone(),
-            v: self.v.clone(),
+            t: self.t,
+            t_end: self.t_end,
+            period: self.period,
+            x: self.x,
+            y: self.y,
+            v: self.v,
         }
     }
 }

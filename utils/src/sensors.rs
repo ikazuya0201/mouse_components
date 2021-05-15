@@ -6,7 +6,7 @@ use core::convert::Infallible;
 use components::{
     prelude::*,
     sensors::{
-        DistanceSensor as IDistanceSensor, Encoder as IEncoder, Motor as IMotor, IMU as IIMU,
+        DistanceSensor as IDistanceSensor, Encoder as IEncoder, Imu as IImu, Motor as IMotor,
     },
     types::data::{Pose, RobotState},
     utils::sample::Sample,
@@ -69,7 +69,7 @@ impl<const N: usize> AgentSimulator<N> {
         Observer,
         Encoder,
         Encoder,
-        IMU,
+        Imu,
         Motor,
         Motor,
         Vec<DistanceSensor<N>>,
@@ -107,7 +107,7 @@ impl<const N: usize> AgentSimulator<N> {
                 wheel_interval,
                 direction: Direction::Left,
             },
-            IMU {
+            Imu {
                 inner: Rc::clone(&self.inner),
             },
             Motor {
@@ -277,11 +277,11 @@ impl IEncoder for Encoder {
     }
 }
 
-pub struct IMU {
+pub struct Imu {
     inner: Rc<RefCell<AgentSimulatorInner>>,
 }
 
-impl IIMU for IMU {
+impl IImu for Imu {
     type Error = Infallible;
 
     fn get_angular_velocity(&mut self) -> nb::Result<AngularVelocity, Self::Error> {

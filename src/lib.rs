@@ -128,7 +128,7 @@ pub mod sensors {
     #[doc(no_inline)]
     pub use controllers::Motor;
     #[doc(no_inline)]
-    pub use estimator::{Encoder, IMU};
+    pub use estimator::{Encoder, Imu};
     #[doc(no_inline)]
     pub use obstacle_detector::DistanceSensor;
 }

@@ -37,7 +37,7 @@ pub use crate::tracker::Controller as _components_tracker_Controller;
 #[doc(no_inline)]
 pub use crate::sensors::{
     DistanceSensor as _components_sensors_DistanceSensor, Encoder as _components_sensors_Encoder,
-    Motor as _components_sensors_Motor, IMU as _components_sensors_IMU,
+    Imu as _components_sensors_Imu, Motor as _components_sensors_Motor,
 };
 
 #[doc(no_inline)]

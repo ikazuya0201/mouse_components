@@ -72,8 +72,8 @@ where
         maze: Maze,
     ) -> Self {
         Self {
-            start: start.clone(),
-            goals: goals.into_iter().cloned().collect(),
+            start,
+            goals: goals.iter().cloned().collect(),
             initial_route,
             final_route,
             current: Mutex::new(current),
@@ -162,8 +162,8 @@ impl<Node, RunNode, Cost, Maze> TrackingCommander
         Maze,
     >
 where
-    RunNode: PartialEq + Copy + Debug + AsIndex,
-    Maze::SearchNode: PartialEq + Copy + Debug + AsIndex + RouteNode + TryFrom<Node>,
+    RunNode: PartialEq + Debug + AsIndex + Clone,
+    Maze::SearchNode: PartialEq + Debug + AsIndex + RouteNode + TryFrom<Node> + Clone,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
@@ -217,13 +217,13 @@ where
                 if candidates.is_empty() {
                     return Err(TrackingCommanderError::Waiting);
                 }
-                for &node in candidates.iter() {
+                for node in candidates.iter() {
                     let is_available = self
                         .maze
-                        .is_available(&node)
+                        .is_available(node)
                         .ok_or(TrackingCommanderError::Waiting)?;
                     if is_available {
-                        next = Some(node);
+                        next = Some(node.clone());
                         break;
                     }
                 }
@@ -248,8 +248,8 @@ where
 //TODO: write test
 impl<Node, RunNode, Cost, Route, Maze> SearchCommander<Node, RunNode, Maze::SearchNode, Route, Maze>
 where
-    RunNode: PartialEq + Copy + Debug + AsIndex,
-    Maze::SearchNode: PartialEq + Copy + Debug + AsIndex,
+    RunNode: PartialEq + Debug + AsIndex + Clone,
+    Maze::SearchNode: PartialEq + Debug + AsIndex + Clone,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
@@ -272,11 +272,11 @@ where
         let mut heap =
             BinaryHeap::<CostNode<Cost, Maze::SearchNode>, Min, NODE_NUMBER_UPPER_BOUND>::new();
         for node in checker_nodes {
-            heap.push(CostNode(Cost::min_value(), node)).unwrap();
             dists[node.as_index()] = Cost::min_value();
+            heap.push(CostNode(Cost::min_value(), node)).unwrap();
         }
         while let Some(CostNode(cost, node)) = heap.pop() {
-            if candidates.iter().any(|&(cand, _)| cand == node) {
+            if candidates.iter().any(|(cand, _)| cand == &node) {
                 continue;
             }
             for (next, edge_cost) in self.maze.predecessors(&node) {
@@ -290,7 +290,10 @@ where
 
         let mut candidates = candidates
             .into_iter()
-            .map(|(node, cost)| (node, cost.saturating_add(dists[node.as_index()])))
+            .map(|(node, cost)| {
+                let index = node.as_index();
+                (node, cost.saturating_add(dists[index]))
+            })
             .filter(|&(_, cost)| cost < Cost::max_value())
             .collect::<Vec<(Maze::SearchNode, Cost), CANDIDATE_SIZE_UPPER_BOUND>>();
 

@@ -27,7 +27,7 @@ where
 {
     pub fn new(current: Node, goals: &[Node], maze: Maze) -> Self {
         for (node, kind) in current.rotation_nodes() {
-            if let Some(_) = compute_shortest_path(&node, goals, &maze) {
+            if compute_shortest_path(&node, goals, &maze).is_some() {
                 return Self {
                     current: node,
                     maze,

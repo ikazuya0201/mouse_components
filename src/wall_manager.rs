@@ -23,17 +23,17 @@ pub struct Wall<const N: usize> {
     top: bool,
 }
 
-impl<const N: usize> Into<[SearchNode<N>; 2]> for Wall<N> {
-    fn into(self) -> [SearchNode<N>; 2] {
+impl<const N: usize> From<Wall<N>> for [SearchNode<N>; 2] {
+    fn from(value: Wall<N>) -> [SearchNode<N>; 2] {
         use crate::types::data::AbsoluteDirection::*;
 
-        let (dx, dy, dirs) = if self.is_top() {
+        let (dx, dy, dirs) = if value.is_top() {
             (0, 1, [North, South])
         } else {
             (1, 0, [East, West])
         };
-        let x = (self.x() * 2 + dx) as i8;
-        let y = (self.y() * 2 + dy) as i8;
+        let x = (value.x() * 2 + dx) as i8;
+        let y = (value.y() * 2 + dy) as i8;
         let new = |x, y, dir| {
             SearchNode::<N>::new(x, y, dir)
                 .unwrap_or_else(|err| unreachable!("Should never be error: {:?}", err))
@@ -67,6 +67,10 @@ impl<const N: usize> Wall<N> {
         1
     }
 
+    /// Creates a new `Wall` with no check of boundaries.
+    ///
+    /// # Safety
+    /// `x` and `y` should be smaller than `N`.
     pub unsafe fn new_unchecked(x: u8, y: u8, top: bool) -> Self {
         Self { x, y, top }
     }
@@ -78,7 +82,7 @@ impl<const N: usize> Wall<N> {
         N.trailing_zeros() as usize + Self::y_offset()
     }
 
-    fn to_index(&self) -> usize {
+    fn as_index(&self) -> usize {
         ((self.x as usize) << Self::x_offset())
             | ((self.y as usize) << Self::y_offset())
             | self.top as usize
@@ -116,9 +120,9 @@ impl<const N: usize> fmt::Display for WallManager<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let prob = |x: u8, y: u8, is_top: bool| -> Probability {
             let wall = Wall::<N>::new(x, y, is_top).unwrap();
-            self.walls[wall.to_index()].lock().clone()
+            *self.walls[wall.as_index()].lock()
         };
-        writeln!(f, "")?;
+        writeln!(f)?;
         for y in (0..N as u8).rev() {
             write!(f, " +--")?;
             for x in 0..N as u8 - 1 {
@@ -130,19 +134,19 @@ impl<const N: usize> fmt::Display for WallManager<N> {
             for _ in 0..N as u8 {
                 write!(f, "     |  ")?;
             }
-            writeln!(f, "")?;
+            writeln!(f)?;
 
             write!(f, "1.0 ")?;
             for x in 0..N as u8 {
                 write!(f, "    {:1.1} ", f32::from(prob(x, y, false)))?;
             }
-            writeln!(f, "")?;
+            writeln!(f)?;
 
             write!(f, " |  ")?;
             for _ in 0..N as u8 {
                 write!(f, "     |  ")?;
             }
-            writeln!(f, "")?;
+            writeln!(f)?;
         }
         write!(f, " +--")?;
         for _ in 0..N as u8 - 1 {
@@ -199,7 +203,7 @@ impl<const N: usize> WallManager<N> {
     fn _update(&self, x: u8, y: u8, top: bool, prob: Probability) {
         *self.walls[Wall::<N>::new(x, y, top)
             .unwrap_or_else(|err| unreachable!("This is bug: {:?}", err))
-            .to_index()]
+            .as_index()]
         .lock() = prob;
     }
 
@@ -290,14 +294,11 @@ impl<const N: usize> WallProbabilityManager<Wall<N>> for WallManager<N> {
     type Error = MutexError;
 
     fn try_existence_probability(&self, wall: &Wall<N>) -> Result<Probability, Self::Error> {
-        Ok(self.walls[wall.to_index()]
-            .try_lock()
-            .ok_or(MutexError)?
-            .clone())
+        Ok(*self.walls[wall.as_index()].try_lock().ok_or(MutexError)?)
     }
 
     fn try_update(&self, wall: &Wall<N>, prob: &Probability) -> Result<(), Self::Error> {
-        *self.walls[wall.to_index()].try_lock().ok_or(MutexError)? = *prob;
+        *self.walls[wall.as_index()].try_lock().ok_or(MutexError)? = *prob;
         Ok(())
     }
 }
@@ -331,7 +332,7 @@ mod tests {
 
         for (x, y, top, expected) in test_cases {
             let wall = Wall::<4>::new(x, y, top).unwrap();
-            assert_eq!(wall.to_index(), expected);
+            assert_eq!(wall.as_index(), expected);
         }
     }
 

@@ -119,8 +119,8 @@ impl_with_as_ref! {
     }
 }
 
-impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
-    fn into(self) -> ConfigContainer<N> {
+impl<const N: usize> From<Config<N>> for ConfigContainer<N> {
+    fn from(value: Config<N>) -> Self {
         let Config {
             square_width,
             front_offset,
@@ -153,14 +153,14 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             slip_angle_const,
             estimator_approximation_threshold,
             fail_safe_voltage_threshold,
-        } = self;
-        ConfigContainer {
+        } = value;
+        Self {
             command_converter: CommandConverterConfig {
                 square_width,
                 front_offset,
             },
             search_commander: SearchCommanderConfig {
-                start: start.clone(),
+                start,
                 goals: goals.clone(),
                 initial_route: search_initial_route,
                 final_route: search_final_route,
@@ -168,19 +168,15 @@ impl<const N: usize> Into<ConfigContainer<N>> for Config<N> {
             run_commander: RunCommanderConfig {
                 goals: goals.clone(),
             },
-            run_setup_commander: RunSetupCommanderConfig {
-                goals: goals.clone(),
-            },
+            run_setup_commander: RunSetupCommanderConfig { goals },
             return_setup_commander: ReturnSetupCommanderConfig {
                 return_goal: return_goal.clone(),
             },
-            return_commander: ReturnCommanderConfig {
-                return_goal: return_goal.clone(),
-            },
+            return_commander: ReturnCommanderConfig { return_goal },
             controller: MultiSisoControllerConfig {
-                period,
                 translational_parameters,
                 rotational_parameters,
+                period,
                 fail_safe_voltage_threshold,
             },
             estimator: EstimatorConfig {
@@ -338,6 +334,12 @@ pub struct ConfigBuilder<const N: usize> {
     slip_angle_const: Option<Acceleration>,
     estimator_approximation_threshold: Option<AngularVelocity>,
     fail_safe_voltage_threshold: Option<ElectricPotential>,
+}
+
+impl<const N: usize> Default for ConfigBuilder<N> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const N: usize> ConfigBuilder<N> {
@@ -574,7 +576,7 @@ impl<const N: usize> ConfigBuilder<N> {
 
         Ok(Config {
             square_width: self.square_width.unwrap_or(DEFAULT_SQUARE_WIDTH),
-            front_offset: self.front_offset.unwrap_or(Default::default()),
+            front_offset: self.front_offset.unwrap_or_default(),
             start: get!(start),
             return_goal: get!(return_goal),
             goals: get!(goals),
@@ -584,7 +586,7 @@ impl<const N: usize> ConfigBuilder<N> {
             translational_parameters: get!(translational_parameters),
             rotational_parameters: get!(rotational_parameters),
             estimator_cut_off_frequency: get!(estimator_cut_off_frequency),
-            pattern_converter: self.pattern_converter.take().unwrap_or(Default::default()),
+            pattern_converter: self.pattern_converter.take().unwrap_or_default(),
             wall_width: self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
             ignore_radius_from_pillar: self
                 .ignore_radius_from_pillar

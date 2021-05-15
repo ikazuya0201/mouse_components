@@ -49,6 +49,8 @@ where
 {
     const HALF_DIAGONAL: f32 = 0.70710677;
 
+    #[allow(clippy::too_many_arguments)]
+    #[inline]
     fn new(
         run_slalom_velocity: Velocity,
         max_velocity: Velocity,
@@ -165,6 +167,7 @@ where
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum RunTrajectory {
     Straight(StraightTrajectory),
     Slalom(SlalomTrajectory),
@@ -224,7 +227,7 @@ impl<Generator> RunTrajectoryGeneratorBuilder<Generator> {
             get_or_err!(self.parameters_generator),
             get_or_err!(self.period),
             get_or_err!(self.square_width),
-            self.initial_velocity.unwrap_or(Default::default()),
+            self.initial_velocity.unwrap_or_default(),
         ))
     }
 

@@ -62,7 +62,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            pose: self.pose.clone(),
+            pose: self.pose,
             inner: self.inner.clone(),
         }
     }

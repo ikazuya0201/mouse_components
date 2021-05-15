@@ -30,7 +30,7 @@ impl<const N: usize> From<State<N>> for StateContainer<N> {
     fn from(value: State<N>) -> Self {
         StateContainer {
             node_commander: CommanderState {
-                current_node: value.current_node.into(),
+                current_node: value.current_node.clone().into(),
             },
             run_node_commander: CommanderState {
                 current_node: value.current_node,
@@ -148,8 +148,8 @@ impl<const N: usize> From<EstimatorState> for StateBuilder<N> {
 
 impl<const N: usize> Merge for StateBuilder<N> {
     fn merge(mut self, mut other: Self) -> Self {
-        self.current_node = self.current_node.or(other.current_node.take());
-        self.robot_state = self.robot_state.or(other.robot_state.take());
+        self.current_node = self.current_node.or_else(|| other.current_node.take());
+        self.robot_state = self.robot_state.or_else(|| other.robot_state.take());
         self
     }
 }

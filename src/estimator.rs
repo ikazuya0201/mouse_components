@@ -19,7 +19,7 @@ use crate::tracker::RobotState;
 use crate::utils::builder::{ok_or, BuilderResult};
 use crate::{get_or_err, Construct, Deconstruct};
 
-pub trait IMU {
+pub trait Imu {
     type Error;
 
     fn get_translational_acceleration(&mut self) -> nb::Result<Acceleration, Self::Error>;
@@ -185,15 +185,15 @@ pub struct EstimatorResource<LeftEncoder, RightEncoder, Imu> {
     pub imu: Imu,
 }
 
-impl<LeftEncoder, RightEncoder, Imu, Config, State, Resource> Construct<Config, State, Resource>
-    for Estimator<LeftEncoder, RightEncoder, Imu>
+impl<LeftEncoder, RightEncoder, ImuType, Config, State, Resource> Construct<Config, State, Resource>
+    for Estimator<LeftEncoder, RightEncoder, ImuType>
 where
     LeftEncoder: Encoder,
     RightEncoder: Encoder,
-    Imu: IMU,
+    ImuType: Imu,
     Config: AsRef<EstimatorConfig>,
     State: AsRef<EstimatorState>,
-    Resource: AsMut<Option<EstimatorResource<LeftEncoder, RightEncoder, Imu>>>,
+    Resource: AsMut<Option<EstimatorResource<LeftEncoder, RightEncoder, ImuType>>>,
 {
     fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
         let config = config.as_ref();
@@ -241,10 +241,10 @@ impl<LE, RE, I> IEstimator for Estimator<LE, RE, I>
 where
     LE: Encoder,
     RE: Encoder,
-    I: IMU,
+    I: Imu,
     <LE as Encoder>::Error: core::fmt::Debug,
     <RE as Encoder>::Error: core::fmt::Debug,
-    <I as IMU>::Error: core::fmt::Debug,
+    <I as Imu>::Error: core::fmt::Debug,
 {
     type State = RobotState;
 
@@ -314,8 +314,8 @@ impl<LeftEncoder, RightEncoder: Encoder, Imu> EstimatorBuilder<LeftEncoder, Righ
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu: IMU> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
-    pub fn imu(&mut self, imu: Imu) -> &mut Self {
+impl<LeftEncoder, RightEncoder, ImuType: Imu> EstimatorBuilder<LeftEncoder, RightEncoder, ImuType> {
+    pub fn imu(&mut self, imu: ImuType) -> &mut Self {
         self.imu = Some(imu);
         self
     }
@@ -370,10 +370,10 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
     }
 }
 
-impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
-    EstimatorBuilder<LeftEncoder, RightEncoder, Imu>
+impl<LeftEncoder: Encoder, RightEncoder: Encoder, ImuType: Imu>
+    EstimatorBuilder<LeftEncoder, RightEncoder, ImuType>
 {
-    pub fn build(&mut self) -> BuilderResult<Estimator<LeftEncoder, RightEncoder, Imu>> {
+    pub fn build(&mut self) -> BuilderResult<Estimator<LeftEncoder, RightEncoder, ImuType>> {
         let period = ok_or(self.period, "period")?;
         let cut_off_frequency = ok_or(self.cut_off_frequency, "cut_off_frequency")?;
         let alpha =
@@ -383,7 +383,7 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, Imu: IMU>
             inner: EstimatorInner::new(
                 period,
                 alpha,
-                self.initial_state.take().unwrap_or(Default::default()),
+                self.initial_state.take().unwrap_or_default(),
                 get_or_err!(self.slip_angle_const),
                 self.approximation_threshold
                     .unwrap_or(EstimatorInner::DEFAULT_APPROXIMATION_THRESHOLD),
@@ -537,7 +537,7 @@ mod tests {
         inner: Rc<RefCell<AgentSimulatorInner<T>>>,
     }
 
-    impl<T> IMU for IIMU<T> {
+    impl<T> Imu for IIMU<T> {
         type Error = ();
 
         fn get_angular_velocity(&mut self) -> nb::Result<AngularVelocity, Self::Error> {

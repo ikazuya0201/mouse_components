@@ -26,7 +26,7 @@ where
 
 impl<Node, Maze> RunCommander<Node, Maze>
 where
-    Node: PartialEq + Copy + Debug + AsIndex + RouteNode,
+    Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
 {
@@ -61,7 +61,7 @@ pub struct RunCommanderConfig<Node> {
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for RunCommander<Node, Maze>
 where
-    Node: PartialEq + Copy + Debug + AsIndex + RouteNode,
+    Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Config: AsRef<RunCommanderConfig<Node>>,
@@ -166,7 +166,7 @@ pub struct ReturnCommanderConfig<Node> {
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for ReturnCommander<Node, Maze>
 where
-    Node: PartialEq + Copy + Debug + AsIndex + RouteNode,
+    Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Config: AsRef<ReturnCommanderConfig<Node>>,

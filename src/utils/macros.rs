@@ -152,6 +152,12 @@ macro_rules! impl_with_builder {
             $($field_name: Option<$type>),*
         }
 
+        impl<$($tt),*, $(const $const: usize),*> Default for $builder<$($tt),*, $($const),*> {
+            fn default() -> Self {
+                Self::new()
+            }
+        }
+
         impl<$($tt),*, $(const $const: usize),*> $builder<$($tt),*, $($const),*> {
             pub fn new() -> Self {
                 Self {
