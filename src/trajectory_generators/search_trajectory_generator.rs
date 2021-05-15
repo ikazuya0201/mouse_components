@@ -68,7 +68,10 @@ impl Iterator for SearchTrajectory {
 }
 
 pub type BackTrajectory = Chain<
-    Chain<StraightTrajectory, ShiftTrajectory<SpinTrajectory>>,
+    Chain<
+        Chain<Chain<StraightTrajectory, StopTrajectory>, ShiftTrajectory<SpinTrajectory>>,
+        StopTrajectory,
+    >,
     ShiftTrajectory<StraightTrajectory>,
 >;
 
@@ -134,7 +137,7 @@ impl SearchTrajectoryGenerator {
                     ..Default::default()
                 },
                 period,
-                Time::new::<second>(1.5),
+                Time::new::<second>(0.5),
             ));
         let right_trajectory = slalom_generator.generate_constant_slalom(
             SlalomKind::Search90,
@@ -154,12 +157,28 @@ impl SearchTrajectoryGenerator {
             let distance = square_width_half - front_offset; //TODO: use configurable value
             straight_generator
                 .generate(distance, search_velocity, Default::default())
+                .chain(StopTrajectory::new(
+                    Pose {
+                        x: distance,
+                        ..Default::default()
+                    },
+                    period,
+                    Time::new::<second>(0.1),
+                ))
                 .chain(ShiftTrajectory::new(
                     Pose {
                         x: distance,
                         ..Default::default()
                     },
                     spin_generator.generate(Angle::new::<degree>(180.0)),
+                ))
+                .chain(StopTrajectory::new(
+                    Pose {
+                        x: distance,
+                        ..Default::default()
+                    },
+                    period,
+                    Time::new::<second>(0.1),
                 ))
                 .chain(ShiftTrajectory::new(
                     Pose {

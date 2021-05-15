@@ -74,10 +74,10 @@ macro_rules! impl_search_operator_test {
                     },
                 };
                 let period = Time::new::<millisecond>(1.0);
-                let trans_model_k = 1.0;
-                let trans_model_t1 = Time::new::<second>(0.3694);
-                let rot_model_k = 10.0;
-                let rot_model_t1 = Time::new::<second>(0.1499);
+                let trans_model_k = 1.865;
+                let trans_model_t1 = Time::new::<second>(0.4443);
+                let rot_model_k = 82.39;
+                let rot_model_t1 = Time::new::<second>(0.2855);
                 let existence_threshold = Probability::new(0.1).unwrap();
                 let wheel_interval = Length::new::<millimeter>(33.5);
 
@@ -144,15 +144,15 @@ macro_rules! impl_search_operator_test {
                                 left_motor,
                                 right_motor,
                                 ControlParameters {
-                                    kp: 1.0,
-                                    ki: 0.05,
-                                    kd: 0.01,
+                                    kp: 4.8497,
+                                    ki: 29.5783,
+                                    kd: 0.0,
                                     model_k: trans_model_k,
                                     model_t1: trans_model_t1.value,
                                 },
                                 ControlParameters {
-                                    kp: 1.0,
-                                    ki: 0.2,
+                                    kp: 0.21134,
+                                    ki: 2.9317,
                                     kd: 0.0,
                                     model_k: rot_model_k,
                                     model_t1: rot_model_t1.value,
