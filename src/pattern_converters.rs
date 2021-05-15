@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::mazes::PatternConverter;
 use crate::types::data::Pattern;
-use crate::{impl_deconstruct_with_default, Construct};
-use crate::{impl_with_builder, Deconstruct};
+use crate::{
+    impl_deconstruct_with_default, impl_with_builder, Construct, Deconstruct,
+    MAZE_WIDTH_UPPER_BOUND,
+};
 
 impl_with_builder! {
     /// A builder for [LinearPatternConverter].
@@ -84,6 +86,8 @@ where
     }
 }
 
+const MAZE_WIDTH_UPPER_BOUND_X2: usize = 2 * MAZE_WIDTH_UPPER_BOUND;
+
 impl_with_builder! {
     /// A builder for [DefaultPatternConverter].
     DefaultPatternConverterBuilder:
@@ -92,7 +96,7 @@ impl_with_builder! {
         ///
         /// The costs of straight and straight diagonal can be determined for each length.
         #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-        pub struct DefaultPatternConverter<Cost; const N: usize> {
+        pub struct DefaultPatternConverter<Cost> {
             search90: Cost,
             fast_run45: Cost,
             fast_run90: Cost,
@@ -100,13 +104,13 @@ impl_with_builder! {
             fast_run180: Cost,
             fast_run_diagonal90: Cost,
             spin_back: Cost,
-            straight_array: Vec<Cost, N>,
-            straight_diagonal_array: Vec<Cost, N>,
+            straight_array: Vec<Cost, MAZE_WIDTH_UPPER_BOUND>,
+            straight_diagonal_array: Vec<Cost, MAZE_WIDTH_UPPER_BOUND_X2>,
         }
     }
 }
 
-impl<Cost, const N: usize> PatternConverter<Pattern> for DefaultPatternConverter<Cost, N>
+impl<Cost> PatternConverter<Pattern> for DefaultPatternConverter<Cost>
 where
     u8: Into<Cost>,
     Cost: core::ops::Mul<Output = Cost> + Copy,
@@ -130,11 +134,12 @@ where
     }
 }
 
-impl<Config, State, Resource, Cost, const N: usize> Construct<Config, State, Resource>
-    for DefaultPatternConverter<Cost, N>
+// TODO: Initializes parameters by using trajectory generators.
+impl<Config, State, Resource, Cost> Construct<Config, State, Resource>
+    for DefaultPatternConverter<Cost>
 where
     Cost: Clone,
-    Config: AsRef<DefaultPatternConverter<Cost, N>>,
+    Config: AsRef<DefaultPatternConverter<Cost>>,
 {
     fn construct<'a>(config: &'a Config, _state: &'a State, _resource: &'a mut Resource) -> Self {
         let converter = config.as_ref();
@@ -142,8 +147,7 @@ where
     }
 }
 
-impl<State, Resource, Cost, const N: usize> Deconstruct<State, Resource>
-    for DefaultPatternConverter<Cost, N>
+impl<State, Resource, Cost> Deconstruct<State, Resource> for DefaultPatternConverter<Cost>
 where
     State: Default,
     Resource: Default,
@@ -153,7 +157,7 @@ where
     }
 }
 
-impl<const N: usize> Default for DefaultPatternConverter<u16, N> {
+impl Default for DefaultPatternConverter<u16> {
     fn default() -> Self {
         use core::array::IntoIter;
 
@@ -169,13 +173,15 @@ impl<const N: usize> Default for DefaultPatternConverter<u16, N> {
                 10, 16, 20, 24, 27, 29, 31, 33, 35, 37, 39, 42, 44, 46, 49, 51, 53, 55, 58, 60, 62,
                 65, 67, 69, 72, 74, 76, 78, 81, 83, 85,
             ])
-            .take(N)
+            .take(MAZE_WIDTH_UPPER_BOUND)
             .collect(),
             straight_diagonal_array: IntoIter::new([
-                7, 12, 15, 18, 21, 23, 25, 26, 28, 29, 31, 32, 33, 34, 36, 37, 39, 40, 42, 43, 45,
-                47, 48, 50, 51, 53, 54, 56, 57, 59, 60,
+                7, 13, 18, 22, 26, 29, 32, 35, 37, 40, 42, 44, 45, 47, 49, 50, 52, 53, 55, 56, 57,
+                58, 59, 61, 62, 63, 64, 65, 67, 68, 70, 71, 72, 74, 75, 77, 78, 79, 81, 82, 84, 85,
+                87, 88, 90, 91, 92, 94, 95, 97, 98, 99, 101, 102, 104, 105, 107, 108, 109, 111,
+                112, 114, 115,
             ])
-            .take(N)
+            .take(2 * MAZE_WIDTH_UPPER_BOUND)
             .collect(),
         }
     }
