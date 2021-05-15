@@ -14,7 +14,7 @@ use components::{
     nodes::{RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
-    pattern_converters::LinearPatternConverter,
+    pattern_converters::DefaultPatternConverter,
     prelude::*,
     robot::Robot,
     tracker::TrackerBuilder,
@@ -239,7 +239,7 @@ macro_rules! impl_run_operator_test {
             let commander = {
                 let maze = CheckedMaze::<_, _, SearchNode<$size>>::new(
                     Rc::clone(&wall_storage),
-                    LinearPatternConverter::default(),
+                    DefaultPatternConverter::default(),
                 );
                 let start = RunNode::new(0, 0, North).unwrap();
                 RunCommander::new(start, &goals, maze)

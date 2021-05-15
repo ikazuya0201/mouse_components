@@ -12,7 +12,7 @@ use components::{
     nodes::{Node, RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
-    pattern_converters::LinearPatternConverter,
+    pattern_converters::DefaultPatternConverter,
     robot::Robot,
     tracker::TrackerBuilder,
     trajectory_generators::{DefaultSlalomParametersGenerator, SearchTrajectoryGeneratorBuilder},
@@ -225,7 +225,7 @@ macro_rules! impl_search_operator_test {
 
                 let create_commander = |wall_storage| {
                     let maze: Maze<_, _, SearchNode<N>> =
-                        Maze::new(wall_storage, LinearPatternConverter::default());
+                        Maze::new(wall_storage, DefaultPatternConverter::default());
                     let start = RunNode::<N>::new(0, 0, North).unwrap();
                     let current: Node<N> = start.clone().into();
                     SearchCommander::new(

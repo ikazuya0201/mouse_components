@@ -52,7 +52,7 @@ impl_with_getter! {
         #[serde(default)]
         estimator_cut_off_frequency: Frequency,
         #[serde(default)]
-        pattern_converter: DefaultPatternConverter<u16, N>,
+        pattern_converter: DefaultPatternConverter<u16>,
         #[serde(default = "default_wall_width")]
         wall_width: Length,
         #[serde(default = "default_ignore_radius_from_pillar")]
@@ -115,7 +115,7 @@ impl_with_as_ref! {
         run_trajectory_generator: RunTrajectoryGeneratorConfig,
         return_setup_generator: ReturnSetupTrajectoryGeneratorConfig,
         wall_detector: WallDetectorConfig,
-        pattern_converter: DefaultPatternConverter<u16, N>,
+        pattern_converter: DefaultPatternConverter<u16>,
     }
 }
 
@@ -318,7 +318,7 @@ pub struct ConfigBuilder<const N: usize> {
     translational_parameters: Option<ControlParameters>,
     rotational_parameters: Option<ControlParameters>,
     estimator_cut_off_frequency: Option<Frequency>,
-    pattern_converter: Option<DefaultPatternConverter<u16, N>>,
+    pattern_converter: Option<DefaultPatternConverter<u16>>,
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
     ignore_length_from_wall: Option<Length>,
@@ -403,7 +403,7 @@ impl<const N: usize> ConfigBuilder<N> {
     impl_setter!(
         /// **Required**,
         /// Sets a pattern converter.
-        pattern_converter: DefaultPatternConverter<u16, N>
+        pattern_converter: DefaultPatternConverter<u16>
     );
     impl_setter!(
         /// **Optional**,

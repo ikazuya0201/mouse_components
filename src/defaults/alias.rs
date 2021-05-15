@@ -38,7 +38,7 @@ pub type SearchOperator<
         RunNode<N>,
         SearchNode<N>,
         SearchKind,
-        Maze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
+        Maze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
         SearchTrajectoryManager<
@@ -66,7 +66,7 @@ pub type RunOperator<
 > = TrackingOperator<
     RunCommander<
         RunNode<N>,
-        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
+        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
@@ -94,7 +94,7 @@ pub type ReturnSetupOperator<
 > = TrackingOperator<
     ReturnSetupCommander<
         RunNode<N>,
-        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
+        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
@@ -122,7 +122,7 @@ pub type ReturnOperator<
 > = TrackingOperator<
     ReturnCommander<
         RunNode<N>,
-        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
+        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
@@ -150,7 +150,7 @@ pub type RunSetupOperator<
 > = TrackingOperator<
     RunSetupCommander<
         RunNode<N>,
-        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16, N>, SearchNode<N>>,
+        CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
