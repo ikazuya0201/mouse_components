@@ -3,7 +3,7 @@ use num::{Bounded, Saturating};
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
-use super::{compute_shortest_path, CommanderState, Graph, GOAL_SIZE_UPPER_BOUND};
+use super::{compute_shortest_path, AsIndex, CommanderState, Graph, GOAL_SIZE_UPPER_BOUND};
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
 
@@ -21,7 +21,7 @@ where
 
 impl<Node, Maze> SetupCommander<Node, Maze>
 where
-    Node: Clone + Into<usize> + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
@@ -79,7 +79,7 @@ where
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for ReturnSetupCommander<Node, Maze>
 where
-    Node: Clone + Into<usize> + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
     Maze::Cost: Ord + Bounded + Saturating + Copy,
     Config: AsRef<ReturnSetupCommanderConfig<Node>>,
@@ -111,7 +111,7 @@ where
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for RunSetupCommander<Node, Maze>
 where
-    Node: Clone + Into<usize> + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
     Maze::Cost: Ord + Bounded + Saturating + Copy,
     Config: AsRef<RunSetupCommanderConfig<Node>>,
@@ -145,7 +145,7 @@ pub trait RotationNode: Sized {
 //TODO: Write test.
 impl<Node, Maze> TrackingCommander for SetupCommander<Node, Maze>
 where
-    Node: Clone + Into<usize> + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
@@ -176,7 +176,7 @@ macro_rules! impl_all_for_setup_commander {
 
         impl<Node, Maze> TrackingCommander for $name<Node, Maze>
         where
-            Node: Clone + Into<usize> + PartialEq + RotationNode,
+            Node: Clone + AsIndex + PartialEq + RotationNode,
             Maze: Graph<Node>,
             Maze::Cost: Bounded + Saturating + Copy + Ord,
         {

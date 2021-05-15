@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
 use super::{
-    compute_shortest_path, CommanderState, CostNode, Graph, RouteNode, GOAL_SIZE_UPPER_BOUND,
-    NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
+    compute_shortest_path, AsIndex, CommanderState, CostNode, Graph, RouteNode,
+    GOAL_SIZE_UPPER_BOUND, NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
@@ -162,8 +162,8 @@ impl<Node, RunNode, Cost, Maze> TrackingCommander
         Maze,
     >
 where
-    RunNode: PartialEq + Copy + Debug + Into<usize>,
-    Maze::SearchNode: PartialEq + Copy + Debug + Into<usize> + RouteNode + TryFrom<Node>,
+    RunNode: PartialEq + Copy + Debug + AsIndex,
+    Maze::SearchNode: PartialEq + Copy + Debug + AsIndex + RouteNode + TryFrom<Node>,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
@@ -248,8 +248,8 @@ where
 //TODO: write test
 impl<Node, RunNode, Cost, Route, Maze> SearchCommander<Node, RunNode, Maze::SearchNode, Route, Maze>
 where
-    RunNode: PartialEq + Copy + Debug + Into<usize>,
-    Maze::SearchNode: PartialEq + Copy + Debug + Into<usize>,
+    RunNode: PartialEq + Copy + Debug + AsIndex,
+    Maze::SearchNode: PartialEq + Copy + Debug + AsIndex,
     Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
@@ -273,7 +273,7 @@ where
             BinaryHeap::<CostNode<Cost, Maze::SearchNode>, Min, NODE_NUMBER_UPPER_BOUND>::new();
         for node in checker_nodes {
             heap.push(CostNode(Cost::min_value(), node)).unwrap();
-            dists[node.into()] = Cost::min_value();
+            dists[node.as_index()] = Cost::min_value();
         }
         while let Some(CostNode(cost, node)) = heap.pop() {
             if candidates.iter().any(|&(cand, _)| cand == node) {
@@ -281,8 +281,8 @@ where
             }
             for (next, edge_cost) in self.maze.predecessors(&node) {
                 let next_cost = cost.saturating_add(edge_cost);
-                if dists[next.into()] > next_cost {
-                    dists[next.into()] = next_cost;
+                if dists[next.as_index()] > next_cost {
+                    dists[next.as_index()] = next_cost;
                     heap.push(CostNode(next_cost, next)).unwrap();
                 }
             }
@@ -290,7 +290,7 @@ where
 
         let mut candidates = candidates
             .into_iter()
-            .map(|(node, cost)| (node, cost.saturating_add(dists[node.into()])))
+            .map(|(node, cost)| (node, cost.saturating_add(dists[node.as_index()])))
             .filter(|&(_, cost)| cost < Cost::max_value())
             .collect::<Vec<(Maze::SearchNode, Cost), CANDIDATE_SIZE_UPPER_BOUND>>();
 
@@ -305,7 +305,7 @@ where
 
 impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, SearchNode, Route, Maze>
 where
-    RunNode: Clone + Into<usize> + PartialEq,
+    RunNode: Clone + AsIndex + PartialEq,
     Maze: Graph<RunNode>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {

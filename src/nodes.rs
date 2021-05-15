@@ -5,7 +5,7 @@ mod direction;
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::commanders::{NextNode, RotationNode, RouteNode};
+use crate::commanders::{AsIndex, NextNode, RotationNode, RouteNode};
 use crate::mazes::NEIGHBOR_NUMBER_UPPER_BOUND;
 use crate::mazes::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
@@ -295,8 +295,8 @@ impl<const N: usize> SearchNode<N> {
     }
 }
 
-impl<const N: usize> Into<usize> for SearchNode<N> {
-    fn into(self) -> usize {
+impl<const N: usize> AsIndex for SearchNode<N> {
+    fn as_index(&self) -> usize {
         use AbsoluteDirection::*;
 
         let direction = if self.0.x() & 1 == 0 {
@@ -524,8 +524,8 @@ impl<const N: usize> core::fmt::Debug for RunNode<N> {
     }
 }
 
-impl<const N: usize> Into<usize> for RunNode<N> {
-    fn into(self) -> usize {
+impl<const N: usize> AsIndex for RunNode<N> {
+    fn as_index(&self) -> usize {
         use AbsoluteDirection::*;
 
         let direction = if (self.0.x ^ self.0.y) & 1 == 1 {
