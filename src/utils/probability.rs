@@ -1,3 +1,6 @@
+#[allow(unused)]
+use micromath::F32Ext;
+
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
 pub struct Probability(f32);
 
@@ -15,6 +18,10 @@ impl Probability {
         }
     }
 
+    /// Creates a new `Probability`.
+    ///
+    /// # Safety
+    /// `val` should be between 0 and 1.
     pub const unsafe fn new_unchecked(val: f32) -> Self {
         Self(val)
     }
@@ -32,11 +39,11 @@ impl Probability {
     }
 
     pub fn is_one(&self) -> bool {
-        self.0 == 1.0
+        (self.0 - 1.0).abs() < core::f32::EPSILON
     }
 
     pub fn is_zero(&self) -> bool {
-        self.0 == 0.0
+        self.0.abs() < core::f32::EPSILON
     }
 }
 

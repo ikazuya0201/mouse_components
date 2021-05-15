@@ -74,9 +74,10 @@ impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, cons
     for ResourceBuilder<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
 {
     fn from(value: Rc<WallManager<N>>) -> Self {
-        let mut resource = Self::default();
-        resource.wall_manager = Some(value);
-        resource
+        Self {
+            wall_manager: Some(value),
+            ..Default::default()
+        }
     }
 }
 
@@ -137,14 +138,12 @@ impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, cons
 }
 
 impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, const N: usize>
-    Into<
-        ResourceContainer<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>,
-    > for Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
+    From<Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>>
+    for ResourceContainer<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
 {
-    fn into(
-        self,
-    ) -> ResourceContainer<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
-    {
+    fn from(
+        value: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>,
+    ) -> Self {
         let Resource {
             left_encoder,
             right_encoder,
@@ -153,8 +152,8 @@ impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, cons
             right_motor,
             distance_sensors,
             wall_manager,
-        } = self;
-        ResourceContainer {
+        } = value;
+        Self {
             estimator: Some(EstimatorResource {
                 left_encoder,
                 right_encoder,

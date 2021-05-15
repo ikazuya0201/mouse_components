@@ -222,6 +222,12 @@ pub struct TrackerBuilder<Controller> {
     b: Option<BType>,
 }
 
+impl<ControllerType> Default for TrackerBuilder<ControllerType> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<ControllerType> TrackerBuilder<ControllerType> {
     pub fn new() -> Self {
         Self {

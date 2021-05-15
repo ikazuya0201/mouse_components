@@ -29,7 +29,7 @@ pub enum Pattern {
 }
 
 //TODO: Create new data type to reduce copy cost.
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that is the super set of [SearchNode] and [RunNode].
 pub struct Node<const N: usize> {
     x: i8,
@@ -222,7 +222,7 @@ impl<const N: usize> Node<N> {
 }
 
 //TODO: Remove Copy
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that represents nodes (verteces) of a graph for search.
 pub struct SearchNode<const N: usize>(Node<N>);
 
@@ -270,15 +270,9 @@ impl<const N: usize> SearchNode<N> {
         if (x ^ y) & 1 == 0 {
             false
         } else if x & 1 == 1 {
-            match direction {
-                East | West => true,
-                _ => false,
-            }
+            matches!(direction, East | West)
         } else {
-            match direction {
-                North | South => true,
-                _ => false,
-            }
+            matches!(direction, North | South)
         }
     }
 }
@@ -309,16 +303,14 @@ impl<const N: usize> AsIndex for SearchNode<N> {
                     _ => unreachable!(),
                 }
             }
-        } else {
-            if self.0.y() & 1 == 0 {
-                match self.0.direction() {
-                    East => 0,
-                    West => 1,
-                    _ => unreachable!(),
-                }
-            } else {
-                unreachable!()
+        } else if self.0.y() & 1 == 0 {
+            match self.0.direction() {
+                East => 0,
+                West => 1,
+                _ => unreachable!(),
             }
+        } else {
+            unreachable!()
         };
         *self.0.x() as usize
             | ((*self.0.y() as usize) << Self::y_offset())
@@ -407,9 +399,11 @@ impl<const N: usize> WallSpaceNode for SearchNode<N> {
     type Wall = Wall<N>;
 }
 
+type SearchWallNodes<const N: usize> = Vec<WallNode<Wall<N>, (SearchNode<N>, Pattern)>, 2>;
+
 impl<const N: usize> GraphNode for SearchNode<N> {
     type Pattern = Pattern;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, 2>;
+    type WallNodes = SearchWallNodes<N>;
     type WallNodesList = Vec<Self::WallNodes, 4>;
 
     fn successors(&self) -> Self::WallNodesList {
@@ -498,7 +492,7 @@ impl<const N: usize> RouteNode for RunNode<N> {
 }
 
 //TODO: Create new data type to reduce copy cost.
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that represents nodes (verteces) of a graph for fast run.
 pub struct RunNode<const N: usize>(Node<N>);
 
@@ -588,15 +582,9 @@ impl<const N: usize> RunNode<N> {
 
         if (x ^ y) & 1 == 1 {
             //on a wall
-            match direction {
-                NorthEast | SouthEast | SouthWest | NorthWest => true,
-                _ => false,
-            }
+            matches!(direction, NorthEast | SouthEast | SouthWest | NorthWest)
         } else if (x | y) & 1 == 0 {
-            match direction {
-                North | East | South | West => true,
-                _ => false,
-            }
+            matches!(direction, North | East | South | West)
         } else {
             false
         }
@@ -643,11 +631,11 @@ impl<const N: usize> RunNode<N> {
         }
     }
 
-    fn add_wall_fn<'a>(
-        &'a self,
+    fn add_wall_fn(
+        &self,
         is_succ: bool,
         base_dir: AbsoluteDirection,
-    ) -> impl 'a
+    ) -> impl '_
            + Fn(
         &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>,
         i8,
@@ -666,11 +654,11 @@ impl<const N: usize> RunNode<N> {
         }
     }
 
-    fn add_node_fn<'a>(
-        &'a self,
+    fn add_node_fn(
+        &self,
         is_succ: bool,
         base_dir: AbsoluteDirection,
-    ) -> impl 'a
+    ) -> impl '_
            + Fn(
         &mut ForcedVec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>,
         i8,
@@ -834,10 +822,13 @@ impl<const N: usize> WallSpaceNode for RunNode<N> {
     type Wall = Wall<N>;
 }
 
+type RunWallNodes<const N: usize> =
+    Vec<WallNode<Wall<N>, (RunNode<N>, Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>;
+
 //TODO: use iterator instead of vec
 impl<const N: usize> GraphNode for RunNode<N> {
     type Pattern = Pattern;
-    type WallNodes = Vec<WallNode<Self::Wall, (Self, Self::Pattern)>, NEIGHBOR_NUMBER_UPPER_BOUND>;
+    type WallNodes = RunWallNodes<N>;
     type WallNodesList = Vec<Self::WallNodes, 3>;
 
     fn successors(&self) -> Self::WallNodesList {

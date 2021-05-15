@@ -6,6 +6,7 @@ use typenum::{consts::*, operator_aliases::PartialQuot, type_operators::PartialD
 use uom::marker::Div;
 use uom::si::{Dimension, Quantity, ISQ, SI};
 
+#[allow(clippy::type_complexity)]
 pub fn sqrt<D>(
     val: Quantity<D, SI<f32>, f32>,
 ) -> Quantity<

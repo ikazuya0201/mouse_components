@@ -108,9 +108,7 @@ where
     type Error = TrackingOperatorError<Agent::Error, Commander::Error>;
 
     fn tick(&self) -> Result<(), Self::Error> {
-        self.agent
-            .update()
-            .map_err(|err| TrackingOperatorError::Agent(err))
+        self.agent.update().map_err(TrackingOperatorError::Agent)
     }
 
     fn run(&self) -> Result<(), OperatorError<Self::Error>> {

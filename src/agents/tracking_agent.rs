@@ -88,13 +88,13 @@ where
         self.robot
             .lock()
             .track_and_update(&target)
-            .map_err(|err| TrackingAgentError::Robot(err))
+            .map_err(TrackingAgentError::Robot)
     }
 
     fn set_command(&self, command: &Command) -> Result<(), Self::Error> {
         self.manager
             .set_command(command)
-            .map_err(|err| TrackingAgentError::Manager(err))
+            .map_err(TrackingAgentError::Manager)
     }
 
     fn is_full(&self) -> Option<bool> {

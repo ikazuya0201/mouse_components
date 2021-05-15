@@ -31,8 +31,8 @@ impl<T, const N: usize> core::ops::DerefMut for ForcedVec<T, N> {
     }
 }
 
-impl<T, const N: usize> Into<Vec<T, N>> for ForcedVec<T, N> {
-    fn into(self) -> Vec<T, N> {
-        self.0
+impl<T, const N: usize> From<ForcedVec<T, N>> for Vec<T, N> {
+    fn from(value: ForcedVec<T, N>) -> Vec<T, N> {
+        value.0
     }
 }

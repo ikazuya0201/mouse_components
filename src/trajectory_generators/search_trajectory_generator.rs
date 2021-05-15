@@ -87,6 +87,8 @@ pub struct SearchTrajectoryGenerator {
 }
 
 impl SearchTrajectoryGenerator {
+    #[allow(clippy::too_many_arguments)]
+    #[inline]
     fn new<Generator>(
         parameters_generator: Generator,
         max_acceleration: Acceleration,

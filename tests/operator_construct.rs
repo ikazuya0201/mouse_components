@@ -35,7 +35,7 @@ use uom::si::{
     time::second,
     velocity::meter_per_second,
 };
-use utils::sensors::{AgentSimulator, DistanceSensor, Encoder, Motor, IMU};
+use utils::sensors::{AgentSimulator, DistanceSensor, Encoder, Imu, Motor};
 
 macro_rules! impl_construct_and_deconstruct_test {
     ($name: ident: $operator: ident, $wall_manager: expr, $state: expr, $maze_width: literal,) => {
@@ -164,7 +164,7 @@ macro_rules! impl_construct_and_deconstruct_test {
             let operator = <$operator<
                 Encoder,
                 Encoder,
-                IMU,
+                Imu,
                 Motor,
                 Motor,
                 DistanceSensor<$maze_width>,
@@ -190,8 +190,9 @@ macro_rules! impl_construct_and_deconstruct_test {
 fn new_state<const N: usize>(x: i8, y: i8, dir: AbsoluteDirection) -> State<N> {
     let node = RunNode::new(x, y, dir).unwrap();
     let command_converter = CommandConverter::default();
-    let (pose, _) = command_converter.convert(&(node, ()));
-    State::new(node, pose.into())
+    let command = (node, ());
+    let (pose, _) = command_converter.convert(&command);
+    State::new(command.0, pose.into())
 }
 
 impl_construct_and_deconstruct_test! {

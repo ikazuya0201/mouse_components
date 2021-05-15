@@ -252,7 +252,7 @@ impl<const N: usize> PoseConverter<N> {
 impl<const N: usize> PoseConverter<N> {
     fn is_near_pillar(&self, pose: &Pose) -> bool {
         let rot = pose.theta.get::<revolution>().rem_euclid(1.0);
-        let pillars = if rot < 0.125 || rot > 0.875 {
+        let pillars = if !(0.125..=0.875).contains(&rot) {
             [
                 (self.square_width, Length::default()),
                 (self.square_width, self.square_width),
@@ -331,11 +331,7 @@ impl<const N: usize> PoseConverter<N> {
 
         use Direction::*;
 
-        let create_error = || {
-            Err(ConversionError::OutOfBound(OutOfBoundError {
-                pose: pose.clone(),
-            }))
-        };
+        let create_error = || Err(ConversionError::OutOfBound(OutOfBoundError { pose: *pose }));
 
         debug_assert!(!pose.x.value.is_nan());
         debug_assert!(!pose.y.value.is_nan());
@@ -460,6 +456,12 @@ pub struct PoseConverterBuilder {
     ignore_length_from_wall: Option<Length>,
 }
 
+impl Default for PoseConverterBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PoseConverterBuilder {
     pub fn new() -> Self {
         Self {
@@ -494,6 +496,12 @@ pub struct WallDetectorBuilder<Manager, Detector> {
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
     ignore_length_from_wall: Option<Length>,
+}
+
+impl<Manager, Detector> Default for WallDetectorBuilder<Manager, Detector> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<Manager, Detector> WallDetectorBuilder<Manager, Detector> {
