@@ -6,7 +6,7 @@ use num::{Bounded, Saturating};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    compute_shortest_path, CommanderState, Graph, RouteNode, GOAL_SIZE_UPPER_BOUND,
+    compute_shortest_path, AsIndex, CommanderState, Graph, RouteNode, GOAL_SIZE_UPPER_BOUND,
     PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
@@ -26,7 +26,7 @@ where
 
 impl<Node, Maze> RunCommander<Node, Maze>
 where
-    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode,
+    Node: PartialEq + Copy + Debug + AsIndex + RouteNode,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Maze: Graph<Node>,
 {
@@ -61,7 +61,7 @@ pub struct RunCommanderConfig<Node> {
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for RunCommander<Node, Maze>
 where
-    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode,
+    Node: PartialEq + Copy + Debug + AsIndex + RouteNode,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Config: AsRef<RunCommanderConfig<Node>>,
@@ -166,7 +166,7 @@ pub struct ReturnCommanderConfig<Node> {
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for ReturnCommander<Node, Maze>
 where
-    Node: PartialEq + Copy + Debug + Into<usize> + RouteNode,
+    Node: PartialEq + Copy + Debug + AsIndex + RouteNode,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
     Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
     Config: AsRef<ReturnCommanderConfig<Node>>,

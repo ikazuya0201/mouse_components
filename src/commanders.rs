@@ -75,18 +75,23 @@ pub(crate) const PATH_UPPER_BOUND: usize = MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_U
 pub(crate) const NODE_NUMBER_UPPER_BOUND: usize =
     16 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
+/// A trait that can be interpreted as index.
+pub trait AsIndex {
+    fn as_index(&self) -> usize;
+}
+
 fn compute_shortest_path<Node, Maze>(
     start: &Node,
     goals: &[Node],
     maze: &Maze,
 ) -> Option<Vec<Node, PATH_UPPER_BOUND>>
 where
-    Node: Clone + Into<usize> + PartialEq,
+    Node: Clone + AsIndex + PartialEq,
     Maze: Graph<Node>,
     Maze::Cost: Bounded + Saturating + Copy + Ord,
 {
     let mut dists = [Maze::Cost::max_value(); NODE_NUMBER_UPPER_BOUND];
-    dists[start.clone().into()] = Maze::Cost::min_value();
+    dists[start.as_index()] = Maze::Cost::min_value();
 
     let mut prev = core::iter::repeat(None)
         .take(NODE_NUMBER_UPPER_BOUND)
@@ -99,11 +104,11 @@ where
         });
 
     let construct_path = |goal: Node, prev: &[Option<Node>]| {
-        let mut current = prev[goal.clone().into()].clone()?;
+        let mut current = prev[goal.as_index()].clone()?;
         let mut path = ForcedVec::new();
         path.push(goal);
         path.push(current.clone());
-        while let Some(next) = prev[current.clone().into()].as_ref() {
+        while let Some(next) = prev[current.as_index()].as_ref() {
             path.push(next.clone());
             current = next.clone();
         }
@@ -123,15 +128,15 @@ where
         }
         for (next, edge_cost) in maze.successors(&node) {
             let next_cost = cost.saturating_add(edge_cost);
-            if next_cost < dists[next.clone().into()] {
-                dists[next.clone().into()] = next_cost;
+            if next_cost < dists[next.as_index()] {
+                dists[next.as_index()] = next_cost;
                 heap.push(CostNode(next_cost, next.clone()))
                     .unwrap_or_else(|_| {
                         unreachable!(
                             "The length of binary heap should never exceed the upper bound"
                         )
                     });
-                prev[next.into()] = Some(node.clone());
+                prev[next.as_index()] = Some(node.clone());
             }
         }
     }
@@ -157,9 +162,9 @@ mod tests {
             }
         }
 
-        impl From<RunNode> for usize {
-            fn from(value: RunNode) -> Self {
-                value.0
+        impl AsIndex for RunNode {
+            fn as_index(&self) -> usize {
+                self.0
             }
         }
 
@@ -186,14 +191,13 @@ mod tests {
 
         impl<T> Graph<T> for IGraph
         where
-            usize: From<T>,
-            T: Clone + From<usize>,
+            T: Clone + From<usize> + AsIndex,
         {
             type Cost = usize;
             type Edges = Vec<(T, usize)>;
 
             fn successors(&self, node: &T) -> Self::Edges {
-                let node = usize::from(node.clone());
+                let node = node.as_index();
                 let mut result = Vec::new();
                 for i in 0..self.n {
                     if let Some(cost) = self.mat[node][i] {
@@ -204,7 +208,7 @@ mod tests {
             }
 
             fn predecessors(&self, node: &T) -> Self::Edges {
-                let node = usize::from(node.clone());
+                let node = node.as_index();
                 let mut result = Vec::new();
                 for i in 0..self.n {
                     if let Some(cost) = self.mat[i][node] {
