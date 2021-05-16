@@ -11,4 +11,6 @@ pub trait Robot<Target> {
     type Error;
 
     fn track_and_update(&mut self, target: &Target) -> Result<(), Self::Error>;
+    /// Stops all actuators in robot.
+    fn stop(&mut self);
 }

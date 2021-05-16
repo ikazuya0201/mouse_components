@@ -11,6 +11,8 @@ pub trait TrackingAgent<Command> {
     fn set_command(&self, command: &Command) -> Result<(), Self::Error>;
     fn is_full(&self) -> Option<bool>;
     fn is_empty(&self) -> Option<bool>;
+    /// Stops all actuators in agent.
+    fn stop(&self);
 }
 
 /// Error on [TrackingCommander](TrackingCommander)
@@ -140,5 +142,9 @@ where
                 Other(err) => Err(OperatorError::Other(TrackingOperatorError::Commander(err))),
             },
         }
+    }
+
+    fn stop(&self) {
+        self.agent.stop();
     }
 }

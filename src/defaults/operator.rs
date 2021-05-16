@@ -148,6 +148,18 @@ where
             Run(operator) => operator.run().map_err(convert),
         }
     }
+
+    fn stop(&self) {
+        use Operators::*;
+
+        match self {
+            Search(operator) => operator.stop(),
+            ReturnSetup(operator) => operator.stop(),
+            Return(operator) => operator.stop(),
+            RunSetup(operator) => operator.stop(),
+            Run(operator) => operator.stop(),
+        }
+    }
 }
 
 impl<

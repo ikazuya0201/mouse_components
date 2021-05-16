@@ -1,8 +1,7 @@
 //! Definition of [Administrator](Administrator) and its dependencies.
 
+use core::cell::RefCell;
 use core::sync::atomic::{AtomicBool, Ordering};
-
-use spin::Mutex;
 
 /// Error on [Operator](Operator).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +33,9 @@ pub trait Operator {
     /// Executes non-periodic tasks like solving maze.
     /// The execution can be blocked.
     fn run(&self) -> Result<(), OperatorError<Self::Error>>;
+
+    /// Stops all actuators.
+    fn stop(&self);
 }
 
 /// A trait that is used for selecting a mode.
@@ -62,9 +64,9 @@ pub trait InterruptManager {
 pub struct Administrator<Mode, Selector, Operator, Store, Manager> {
     is_select: AtomicBool,
     selector: Selector,
-    operator: Mutex<Option<Operator>>,
+    operator: RefCell<Option<Operator>>,
     store: Store,
-    mode: Mutex<Mode>,
+    mode: RefCell<Mode>,
     manager: Manager,
 }
 
@@ -87,42 +89,51 @@ where
         Self {
             is_select: AtomicBool::new(false),
             selector,
-            operator: Mutex::new(Some(operator)),
+            operator: RefCell::new(Some(operator)),
             store,
-            mode: Mutex::new(mode),
+            mode: RefCell::new(mode),
             manager,
         }
+    }
+
+    pub fn start(&self) {
+        self.manager.turn_on();
     }
 
     pub fn run(&self) -> Result<(), OperatorType::Error> {
         if self.is_select.load(Ordering::Relaxed) {
             self.mode_select();
             Ok(())
-        } else if let Err(err) = self
-            .operator
-            .lock()
-            .as_ref()
-            .unwrap_or_else(|| todo!())
-            .run()
-        {
-            match err {
-                OperatorError::Incompleted => Ok(()),
-                OperatorError::Other(err) => Err(err),
-            }
         } else {
-            self.manager.turn_off();
-            let mut mode = self.mode.lock();
-            *mode = mode.successor();
-            self.exchange_operator(*mode);
-            self.manager.turn_on();
-            Ok(())
+            let operator = self.operator.borrow();
+            if let Err(err) = operator.as_ref().unwrap_or_else(|| todo!()).run() {
+                match err {
+                    OperatorError::Incompleted => Ok(()),
+                    OperatorError::Other(err) => Err(err),
+                }
+            } else {
+                self.manager.turn_off();
+                core::mem::drop(operator);
+                let mut mode = self.mode.borrow_mut();
+                *mode = mode.successor();
+                self.exchange_operator(*mode);
+                self.manager.turn_on();
+                Ok(())
+            }
         }
     }
 
     fn exchange_operator(&self, mode: Mode) {
-        let operator = self.operator.lock().take().expect("Should never be None");
-        let operator = self.store.exchange(operator, mode);
-        *self.operator.lock() = Some(operator);
+        let operator = {
+            let operator = self
+                .operator
+                .borrow_mut()
+                .take()
+                .expect("Should never be None");
+            operator.stop();
+            self.store.exchange(operator, mode)
+        };
+        *self.operator.borrow_mut() = Some(operator);
     }
 
     fn mode_select(&self) {
@@ -138,7 +149,7 @@ where
         while self.selector.is_enabled() {}
 
         let mode = self.selector.mode();
-        *self.mode.lock() = mode;
+        *self.mode.borrow_mut() = mode;
         self.exchange_operator(mode);
 
         self.is_select.store(false, Ordering::Relaxed);
@@ -156,8 +167,8 @@ where
     pub fn tick(&self) -> Result<(), OperatorType::Error> {
         if self.is_select.load(Ordering::Relaxed) {
             return Ok(());
-        } else if let Some(operator) = self.operator.try_lock() {
-            operator.as_ref().unwrap_or_else(|| todo!()).tick()?
+        } else if let Some(operator) = self.operator.borrow().as_ref() {
+            operator.tick()?
         }
         if self.selector.is_enabled() {
             self.is_select.store(true, Ordering::Relaxed);
