@@ -3,5 +3,6 @@
 /// Alias for operators.
 pub mod alias;
 pub mod config;
+pub mod operator;
 pub mod resource;
 pub mod state;

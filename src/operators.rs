@@ -4,4 +4,5 @@ mod tracking_operator;
 
 pub use tracking_operator::{
     TrackingAgent, TrackingCommander, TrackingCommanderError, TrackingOperator,
+    TrackingOperatorError,
 };
