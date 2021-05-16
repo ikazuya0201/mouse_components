@@ -1,6 +1,5 @@
 //! Definition of [Administrator](Administrator) and its dependencies.
 
-use core::marker::PhantomData;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use spin::Mutex;
@@ -14,82 +13,109 @@ pub enum OperatorError<T> {
 
 /// A trait that consumes and initializes operators.
 pub trait OperatorStore<Mode, Operator> {
+    /// Exchanges an operator by a given mode.
     fn exchange(&self, operator: Operator, mode: Mode) -> Operator;
-    fn next(&self, operator: Operator) -> Operator;
+}
+
+/// A trait that has a successor.
+pub trait Successor {
+    /// Returns the successor of the value.
+    fn successor(&self) -> Self;
 }
 
 /// A trait that operates a given process.
 pub trait Operator {
     type Error;
 
+    /// Executes periodic tasks for control.
+    /// The execution should never be blocked.
     fn tick(&self) -> Result<(), Self::Error>;
+
+    /// Executes non-periodic tasks like solving maze.
+    /// The execution can be blocked.
     fn run(&self) -> Result<(), OperatorError<Self::Error>>;
 }
 
 /// A trait that is used for selecting a mode.
 pub trait Selector<Mode> {
+    /// Resets the state of selector.
     fn reset(&self);
+
+    /// Gets the currently selected mode.
     fn mode(&self) -> Mode;
+
+    /// Returns where the selector is enabled or not.
     fn is_enabled(&self) -> bool;
 }
 
-/// A type that manages modes and orchestrates operators.
-pub struct Administrator<Mode, ISelector, Operator, Store> {
-    is_select: AtomicBool,
-    selector: ISelector,
-    operator: Mutex<Option<Operator>>,
-    store: Store,
-    _mode: PhantomData<fn() -> Mode>,
+/// A trait that manages interrupts.
+pub trait InterruptManager {
+    /// Turns on periodic interrupt.
+    fn turn_on(&self);
+
+    /// Turns off periodic interrupt.
+    fn turn_off(&self);
 }
 
-impl<Mode, ISelector, IOperator, Store> Administrator<Mode, ISelector, IOperator, Store>
+// TODO: Write test.
+/// A type that manages modes and orchestrates operators.
+pub struct Administrator<Mode, Selector, Operator, Store, Manager> {
+    is_select: AtomicBool,
+    selector: Selector,
+    operator: Mutex<Option<Operator>>,
+    store: Store,
+    mode: Mutex<Mode>,
+    manager: Manager,
+}
+
+impl<Mode, SelectorType, OperatorType, Store, Manager>
+    Administrator<Mode, SelectorType, OperatorType, Store, Manager>
 where
-    ISelector: Selector<Mode>,
-    IOperator: Operator,
-    Store: OperatorStore<Mode, IOperator>,
+    Mode: Successor + Copy,
+    SelectorType: Selector<Mode>,
+    OperatorType: Operator,
+    Store: OperatorStore<Mode, OperatorType>,
+    Manager: InterruptManager,
 {
-    pub fn new(selector: ISelector, operator: IOperator, store: Store) -> Self {
+    pub fn new(
+        selector: SelectorType,
+        operator: OperatorType,
+        store: Store,
+        mode: Mode,
+        manager: Manager,
+    ) -> Self {
         Self {
             is_select: AtomicBool::new(false),
             selector,
             operator: Mutex::new(Some(operator)),
             store,
-            _mode: PhantomData,
+            mode: Mutex::new(mode),
+            manager,
         }
     }
 
-    //called by periodic interrupt
-    pub fn tick(&self) {
+    pub fn run(&self) -> Result<(), OperatorType::Error> {
         if self.is_select.load(Ordering::Relaxed) {
-            return;
-        } else if let Some(operator) = self.operator.try_lock() {
-            operator
-                .as_ref()
-                .unwrap_or_else(|| todo!())
-                .tick()
-                .unwrap_or_else(|_| todo!());
-        }
-        if self.selector.is_enabled() {
-            self.is_select.store(true, Ordering::Relaxed);
-        }
-    }
-
-    pub fn run(&self) {
-        loop {
-            if self.is_select.load(Ordering::Relaxed) {
-                self.mode_select();
-            } else if self
-                .operator
-                .lock()
-                .as_ref()
-                .unwrap_or_else(|| todo!())
-                .run()
-                .is_ok()
-            {
-                let operator = self.operator.lock().take().expect("Should never be None");
-                let operator = self.store.next(operator);
-                *self.operator.lock() = Some(operator);
+            self.mode_select();
+            Ok(())
+        } else if let Err(err) = self
+            .operator
+            .lock()
+            .as_ref()
+            .unwrap_or_else(|| todo!())
+            .run()
+        {
+            match err {
+                OperatorError::Incompleted => Ok(()),
+                OperatorError::Other(err) => Err(err),
             }
+        } else {
+            self.manager.turn_off();
+            let mut mode = self.mode.lock();
+            *mode = mode.successor();
+            self.exchange_operator(*mode);
+            self.manager.turn_on();
+            Ok(())
         }
     }
 
@@ -100,6 +126,7 @@ where
     }
 
     fn mode_select(&self) {
+        self.manager.turn_off();
         //waiting for switch off
         while self.selector.is_enabled() {}
 
@@ -111,8 +138,30 @@ where
         while self.selector.is_enabled() {}
 
         let mode = self.selector.mode();
+        *self.mode.lock() = mode;
         self.exchange_operator(mode);
 
         self.is_select.store(false, Ordering::Relaxed);
+        self.manager.turn_on();
+    }
+}
+
+impl<Mode, SelectorType, OperatorType, Store, Manager>
+    Administrator<Mode, SelectorType, OperatorType, Store, Manager>
+where
+    SelectorType: Selector<Mode>,
+    OperatorType: Operator,
+{
+    //called by periodic interrupt
+    pub fn tick(&self) -> Result<(), OperatorType::Error> {
+        if self.is_select.load(Ordering::Relaxed) {
+            return Ok(());
+        } else if let Some(operator) = self.operator.try_lock() {
+            operator.as_ref().unwrap_or_else(|| todo!()).tick()?
+        }
+        if self.selector.is_enabled() {
+            self.is_select.store(true, Ordering::Relaxed);
+        }
+        Ok(())
     }
 }
