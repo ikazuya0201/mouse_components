@@ -5,7 +5,7 @@ mod direction;
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::commanders::{AsIndex, NextNode, RotationNode, RouteNode};
+use crate::commanders::{AsIndex, Distance, NextNode, RotationNode, RouteNode};
 use crate::mazes::NEIGHBOR_NUMBER_UPPER_BOUND;
 use crate::mazes::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
@@ -35,6 +35,16 @@ pub struct Node<const N: usize> {
     x: i8,
     y: i8,
     direction: AbsoluteDirection,
+}
+
+impl<const N: usize> Distance for Node<N> {
+    type Output = u16;
+
+    // TODO: Uses a configurable value as a multiplier.
+    /// Returns L_inf norm times 5.
+    fn distance(&self, other: &Self) -> Self::Output {
+        (self.x - other.x).abs().max((self.y - other.y).abs()) as u16 * 5
+    }
 }
 
 impl<const N: usize> NextNode<SearchKind> for Node<N> {
@@ -225,6 +235,14 @@ impl<const N: usize> Node<N> {
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that represents nodes (verteces) of a graph for search.
 pub struct SearchNode<const N: usize>(Node<N>);
+
+impl<const N: usize> Distance for SearchNode<N> {
+    type Output = <Node<N> as Distance>::Output;
+
+    fn distance(&self, other: &Self) -> Self::Output {
+        self.0.distance(&other.0)
+    }
+}
 
 impl<const N: usize> SearchNode<N> {
     pub fn inner(&self) -> &Node<N> {
@@ -496,6 +514,13 @@ impl<const N: usize> RouteNode for RunNode<N> {
 /// A type that represents nodes (verteces) of a graph for fast run.
 pub struct RunNode<const N: usize>(Node<N>);
 
+impl<const N: usize> Distance for RunNode<N> {
+    type Output = <Node<N> as Distance>::Output;
+
+    fn distance(&self, other: &Self) -> Self::Output {
+        self.0.distance(&other.0)
+    }
+}
 impl<const N: usize> RunNode<N> {
     pub fn inner(&self) -> &Node<N> {
         &self.0

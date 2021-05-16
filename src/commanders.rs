@@ -4,6 +4,8 @@ mod run_commander;
 mod search_commander;
 mod setup_commander;
 
+use core::ops::Add;
+
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num::{Bounded, Saturating};
 use serde::{Deserialize, Serialize};
@@ -80,25 +82,35 @@ pub trait AsIndex {
     fn as_index(&self) -> usize;
 }
 
+/// A trait for converting two values to the distance between them.
+pub trait Distance {
+    type Output;
+
+    fn distance(&self, other: &Self) -> Self::Output;
+}
+
+// NOTE: Distances between `goals` must be 0.
+// The length of `goals` must be greater than 0.
 fn compute_shortest_path<Node, Maze>(
     start: &Node,
     goals: &[Node],
     maze: &Maze,
 ) -> Option<Vec<Node, PATH_UPPER_BOUND>>
 where
-    Node: Clone + AsIndex + PartialEq,
+    Node: Clone + AsIndex + PartialEq + Distance<Output = Maze::Cost>,
     Maze: Graph<Node>,
-    Maze::Cost: Bounded + Saturating + Copy + Ord,
+    Maze::Cost: Bounded + Saturating + Copy + Ord + Add<Output = Maze::Cost>,
 {
     let mut dists = [Maze::Cost::max_value(); NODE_NUMBER_UPPER_BOUND];
-    dists[start.as_index()] = Maze::Cost::min_value();
+    let start_cost = Maze::Cost::min_value() + start.distance(&goals[0]);
+    dists[start.as_index()] = start_cost;
 
     let mut prev = core::iter::repeat(None)
         .take(NODE_NUMBER_UPPER_BOUND)
         .collect::<Vec<_, NODE_NUMBER_UPPER_BOUND>>();
 
     let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node>, Min, NODE_NUMBER_UPPER_BOUND>::new();
-    heap.push(CostNode(Maze::Cost::min_value(), start.clone()))
+    heap.push(CostNode(start_cost, start.clone()))
         .unwrap_or_else(|_| {
             unreachable!("The length of binary heap should never exceed the upper bound")
         });
@@ -127,7 +139,7 @@ where
             }
         }
         for (next, edge_cost) in maze.successors(&node) {
-            let next_cost = cost.saturating_add(edge_cost);
+            let next_cost = cost.saturating_add(edge_cost + next.distance(&goals[0]));
             if next_cost < dists[next.as_index()] {
                 dists[next.as_index()] = next_cost;
                 heap.push(CostNode(next_cost, next.clone()))
@@ -155,6 +167,14 @@ mod tests {
         #[derive(Clone, Copy, PartialEq, Debug)]
         struct RunNode(usize);
         struct SearchNode(usize);
+
+        impl Distance for RunNode {
+            type Output = usize;
+
+            fn distance(&self, _other: &Self) -> Self::Output {
+                0
+            }
+        }
 
         impl From<usize> for RunNode {
             fn from(value: usize) -> Self {
