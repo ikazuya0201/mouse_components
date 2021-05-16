@@ -1,9 +1,13 @@
+use core::ops::Add;
+
 use heapless::Vec;
 use num::{Bounded, Saturating};
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
-use super::{compute_shortest_path, AsIndex, CommanderState, Graph, GOAL_SIZE_UPPER_BOUND};
+use super::{
+    compute_shortest_path, AsIndex, CommanderState, Distance, Graph, GOAL_SIZE_UPPER_BOUND,
+};
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
 
@@ -21,9 +25,9 @@ where
 
 impl<Node, Maze> SetupCommander<Node, Maze>
 where
-    Node: Clone + AsIndex + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode + Distance<Output = Maze::Cost>,
     Maze: Graph<Node>,
-    Maze::Cost: Bounded + Saturating + Copy + Ord,
+    Maze::Cost: Bounded + Saturating + Copy + Ord + Add<Output = Maze::Cost>,
 {
     pub fn new(current: Node, goals: &[Node], maze: Maze) -> Self {
         for (node, kind) in current.rotation_nodes() {
@@ -79,9 +83,9 @@ where
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for ReturnSetupCommander<Node, Maze>
 where
-    Node: Clone + AsIndex + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode + Distance<Output = Maze::Cost>,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
-    Maze::Cost: Ord + Bounded + Saturating + Copy,
+    Maze::Cost: Ord + Bounded + Saturating + Copy + Add<Output = Maze::Cost>,
     Config: AsRef<ReturnSetupCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
 {
@@ -111,9 +115,9 @@ where
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for RunSetupCommander<Node, Maze>
 where
-    Node: Clone + AsIndex + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode + Distance<Output = Maze::Cost>,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
-    Maze::Cost: Ord + Bounded + Saturating + Copy,
+    Maze::Cost: Ord + Bounded + Saturating + Copy + Add<Output = Maze::Cost>,
     Config: AsRef<RunSetupCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
 {
