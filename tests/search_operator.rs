@@ -1,6 +1,4 @@
 use std::rc::Rc;
-#[cfg(feature = "log_test")]
-use std::{cell::RefCell, io::Write};
 
 use components::{
     agents::TrackingAgent,
@@ -119,9 +117,6 @@ macro_rules! impl_search_operator_test {
                     ignore_length_from_wall,
                 );
 
-                #[cfg(feature = "log_test")]
-                let logs = RefCell::new(Vec::new());
-
                 let agent = {
                     let robot = {
                         let estimator = {
@@ -161,7 +156,7 @@ macro_rules! impl_search_operator_test {
                                 ElectricPotential::new::<volt>(10.0),
                             );
 
-                            let tracker = TrackerBuilder::new()
+                            TrackerBuilder::new()
                                 .period(period)
                                 .gain(40.0)
                                 .dgain(4.0)
@@ -170,16 +165,7 @@ macro_rules! impl_search_operator_test {
                                 .low_zeta(1.0)
                                 .low_b(1.0)
                                 .build()
-                                .unwrap();
-
-                            #[cfg(not(feature = "log_test"))]
-                            {
-                                tracker
-                            }
-                            #[cfg(feature = "log_test")]
-                            {
-                                utils::logged_tracker::JsonLoggedTracker::new(tracker, &logs)
-                            }
+                                .unwrap()
                         };
 
                         let wall_detector = {
@@ -241,24 +227,10 @@ macro_rules! impl_search_operator_test {
                 let commander = create_commander(Rc::clone(&wall_manager));
                 let expected_commander = create_commander(Rc::new(expected_wall_manager));
 
-                #[cfg(feature = "log_test")]
-                let output_log = || {
-                    use std::ops::Deref;
-
-                    writeln!(
-                        std::io::stdout(),
-                        "{}",
-                        serde_json::to_string(logs.borrow().deref()).unwrap()
-                    )
-                    .unwrap();
-                };
-
                 let operator = TrackingOperator::new(commander, agent);
                 while operator.run().is_err() {
                     stepper.step();
                     if let Err(err) = operator.tick() {
-                        #[cfg(feature = "log_test")]
-                        output_log();
                         panic!("Should never panic: {:?}", err);
                     }
                 }
@@ -268,9 +240,6 @@ macro_rules! impl_search_operator_test {
                     commander.compute_shortest_path(),
                     expected_commander.compute_shortest_path()
                 );
-
-                #[cfg(feature = "log_test")]
-                output_log();
             }
 
             #[ignore]

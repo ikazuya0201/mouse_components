@@ -16,6 +16,8 @@ pub trait Tracker<State, Target> {
     type Error;
 
     fn track(&mut self, state: &State, target: &Target) -> Result<(), Self::Error>;
+    /// Stops all actuators in tracker.
+    fn stop(&mut self);
 }
 
 /// A trait that detects obstacles, updates the states of wall and gives feedbacks for state
@@ -119,6 +121,10 @@ where
         self.detector.detect_and_update(self.estimator.state());
         Ok(())
     }
+
+    fn stop(&mut self) {
+        self.tracker.stop();
+    }
 }
 
 #[cfg(test)]
@@ -168,6 +174,10 @@ mod tests {
                 self.state = Some(*state);
                 self.target = Some(*target);
                 Ok(())
+            }
+
+            fn stop(&mut self) {
+                unimplemented!()
             }
         }
 

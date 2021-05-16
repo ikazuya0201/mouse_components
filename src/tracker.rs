@@ -37,6 +37,8 @@ pub trait Controller {
     type Error;
 
     fn control(&mut self, r: &ControlTarget, y: &ControlTarget) -> Result<(), Self::Error>;
+    /// Stops all actuators in controller.
+    fn stop(&mut self);
 }
 
 /// An implementation of [Tracker](crate::robot::Tracker).
@@ -190,6 +192,10 @@ where
             },
         )
     }
+
+    fn stop(&mut self) {
+        self.controller.stop();
+    }
 }
 
 // normalize angle to [-pi, pi].
@@ -312,6 +318,10 @@ mod tests {
 
         fn control(&mut self, _r: &ControlTarget, _y: &ControlTarget) -> Result<(), Self::Error> {
             Ok(())
+        }
+
+        fn stop(&mut self) {
+            unimplemented!()
         }
     }
 

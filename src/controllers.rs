@@ -209,6 +209,11 @@ where
         self.right_motor.apply(vol_t + vol_r);
         Ok(())
     }
+
+    fn stop(&mut self) {
+        self.left_motor.apply(Default::default());
+        self.right_motor.apply(Default::default());
+    }
 }
 
 /// Config for [MultiSisoController].

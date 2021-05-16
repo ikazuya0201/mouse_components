@@ -11,19 +11,19 @@ pub struct Log<State, Target> {
     target: Target,
 }
 
-pub struct JsonLoggedTracker<'a, State, Target, Tracker> {
+pub struct LoggedTracker<'a, State, Target, Tracker> {
     tracker: Tracker,
     logs: &'a RefCell<Vec<Log<State, Target>>>,
 }
 
-impl<'a, State, Target, Tracker> JsonLoggedTracker<'a, State, Target, Tracker> {
+impl<'a, State, Target, Tracker> LoggedTracker<'a, State, Target, Tracker> {
     pub fn new(tracker: Tracker, logs: &'a RefCell<Vec<Log<State, Target>>>) -> Self {
         Self { tracker, logs }
     }
 }
 
 impl<'a, Tracker, State, Target> ITracker<State, Target>
-    for JsonLoggedTracker<'a, State, Target, Tracker>
+    for LoggedTracker<'a, State, Target, Tracker>
 where
     State: Clone,
     Target: Clone,
@@ -37,5 +37,9 @@ where
             target: target.clone(),
         });
         self.tracker.track(state, target)
+    }
+
+    fn stop(&mut self) {
+        self.tracker.stop();
     }
 }

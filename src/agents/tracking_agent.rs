@@ -104,4 +104,8 @@ where
     fn is_empty(&self) -> Option<bool> {
         self.manager.is_empty()
     }
+
+    fn stop(&self) {
+        self.robot.lock().stop();
+    }
 }
