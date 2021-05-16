@@ -7,12 +7,15 @@ use crate::administrator::{Operator as IOperator, OperatorError};
 use crate::agents::TrackingAgentError;
 use crate::commanders::{RunCommanderError, SetupCommanderError};
 use crate::controllers::FailSafeError;
-use crate::defaults::alias::{
-    ReturnOperator, ReturnSetupOperator, RunOperator, RunSetupOperator, SearchOperator,
+use crate::defaults::{
+    alias::{ReturnOperator, ReturnSetupOperator, RunOperator, RunSetupOperator, SearchOperator},
+    resource::ResourceBuilder,
+    state::StateBuilder,
 };
 use crate::operators::TrackingOperatorError;
 use crate::sensors::*;
 use crate::trajectory_managers::{SearchTrajectoryManagerError, TrackingTrajectoryManagerError};
+use crate::Deconstruct;
 
 /// Enum which contains all operators.
 pub enum Operators<
@@ -143,6 +146,66 @@ where
             Return(operator) => operator.run().map_err(convert),
             RunSetup(operator) => operator.run().map_err(convert),
             Run(operator) => operator.run().map_err(convert),
+        }
+    }
+}
+
+impl<
+        LeftEncoder,
+        RightEncoder,
+        ImuType,
+        LeftMotor,
+        RightMotor,
+        DistanceSensorType,
+        const N: usize,
+    >
+    Deconstruct<
+        StateBuilder<N>,
+        ResourceBuilder<
+            LeftEncoder,
+            RightEncoder,
+            ImuType,
+            LeftMotor,
+            RightMotor,
+            DistanceSensorType,
+            N,
+        >,
+    >
+    for Operators<LeftEncoder, RightEncoder, ImuType, LeftMotor, RightMotor, DistanceSensorType, N>
+where
+    LeftEncoder: Encoder,
+    RightEncoder: Encoder,
+    ImuType: Imu,
+    RightMotor: Motor,
+    LeftMotor: Motor,
+    DistanceSensorType: DistanceSensor,
+    LeftEncoder::Error: Debug,
+    RightEncoder::Error: Debug,
+    ImuType::Error: Debug,
+    DistanceSensorType::Error: Debug,
+{
+    fn deconstruct(
+        self,
+    ) -> (
+        StateBuilder<N>,
+        ResourceBuilder<
+            LeftEncoder,
+            RightEncoder,
+            ImuType,
+            LeftMotor,
+            RightMotor,
+            DistanceSensorType,
+            N,
+        >,
+    ) {
+        use Operators::*;
+
+        match self {
+            Search(operator) => operator.deconstruct(),
+            ReturnSetup(operator) => operator.deconstruct(),
+            Return(operator) => operator.deconstruct(),
+            RunSetup(operator) => operator.deconstruct(),
+            Run(operator) => operator.deconstruct(),
         }
     }
 }
