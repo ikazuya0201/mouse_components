@@ -82,6 +82,8 @@ pub(crate) const PATH_UPPER_BOUND: usize = MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_U
 pub(crate) const NODE_NUMBER_UPPER_BOUND: usize =
     16 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
+const HEAP_SIZE: usize = 3000;
+
 /// A trait that can be interpreted as index.
 pub trait AsIndex {
     fn as_index(&self) -> usize;
@@ -107,7 +109,7 @@ where
         .take(NODE_NUMBER_UPPER_BOUND)
         .collect::<Vec<_, NODE_NUMBER_UPPER_BOUND>>();
 
-    let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node>, Min, NODE_NUMBER_UPPER_BOUND>::new();
+    let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node>, Min, HEAP_SIZE>::new();
     heap.push(CostNode(start_cost, start.clone()))
         .unwrap_or_else(|_| {
             unreachable!("The length of binary heap should never exceed the upper bound")

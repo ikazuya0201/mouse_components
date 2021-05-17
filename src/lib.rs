@@ -138,7 +138,7 @@ pub mod sensors {
     pub use obstacle_detector::DistanceSensor;
 }
 
-const MAZE_WIDTH_UPPER_BOUND: usize = 16;
+const MAZE_WIDTH_UPPER_BOUND: usize = 32;
 
 /// A trait for constructing itself by config, state and resource.
 pub trait Construct<Config, State, Resource>: Sized {
