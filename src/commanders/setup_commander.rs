@@ -1,7 +1,5 @@
-use core::ops::Add;
-
 use heapless::Vec;
-use num::{Bounded, Saturating};
+use num_traits::{PrimInt, Unsigned};
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
@@ -27,7 +25,7 @@ impl<Node, Maze> SetupCommander<Node, Maze>
 where
     Node: Clone + AsIndex + PartialEq + RotationNode + Distance<Output = Maze::Cost>,
     Maze: Graph<Node>,
-    Maze::Cost: Bounded + Saturating + Copy + Ord + Add<Output = Maze::Cost>,
+    Maze::Cost: PrimInt + Unsigned,
 {
     pub fn new(current: Node, goals: &[Node], maze: Maze) -> Self {
         for (node, kind) in current.rotation_nodes() {
@@ -85,7 +83,7 @@ impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
 where
     Node: Clone + AsIndex + PartialEq + RotationNode + Distance<Output = Maze::Cost>,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
-    Maze::Cost: Ord + Bounded + Saturating + Copy + Add<Output = Maze::Cost>,
+    Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<ReturnSetupCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
 {
@@ -117,7 +115,7 @@ impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
 where
     Node: Clone + AsIndex + PartialEq + RotationNode + Distance<Output = Maze::Cost>,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
-    Maze::Cost: Ord + Bounded + Saturating + Copy + Add<Output = Maze::Cost>,
+    Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<RunSetupCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
 {
@@ -151,7 +149,7 @@ impl<Node, Maze> TrackingCommander for SetupCommander<Node, Maze>
 where
     Node: Clone + AsIndex + PartialEq + RotationNode,
     Maze: Graph<Node>,
-    Maze::Cost: Bounded + Saturating + Copy + Ord,
+    Maze::Cost: PrimInt + Unsigned,
 {
     type Error = SetupCommanderError;
     type Command = (Node, Node::Kind);
@@ -182,7 +180,7 @@ macro_rules! impl_all_for_setup_commander {
         where
             Node: Clone + AsIndex + PartialEq + RotationNode,
             Maze: Graph<Node>,
-            Maze::Cost: Bounded + Saturating + Copy + Ord,
+            Maze::Cost: PrimInt + Unsigned,
         {
             type Error = SetupCommanderError;
             type Command = (Node, Node::Kind);

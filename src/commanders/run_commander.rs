@@ -2,7 +2,7 @@ use core::fmt::Debug;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use heapless::Vec;
-use num::{Bounded, Saturating};
+use num_traits::{PrimInt, Unsigned};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -27,7 +27,7 @@ where
 impl<Node, Maze> RunCommander<Node, Maze>
 where
     Node: PartialEq + Clone + Debug + AsIndex + RouteNode + Distance<Output = Maze::Cost>,
-    Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Maze::Cost: PrimInt + Unsigned,
     Maze: Graph<Node>,
 {
     pub fn new(start: Node, goals: &[Node], maze: Maze) -> Self {
@@ -63,7 +63,7 @@ impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
 where
     Node: PartialEq + Clone + Debug + AsIndex + RouteNode + Distance<Output = Maze::Cost>,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
-    Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<RunCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
 {
@@ -168,7 +168,7 @@ impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
 where
     Node: PartialEq + Clone + Debug + AsIndex + RouteNode + Distance<Output = Maze::Cost>,
     Maze: Construct<Config, State, Resource> + Graph<Node>,
-    Maze::Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<ReturnCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
 {

@@ -4,10 +4,8 @@ mod run_commander;
 mod search_commander;
 mod setup_commander;
 
-use core::ops::Add;
-
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
-use num::{Bounded, Saturating};
+use num_traits::{Bounded, PrimInt, Saturating, Unsigned};
 use serde::{Deserialize, Serialize};
 
 use crate::utils::forced_vec::ForcedVec;
@@ -99,7 +97,7 @@ fn compute_shortest_path<Node, Maze>(
 where
     Node: Clone + AsIndex + PartialEq + Distance<Output = Maze::Cost>,
     Maze: Graph<Node>,
-    Maze::Cost: Bounded + Saturating + Copy + Ord + Add<Output = Maze::Cost>,
+    Maze::Cost: PrimInt + Unsigned,
 {
     let mut dists = [Maze::Cost::max_value(); NODE_NUMBER_UPPER_BOUND];
     let start_cost = Maze::Cost::min_value() + start.distance(&goals[0]);
