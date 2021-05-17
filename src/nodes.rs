@@ -5,9 +5,10 @@ mod direction;
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::commanders::{AsIndex, Distance, NextNode, RotationNode, RouteNode};
-use crate::mazes::NEIGHBOR_NUMBER_UPPER_BOUND;
-use crate::mazes::{GraphNode, WallFinderNode, WallNode, WallSpaceNode};
+use crate::commanders::{AsIndex, NextNode, RotationNode, RouteNode};
+use crate::mazes::{
+    GeometricNode, GraphNode, WallFinderNode, WallNode, WallSpaceNode, NEIGHBOR_NUMBER_UPPER_BOUND,
+};
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
@@ -37,13 +38,14 @@ pub struct Node<const N: usize> {
     direction: AbsoluteDirection,
 }
 
-impl<const N: usize> Distance for Node<N> {
-    type Output = u16;
+impl<const N: usize> GeometricNode for Node<N> {
+    type Output = Pattern;
 
-    // TODO: Uses a configurable value as a multiplier.
-    /// Returns L_inf norm times 5.
+    /// Returns L_inf norm as a straight pattern.
     fn distance(&self, other: &Self) -> Self::Output {
-        (self.x - other.x).abs().max((self.y - other.y).abs()) as u16 * 5
+        // TODO: Modified `Pattern` to be able to represents a straight pattern with a half length
+        // of a square.
+        Pattern::Straight((self.x - other.x).abs().max((self.y - other.y).abs()) as u8 / 2)
     }
 }
 
@@ -236,8 +238,8 @@ impl<const N: usize> Node<N> {
 /// A type that represents nodes (verteces) of a graph for search.
 pub struct SearchNode<const N: usize>(Node<N>);
 
-impl<const N: usize> Distance for SearchNode<N> {
-    type Output = <Node<N> as Distance>::Output;
+impl<const N: usize> GeometricNode for SearchNode<N> {
+    type Output = Pattern;
 
     fn distance(&self, other: &Self) -> Self::Output {
         self.0.distance(&other.0)
@@ -514,13 +516,14 @@ impl<const N: usize> RouteNode for RunNode<N> {
 /// A type that represents nodes (verteces) of a graph for fast run.
 pub struct RunNode<const N: usize>(Node<N>);
 
-impl<const N: usize> Distance for RunNode<N> {
-    type Output = <Node<N> as Distance>::Output;
+impl<const N: usize> GeometricNode for RunNode<N> {
+    type Output = <Node<N> as GeometricNode>::Output;
 
     fn distance(&self, other: &Self) -> Self::Output {
         self.0.distance(&other.0)
     }
 }
+
 impl<const N: usize> RunNode<N> {
     pub fn inner(&self) -> &Node<N> {
         &self.0

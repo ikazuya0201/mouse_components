@@ -6,7 +6,9 @@ use core::marker::PhantomData;
 
 use heapless::Vec;
 
-use crate::commanders::{Graph, NodeChecker, UncheckedNodeFinder, NODE_NUMBER_UPPER_BOUND};
+use crate::commanders::{
+    GeometricGraph, Graph, NodeChecker, UncheckedNodeFinder, NODE_NUMBER_UPPER_BOUND,
+};
 use crate::utils::forced_vec::ForcedVec;
 use crate::MAZE_WIDTH_UPPER_BOUND;
 use crate::{Construct, Deconstruct};
@@ -217,6 +219,25 @@ where
     }
 }
 
+/// A trait that represents a geometric node.
+pub trait GeometricNode {
+    type Output;
+
+    fn distance(&self, other: &Self) -> Self::Output;
+}
+
+impl<Node, Manager, Converter, SearchNode> GeometricGraph<Node>
+    for Maze<Manager, Converter, SearchNode>
+where
+    Node: GraphNode + GeometricNode<Output = Node::Pattern>,
+    Converter: PatternConverter<Node::Pattern>,
+    Manager: WallChecker<Node::Wall>,
+{
+    fn distance(&self, lhs: &Node, rhs: &Node) -> Self::Cost {
+        self.converter.convert(&lhs.distance(rhs))
+    }
+}
+
 impl<Node, Manager, Converter, SearchNode> UncheckedNodeFinder<Node>
     for Maze<Manager, Converter, SearchNode>
 where
@@ -331,6 +352,19 @@ where
         self._predecessors(node, |wall| {
             !self.manager.is_checked(wall) || self.manager.exists(wall)
         })
+    }
+}
+
+impl<Node, Manager, Converter, SearchNode> GeometricGraph<Node>
+    for CheckedMaze<Manager, Converter, SearchNode>
+where
+    Node: GraphNode + GeometricNode<Output = Node::Pattern>,
+    Converter: PatternConverter<Node::Pattern>,
+    Manager: WallChecker<Node::Wall>,
+{
+    #[inline]
+    fn distance(&self, lhs: &Node, rhs: &Node) -> Self::Cost {
+        self.0.distance(lhs, rhs)
     }
 }
 

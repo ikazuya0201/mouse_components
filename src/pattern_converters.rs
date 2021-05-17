@@ -121,8 +121,8 @@ where
         use Pattern::*;
 
         match pattern {
-            &Straight(x) => self.straight_array[x as usize - 1],
-            &StraightDiagonal(x) => self.straight_diagonal_array[x as usize - 1],
+            &Straight(x) => self.straight_array[x as usize],
+            &StraightDiagonal(x) => self.straight_diagonal_array[x as usize],
             Search90 => self.search90,
             FastRun45 => self.fast_run45,
             FastRun90 => self.fast_run90,
@@ -170,15 +170,15 @@ impl Default for DefaultPatternConverter<u16> {
             fast_run_diagonal90: 15,
             spin_back: 15,
             straight_array: IntoIter::new([
-                10, 16, 20, 24, 27, 29, 31, 33, 35, 37, 39, 42, 44, 46, 49, 51, 53, 55, 58, 60, 62,
-                65, 67, 69, 72, 74, 76, 78, 81, 83, 85,
+                0, 10, 16, 20, 24, 27, 29, 31, 33, 35, 37, 39, 42, 44, 46, 49, 51, 53, 55, 58, 60,
+                62, 65, 67, 69, 72, 74, 76, 78, 81, 83, 85,
             ])
             .take(MAZE_WIDTH_UPPER_BOUND)
             .collect(),
             straight_diagonal_array: IntoIter::new([
-                7, 13, 18, 22, 26, 29, 32, 35, 37, 40, 42, 44, 45, 47, 49, 50, 52, 53, 55, 56, 57,
-                58, 59, 61, 62, 63, 64, 65, 67, 68, 70, 71, 72, 74, 75, 77, 78, 79, 81, 82, 84, 85,
-                87, 88, 90, 91, 92, 94, 95, 97, 98, 99, 101, 102, 104, 105, 107, 108, 109, 111,
+                0, 7, 13, 18, 22, 26, 29, 32, 35, 37, 40, 42, 44, 45, 47, 49, 50, 52, 53, 55, 56,
+                57, 58, 59, 61, 62, 63, 64, 65, 67, 68, 70, 71, 72, 74, 75, 77, 78, 79, 81, 82, 84,
+                85, 87, 88, 90, 91, 92, 94, 95, 97, 98, 99, 101, 102, 104, 105, 107, 108, 109, 111,
                 112, 114, 115,
             ])
             .take(2 * MAZE_WIDTH_UPPER_BOUND)

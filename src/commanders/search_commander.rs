@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
 use super::{
-    compute_shortest_path, AsIndex, CommanderState, CostNode, Distance, Graph, RouteNode,
+    compute_shortest_path, AsIndex, CommanderState, CostNode, GeometricGraph, Graph, RouteNode,
     GOAL_SIZE_UPPER_BOUND, NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
@@ -162,10 +162,10 @@ impl<Node, RunNode, Cost, Maze> TrackingCommander
         Maze,
     >
 where
-    RunNode: PartialEq + Debug + AsIndex + Clone + Distance<Output = Cost>,
+    RunNode: PartialEq + Debug + AsIndex + Clone,
     Maze::SearchNode: PartialEq + Debug + AsIndex + RouteNode + TryFrom<Node> + Clone,
     Cost: PrimInt + Unsigned + Debug,
-    Maze: Graph<RunNode, Cost = Cost>
+    Maze: GeometricGraph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
         + UncheckedNodeFinder<RunNode>
         + NodeChecker<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode>,
@@ -248,10 +248,10 @@ where
 //TODO: write test
 impl<Node, RunNode, Cost, Route, Maze> SearchCommander<Node, RunNode, Maze::SearchNode, Route, Maze>
 where
-    RunNode: PartialEq + Debug + AsIndex + Clone + Distance<Output = Cost>,
+    RunNode: PartialEq + Debug + AsIndex + Clone,
     Maze::SearchNode: PartialEq + Debug + AsIndex + Clone,
     Cost: PrimInt + Unsigned + Debug,
-    Maze: Graph<RunNode, Cost = Cost>
+    Maze: GeometricGraph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
         + UncheckedNodeFinder<RunNode>,
 {
@@ -308,8 +308,8 @@ where
 
 impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, SearchNode, Route, Maze>
 where
-    RunNode: Clone + AsIndex + PartialEq + Distance<Output = Maze::Cost>,
-    Maze: Graph<RunNode>,
+    RunNode: Clone + AsIndex + PartialEq,
+    Maze: GeometricGraph<RunNode>,
     Maze::Cost: PrimInt + Unsigned,
 {
     pub fn compute_shortest_path(&self) -> Option<Vec<RunNode, PATH_UPPER_BOUND>> {
