@@ -138,45 +138,48 @@ where
             + self.gain * (target.y.v - state.y.v);
 
         let dxi = ux * cos_th + uy * sin_th;
-        let (uv, uw, duv, duw) = if self.xi.abs() > self.xi_threshold {
-            let uv = self.xi;
-            let uw = AngularVelocity::from((uy * cos_th - ux * sin_th) / self.xi);
-            let duv = dxi;
-            let duw = -AngularAcceleration::from(
-                (2.0 * dxi * uw + dux * sin_th - duy * cos_th) / self.xi,
-            );
-            (uv, uw, duv, duw)
-        } else {
-            let sin_th_r = target.theta.x.value.sin();
-            let cos_th_r = target.theta.x.value.cos();
-            let theta_d = normalize_angle(target.theta.x - state.theta.x);
-            let cos_th_d = theta_d.value.cos();
-            let xd = target.x.x - state.x.x;
-            let yd = target.y.x - state.y.x;
-
-            let vr = target.x.v * cos_th_r + target.y.v * sin_th_r;
-            let wr = target.theta.v;
-
-            let k1 = 2.0
-                * self.zeta
-                * AngularVelocity::from(crate::utils::math::sqrt(wr * wr + self.b * vr * vr));
-            let k2 = self.b;
-            let k3 = k1;
-
-            let uv = vr * cos_th_d + k1 * (xd * cos_th + yd * sin_th);
-            let uw =
-                wr + AngularVelocity::from(
-                    k2 * vr * (-xd * sin_th + yd * cos_th) * sinc(theta_d.value),
-                ) + AngularVelocity::from(k3 * theta_d);
-            (
-                uv,
-                uw,
-                target.x.a * cos_th_r + target.y.a * sin_th_r,
-                target.theta.a,
-            )
-        };
-
         self.xi += self.period * dxi;
+
+        let sin_th_r = target.theta.x.value.sin();
+        let cos_th_r = target.theta.x.value.cos();
+        let vr = target.x.v * cos_th_r + target.y.v * sin_th_r;
+
+        let (uv, uw, duv, duw) =
+            if vr.abs() > self.xi_threshold && self.xi.abs() > self.xi_threshold {
+                let uv = self.xi;
+                let uw = AngularVelocity::from((uy * cos_th - ux * sin_th) / self.xi);
+                let duv = dxi;
+                let duw = -AngularAcceleration::from(
+                    (2.0 * dxi * uw + dux * sin_th - duy * cos_th) / self.xi,
+                );
+                (uv, uw, duv, duw)
+            } else {
+                let theta_d = normalize_angle(target.theta.x - state.theta.x);
+                let cos_th_d = theta_d.value.cos();
+                let xd = target.x.x - state.x.x;
+                let yd = target.y.x - state.y.x;
+
+                let wr = target.theta.v;
+
+                let k1 = 2.0
+                    * self.zeta
+                    * AngularVelocity::from(crate::utils::math::sqrt(wr * wr + self.b * vr * vr));
+                let k2 = self.b;
+                let k3 = k1;
+
+                let uv = vr * cos_th_d + k1 * (xd * cos_th + yd * sin_th);
+                let uw =
+                    wr + AngularVelocity::from(
+                        k2 * vr * (-xd * sin_th + yd * cos_th) * sinc(theta_d.value),
+                    ) + AngularVelocity::from(k3 * theta_d);
+                (
+                    uv,
+                    uw,
+                    target.x.a * cos_th_r + target.y.a * sin_th_r,
+                    target.theta.a,
+                )
+            };
+
         self.controller.control(
             &ControlTarget {
                 v: uv,
