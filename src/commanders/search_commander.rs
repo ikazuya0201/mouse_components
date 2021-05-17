@@ -9,7 +9,7 @@ use spin::Mutex;
 
 use super::{
     compute_shortest_path, AsIndex, CommanderState, CostNode, GeometricGraph, GoalVec, Graph,
-    RouteNode, NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
+    RouteNode, HEAP_SIZE, NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
@@ -281,8 +281,7 @@ where
             .collect::<Vec<(Maze::SearchNode, Cost), CANDIDATE_SIZE_UPPER_BOUND>>();
 
         let mut dists = [Cost::max_value(); NODE_NUMBER_UPPER_BOUND];
-        let mut heap =
-            BinaryHeap::<CostNode<Cost, Maze::SearchNode>, Min, NODE_NUMBER_UPPER_BOUND>::new();
+        let mut heap = BinaryHeap::<CostNode<Cost, Maze::SearchNode>, Min, HEAP_SIZE>::new();
         for node in checker_nodes {
             dists[node.as_index()] = Cost::min_value();
             heap.push(CostNode(Cost::min_value(), node)).unwrap();
