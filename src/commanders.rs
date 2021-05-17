@@ -31,6 +31,11 @@ pub trait Graph<Node> {
     fn predecessors(&self, node: &Node) -> Self::Edges;
 }
 
+/// A trait that represents a geometic graph.
+pub trait GeometricGraph<Node>: Graph<Node> {
+    fn distance(&self, lhs: &Node, rhs: &Node) -> Self::Cost;
+}
+
 /// A trait that computes a route value between itself and another node.
 pub trait RouteNode {
     type Error;
@@ -80,13 +85,6 @@ pub trait AsIndex {
     fn as_index(&self) -> usize;
 }
 
-/// A trait for converting two values to the distance between them.
-pub trait Distance {
-    type Output;
-
-    fn distance(&self, other: &Self) -> Self::Output;
-}
-
 // NOTE: Distances between `goals` must be 0.
 // The length of `goals` must be greater than 0.
 fn compute_shortest_path<Node, Maze>(
@@ -95,12 +93,12 @@ fn compute_shortest_path<Node, Maze>(
     maze: &Maze,
 ) -> Option<Vec<Node, PATH_UPPER_BOUND>>
 where
-    Node: Clone + AsIndex + PartialEq + Distance<Output = Maze::Cost>,
-    Maze: Graph<Node>,
+    Node: Clone + AsIndex + PartialEq,
+    Maze: GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
 {
     let mut dists = [Maze::Cost::max_value(); NODE_NUMBER_UPPER_BOUND];
-    let start_cost = Maze::Cost::min_value() + start.distance(&goals[0]);
+    let start_cost = Maze::Cost::min_value() + maze.distance(&start, &goals[0]);
     dists[start.as_index()] = start_cost;
 
     let mut prev = core::iter::repeat(None)
@@ -137,7 +135,7 @@ where
             }
         }
         for (next, edge_cost) in maze.successors(&node) {
-            let next_cost = cost.saturating_add(edge_cost + next.distance(&goals[0]));
+            let next_cost = cost.saturating_add(edge_cost + maze.distance(&next, &goals[0]));
             if next_cost < dists[next.as_index()] {
                 dists[next.as_index()] = next_cost;
                 heap.push(CostNode(next_cost, next.clone()))
@@ -165,14 +163,6 @@ mod tests {
         #[derive(Clone, Copy, PartialEq, Debug)]
         struct RunNode(usize);
         struct SearchNode(usize);
-
-        impl Distance for RunNode {
-            type Output = usize;
-
-            fn distance(&self, _other: &Self) -> Self::Output {
-                0
-            }
-        }
 
         impl From<usize> for RunNode {
             fn from(value: usize) -> Self {
@@ -234,6 +224,15 @@ mod tests {
                     }
                 }
                 result
+            }
+        }
+
+        impl<T> GeometricGraph<T> for IGraph
+        where
+            T: Clone + From<usize> + AsIndex,
+        {
+            fn distance(&self, _lhs: &T, _rhs: &T) -> Self::Cost {
+                0
             }
         }
 

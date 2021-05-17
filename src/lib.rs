@@ -35,9 +35,11 @@ pub mod traits {
     #[doc(no_inline)]
     pub use administrator::{Operator, OperatorStore, Selector};
     #[doc(no_inline)]
-    pub use commanders::{AsIndex, Graph, NextNode, NodeChecker, RouteNode, UncheckedNodeFinder};
+    pub use commanders::{
+        AsIndex, GeometricGraph, Graph, NextNode, NodeChecker, RouteNode, UncheckedNodeFinder,
+    };
     #[doc(no_inline)]
-    pub use mazes::{GraphNode, WallChecker, WallFinderNode, WallSpaceNode};
+    pub use mazes::{GeometricNode, GraphNode, WallChecker, WallFinderNode, WallSpaceNode};
     #[doc(no_inline)]
     pub use operators::{TrackingAgent, TrackingCommander};
     #[doc(no_inline)]

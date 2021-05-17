@@ -20,7 +20,8 @@ pub use crate::operators::{
 
 #[doc(no_inline)]
 pub use crate::commanders::{
-    AsIndex as _components_commanders_AsIndex, Graph as _components_commanders_Graph,
+    AsIndex as _components_commanders_AsIndex,
+    GeometricGraph as _components_commanders_GeometricGraph, Graph as _components_commanders_Graph,
     NextNode as _components_commanders_NextNode, NodeChecker as _components_commanders_NodeChecker,
     RouteNode as _components_commanders_RouteNode,
     UncheckedNodeFinder as _components_commanders_UncheckedNodeFinder,
@@ -42,8 +43,8 @@ pub use crate::sensors::{
 
 #[doc(no_inline)]
 pub use crate::mazes::{
-    GraphNode as _components_maze_GraphNode, WallChecker as _components_maze_WallManager,
-    WallFinderNode as _components_maze_WallFinderNode,
+    GeometricNode as _components_maze_GeometricNode, GraphNode as _components_maze_GraphNode,
+    WallChecker as _components_maze_WallManager, WallFinderNode as _components_maze_WallFinderNode,
     WallSpaceNode as _components_maze_WallSpaceNode,
 };
 

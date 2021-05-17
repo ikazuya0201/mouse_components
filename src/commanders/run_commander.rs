@@ -6,7 +6,7 @@ use num_traits::{PrimInt, Unsigned};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    compute_shortest_path, AsIndex, CommanderState, Distance, Graph, RouteNode,
+    compute_shortest_path, AsIndex, CommanderState, GeometricGraph, RouteNode,
     GOAL_SIZE_UPPER_BOUND, PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
@@ -26,9 +26,9 @@ where
 
 impl<Node, Maze> RunCommander<Node, Maze>
 where
-    Node: PartialEq + Clone + Debug + AsIndex + RouteNode + Distance<Output = Maze::Cost>,
+    Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
     Maze::Cost: PrimInt + Unsigned,
-    Maze: Graph<Node>,
+    Maze: GeometricGraph<Node>,
 {
     pub fn new(start: Node, goals: &[Node], maze: Maze) -> Self {
         let path = compute_shortest_path(&start, &goals, &maze).unwrap_or_else(|| unimplemented!());
@@ -61,8 +61,8 @@ pub struct RunCommanderConfig<Node> {
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for RunCommander<Node, Maze>
 where
-    Node: PartialEq + Clone + Debug + AsIndex + RouteNode + Distance<Output = Maze::Cost>,
-    Maze: Construct<Config, State, Resource> + Graph<Node>,
+    Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
+    Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<RunCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
@@ -166,8 +166,8 @@ pub struct ReturnCommanderConfig<Node> {
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for ReturnCommander<Node, Maze>
 where
-    Node: PartialEq + Clone + Debug + AsIndex + RouteNode + Distance<Output = Maze::Cost>,
-    Maze: Construct<Config, State, Resource> + Graph<Node>,
+    Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
+    Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<ReturnCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,

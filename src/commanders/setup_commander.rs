@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
 use super::{
-    compute_shortest_path, AsIndex, CommanderState, Distance, Graph, GOAL_SIZE_UPPER_BOUND,
+    compute_shortest_path, AsIndex, CommanderState, GeometricGraph, Graph, GOAL_SIZE_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
@@ -23,8 +23,8 @@ where
 
 impl<Node, Maze> SetupCommander<Node, Maze>
 where
-    Node: Clone + AsIndex + PartialEq + RotationNode + Distance<Output = Maze::Cost>,
-    Maze: Graph<Node>,
+    Node: Clone + AsIndex + PartialEq + RotationNode,
+    Maze: GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
 {
     pub fn new(current: Node, goals: &[Node], maze: Maze) -> Self {
@@ -81,8 +81,8 @@ where
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for ReturnSetupCommander<Node, Maze>
 where
-    Node: Clone + AsIndex + PartialEq + RotationNode + Distance<Output = Maze::Cost>,
-    Maze: Construct<Config, State, Resource> + Graph<Node>,
+    Node: Clone + AsIndex + PartialEq + RotationNode,
+    Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<ReturnSetupCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
@@ -113,8 +113,8 @@ where
 impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for RunSetupCommander<Node, Maze>
 where
-    Node: Clone + AsIndex + PartialEq + RotationNode + Distance<Output = Maze::Cost>,
-    Maze: Construct<Config, State, Resource> + Graph<Node>,
+    Node: Clone + AsIndex + PartialEq + RotationNode,
+    Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<RunSetupCommanderConfig<Node>>,
     State: AsRef<CommanderState<Node>>,
