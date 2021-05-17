@@ -1,17 +1,15 @@
 //! An implementation of config.
 
-use heapless::Vec;
 use serde::{Deserialize, Serialize};
 use uom::si::f32::{
     Acceleration, AngularAcceleration, AngularJerk, AngularVelocity, ElectricPotential, Frequency,
     Jerk, Length, Time, Velocity,
 };
 
-use crate::commanders::GOAL_SIZE_UPPER_BOUND;
 use crate::controllers::ControlParameters;
 use crate::impl_setter;
 use crate::impl_with_getter;
-use crate::nodes::RunNode;
+use crate::nodes::{Position, RunNode};
 use crate::pattern_converters::DefaultPatternConverter;
 use crate::types::configs::*;
 use crate::types::data::SearchKind;
@@ -42,8 +40,8 @@ impl_with_getter! {
         #[serde(default)]
         front_offset: Length,
         start: RunNode<N>,
-        return_goal: RunNode<N>,
-        goals: Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>,
+        return_goal: Position<N>,
+        goal: Position<N>,
         search_initial_route: SearchKind,
         search_final_route: SearchKind,
         translational_parameters: ControlParameters,
@@ -103,11 +101,11 @@ macro_rules! impl_with_as_ref {
 impl_with_as_ref! {
     pub struct ConfigContainer<const N: usize> {
         command_converter: CommandConverterConfig,
-        search_commander: SearchCommanderConfig<RunNode<N>, SearchKind>,
-        run_commander: RunCommanderConfig<RunNode<N>>,
-        run_setup_commander: RunSetupCommanderConfig<RunNode<N>>,
-        return_setup_commander: ReturnSetupCommanderConfig<RunNode<N>>,
-        return_commander: ReturnCommanderConfig<RunNode<N>>,
+        search_commander: SearchCommanderConfig<RunNode<N>, SearchKind, Position<N>>,
+        run_commander: RunCommanderConfig<Position<N>>,
+        run_setup_commander: RunSetupCommanderConfig<Position<N>>,
+        return_setup_commander: ReturnSetupCommanderConfig<Position<N>>,
+        return_commander: ReturnCommanderConfig<Position<N>>,
         controller: MultiSisoControllerConfig,
         estimator: EstimatorConfig,
         tracker: TrackerConfig,
@@ -126,7 +124,7 @@ impl<const N: usize> From<Config<N>> for ConfigContainer<N> {
             front_offset,
             start,
             return_goal,
-            goals,
+            goal,
             search_initial_route,
             search_final_route,
             period,
@@ -161,14 +159,12 @@ impl<const N: usize> From<Config<N>> for ConfigContainer<N> {
             },
             search_commander: SearchCommanderConfig {
                 start,
-                goals: goals.clone(),
+                goal: goal.clone(),
                 initial_route: search_initial_route,
                 final_route: search_final_route,
             },
-            run_commander: RunCommanderConfig {
-                goals: goals.clone(),
-            },
-            run_setup_commander: RunSetupCommanderConfig { goals },
+            run_commander: RunCommanderConfig { goal: goal.clone() },
+            run_setup_commander: RunSetupCommanderConfig { goal },
             return_setup_commander: ReturnSetupCommanderConfig {
                 return_goal: return_goal.clone(),
             },
@@ -246,23 +242,21 @@ impl<const N: usize> From<Config<N>> for ConfigContainer<N> {
 ///     time::second, velocity::meter_per_second, frequency::hertz, electric_potential::volt,
 /// };
 /// use components::nodes::RunNode;
-/// use components::types::data::{AbsoluteDirection, Pattern, SearchKind, ControlParameters};
+/// use components::types::data::{AbsoluteDirection, Pattern, SearchKind, ControlParameters,
+/// Position};
 /// use components::defaults::config::ConfigBuilder;
 /// use components::pattern_converters::LinearPatternConverter;
 ///
 /// use AbsoluteDirection::*;
 ///
 /// let start = RunNode::<4>::new(0, 0, North).unwrap();
-/// let return_goal = RunNode::<4>::new(0, 0, South).unwrap();
-/// let goals = vec![
-///     RunNode::<4>::new(2, 0, South).unwrap(),
-///     RunNode::<4>::new(2, 0, West).unwrap(),
-/// ];
+/// let return_goal = Position::new(0, 0).unwrap();
+/// let goal = Position::new(2, 0).unwrap();
 ///
 /// let config = ConfigBuilder::new()
 ///     .start(start)
 ///     .return_goal(return_goal)
-///     .goals(goals.into_iter().collect())
+///     .goal(goal)
 ///     .search_initial_route(SearchKind::Init)
 ///     .search_final_route(SearchKind::Final)
 ///     .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
@@ -306,8 +300,8 @@ pub struct ConfigBuilder<const N: usize> {
     square_width: Option<Length>,
     front_offset: Option<Length>,
     start: Option<RunNode<N>>,
-    return_goal: Option<RunNode<N>>,
-    goals: Option<Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>>,
+    return_goal: Option<Position<N>>,
+    goal: Option<Position<N>>,
     search_initial_route: Option<SearchKind>,
     search_final_route: Option<SearchKind>,
     period: Option<Time>,
@@ -364,13 +358,13 @@ impl<const N: usize> ConfigBuilder<N> {
     );
     impl_setter!(
         /// **Required**,
-        /// Sets a goal for return to start.
-        return_goal: RunNode<N>
+        /// Sets the goal position for return to start.
+        return_goal: Position<N>
     );
     impl_setter!(
         /// **Required**,
-        /// Sets the goal nodes for search.
-        goals: Vec<RunNode<N>, GOAL_SIZE_UPPER_BOUND>
+        /// Sets the goal position for search.
+        goal: Position<N>
     );
     impl_setter!(
         /// **Required**,
@@ -530,7 +524,7 @@ impl<const N: usize> ConfigBuilder<N> {
             front_offset: None,
             start: None,
             return_goal: None,
-            goals: None,
+            goal: None,
             search_initial_route: None,
             search_final_route: None,
             period: None,
@@ -579,7 +573,7 @@ impl<const N: usize> ConfigBuilder<N> {
             front_offset: self.front_offset.unwrap_or_default(),
             start: get!(start),
             return_goal: get!(return_goal),
-            goals: get!(goals),
+            goal: get!(goal),
             search_initial_route: get!(search_initial_route),
             search_final_route: get!(search_final_route),
             period: get!(period),
@@ -636,16 +630,13 @@ mod tests {
         use AbsoluteDirection::*;
 
         let start = RunNode::<4>::new(0, 0, North).unwrap();
-        let return_goal = RunNode::<4>::new(0, 0, South).unwrap();
-        let goals = vec![
-            RunNode::<4>::new(2, 0, South).unwrap(),
-            RunNode::<4>::new(2, 0, West).unwrap(),
-        ];
+        let return_goal = Position::new(0, 0).unwrap();
+        let goal = Position::new(2, 0).unwrap();
 
         ConfigBuilder::new()
             .start(start)
             .return_goal(return_goal)
-            .goals(goals.into_iter().collect())
+            .goal(goal)
             .search_initial_route(SearchKind::Init)
             .search_final_route(SearchKind::Final)
             .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))

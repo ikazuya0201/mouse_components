@@ -44,7 +44,9 @@ pub trait RouteNode {
     fn route(&self, to: &Self) -> Result<Self::Route, Self::Error>;
 }
 
-pub(crate) const GOAL_SIZE_UPPER_BOUND: usize = 8;
+const GOAL_SIZE_UPPER_BOUND: usize = 8;
+
+pub(crate) type GoalVec<T> = Vec<T, GOAL_SIZE_UPPER_BOUND>;
 
 #[derive(Debug)]
 struct CostNode<Cost, Node>(Cost, Node);
@@ -164,6 +166,15 @@ mod tests {
         struct RunNode(usize);
         struct SearchNode(usize);
 
+        #[derive(Clone)]
+        struct Position(usize);
+
+        impl Into<GoalVec<RunNode>> for Position {
+            fn into(self) -> GoalVec<RunNode> {
+                core::array::IntoIter::new([RunNode(self.0)]).collect()
+            }
+        }
+
         impl From<usize> for RunNode {
             fn from(value: usize) -> Self {
                 RunNode(value)
@@ -249,14 +260,14 @@ mod tests {
             (7, 8, 1),
         ];
         let start = RunNode(0);
-        let goals = vec![RunNode(8usize)];
+        let goal = Position(8usize);
         let n = 9;
 
         let graph = IGraph::new(n, &edges);
 
-        let solver = SearchCommander::<Node, RunNode, SearchNode, _, _>::new(
+        let solver = SearchCommander::<Node, RunNode, SearchNode, _, _, _>::new(
             start.clone(),
-            &goals,
+            goal,
             start.into(),
             (),
             (),

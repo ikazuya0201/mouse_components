@@ -58,7 +58,10 @@ pub mod types {
         #[doc(no_inline)]
         pub use controllers::ControlParameters;
         #[doc(no_inline)]
-        pub use nodes::{AbsoluteDirection, Pattern, RelativeDirection, RotationKind};
+        pub use nodes::{
+            AbsoluteDirection, Node, Pattern, Position, RelativeDirection, RotationKind, RunNode,
+            SearchNode,
+        };
         #[doc(no_inline)]
         pub use obstacle_detector::Obstacle;
         #[doc(no_inline)]

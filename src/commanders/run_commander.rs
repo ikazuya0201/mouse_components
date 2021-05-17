@@ -1,4 +1,5 @@
 use core::fmt::Debug;
+use core::marker::PhantomData;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use heapless::Vec;
@@ -6,15 +7,15 @@ use num_traits::{PrimInt, Unsigned};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    compute_shortest_path, AsIndex, CommanderState, GeometricGraph, RouteNode,
-    GOAL_SIZE_UPPER_BOUND, PATH_UPPER_BOUND,
+    compute_shortest_path, AsIndex, CommanderState, GeometricGraph, GoalVec, RouteNode,
+    PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::trajectory_generators::RunState;
 use crate::{Construct, Deconstruct, Merge};
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander).
-pub struct RunCommander<Node, Maze>
+pub struct RunCommander<Node, Position, Maze>
 where
     Node: RouteNode,
 {
@@ -22,27 +23,31 @@ where
     maze: Maze,
     path: Vec<Node, PATH_UPPER_BOUND>,
     iter: AtomicUsize,
+    _position: PhantomData<fn() -> Position>,
 }
 
-impl<Node, Maze> RunCommander<Node, Maze>
+impl<Node, Position, Maze> RunCommander<Node, Position, Maze>
 where
     Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
+    Position: Into<GoalVec<Node>>,
     Maze::Cost: PrimInt + Unsigned,
     Maze: GeometricGraph<Node>,
 {
-    pub fn new(start: Node, goals: &[Node], maze: Maze) -> Self {
-        let path = compute_shortest_path(&start, &goals, &maze).unwrap_or_else(|| unimplemented!());
+    pub fn new(start: Node, goal: Position, maze: Maze) -> Self {
+        let path =
+            compute_shortest_path(&start, &goal.into(), &maze).unwrap_or_else(|| unimplemented!());
 
         Self {
             current: path.last().unwrap_or_else(|| unimplemented!()).clone(),
             maze,
             path,
             iter: AtomicUsize::new(0),
+            _position: PhantomData,
         }
     }
 }
 
-impl<Node, Maze> RunCommander<Node, Maze>
+impl<Node, Position, Maze> RunCommander<Node, Position, Maze>
 where
     Node: RouteNode,
 {
@@ -54,28 +59,30 @@ where
 
 /// Config for [RunCommander].
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct RunCommanderConfig<Node> {
-    pub goals: Vec<Node, GOAL_SIZE_UPPER_BOUND>,
+pub struct RunCommanderConfig<Position> {
+    pub goal: Position,
 }
 
-impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
-    for RunCommander<Node, Maze>
+impl<Node, Position, Maze, Config, State, Resource> Construct<Config, State, Resource>
+    for RunCommander<Node, Position, Maze>
 where
     Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
     Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
-    Config: AsRef<RunCommanderConfig<Node>>,
+    Config: AsRef<RunCommanderConfig<Position>>,
     State: AsRef<CommanderState<Node>>,
+    Position: Clone + Into<GoalVec<Node>>,
 {
     fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
         let maze = Maze::construct(config, state, resource);
         let config = config.as_ref();
         let state = state.as_ref();
-        Self::new(state.current_node.clone(), &config.goals, maze)
+        Self::new(state.current_node.clone(), config.goal.clone(), maze)
     }
 }
 
-impl<Node, Maze, State, Resource> Deconstruct<State, Resource> for RunCommander<Node, Maze>
+impl<Node, Position, Maze, State, Resource> Deconstruct<State, Resource>
+    for RunCommander<Node, Position, Maze>
 where
     Node: RouteNode,
     Maze: Deconstruct<State, Resource>,
@@ -107,7 +114,7 @@ pub struct RunCommand<Node, Route> {
 }
 
 //TODO: write test
-impl<Node, Maze> TrackingCommander for RunCommander<Node, Maze>
+impl<Node, Position, Maze> TrackingCommander for RunCommander<Node, Position, Maze>
 where
     Node: RouteNode + Clone,
 {
@@ -141,11 +148,11 @@ where
 }
 
 /// A commander for returning to start.
-pub struct ReturnCommander<Node, Maze>(RunCommander<Node, Maze>)
+pub struct ReturnCommander<Node, Position, Maze>(RunCommander<Node, Position, Maze>)
 where
     Node: RouteNode;
 
-impl<Node, Maze> TrackingCommander for ReturnCommander<Node, Maze>
+impl<Node, Position, Maze> TrackingCommander for ReturnCommander<Node, Position, Maze>
 where
     Node: RouteNode + Clone,
 {
@@ -159,18 +166,19 @@ where
 
 /// Config for [ReturnCommander].
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct ReturnCommanderConfig<Node> {
-    pub return_goal: Node,
+pub struct ReturnCommanderConfig<Position> {
+    pub return_goal: Position,
 }
 
-impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
-    for ReturnCommander<Node, Maze>
+impl<Node, Position, Maze, Config, State, Resource> Construct<Config, State, Resource>
+    for ReturnCommander<Node, Position, Maze>
 where
     Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
     Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
-    Config: AsRef<ReturnCommanderConfig<Node>>,
+    Config: AsRef<ReturnCommanderConfig<Position>>,
     State: AsRef<CommanderState<Node>>,
+    Position: Clone + Into<GoalVec<Node>>,
 {
     fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
         let maze = Maze::construct(config, state, resource);
@@ -178,13 +186,14 @@ where
         let state = state.as_ref();
         Self(RunCommander::new(
             state.current_node.clone(),
-            &[config.return_goal.clone()],
+            config.return_goal.clone(),
             maze,
         ))
     }
 }
 
-impl<Node, Maze, State, Resource> Deconstruct<State, Resource> for ReturnCommander<Node, Maze>
+impl<Node, Position, Maze, State, Resource> Deconstruct<State, Resource>
+    for ReturnCommander<Node, Position, Maze>
 where
     Node: RouteNode,
     Maze: Deconstruct<State, Resource>,

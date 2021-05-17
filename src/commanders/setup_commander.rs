@@ -1,39 +1,42 @@
-use heapless::Vec;
+use core::marker::PhantomData;
+
 use num_traits::{PrimInt, Unsigned};
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
-use super::{
-    compute_shortest_path, AsIndex, CommanderState, GeometricGraph, Graph, GOAL_SIZE_UPPER_BOUND,
-};
+use super::{compute_shortest_path, AsIndex, CommanderState, GeometricGraph, GoalVec, Graph};
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander).
 ///
 /// This produces a setup command.
-pub struct SetupCommander<Node, Maze>
+pub struct SetupCommander<Node, Position, Maze>
 where
     Node: RotationNode,
 {
     current: Node,
     maze: Maze,
     command: Mutex<Option<(Node, Node::Kind)>>,
+    _position: PhantomData<fn() -> Position>,
 }
 
-impl<Node, Maze> SetupCommander<Node, Maze>
+impl<Node, Position, Maze> SetupCommander<Node, Position, Maze>
 where
     Node: Clone + AsIndex + PartialEq + RotationNode,
     Maze: GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
+    Position: Into<GoalVec<Node>>,
 {
-    pub fn new(current: Node, goals: &[Node], maze: Maze) -> Self {
+    pub fn new(current: Node, goal: Position, maze: Maze) -> Self {
+        let goals = goal.into();
         for (node, kind) in current.rotation_nodes() {
-            if compute_shortest_path(&node, goals, &maze).is_some() {
+            if compute_shortest_path(&node, &goals, &maze).is_some() {
                 return Self {
                     current: node,
                     maze,
                     command: Mutex::new(Some((current, kind))),
+                    _position: PhantomData,
                 };
             }
         }
@@ -41,7 +44,7 @@ where
     }
 }
 
-impl<Node, Maze> SetupCommander<Node, Maze>
+impl<Node, Position, Maze> SetupCommander<Node, Position, Maze>
 where
     Node: RotationNode,
 {
@@ -51,7 +54,8 @@ where
     }
 }
 
-impl<Node, Maze, State, Resource> Deconstruct<State, Resource> for SetupCommander<Node, Maze>
+impl<Node, Position, Maze, State, Resource> Deconstruct<State, Resource>
+    for SetupCommander<Node, Position, Maze>
 where
     Node: RotationNode,
     Maze: Deconstruct<State, Resource>,
@@ -69,23 +73,24 @@ where
 
 /// Config for [ReturnSetupCommander].
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct ReturnSetupCommanderConfig<Node> {
-    pub return_goal: Node,
+pub struct ReturnSetupCommanderConfig<Position> {
+    pub return_goal: Position,
 }
 
 /// A commander for setting up return.
-pub struct ReturnSetupCommander<Node, Maze>(SetupCommander<Node, Maze>)
+pub struct ReturnSetupCommander<Node, Position, Maze>(SetupCommander<Node, Position, Maze>)
 where
     Node: RotationNode;
 
-impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
-    for ReturnSetupCommander<Node, Maze>
+impl<Node, Position, Maze, Config, State, Resource> Construct<Config, State, Resource>
+    for ReturnSetupCommander<Node, Position, Maze>
 where
     Node: Clone + AsIndex + PartialEq + RotationNode,
     Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
-    Config: AsRef<ReturnSetupCommanderConfig<Node>>,
+    Config: AsRef<ReturnSetupCommanderConfig<Position>>,
     State: AsRef<CommanderState<Node>>,
+    Position: Clone + Into<GoalVec<Node>>,
 {
     fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
         let maze = Maze::construct(config, state, resource);
@@ -93,7 +98,7 @@ where
         let state = state.as_ref();
         Self(SetupCommander::new(
             state.current_node.clone(),
-            &[config.return_goal.clone()],
+            config.return_goal.clone(),
             maze,
         ))
     }
@@ -101,23 +106,24 @@ where
 
 /// Config for [ReturnSetupCommander].
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct RunSetupCommanderConfig<Node> {
-    pub goals: Vec<Node, GOAL_SIZE_UPPER_BOUND>,
+pub struct RunSetupCommanderConfig<Position> {
+    pub goal: Position,
 }
 
 /// A commander for setting up fast run.
-pub struct RunSetupCommander<Node, Maze>(SetupCommander<Node, Maze>)
+pub struct RunSetupCommander<Node, Position, Maze>(SetupCommander<Node, Position, Maze>)
 where
     Node: RotationNode;
 
-impl<Node, Maze, Config, State, Resource> Construct<Config, State, Resource>
-    for RunSetupCommander<Node, Maze>
+impl<Node, Position, Maze, Config, State, Resource> Construct<Config, State, Resource>
+    for RunSetupCommander<Node, Position, Maze>
 where
     Node: Clone + AsIndex + PartialEq + RotationNode,
     Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
-    Config: AsRef<RunSetupCommanderConfig<Node>>,
+    Config: AsRef<RunSetupCommanderConfig<Position>>,
     State: AsRef<CommanderState<Node>>,
+    Position: Clone + Into<GoalVec<Node>>,
 {
     fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
         let maze = Maze::construct(config, state, resource);
@@ -125,7 +131,7 @@ where
         let state = state.as_ref();
         Self(SetupCommander::new(
             state.current_node.clone(),
-            &config.goals,
+            config.goal.clone(),
             maze,
         ))
     }
@@ -145,7 +151,7 @@ pub trait RotationNode: Sized {
 }
 
 //TODO: Write test.
-impl<Node, Maze> TrackingCommander for SetupCommander<Node, Maze>
+impl<Node, Position, Maze> TrackingCommander for SetupCommander<Node, Position, Maze>
 where
     Node: Clone + AsIndex + PartialEq + RotationNode,
     Maze: Graph<Node>,
@@ -165,7 +171,8 @@ where
 
 macro_rules! impl_all_for_setup_commander {
     ($name: ident) => {
-        impl<Node, Maze, State, Resource> Deconstruct<State, Resource> for $name<Node, Maze>
+        impl<Node, Position, Maze, State, Resource> Deconstruct<State, Resource>
+            for $name<Node, Position, Maze>
         where
             Node: RotationNode,
             Maze: Deconstruct<State, Resource>,
@@ -176,7 +183,7 @@ macro_rules! impl_all_for_setup_commander {
             }
         }
 
-        impl<Node, Maze> TrackingCommander for $name<Node, Maze>
+        impl<Node, Position, Maze> TrackingCommander for $name<Node, Position, Maze>
         where
             Node: Clone + AsIndex + PartialEq + RotationNode,
             Maze: Graph<Node>,
