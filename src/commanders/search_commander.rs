@@ -1,5 +1,6 @@
 use core::convert::{Infallible, TryFrom, TryInto};
 use core::fmt::Debug;
+use core::marker::PhantomData;
 
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num_traits::{PrimInt, Unsigned};
@@ -7,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
 use super::{
-    compute_shortest_path, AsIndex, CommanderState, CostNode, GeometricGraph, Graph, RouteNode,
-    GOAL_SIZE_UPPER_BOUND, NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
+    compute_shortest_path, AsIndex, CommanderState, CostNode, GeometricGraph, GoalVec, Graph,
+    RouteNode, NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
@@ -48,24 +49,27 @@ const CANDIDATE_SIZE_UPPER_BOUND: usize = 4;
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander) required by
 /// [TrackingOperator](crate::operators::TrackingOperator).
-pub struct SearchCommander<Node, RunNode, SearchNode, Route, Maze> {
+pub struct SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze> {
     start: RunNode,
-    goals: Vec<RunNode, GOAL_SIZE_UPPER_BOUND>,
+    goals: GoalVec<RunNode>,
     initial_route: Route,
     final_route: Route,
     current: Mutex<Node>,
     state: Mutex<State>,
     candidates: Mutex<Vec<SearchNode, CANDIDATE_SIZE_UPPER_BOUND>>,
     maze: Maze,
+    _position: PhantomData<fn() -> Position>,
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, SearchNode, Route, Maze>
+impl<Node, RunNode, SearchNode, Route, Position, Maze>
+    SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
 where
     RunNode: Clone,
+    Position: Into<GoalVec<RunNode>>,
 {
     pub fn new(
         start: RunNode,
-        goals: &[RunNode],
+        goal: Position,
         current: Node,
         initial_route: Route,
         final_route: Route,
@@ -73,16 +77,21 @@ where
     ) -> Self {
         Self {
             start,
-            goals: goals.iter().cloned().collect(),
+            goals: goal.into(),
             initial_route,
             final_route,
             current: Mutex::new(current),
             state: Mutex::new(State::Initial),
             candidates: Mutex::new(Vec::new()),
             maze,
+            _position: PhantomData,
         }
     }
+}
 
+impl<Node, RunNode, SearchNode, Route, Position, Maze>
+    SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
+{
     pub fn release(self) -> (Node, Maze) {
         let Self { current, maze, .. } = self;
         (current.into_inner(), maze)
@@ -91,23 +100,24 @@ where
 
 /// Config for [SearchCommander].
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct SearchCommanderConfig<RunNode, Route> {
+pub struct SearchCommanderConfig<RunNode, Route, Position> {
     pub start: RunNode,
-    pub goals: Vec<RunNode, GOAL_SIZE_UPPER_BOUND>,
+    pub goal: Position,
     pub initial_route: Route,
     pub final_route: Route,
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze, Config, State, Resource>
+impl<Node, RunNode, SearchNode, Route, Position, Maze, Config, State, Resource>
     Construct<Config, State, Resource>
-    for crate::commanders::SearchCommander<Node, RunNode, SearchNode, Route, Maze>
+    for SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
 where
     Maze: Construct<Config, State, Resource>,
-    Config: AsRef<SearchCommanderConfig<RunNode, Route>>,
+    Config: AsRef<SearchCommanderConfig<RunNode, Route, Position>>,
     State: AsRef<CommanderState<Node>>,
     Node: Clone,
     RunNode: Clone,
     Route: Clone,
+    Position: Clone + Into<GoalVec<RunNode>>,
 {
     fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
         let maze = Maze::construct(config, state, resource);
@@ -115,7 +125,7 @@ where
         let state = state.as_ref();
         Self::new(
             config.start.clone(),
-            &config.goals,
+            config.goal.clone(),
             state.current_node.clone(),
             config.initial_route.clone(),
             config.final_route.clone(),
@@ -124,8 +134,8 @@ where
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze, State, Resource> Deconstruct<State, Resource>
-    for SearchCommander<Node, RunNode, SearchNode, Route, Maze>
+impl<Node, RunNode, SearchNode, Route, Position, Maze, State, Resource> Deconstruct<State, Resource>
+    for SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
 where
     RunNode: Clone,
     Maze: Deconstruct<State, Resource>,
@@ -141,8 +151,8 @@ where
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze> core::fmt::Debug
-    for SearchCommander<Node, RunNode, SearchNode, Route, Maze>
+impl<Node, RunNode, SearchNode, Route, Position, Maze> core::fmt::Debug
+    for SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
 where
     Maze: core::fmt::Debug,
     SearchNode: core::fmt::Debug,
@@ -153,12 +163,13 @@ where
     }
 }
 
-impl<Node, RunNode, Cost, Maze> TrackingCommander
+impl<Node, RunNode, Cost, Position, Maze> TrackingCommander
     for SearchCommander<
         Node,
         RunNode,
         Maze::SearchNode,
         <Maze::SearchNode as RouteNode>::Route,
+        Position,
         Maze,
     >
 where
@@ -246,7 +257,8 @@ where
 }
 
 //TODO: write test
-impl<Node, RunNode, Cost, Route, Maze> SearchCommander<Node, RunNode, Maze::SearchNode, Route, Maze>
+impl<Node, RunNode, Cost, Route, Position, Maze>
+    SearchCommander<Node, RunNode, Maze::SearchNode, Route, Position, Maze>
 where
     RunNode: PartialEq + Debug + AsIndex + Clone,
     Maze::SearchNode: PartialEq + Debug + AsIndex + Clone,
@@ -306,7 +318,8 @@ where
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, SearchNode, Route, Maze>
+impl<Node, RunNode, SearchNode, Route, Position, Maze>
+    SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
 where
     RunNode: Clone + AsIndex + PartialEq,
     Maze: GeometricGraph<RunNode>,

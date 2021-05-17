@@ -2,10 +2,12 @@
 
 mod direction;
 
+use core::convert::TryFrom;
+
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::commanders::{AsIndex, NextNode, RotationNode, RouteNode};
+use crate::commanders::{AsIndex, GoalVec, NextNode, RotationNode, RouteNode};
 use crate::mazes::{
     GeometricNode, GraphNode, WallFinderNode, WallNode, WallSpaceNode, NEIGHBOR_NUMBER_UPPER_BOUND,
 };
@@ -27,6 +29,65 @@ pub enum Pattern {
     FastRun180,
     FastRunDiagonal90,
     SpinBack,
+}
+
+/// A type for representing position in maze.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct Position<const N: usize> {
+    x: i8,
+    y: i8,
+}
+
+/// Error on [Position].
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct PositionCreationError {
+    x: i8,
+    y: i8,
+}
+
+impl<const N: usize> Position<N> {
+    fn max() -> i8 {
+        (2 * N - 1) as i8
+    }
+
+    pub fn new(x: i8, y: i8) -> Result<Self, PositionCreationError> {
+        if x < 0 || y < 0 || x > Self::max() || y > Self::max() || x & y & 1 == 1 {
+            Err(PositionCreationError { x, y })
+        } else {
+            Ok(unsafe { Self::new_unchecked(x, y) })
+        }
+    }
+
+    /// Create a new position with no check.
+    ///
+    /// # Safety
+    /// - Given `x` and `y` must be in the maze.
+    /// - The position must not be on a pillar.
+    pub unsafe fn new_unchecked(x: i8, y: i8) -> Self {
+        Self { x, y }
+    }
+}
+
+impl<const N: usize> From<Position<N>> for GoalVec<RunNode<N>> {
+    fn from(value: Position<N>) -> Self {
+        use AbsoluteDirection::*;
+
+        let Position { x, y } = value;
+        core::array::IntoIter::new(if (x ^ y) & 1 == 1 {
+            // on a wall
+            [NorthEast, SouthEast, SouthWest, NorthWest]
+        } else if (x | y) & 1 == 0 {
+            // in a cell
+            [North, East, South, West]
+        } else {
+            unreachable!("Should never be on a pillar")
+        })
+        .map(|dir| {
+            RunNode::new(x, y, dir)
+                .unwrap_or_else(|err| unreachable!("Should never panic: {:?}", err))
+        })
+        .collect()
+    }
 }
 
 //TODO: Create new data type to reduce copy cost.
@@ -399,7 +460,7 @@ impl<const N: usize> SearchNode<N> {
     }
 }
 
-impl<const N: usize> core::convert::TryFrom<Node<N>> for SearchNode<N> {
+impl<const N: usize> TryFrom<Node<N>> for SearchNode<N> {
     type Error = NodeCreationError;
 
     fn try_from(value: Node<N>) -> Result<Self, Self::Error> {
@@ -830,7 +891,7 @@ impl<const N: usize> RunNode<N> {
     }
 }
 
-impl<const N: usize> core::convert::TryFrom<Node<N>> for RunNode<N> {
+impl<const N: usize> TryFrom<Node<N>> for RunNode<N> {
     type Error = NodeCreationError;
 
     fn try_from(value: Node<N>) -> Result<Self, Self::Error> {
@@ -1003,6 +1064,22 @@ impl<const N: usize> RotationNode for RunNode<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_position_new() {
+        let test_cases = vec![
+            (0, 0, Ok(Position { x: 0, y: 0 })),
+            (0, 1, Ok(Position { x: 0, y: 1 })),
+            (1, 0, Ok(Position { x: 1, y: 0 })),
+            (1, 1, Err(PositionCreationError { x: 1, y: 1 })),
+            (-1, 0, Err(PositionCreationError { x: -1, y: 0 })),
+            (8, 0, Err(PositionCreationError { x: 8, y: 0 })),
+        ];
+
+        for (x, y, expected) in test_cases {
+            assert_eq!(Position::<4>::new(x, y), expected);
+        }
+    }
 
     #[test]
     fn test_search_node_new() {

@@ -7,7 +7,7 @@ use crate::{
     controllers::MultiSisoController,
     estimator::Estimator,
     mazes::{CheckedMaze, Maze},
-    nodes::{Node, RunNode, SearchNode},
+    nodes::{Node, Position, RunNode, SearchNode},
     obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
     pattern_converters::DefaultPatternConverter,
@@ -38,6 +38,7 @@ pub type SearchOperator<
         RunNode<N>,
         SearchNode<N>,
         SearchKind,
+        Position<N>,
         Maze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
@@ -66,6 +67,7 @@ pub type RunOperator<
 > = TrackingOperator<
     RunCommander<
         RunNode<N>,
+        Position<N>,
         CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
@@ -94,6 +96,7 @@ pub type ReturnSetupOperator<
 > = TrackingOperator<
     ReturnSetupCommander<
         RunNode<N>,
+        Position<N>,
         CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
@@ -122,6 +125,7 @@ pub type ReturnOperator<
 > = TrackingOperator<
     ReturnCommander<
         RunNode<N>,
+        Position<N>,
         CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<
@@ -150,6 +154,7 @@ pub type RunSetupOperator<
 > = TrackingOperator<
     RunSetupCommander<
         RunNode<N>,
+        Position<N>,
         CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
     >,
     TrackingAgent<

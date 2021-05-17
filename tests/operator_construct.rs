@@ -14,7 +14,7 @@ use components::{
     },
     nodes::RunNode,
     prelude::*,
-    types::data::{AbsoluteDirection, ControlParameters, Pose, SearchKind},
+    types::data::{AbsoluteDirection, ControlParameters, Pose, Position, SearchKind},
     utils::probability::Probability,
     wall_manager::WallManager,
 };
@@ -38,7 +38,7 @@ use uom::si::{
 use utils::sensors::{AgentSimulator, DistanceSensor, Encoder, Imu, Motor};
 
 macro_rules! impl_construct_and_deconstruct_test {
-    ($name: ident: $operator: ident, $wall_manager: expr, $state: expr, $maze_width: literal,) => {
+    ($name: ident: $operator: ident, $wall_manager: expr, $state: expr, $goal: expr, $maze_width: literal,) => {
         #[test]
         fn $name() {
             use AbsoluteDirection::*;
@@ -47,15 +47,8 @@ macro_rules! impl_construct_and_deconstruct_test {
 
             let config = ConfigBuilder::new()
                 .start(RunNode::<$maze_width>::new(0, 0, North).unwrap())
-                .return_goal(RunNode::<$maze_width>::new(0, 0, South).unwrap())
-                .goals(
-                    vec![
-                        RunNode::<$maze_width>::new(2, 0, South).unwrap(),
-                        RunNode::<$maze_width>::new(2, 0, West).unwrap(),
-                    ]
-                    .into_iter()
-                    .collect(),
-                )
+                .return_goal(Position::new(0, 0).unwrap())
+                .goal(Position::new($goal.0, $goal.1).unwrap())
                 .search_initial_route(SearchKind::Init)
                 .search_final_route(SearchKind::Final)
                 .estimator_cut_off_frequency(Frequency::new::<hertz>(50.0))
@@ -200,6 +193,7 @@ impl_construct_and_deconstruct_test! {
     SearchOperator,
     WallManager::<4>::new(Probability::new(0.1).unwrap()),
     new_state::<4>(0, 0, North),
+    (2, 0),
     4,
 }
 
@@ -208,6 +202,7 @@ impl_construct_and_deconstruct_test! {
     RunOperator,
     WallManager::<4>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
     new_state::<4>(0, 0, North),
+    (2, 0),
     4,
 }
 
@@ -216,6 +211,7 @@ impl_construct_and_deconstruct_test! {
     ReturnSetupOperator,
     WallManager::<16>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze2.dat")),
     new_state::<16>(0, 26, South),
+    (14, 14),
     16,
 }
 
@@ -224,6 +220,7 @@ impl_construct_and_deconstruct_test! {
     ReturnOperator,
     WallManager::<4>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
     new_state::<4>(2, 0, North),
+    (2, 0),
     4,
 }
 
@@ -232,5 +229,6 @@ impl_construct_and_deconstruct_test! {
     RunSetupOperator,
     WallManager::<4>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
     new_state::<4>(0, 0, South),
+    (2, 0),
     4,
 }

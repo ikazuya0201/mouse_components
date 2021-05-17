@@ -16,7 +16,8 @@ use components::{
     trajectory_generators::{DefaultSlalomParametersGenerator, SearchTrajectoryGeneratorBuilder},
     trajectory_managers::SearchTrajectoryManager,
     types::data::{
-        AbsoluteDirection, AngleState, ControlParameters, LengthState, Pose, RobotState, SearchKind,
+        AbsoluteDirection, AngleState, ControlParameters, LengthState, Pose, Position, RobotState,
+        SearchKind,
     },
     utils::probability::Probability,
     wall_detector::WallDetectorBuilder,
@@ -42,7 +43,7 @@ use uom::si::{
 use utils::sensors::AgentSimulator;
 
 macro_rules! impl_search_operator_test {
-    ($name: ident: $size: literal, $input_str: expr, $goals: expr,) => {
+    ($name: ident: $size: literal, $input_str: expr, $goal: expr,) => {
         mod $name {
             use super::*;
 
@@ -52,10 +53,8 @@ macro_rules! impl_search_operator_test {
                 use components::prelude::*;
 
                 let input_str = $input_str;
-                let goals = $goals
-                    .into_iter()
-                    .map(|goal| RunNode::<N>::new(goal.0, goal.1, goal.2).unwrap())
-                    .collect::<Vec<_>>();
+                let goal = $goal;
+                let goal = Position::new(goal.0, goal.1).unwrap();
 
                 let start_state = RobotState {
                     x: LengthState {
@@ -216,7 +215,7 @@ macro_rules! impl_search_operator_test {
                     let current: Node<N> = start.clone().into();
                     SearchCommander::new(
                         start,
-                        &goals,
+                        goal.clone(),
                         current,
                         SearchKind::Init,
                         SearchKind::Final,
@@ -308,33 +307,23 @@ macro_rules! impl_search_operator_test {
 impl_search_operator_test!(
     search_operator_tests1: 4,
     include_str!("../mazes/maze1.dat"),
-    vec![(2, 0, South), (2, 0, West)],
+    (2, 0),
 );
 
 impl_search_operator_test!(
     search_operator_tests2: 16,
     include_str!("../mazes/maze2.dat"),
-    vec![
-        (15, 14, SouthWest),
-        (15, 14, SouthEast),
-        (15, 16, NorthWest),
-        (15, 16, NorthEast)
-    ],
+    (14, 14),
 );
 
 impl_search_operator_test!(
     search_operator_tests3: 4,
     include_str!("../mazes/maze3.dat"),
-    vec![(2, 0, South), (2, 0, West)],
+    (2, 0),
 );
 
 impl_search_operator_test!(
     search_operator_test_corner1: 16,
     include_str!("../mazes/search-corner1.dat"),
-    vec![
-        (15, 14, SouthWest),
-        (15, 14, SouthEast),
-        (15, 16, NorthWest),
-        (15, 16, NorthEast)
-    ],
+    (14, 14),
 );

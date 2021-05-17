@@ -19,7 +19,7 @@ use components::{
     trajectory_generators::{DefaultSlalomParametersGenerator, RunTrajectoryGeneratorBuilder},
     trajectory_managers::TrackingTrajectoryManager,
     types::data::{
-        AbsoluteDirection, AngleState, ControlParameters, LengthState, Pose, RobotState,
+        AbsoluteDirection, AngleState, ControlParameters, LengthState, Pose, Position, RobotState,
     },
     utils::probability::Probability,
     wall_detector::WallDetectorBuilder,
@@ -44,7 +44,7 @@ macro_rules! impl_run_operator_test {
     ($name: ident < $size: literal > { $input: expr, }) => {
         #[test]
         fn $name() {
-            let (input_str, goals, square_width) = $input;
+            let (input_str, goal, square_width) = $input;
 
             let square_width = Length::new::<meter>(square_width);
             let wall_width = Length::new::<meter>(0.006);
@@ -217,18 +217,14 @@ macro_rules! impl_run_operator_test {
 
             use AbsoluteDirection::*;
 
-            let goals = goals
-                .into_iter()
-                .map(|(x, y, dir)| RunNode::new(x, y, dir).unwrap())
-                .collect::<Vec<_>>();
-
             let commander = {
                 let maze = CheckedMaze::<_, _, SearchNode<$size>>::new(
                     Rc::clone(&wall_storage),
                     DefaultPatternConverter::default(),
                 );
                 let start = RunNode::new(0, 0, North).unwrap();
-                RunCommander::new(start, &goals, maze)
+                let goal = Position::new(goal.0, goal.1).unwrap();
+                RunCommander::new(start, goal, maze)
             };
 
             let operator = TrackingOperator::new(commander, agent);
@@ -247,10 +243,7 @@ impl_run_operator_test! {
     test_run_operator1<4> {
         (
             include_str!("../mazes/maze1.dat"),
-            vec![
-                (2, 0, South),
-                (2, 0, West),
-            ],
+            (2, 0),
             0.09,
         ),
     }
@@ -260,12 +253,7 @@ impl_run_operator_test! {
     test_run_operator2<16> {
         (
             include_str!("../mazes/maze2.dat"),
-            vec![
-                (15, 14, SouthWest),
-                (15, 14, SouthEast),
-                (15, 16, NorthWest),
-                (15, 16, NorthEast)
-            ],
+            (14, 14),
             0.09,
         ),
     }
@@ -275,7 +263,7 @@ impl_run_operator_test! {
     test_run_operator3<4> {
         (
             include_str!("../mazes/maze3.dat"),
-            vec![(2, 0, South), (2, 0, West)],
+            (2, 0),
             0.09,
         ),
     }
@@ -285,7 +273,7 @@ impl_run_operator_test! {
     test_run_operator_with_accel_slalom<4> {
         (
             include_str!("../mazes/maze4.dat"),
-            vec![(2, 0, South), (2, 0, West)],
+            (2, 0),
             0.09,
         ),
     }
@@ -295,7 +283,7 @@ impl_run_operator_test! {
     test_run_operator_with_classic_size<4> {
         (
             include_str!("../mazes/maze1.dat"),
-            vec![(2, 0, South), (2, 0, West)],
+            (2, 0),
             0.18,
         ),
     }
