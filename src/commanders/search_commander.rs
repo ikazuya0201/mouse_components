@@ -1,9 +1,8 @@
 use core::convert::{Infallible, TryFrom, TryInto};
 use core::fmt::Debug;
-use core::ops::Add;
 
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
-use num::{Bounded, Saturating};
+use num_traits::{PrimInt, Unsigned};
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
@@ -165,7 +164,7 @@ impl<Node, RunNode, Cost, Maze> TrackingCommander
 where
     RunNode: PartialEq + Debug + AsIndex + Clone + Distance<Output = Cost>,
     Maze::SearchNode: PartialEq + Debug + AsIndex + RouteNode + TryFrom<Node> + Clone,
-    Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Cost: PrimInt + Unsigned + Debug,
     Maze: Graph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
         + UncheckedNodeFinder<RunNode>
@@ -251,7 +250,7 @@ impl<Node, RunNode, Cost, Route, Maze> SearchCommander<Node, RunNode, Maze::Sear
 where
     RunNode: PartialEq + Debug + AsIndex + Clone + Distance<Output = Cost>,
     Maze::SearchNode: PartialEq + Debug + AsIndex + Clone,
-    Cost: Ord + Bounded + Saturating + num::Unsigned + Debug + Copy,
+    Cost: PrimInt + Unsigned + Debug,
     Maze: Graph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
         + UncheckedNodeFinder<RunNode>,
@@ -311,7 +310,7 @@ impl<Node, RunNode, SearchNode, Route, Maze> SearchCommander<Node, RunNode, Sear
 where
     RunNode: Clone + AsIndex + PartialEq + Distance<Output = Maze::Cost>,
     Maze: Graph<RunNode>,
-    Maze::Cost: Bounded + Saturating + Copy + Ord + Add<Output = Maze::Cost>,
+    Maze::Cost: PrimInt + Unsigned,
 {
     pub fn compute_shortest_path(&self) -> Option<Vec<RunNode, PATH_UPPER_BOUND>> {
         compute_shortest_path(&self.start, &self.goals, &self.maze)
