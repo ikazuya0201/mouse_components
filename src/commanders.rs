@@ -133,6 +133,9 @@ where
     };
 
     while let Some(CostNode(cost, node)) = heap.pop() {
+        if dists[node.as_index()] < cost {
+            continue;
+        }
         for goal in goals.iter() {
             if &node == goal {
                 return construct_path(goal.clone(), &prev);
@@ -140,15 +143,13 @@ where
         }
         for (next, edge_cost) in maze.successors(&node) {
             let next_cost = cost.saturating_add(edge_cost + maze.distance(&next, &goals[0]));
-            if next_cost < dists[next.as_index()] {
-                dists[next.as_index()] = next_cost;
-                heap.push(CostNode(next_cost, next.clone()))
-                    .unwrap_or_else(|_| {
-                        unreachable!(
-                            "The length of binary heap should never exceed the upper bound"
-                        )
-                    });
-                prev[next.as_index()] = Some(node.clone());
+            let next_index = next.as_index();
+            if next_cost < dists[next_index] {
+                dists[next_index] = next_cost;
+                heap.push(CostNode(next_cost, next)).unwrap_or_else(|_| {
+                    unreachable!("The length of binary heap should never exceed the upper bound")
+                });
+                prev[next_index] = Some(node.clone());
             }
         }
     }
