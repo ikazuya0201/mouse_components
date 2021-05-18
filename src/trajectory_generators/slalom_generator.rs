@@ -331,6 +331,8 @@ impl Iterator for CurveTrajectory {
     }
 }
 
+/// Default implementation of [SlalomParametersGenerator].
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct DefaultSlalomParametersGenerator {
     search90: [SlalomParameters; 2],
     fast_run45: [SlalomParameters; 2],
@@ -395,20 +397,20 @@ impl DefaultSlalomParametersGenerator {
                 )
             },
             fast_run45: Self::create_params(
-                0.02859611,
-                0.23570222,
-                0.8333333,
-                0.33333334,
-                4.5737333,
+                0.156_441_4,
+                0.368_032_1,
+                0.739_762,
+                0.239_762,
+                3.333_333_3,
                 45.0,
                 square_width,
             ),
             fast_run45_rev: Self::create_params(
-                0.23570222,
-                0.02859611,
-                1.0404397,
-                0.3333329,
-                4.5737333,
+                0.363_547_5,
+                0.156_441_2,
+                0.950_039_5,
+                0.242_932_8,
+                3.333_333_3,
                 45.0,
                 square_width,
             ),
