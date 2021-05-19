@@ -46,7 +46,7 @@ pub struct PositionCreationError {
 }
 
 impl<const N: usize> Position<N> {
-    fn max() -> i8 {
+    const fn max() -> i8 {
         (2 * N - 1) as i8
     }
 
@@ -221,7 +221,7 @@ impl<const N: usize> Node<N> {
         }
     }
 
-    fn max() -> i8 {
+    const fn max() -> i8 {
         2 * N as i8 - 1
     }
 
@@ -359,13 +359,11 @@ impl<const N: usize> SearchNode<N> {
 }
 
 impl<const N: usize> SearchNode<N> {
-    #[inline]
-    fn y_offset() -> u32 {
+    const fn y_offset() -> u32 {
         (N * 2).trailing_zeros()
     }
 
-    #[inline]
-    fn direction_offset() -> u32 {
+    const fn direction_offset() -> u32 {
         2 * (N * 2).trailing_zeros()
     }
 }
@@ -638,13 +636,11 @@ impl<const N: usize> AsIndex for RunNode<N> {
 }
 
 impl<const N: usize> RunNode<N> {
-    #[inline]
-    fn y_offset() -> u32 {
+    const fn y_offset() -> u32 {
         (N * 2).trailing_zeros()
     }
 
-    #[inline]
-    fn direction_offset() -> u32 {
+    const fn direction_offset() -> u32 {
         2 * (N * 2).trailing_zeros()
     }
 }
