@@ -62,8 +62,7 @@ impl<const N: usize> Wall<N> {
         self.top
     }
 
-    #[inline]
-    fn y_offset() -> usize {
+    const fn y_offset() -> usize {
         1
     }
 
@@ -77,8 +76,7 @@ impl<const N: usize> Wall<N> {
 }
 
 impl<const N: usize> Wall<N> {
-    #[inline]
-    fn x_offset() -> usize {
+    const fn x_offset() -> usize {
         N.trailing_zeros() as usize + Self::y_offset()
     }
 
@@ -88,8 +86,7 @@ impl<const N: usize> Wall<N> {
             | self.top as usize
     }
 
-    #[inline]
-    fn max() -> u8 {
+    const fn max() -> u8 {
         N as u8 - 1
     }
 
