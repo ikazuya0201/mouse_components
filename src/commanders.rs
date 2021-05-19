@@ -82,11 +82,18 @@ pub(crate) const PATH_UPPER_BOUND: usize = MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_U
 pub(crate) const NODE_NUMBER_UPPER_BOUND: usize =
     16 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
-const HEAP_SIZE: usize = 3000;
+const HEAP_SIZE: usize = 8 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
 /// A trait that can be interpreted as index.
 pub trait AsIndex {
     fn as_index(&self) -> usize;
+}
+
+/// A trait that can be converted into an unique ID.
+pub trait AsId {
+    type Id;
+
+    fn as_id(&self) -> Self::Id;
 }
 
 // NOTE: Distances between `goals` must be 0.
@@ -97,9 +104,10 @@ fn compute_shortest_path<Node, Maze>(
     maze: &Maze,
 ) -> Option<Vec<Node, PATH_UPPER_BOUND>>
 where
-    Node: Clone + AsIndex + PartialEq,
+    Node: Clone + AsIndex + PartialEq + AsId + From<Node::Id>,
     Maze: GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
+    Node::Id: Clone,
 {
     let mut dists = [Maze::Cost::max_value(); NODE_NUMBER_UPPER_BOUND];
     let start_cost = Maze::Cost::min_value() + maze.distance(&start, &goals[0]);
@@ -109,20 +117,21 @@ where
         .take(NODE_NUMBER_UPPER_BOUND)
         .collect::<Vec<_, NODE_NUMBER_UPPER_BOUND>>();
 
-    let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node>, Min, HEAP_SIZE>::new();
-    heap.push(CostNode(start_cost, start.clone()))
+    let mut heap = BinaryHeap::<CostNode<Maze::Cost, Node::Id>, Min, HEAP_SIZE>::new();
+    heap.push(CostNode(start_cost, start.as_id()))
         .unwrap_or_else(|_| {
             unreachable!("The length of binary heap should never exceed the upper bound")
         });
 
-    let construct_path = |goal: Node, prev: &[Option<Node>]| {
-        let mut current = prev[goal.as_index()].clone()?;
+    let construct_path = |goal: Node, prev: &[Option<Node::Id>]| {
+        let mut current = Node::from(prev[goal.as_index()].clone()?);
         let mut path = ForcedVec::new();
         path.push(goal);
         path.push(current.clone());
         while let Some(next) = prev[current.as_index()].as_ref() {
+            let next = Node::from(next.clone());
             path.push(next.clone());
-            current = next.clone();
+            current = next;
         }
         let len = path.len();
         //reverse
@@ -133,6 +142,7 @@ where
     };
 
     while let Some(CostNode(cost, node)) = heap.pop() {
+        let node = Node::from(node);
         if dists[node.as_index()] < cost {
             continue;
         }
@@ -146,10 +156,13 @@ where
             let next_index = next.as_index();
             if next_cost < dists[next_index] {
                 dists[next_index] = next_cost;
-                heap.push(CostNode(next_cost, next)).unwrap_or_else(|_| {
-                    unreachable!("The length of binary heap should never exceed the upper bound")
-                });
-                prev[next_index] = Some(node.clone());
+                heap.push(CostNode(next_cost, next.as_id()))
+                    .unwrap_or_else(|_| {
+                        unreachable!(
+                            "The length of binary heap should never exceed the upper bound"
+                        )
+                    });
+                prev[next_index] = Some(node.as_id());
             }
         }
     }
@@ -175,6 +188,14 @@ mod tests {
         impl Into<GoalVec<RunNode>> for Position {
             fn into(self) -> GoalVec<RunNode> {
                 core::array::IntoIter::new([RunNode(self.0)]).collect()
+            }
+        }
+
+        impl AsId for RunNode {
+            type Id = usize;
+
+            fn as_id(&self) -> Self::Id {
+                self.0
             }
         }
 

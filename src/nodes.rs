@@ -3,11 +3,12 @@
 mod direction;
 
 use core::convert::TryFrom;
+use core::num::NonZeroU16;
 
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::commanders::{AsIndex, GoalVec, NextNode, RotationNode, RouteNode};
+use crate::commanders::{AsId, AsIndex, GoalVec, NextNode, RotationNode, RouteNode};
 use crate::mazes::{
     GeometricNode, GraphNode, WallFinderNode, WallNode, WallSpaceNode, NEIGHBOR_NUMBER_UPPER_BOUND,
 };
@@ -99,6 +100,41 @@ pub struct Node<const N: usize> {
     direction: AbsoluteDirection,
 }
 
+/// ID type of [Node].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct NodeId<const N: usize>(NonZeroU16);
+
+impl<const N: usize> AsId for Node<N> {
+    type Id = NodeId<N>;
+
+    fn as_id(&self) -> Self::Id {
+        let value = ((self.x as u16
+            | ((self.y as u16) << Self::y_offset())
+            | ((self.direction as u16) << Self::direction_offset()))
+            << 1)
+            + 1;
+
+        debug_assert!(value > 0, "{:?}", self);
+
+        NodeId(unsafe { NonZeroU16::new_unchecked(value) })
+    }
+}
+
+impl<const N: usize> From<NodeId<N>> for Node<N> {
+    fn from(value: NodeId<N>) -> Self {
+        use core::convert::TryInto;
+
+        let value = value.0.get() >> 1;
+        Self {
+            x: (value & Self::mask_x()) as i8,
+            y: ((value >> Self::y_offset()) & Self::mask_y()) as i8,
+            direction: ((value >> Self::direction_offset()) & Self::mask_direction())
+                .try_into()
+                .unwrap_or_else(|err| unreachable!("This is a bug: {:?}", err)),
+        }
+    }
+}
+
 impl<const N: usize> GeometricNode for Node<N> {
     type Output = Pattern;
 
@@ -166,6 +202,26 @@ enum Location {
 impl<const N: usize> Node<N> {
     unsafe fn new_unchecked(x: i8, y: i8, direction: AbsoluteDirection) -> Self {
         Self { x, y, direction }
+    }
+
+    const fn y_offset() -> u32 {
+        (N * 2).trailing_zeros()
+    }
+
+    const fn direction_offset() -> u32 {
+        2 * (N * 2).trailing_zeros()
+    }
+
+    const fn mask_x() -> u16 {
+        N as u16 * 2 - 1
+    }
+
+    const fn mask_y() -> u16 {
+        Self::mask_x()
+    }
+
+    const fn mask_direction() -> u16 {
+        7
     }
 
     pub fn x(&self) -> &i8 {
@@ -298,6 +354,24 @@ impl<const N: usize> Node<N> {
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that represents nodes (verteces) of a graph for search.
 pub struct SearchNode<const N: usize>(Node<N>);
+
+/// ID type of [SearchNode].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SearchNodeId<const N: usize>(NodeId<N>);
+
+impl<const N: usize> AsId for SearchNode<N> {
+    type Id = SearchNodeId<N>;
+
+    fn as_id(&self) -> Self::Id {
+        SearchNodeId(self.0.as_id())
+    }
+}
+
+impl<const N: usize> From<SearchNodeId<N>> for SearchNode<N> {
+    fn from(value: SearchNodeId<N>) -> Self {
+        Self(Node::from(value.0))
+    }
+}
 
 impl<const N: usize> GeometricNode for SearchNode<N> {
     type Output = Pattern;
@@ -570,10 +644,27 @@ impl<const N: usize> RouteNode for RunNode<N> {
     }
 }
 
-//TODO: Create new data type to reduce copy cost.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// A type that represents nodes (verteces) of a graph for fast run.
 pub struct RunNode<const N: usize>(Node<N>);
+
+/// ID type of [RunNode].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RunNodeId<const N: usize>(NodeId<N>);
+
+impl<const N: usize> AsId for RunNode<N> {
+    type Id = RunNodeId<N>;
+
+    fn as_id(&self) -> Self::Id {
+        RunNodeId(self.0.as_id())
+    }
+}
+
+impl<const N: usize> From<RunNodeId<N>> for RunNode<N> {
+    fn from(value: RunNodeId<N>) -> Self {
+        Self(Node::from(value.0))
+    }
+}
 
 impl<const N: usize> GeometricNode for RunNode<N> {
     type Output = <Node<N> as GeometricNode>::Output;
@@ -1614,6 +1705,31 @@ mod tests {
                 .map(|(node, kind)| (RunNode::<SIZE>::new(node.0, node.1, node.2).unwrap(), kind))
                 .collect::<Vec<_>>();
             assert_eq!(node.rotation_nodes(), expected.as_slice());
+        }
+    }
+
+    fn into_run_node<const N: usize>((x, y, dir): (i8, i8, AbsoluteDirection)) -> RunNode<N> {
+        RunNode::new(x, y, dir).unwrap()
+    }
+
+    #[test]
+    fn test_run_node_conversion_with_id() {
+        use AbsoluteDirection::*;
+
+        let test_cases = vec![
+            (0, 0, North),
+            (0, 1, NorthEast),
+            (0, 2, East),
+            (2, 2, South),
+            (2, 1, SouthEast),
+        ]
+        .into_iter()
+        .map(into_run_node::<4>)
+        .collect::<std::vec::Vec<_>>();
+
+        for node in test_cases {
+            let id = node.as_id();
+            assert_eq!(RunNode::from(id), node);
         }
     }
 }
