@@ -1,9 +1,12 @@
+use core::convert::TryFrom;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(u8)]
 /// An enum that represents directions fixed to the maze.
 pub enum AbsoluteDirection {
-    North,
+    North = 0,
     NorthEast,
     East,
     SouthEast,
@@ -13,10 +16,36 @@ pub enum AbsoluteDirection {
     NorthWest,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
+pub struct AbsoluteDirectionConversionError {
+    value: u16,
+}
+
+impl TryFrom<u16> for AbsoluteDirection {
+    type Error = AbsoluteDirectionConversionError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        use AbsoluteDirection::*;
+
+        Ok(match value {
+            0 => North,
+            1 => NorthEast,
+            2 => East,
+            3 => SouthEast,
+            4 => South,
+            5 => SouthWest,
+            6 => West,
+            7 => NorthWest,
+            _ => return Err(AbsoluteDirectionConversionError { value }),
+        })
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(u8)]
 /// An enum that represents directions relative to the robot.
 pub enum RelativeDirection {
-    Front,
+    Front = 0,
     FrontRight,
     Right,
     BackRight,
@@ -204,6 +233,25 @@ impl RelativeDirection {
                 West => FrontLeft,
                 NorthWest => Front,
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_absolute_direction() {
+        use AbsoluteDirection::*;
+
+        let directions = vec![
+            North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest,
+        ];
+
+        for dir in directions {
+            let value = dir as u16;
+            assert_eq!(AbsoluteDirection::try_from(value), Ok(dir));
         }
     }
 }
