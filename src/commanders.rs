@@ -82,7 +82,7 @@ pub(crate) const PATH_UPPER_BOUND: usize = MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_U
 pub(crate) const NODE_NUMBER_UPPER_BOUND: usize =
     16 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
-const HEAP_SIZE: usize = 3000;
+const HEAP_SIZE: usize = 6000;
 
 /// A trait that can be interpreted as index.
 pub trait AsIndex {
