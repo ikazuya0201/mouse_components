@@ -4,7 +4,7 @@ use num_traits::{PrimInt, Unsigned};
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
-use super::{compute_shortest_path, AsIndex, CommanderState, GeometricGraph, GoalVec, Graph};
+use super::{compute_shortest_path, AsId, AsIndex, CommanderState, GeometricGraph, GoalVec, Graph};
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
 
@@ -23,7 +23,8 @@ where
 
 impl<Node, Position, Maze> SetupCommander<Node, Position, Maze>
 where
-    Node: Clone + AsIndex + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode + AsId + From<Node::Id>,
+    Node::Id: Clone,
     Maze: GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
     Position: Into<GoalVec<Node>>,
@@ -85,7 +86,8 @@ where
 impl<Node, Position, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for ReturnSetupCommander<Node, Position, Maze>
 where
-    Node: Clone + AsIndex + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode + AsId + From<Node::Id>,
+    Node::Id: Clone,
     Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<ReturnSetupCommanderConfig<Position>>,
@@ -118,7 +120,8 @@ where
 impl<Node, Position, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for RunSetupCommander<Node, Position, Maze>
 where
-    Node: Clone + AsIndex + PartialEq + RotationNode,
+    Node: Clone + AsIndex + PartialEq + RotationNode + AsId + From<Node::Id>,
+    Node::Id: Clone,
     Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<RunSetupCommanderConfig<Position>>,

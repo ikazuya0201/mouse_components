@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
 use super::{
-    compute_shortest_path, AsIndex, CommanderState, CostNode, GeometricGraph, GoalVec, Graph,
+    compute_shortest_path, AsId, AsIndex, CommanderState, CostNode, GeometricGraph, GoalVec, Graph,
     RouteNode, HEAP_SIZE, NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
@@ -173,8 +173,15 @@ impl<Node, RunNode, Cost, Position, Maze> TrackingCommander
         Maze,
     >
 where
-    RunNode: PartialEq + Debug + AsIndex + Clone,
-    Maze::SearchNode: PartialEq + Debug + AsIndex + RouteNode + TryFrom<Node> + Clone,
+    RunNode: PartialEq + Debug + AsIndex + Clone + AsId + From<RunNode::Id>,
+    RunNode::Id: Clone,
+    Maze::SearchNode: PartialEq
+        + AsIndex
+        + RouteNode
+        + TryFrom<Node>
+        + Clone
+        + AsId
+        + From<<Maze::SearchNode as AsId>::Id>,
     Cost: PrimInt + Unsigned + Debug,
     Maze: GeometricGraph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
@@ -260,8 +267,9 @@ where
 impl<Node, RunNode, Cost, Route, Position, Maze>
     SearchCommander<Node, RunNode, Maze::SearchNode, Route, Position, Maze>
 where
-    RunNode: PartialEq + Debug + AsIndex + Clone,
-    Maze::SearchNode: PartialEq + Debug + AsIndex + Clone,
+    RunNode: PartialEq + Debug + AsIndex + Clone + AsId + From<RunNode::Id>,
+    RunNode::Id: Clone,
+    Maze::SearchNode: PartialEq + AsIndex + Clone + AsId + From<<Maze::SearchNode as AsId>::Id>,
     Cost: PrimInt + Unsigned + Debug,
     Maze: GeometricGraph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
@@ -281,12 +289,17 @@ where
             .collect::<Vec<(Maze::SearchNode, Cost), CANDIDATE_SIZE_UPPER_BOUND>>();
 
         let mut dists = [Cost::max_value(); NODE_NUMBER_UPPER_BOUND];
-        let mut heap = BinaryHeap::<CostNode<Cost, Maze::SearchNode>, Min, HEAP_SIZE>::new();
+        let mut heap =
+            BinaryHeap::<CostNode<Cost, <Maze::SearchNode as AsId>::Id>, Min, HEAP_SIZE>::new();
         for node in checker_nodes {
             dists[node.as_index()] = Cost::min_value();
-            heap.push(CostNode(Cost::min_value(), node)).unwrap();
+            heap.push(CostNode(Cost::min_value(), node.as_id()))
+                .unwrap_or_else(|_| {
+                    unreachable!("The length of binary heap should never exceed the upper bound")
+                });
         }
         while let Some(CostNode(cost, node)) = heap.pop() {
+            let node = Maze::SearchNode::from(node);
             if candidates.iter().any(|(cand, _)| cand == &node) {
                 continue;
             }
@@ -294,7 +307,12 @@ where
                 let next_cost = cost.saturating_add(edge_cost);
                 if dists[next.as_index()] > next_cost {
                     dists[next.as_index()] = next_cost;
-                    heap.push(CostNode(next_cost, next)).unwrap();
+                    heap.push(CostNode(next_cost, next.as_id()))
+                        .unwrap_or_else(|_| {
+                            unreachable!(
+                                "The length of binary heap should never exceed the upper bound"
+                            )
+                        });
                 }
             }
         }
@@ -320,7 +338,8 @@ where
 impl<Node, RunNode, SearchNode, Route, Position, Maze>
     SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
 where
-    RunNode: Clone + AsIndex + PartialEq,
+    RunNode: Clone + AsIndex + PartialEq + AsId + From<RunNode::Id>,
+    RunNode::Id: Clone,
     Maze: GeometricGraph<RunNode>,
     Maze::Cost: PrimInt + Unsigned,
 {

@@ -7,7 +7,7 @@ use num_traits::{PrimInt, Unsigned};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    compute_shortest_path, AsIndex, CommanderState, GeometricGraph, GoalVec, RouteNode,
+    compute_shortest_path, AsId, AsIndex, CommanderState, GeometricGraph, GoalVec, RouteNode,
     PATH_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
@@ -28,10 +28,11 @@ where
 
 impl<Node, Position, Maze> RunCommander<Node, Position, Maze>
 where
-    Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
+    Node: PartialEq + Clone + Debug + AsIndex + RouteNode + AsId + From<Node::Id>,
     Position: Into<GoalVec<Node>>,
     Maze::Cost: PrimInt + Unsigned,
     Maze: GeometricGraph<Node>,
+    Node::Id: Clone,
 {
     pub fn new(start: Node, goal: Position, maze: Maze) -> Self {
         let path =
@@ -66,7 +67,8 @@ pub struct RunCommanderConfig<Position> {
 impl<Node, Position, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for RunCommander<Node, Position, Maze>
 where
-    Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
+    Node: PartialEq + Clone + Debug + AsIndex + RouteNode + AsId + From<Node::Id>,
+    Node::Id: Clone,
     Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<RunCommanderConfig<Position>>,
@@ -173,7 +175,8 @@ pub struct ReturnCommanderConfig<Position> {
 impl<Node, Position, Maze, Config, State, Resource> Construct<Config, State, Resource>
     for ReturnCommander<Node, Position, Maze>
 where
-    Node: PartialEq + Clone + Debug + AsIndex + RouteNode,
+    Node: PartialEq + Clone + Debug + AsIndex + RouteNode + AsId + From<Node::Id>,
+    Node::Id: Clone,
     Maze: Construct<Config, State, Resource> + GeometricGraph<Node>,
     Maze::Cost: PrimInt + Unsigned,
     Config: AsRef<ReturnCommanderConfig<Position>>,
