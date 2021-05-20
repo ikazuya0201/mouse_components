@@ -8,7 +8,6 @@ use crate::{
     estimator::Estimator,
     mazes::{CheckedMaze, Maze},
     nodes::{Node, Position, RunNode, SearchNode},
-    obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
     pattern_converters::DefaultPatternConverter,
     robot::Robot,
@@ -51,7 +50,7 @@ pub type SearchOperator<
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
+            WallDetector<WallManager<N>, DistanceSensor, N>,
         >,
     >,
 >;
@@ -80,7 +79,7 @@ pub type RunOperator<
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
+            WallDetector<WallManager<N>, DistanceSensor, N>,
         >,
     >,
 >;
@@ -109,7 +108,7 @@ pub type ReturnSetupOperator<
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
+            WallDetector<WallManager<N>, DistanceSensor, N>,
         >,
     >,
 >;
@@ -138,7 +137,7 @@ pub type ReturnOperator<
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
+            WallDetector<WallManager<N>, DistanceSensor, N>,
         >,
     >,
 >;
@@ -167,7 +166,7 @@ pub type RunSetupOperator<
         Robot<
             Estimator<LeftEncoder, RightEncoder, Imu>,
             Tracker<MultiSisoController<LeftMotor, RightMotor>>,
-            WallDetector<WallManager<N>, ObstacleDetector<DistanceSensor>, N>,
+            WallDetector<WallManager<N>, DistanceSensor, N>,
         >,
     >,
 >;

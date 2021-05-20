@@ -10,7 +10,6 @@ use components::{
     estimator::EstimatorBuilder,
     mazes::CheckedMaze,
     nodes::{RunNode, SearchNode},
-    obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
     pattern_converters::DefaultPatternConverter,
     prelude::*,
@@ -184,10 +183,9 @@ macro_rules! impl_run_operator_test {
                     };
 
                     let wall_detector = {
-                        let obstacle_detector = ObstacleDetector::new(distance_sensors);
                         WallDetectorBuilder::new()
                             .wall_manager(Rc::clone(&wall_storage))
-                            .obstacle_detector(obstacle_detector)
+                            .distance_sensors(distance_sensors.into_iter().collect())
                             .build::<$size>()
                             .unwrap()
                     };

@@ -10,6 +10,7 @@ use crate::defaults::{
     state::StateContainer,
 };
 use crate::sensors::*;
+use crate::wall_manager::WallManager;
 use crate::{Construct, Deconstruct};
 
 /// Mode for describing current state of operator.
@@ -103,7 +104,7 @@ where
             LeftMotor,
             RightMotor,
             DistanceSensorType,
-            N,
+            WallManager<N>,
         > = resource.build().expect("Should never panic").into();
 
         match mode {

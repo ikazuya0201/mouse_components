@@ -139,7 +139,7 @@ macro_rules! impl_construct_and_deconstruct_test {
                 *config.ignore_length_from_wall(),
             );
 
-            let mut resource: ResourceContainer<_, _, _, _, _, _, $maze_width> =
+            let mut resource: ResourceContainer<_, _, _, _, _, _, WallManager<$maze_width>> =
                 ResourceBuilder::new()
                     .left_encoder(left_encoder)
                     .right_encoder(right_encoder)
@@ -172,7 +172,7 @@ macro_rules! impl_construct_and_deconstruct_test {
 
             let (mut state_builder, mut resource_builder): (
                 StateBuilder<$maze_width>,
-                ResourceBuilder<_, _, _, _, _, _, $maze_width>,
+                ResourceBuilder<_, _, _, _, _, _, WallManager<$maze_width>>,
             ) = operator.deconstruct();
             state_builder.build().expect("Should never panic"); // Assert if all fields exist.
             resource_builder.build().expect("Should never panic");
