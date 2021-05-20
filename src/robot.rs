@@ -9,6 +9,9 @@ pub trait Estimator {
 
     fn estimate(&mut self);
     fn state(&self) -> &Self::State;
+
+    /// Returns mutable reference of estimated state.
+    fn state_mut(&mut self) -> &mut Self::State;
 }
 
 /// A trait that tracks the given target with the given robot state.
@@ -23,7 +26,8 @@ pub trait Tracker<State, Target> {
 /// A trait that detects obstacles, updates the states of wall and gives feedbacks for state
 /// estimation.
 pub trait WallDetector<State> {
-    fn detect_and_update(&mut self, state: &State);
+    /// Updates walls by a given state and corrects the given state.
+    fn detect_and_update(&mut self, state: &mut State);
 }
 
 /// An implementation of [Robot](crate::agents::Robot).
@@ -118,7 +122,7 @@ where
     fn track_and_update(&mut self, target: &Target) -> Result<(), Self::Error> {
         self.estimator.estimate();
         self.tracker.track(self.estimator.state(), target)?;
-        self.detector.detect_and_update(self.estimator.state());
+        self.detector.detect_and_update(self.estimator.state_mut());
         Ok(())
     }
 
@@ -148,6 +152,10 @@ mod tests {
             fn state(&self) -> &Self::State {
                 &self.state
             }
+
+            fn state_mut(&mut self) -> &mut Self::State {
+                &mut self.state
+            }
         }
 
         #[derive(PartialEq, Eq, Debug)]
@@ -156,7 +164,7 @@ mod tests {
         }
 
         impl WallDetector<usize> for DetectorType {
-            fn detect_and_update(&mut self, state: &usize) {
+            fn detect_and_update(&mut self, state: &mut usize) {
                 self.state = Some(*state);
             }
         }

@@ -118,7 +118,7 @@ where
     Manager: WallProbabilityManager<Wall<N>>,
     Detector: ObstacleDetector<State, Obstacle = Obstacle>,
 {
-    fn detect_and_update(&mut self, state: &State) {
+    fn detect_and_update(&mut self, state: &mut State) {
         use uom::si::ratio::ratio;
 
         let obstacles = self.detector.detect(state);

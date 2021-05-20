@@ -252,6 +252,10 @@ where
         &self.inner.state
     }
 
+    fn state_mut(&mut self) -> &mut Self::State {
+        &mut self.inner.state
+    }
+
     fn estimate(&mut self) {
         //velocity estimation
         let left_distance = block!(self.left_encoder.get_relative_distance()).unwrap();
