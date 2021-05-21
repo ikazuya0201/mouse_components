@@ -16,7 +16,7 @@ use crate::types::data::{Pose, RobotState};
 use crate::utils::{
     builder::{ok_or, BuilderResult},
     probability::Probability,
-    sample::Sample,
+    random::Random,
     total::Total,
 };
 use crate::wall_manager::Wall;
@@ -44,7 +44,7 @@ pub trait DistanceSensor {
     /// Return the relative pose of the sensor from the center of the machine.
     /// The x axis is directed from the center of the machine to the front of the machine.
     fn pose(&self) -> &Pose;
-    fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error>;
+    fn get_distance(&mut self) -> nb::Result<Random<Length>, Self::Error>;
 }
 
 pub(crate) const SENSOR_SIZE_UPPER_BOUND: usize = 6;
@@ -150,10 +150,17 @@ where
         use uom::si::ratio::ratio;
 
         let current_pose = Pose {
-            x: state.x.x,
-            y: state.y.x,
+            x: state.x.x.mean,
+            y: state.y.x.mean,
             theta: state.theta.x,
         };
+
+        let mut delta_x = Length::default();
+        let mut delta_y = Length::default();
+        let average_standard_deviation =
+            (state.x.x.standard_deviation + state.y.x.standard_deviation) / 2.0;
+        let mut sigma2 = average_standard_deviation * average_standard_deviation;
+
         for (i, distance_sensor) in self.distance_sensors.iter_mut().enumerate() {
             let distance = if let Ok(distance) = distance_sensor.get_distance() {
                 distance
@@ -164,26 +171,29 @@ where
                 continue;
             };
 
-            let source = {
-                let sensor_pose = distance_sensor.pose();
-                // TODO: use configurable value as index (e.g. `self.pose_histories[i].len() / val`)
-                let machine_pose = self.past_poses[i].take().unwrap_or(current_pose);
-                let sin_th = machine_pose.theta.value.sin();
-                let cos_th = machine_pose.theta.value.cos();
+            let sensor_relative_pose = distance_sensor.pose();
+            // TODO: use configurable value as index (e.g. `self.pose_histories[i].len() / val`)
+            let machine_pose = self.past_poses[i].take().unwrap_or(current_pose);
+            let sin_th = machine_pose.theta.value.sin();
+            let cos_th = machine_pose.theta.value.cos();
 
-                debug_assert!(!machine_pose.x.is_nan());
-                debug_assert!(!machine_pose.y.is_nan());
-                debug_assert!(!sensor_pose.x.is_nan());
-                debug_assert!(!sensor_pose.y.is_nan());
+            debug_assert!(!machine_pose.x.is_nan());
+            debug_assert!(!machine_pose.y.is_nan());
+            debug_assert!(!sensor_relative_pose.x.is_nan());
+            debug_assert!(!sensor_relative_pose.y.is_nan());
 
-                Pose {
-                    x: machine_pose.x + sensor_pose.x * cos_th - sensor_pose.y * sin_th,
-                    y: machine_pose.y + sensor_pose.x * sin_th + sensor_pose.y * cos_th,
-                    theta: machine_pose.theta + sensor_pose.theta,
-                }
+            let sensor_pose = Pose {
+                x: machine_pose.x + sensor_relative_pose.x * cos_th
+                    - sensor_relative_pose.y * sin_th
+                    + delta_x,
+                y: machine_pose.y
+                    + sensor_relative_pose.x * sin_th
+                    + sensor_relative_pose.y * cos_th
+                    + delta_y,
+                theta: machine_pose.theta + sensor_relative_pose.theta,
             };
 
-            let wall_info = if let Ok(wall_info) = self.converter.convert(&source) {
+            let wall_info = if let Ok(wall_info) = self.converter.convert(&sensor_pose) {
                 wall_info
             } else {
                 continue;
@@ -196,7 +206,18 @@ where
                     continue;
                 };
 
-            if existence.is_zero() || existence.is_one() {
+            if existence.is_zero() {
+                continue;
+            } else if existence.is_one() {
+                let sigma_sens2 = distance.standard_deviation * distance.standard_deviation;
+                let k = (sigma2 / (sigma2 + sigma_sens2)).get::<ratio>();
+
+                let distance_diff = k * (wall_info.existing_distance - distance.mean);
+                let cos_th = sensor_pose.theta.value.cos();
+                let sin_th = sensor_pose.theta.value.sin();
+                delta_x += distance_diff * cos_th;
+                delta_y += distance_diff * sin_th;
+                sigma2 *= 1.0 - k;
                 continue;
             }
 
@@ -236,6 +257,12 @@ where
             // Ignore the result.
             let _ = self.manager.try_update(&wall_info.wall, &existence);
         }
+        // Update state.
+        state.x.x.mean += delta_x;
+        state.y.x.mean += delta_y;
+        let standard_deviation = crate::utils::math::sqrt(sigma2);
+        state.x.x.standard_deviation = standard_deviation;
+        state.y.x.standard_deviation = standard_deviation;
     }
 }
 

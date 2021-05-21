@@ -9,7 +9,7 @@ use components::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Imu as IImu, Motor as IMotor,
     },
     types::data::{Pose, RobotState},
-    utils::sample::Sample,
+    utils::random::Random,
     wall_detector::{ConversionError, PoseConverter, PoseConverterBuilder},
     wall_manager::WallManager,
 };
@@ -181,8 +181,10 @@ impl AgentSimulatorInner {
         let next_sin = next.theta.x.value.sin();
         let next_cos = next.theta.x.value.cos();
 
-        next.x.x += (current_trans_vel * cur_cos + next_trans_vel * next_cos) * self.period / 2.0;
-        next.y.x += (current_trans_vel * cur_sin + next_trans_vel * next_sin) * self.period / 2.0;
+        next.x.x.mean +=
+            (current_trans_vel * cur_cos + next_trans_vel * next_cos) * self.period / 2.0;
+        next.y.x.mean +=
+            (current_trans_vel * cur_sin + next_trans_vel * next_sin) * self.period / 2.0;
 
         next.x.v = next_trans_vel * next_cos;
         next.y.v = next_trans_vel * next_sin;
@@ -337,13 +339,13 @@ impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
         &self.pose
     }
 
-    fn get_distance(&mut self) -> nb::Result<Sample<Length>, Self::Error> {
+    fn get_distance(&mut self) -> nb::Result<Random<Length>, Self::Error> {
         let state = &self.inner.borrow().current;
         let sin_th = state.theta.x.value.sin();
         let cos_th = state.theta.x.value.cos();
         let pose = Pose {
-            x: state.x.x + self.pose.x * cos_th - self.pose.y * sin_th,
-            y: state.y.x + self.pose.x * sin_th + self.pose.y * cos_th,
+            x: state.x.x.mean + self.pose.x * cos_th - self.pose.y * sin_th,
+            y: state.y.x.mean + self.pose.x * sin_th + self.pose.y * cos_th,
             theta: state.theta.x + self.pose.theta,
         };
         let wall_info = self
@@ -358,9 +360,9 @@ impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
         if distance.is_nan() {
             return Err(nb::Error::Other(DistanceSensorError::DistanceIsNaN));
         }
-        Ok(Sample {
+        Ok(Random {
             mean: distance,
-            standard_deviation: Length::new::<meter>(0.001),
+            standard_deviation: Length::new::<meter>(0.002),
         })
     }
 }

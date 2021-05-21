@@ -21,6 +21,7 @@ use components::{
         AbsoluteDirection, AngleState, ControlParameters, LengthState, Pose, Position, RobotState,
     },
     utils::probability::Probability,
+    utils::random::Random,
     wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
 };
@@ -52,11 +53,17 @@ macro_rules! impl_run_operator_test {
 
             let start_state = RobotState {
                 x: LengthState {
-                    x: square_width / 2.0,
+                    x: Random {
+                        mean: square_width / 2.0,
+                        standard_deviation: Default::default(),
+                    },
                     ..Default::default()
                 },
                 y: LengthState {
-                    x: square_width / 2.0,
+                    x: Random {
+                        mean: square_width / 2.0,
+                        standard_deviation: Default::default(),
+                    },
                     ..Default::default()
                 },
                 theta: AngleState {

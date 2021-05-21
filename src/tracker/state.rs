@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use uom::si::f32::{Acceleration, Angle, AngularAcceleration, AngularVelocity, Length, Velocity};
 
 use crate::types::data::Pose;
+use crate::utils::random::Random;
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct RobotState {
@@ -12,7 +13,7 @@ pub struct RobotState {
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct LengthState {
-    pub x: Length,
+    pub x: Random<Length>,
     pub v: Velocity,
     pub a: Acceleration,
 }
@@ -28,11 +29,17 @@ impl From<Pose> for RobotState {
     fn from(pose: Pose) -> Self {
         Self {
             x: LengthState {
-                x: pose.x,
+                x: Random {
+                    mean: pose.x,
+                    standard_deviation: Default::default(),
+                },
                 ..Default::default()
             },
             y: LengthState {
-                x: pose.y,
+                x: Random {
+                    mean: pose.y,
+                    standard_deviation: Default::default(),
+                },
                 ..Default::default()
             },
             theta: AngleState {
@@ -65,8 +72,9 @@ mod tests {
 
         fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
             self.x
+                .mean
                 .get::<meter>()
-                .abs_diff_eq(&other.x.get::<meter>(), epsilon)
+                .abs_diff_eq(&other.x.mean.get::<meter>(), epsilon)
                 && self
                     .v
                     .get::<meter_per_second>()
@@ -111,19 +119,19 @@ mod tests {
             epsilon: Self::Epsilon,
             max_relative: Self::Epsilon,
         ) -> bool {
-            self.x
-                .get::<meter>()
-                .relative_eq(&other.x.get::<meter>(), epsilon, max_relative)
-                && self.v.get::<meter_per_second>().relative_eq(
-                    &other.v.get::<meter_per_second>(),
-                    epsilon * V_RATIO,
-                    max_relative,
-                )
-                && self.a.get::<meter_per_second_squared>().relative_eq(
-                    &other.a.get::<meter_per_second_squared>(),
-                    epsilon * A_RATIO,
-                    max_relative,
-                )
+            self.x.mean.get::<meter>().relative_eq(
+                &other.x.mean.get::<meter>(),
+                epsilon,
+                max_relative,
+            ) && self.v.get::<meter_per_second>().relative_eq(
+                &other.v.get::<meter_per_second>(),
+                epsilon * V_RATIO,
+                max_relative,
+            ) && self.a.get::<meter_per_second_squared>().relative_eq(
+                &other.a.get::<meter_per_second_squared>(),
+                epsilon * A_RATIO,
+                max_relative,
+            )
         }
     }
 

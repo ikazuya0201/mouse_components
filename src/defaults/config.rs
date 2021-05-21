@@ -73,6 +73,7 @@ impl_with_getter! {
         slip_angle_const: Acceleration,
         estimator_approximation_threshold: AngularVelocity,
         fail_safe_voltage_threshold: ElectricPotential,
+        estimator_standard_deviation_delta: Length,
     }
 }
 
@@ -151,6 +152,7 @@ impl<const N: usize> From<Config<N>> for ConfigContainer<N> {
             slip_angle_const,
             estimator_approximation_threshold,
             fail_safe_voltage_threshold,
+            estimator_standard_deviation_delta,
         } = value;
         Self {
             command_converter: CommandConverterConfig {
@@ -180,6 +182,7 @@ impl<const N: usize> From<Config<N>> for ConfigContainer<N> {
                 cut_off_frequency: estimator_cut_off_frequency,
                 slip_angle_const,
                 approximation_threshold: estimator_approximation_threshold,
+                standard_deviation_delta: estimator_standard_deviation_delta,
             },
             tracker: TrackerConfig {
                 gain: tracker_gain,
@@ -328,6 +331,7 @@ pub struct ConfigBuilder<const N: usize> {
     slip_angle_const: Option<Acceleration>,
     estimator_approximation_threshold: Option<AngularVelocity>,
     fail_safe_voltage_threshold: Option<ElectricPotential>,
+    estimator_standard_deviation_delta: Option<Length>,
 }
 
 impl<const N: usize> Default for ConfigBuilder<N> {
@@ -516,6 +520,13 @@ impl<const N: usize> ConfigBuilder<N> {
         /// and stops all motors.
         fail_safe_voltage_threshold: ElectricPotential
     );
+    impl_setter!(
+        /// **Optional**,
+        /// Default: 0.0 \[m\]
+        ///
+        /// Sets the standard deviation delta for state of estimator.
+        estimator_standard_deviation_delta: Length
+    );
 
     /// Generates new builder whose values are set as None.
     pub fn new() -> Self {
@@ -551,6 +562,7 @@ impl<const N: usize> ConfigBuilder<N> {
             slip_angle_const: None,
             estimator_approximation_threshold: None,
             fail_safe_voltage_threshold: None,
+            estimator_standard_deviation_delta: None,
         }
     }
 
@@ -606,6 +618,9 @@ impl<const N: usize> ConfigBuilder<N> {
                 .estimator_approximation_threshold
                 .unwrap_or(crate::estimator::EstimatorInner::DEFAULT_APPROXIMATION_THRESHOLD),
             fail_safe_voltage_threshold: get!(fail_safe_voltage_threshold),
+            estimator_standard_deviation_delta: self
+                .estimator_standard_deviation_delta
+                .unwrap_or_default(),
         })
     }
 }

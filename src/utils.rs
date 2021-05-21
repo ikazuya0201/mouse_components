@@ -6,5 +6,5 @@ pub(crate) mod forced_vec;
 pub(crate) mod macros;
 pub(crate) mod math;
 pub mod probability;
-pub mod sample;
+pub mod random;
 pub(crate) mod total;

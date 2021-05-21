@@ -84,6 +84,7 @@ macro_rules! impl_construct_and_deconstruct_test {
                 .run_slalom_velocity(Velocity::new::<meter_per_second>(0.5))
                 .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
                 .fail_safe_voltage_threshold(ElectricPotential::new::<volt>(10.0))
+                .estimator_standard_deviation_delta(Length::new::<millimeter>(1e-3))
                 .build()
                 .unwrap();
 
