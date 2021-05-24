@@ -10,7 +10,6 @@ use components::{
     estimator::EstimatorBuilder,
     mazes::CheckedMaze,
     nodes::{RunNode, SearchNode},
-    obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
     pattern_converters::DefaultPatternConverter,
     prelude::*,
@@ -22,6 +21,7 @@ use components::{
         AbsoluteDirection, AngleState, ControlParameters, LengthState, Pose, Position, RobotState,
     },
     utils::probability::Probability,
+    utils::random::Random,
     wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
 };
@@ -53,11 +53,17 @@ macro_rules! impl_run_operator_test {
 
             let start_state = RobotState {
                 x: LengthState {
-                    x: square_width / 2.0,
+                    x: Random {
+                        mean: square_width / 2.0,
+                        standard_deviation: Default::default(),
+                    },
                     ..Default::default()
                 },
                 y: LengthState {
-                    x: square_width / 2.0,
+                    x: Random {
+                        mean: square_width / 2.0,
+                        standard_deviation: Default::default(),
+                    },
                     ..Default::default()
                 },
                 theta: AngleState {
@@ -184,10 +190,9 @@ macro_rules! impl_run_operator_test {
                     };
 
                     let wall_detector = {
-                        let obstacle_detector = ObstacleDetector::new(distance_sensors);
                         WallDetectorBuilder::new()
                             .wall_manager(Rc::clone(&wall_storage))
-                            .obstacle_detector(obstacle_detector)
+                            .distance_sensors(distance_sensors.into_iter().collect())
                             .build::<$size>()
                             .unwrap()
                     };

@@ -15,6 +15,7 @@ use crate::defaults::{
 use crate::operators::TrackingOperatorError;
 use crate::sensors::*;
 use crate::trajectory_managers::{SearchTrajectoryManagerError, TrackingTrajectoryManagerError};
+use crate::wall_manager::WallManager;
 use crate::Deconstruct;
 
 /// Enum which contains all operators.
@@ -180,7 +181,7 @@ impl<
             LeftMotor,
             RightMotor,
             DistanceSensorType,
-            N,
+            WallManager<N>,
         >,
     >
     for Operators<LeftEncoder, RightEncoder, ImuType, LeftMotor, RightMotor, DistanceSensorType, N>
@@ -196,6 +197,7 @@ where
     ImuType::Error: Debug,
     DistanceSensorType::Error: Debug,
 {
+    #[allow(clippy::type_complexity)]
     fn deconstruct(
         self,
     ) -> (
@@ -207,7 +209,7 @@ where
             LeftMotor,
             RightMotor,
             DistanceSensorType,
-            N,
+            WallManager<N>,
         >,
     ) {
         use Operators::*;

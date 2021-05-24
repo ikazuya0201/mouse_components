@@ -12,10 +12,11 @@ use uom::si::{angle::revolution, length::meter};
 
 use crate::impl_setter;
 use crate::robot::WallDetector as IWallDetector;
-use crate::types::data::{Obstacle, Pose};
+use crate::types::data::{Pose, RobotState};
 use crate::utils::{
     builder::{ok_or, BuilderResult},
     probability::Probability,
+    random::Random,
     total::Total,
 };
 use crate::wall_manager::Wall;
@@ -28,14 +29,6 @@ pub struct WallInfo<Wall> {
     pub not_existing_distance: Length,
 }
 
-/// A trait that detects obstacle.
-pub trait ObstacleDetector<State> {
-    type Obstacle;
-    type Obstacles: IntoIterator<Item = Self::Obstacle>;
-
-    fn detect(&mut self, state: &State) -> Self::Obstacles;
-}
-
 /// A trait that manages existence probabilities of walls.
 pub trait WallProbabilityManager<Wall>: Send + Sync {
     type Error;
@@ -44,27 +37,47 @@ pub trait WallProbabilityManager<Wall>: Send + Sync {
     fn try_update(&self, wall: &Wall, probablity: &Probability) -> Result<(), Self::Error>;
 }
 
+/// A trait that measures the distance from this sensor to an obstacle in front of the sensor.
+pub trait DistanceSensor {
+    type Error;
+
+    /// Return the relative pose of the sensor from the center of the machine.
+    /// The x axis is directed from the center of the machine to the front of the machine.
+    fn pose(&self) -> &Pose;
+    fn get_distance(&mut self) -> nb::Result<Random<Length>, Self::Error>;
+}
+
+pub(crate) const SENSOR_SIZE_UPPER_BOUND: usize = 6;
+
 /// An implementation of [WallDetector](crate::robot::WallDetector).
-pub struct WallDetector<Manager, Detector, const N: usize> {
+pub struct WallDetector<Manager, DistanceSensor, const N: usize> {
     manager: Rc<Manager>,
-    detector: Detector,
+    distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>,
+    past_poses: [Option<Pose>; SENSOR_SIZE_UPPER_BOUND],
     converter: PoseConverter<N>,
 }
 
-impl<Manager, Detector, const N: usize> WallDetector<Manager, Detector, N> {
-    pub fn new(manager: Rc<Manager>, detector: Detector, converter: PoseConverter<N>) -> Self {
+impl<Manager, DistanceSensor, const N: usize> WallDetector<Manager, DistanceSensor, N> {
+    pub fn new(
+        manager: Rc<Manager>,
+        distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>,
+        converter: PoseConverter<N>,
+    ) -> Self {
         Self {
             manager,
-            detector,
+            distance_sensors,
+            past_poses: [None; SENSOR_SIZE_UPPER_BOUND],
             converter,
         }
     }
 
-    pub fn release(self) -> (Rc<Manager>, Detector) {
+    pub fn release(self) -> (Rc<Manager>, Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>) {
         let Self {
-            detector, manager, ..
+            distance_sensors,
+            manager,
+            ..
         } = self;
-        (manager, detector)
+        (manager, distance_sensors)
     }
 }
 
@@ -77,16 +90,25 @@ pub struct WallDetectorConfig {
     pub ignore_length_from_wall: Length,
 }
 
-impl<Manager, Detector, Config, State, Resource, const N: usize> Construct<Config, State, Resource>
-    for WallDetector<Manager, Detector, N>
+pub struct WallDetectorResource<Manager, DistanceSensor> {
+    pub wall_manager: Rc<Manager>,
+    pub distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>,
+}
+
+impl<Manager, DistanceSensor, Config, State, Resource, const N: usize>
+    Construct<Config, State, Resource> for WallDetector<Manager, DistanceSensor, N>
 where
-    Detector: Construct<Config, State, Resource>,
     Config: AsRef<WallDetectorConfig>,
-    Resource: AsRef<Rc<Manager>>,
+    Resource: AsMut<Option<WallDetectorResource<Manager, DistanceSensor>>>,
 {
-    fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
-        let detector = Detector::construct(config, state, resource);
-        let wall_manager = Rc::clone(resource.as_ref());
+    fn construct<'a>(config: &'a Config, _state: &'a State, resource: &'a mut Resource) -> Self {
+        let WallDetectorResource {
+            wall_manager,
+            distance_sensors,
+        } = resource
+            .as_mut()
+            .take()
+            .unwrap_or_else(|| unreachable!("This is a bug"));
         let config = config.as_ref();
         let converter = PoseConverterBuilder::new()
             .square_width(config.square_width)
@@ -95,79 +117,152 @@ where
             .ignore_length_from_wall(config.ignore_length_from_wall)
             .build()
             .expect("Should never panic");
-        Self::new(wall_manager, detector, converter)
+        Self::new(wall_manager, distance_sensors, converter)
     }
 }
 
-impl<Manager, Detector, State, Resource, const N: usize> Deconstruct<State, Resource>
-    for WallDetector<Manager, Detector, N>
+impl<Manager, DistanceSensor, State, Resource, const N: usize> Deconstruct<State, Resource>
+    for WallDetector<Manager, DistanceSensor, N>
 where
-    Resource: Merge + From<Rc<Manager>>,
-    Detector: Deconstruct<State, Resource>,
+    State: Default,
+    Resource: Merge + From<WallDetectorResource<Manager, DistanceSensor>>,
 {
     fn deconstruct(self) -> (State, Resource) {
-        let (manager, detector) = self.release();
-        let (state, resource) = detector.deconstruct();
-        (state, resource.merge(manager.into()))
+        let (wall_manager, distance_sensors) = self.release();
+        (
+            Default::default(),
+            WallDetectorResource {
+                wall_manager,
+                distance_sensors,
+            }
+            .into(),
+        )
     }
 }
 
-impl<Manager, Detector, State, const N: usize> IWallDetector<State>
-    for WallDetector<Manager, Detector, N>
+impl<Manager, DistanceSensorType, const N: usize> IWallDetector<RobotState>
+    for WallDetector<Manager, DistanceSensorType, N>
 where
     Manager: WallProbabilityManager<Wall<N>>,
-    Detector: ObstacleDetector<State, Obstacle = Obstacle>,
+    DistanceSensorType: DistanceSensor,
 {
-    fn detect_and_update(&mut self, state: &State) {
+    fn detect_and_update(&mut self, state: &mut RobotState) {
         use uom::si::ratio::ratio;
 
-        let obstacles = self.detector.detect(state);
+        let current_pose = Pose {
+            x: state.x.x.mean,
+            y: state.y.x.mean,
+            theta: state.theta.x,
+        };
 
-        for obstacle in obstacles {
-            if let Ok(wall_info) = self.converter.convert(&obstacle.source) {
-                if let Ok(existence) = self.manager.try_existence_probability(&wall_info.wall) {
-                    if existence.is_zero() || existence.is_one() {
-                        continue;
-                    }
+        let mut delta_x = Length::default();
+        let mut delta_y = Length::default();
+        let average_standard_deviation =
+            (state.x.x.standard_deviation + state.y.x.standard_deviation) / 2.0;
+        let mut sigma2 = average_standard_deviation * average_standard_deviation;
 
-                    let exist_val = {
-                        let tmp = ((wall_info.existing_distance - obstacle.distance.mean)
-                            / obstacle.distance.standard_deviation)
-                            .get::<ratio>();
-                        -tmp * tmp / 2.0
-                    };
-                    let not_exist_val = {
-                        let tmp = ((wall_info.not_existing_distance - obstacle.distance.mean)
-                            / obstacle.distance.standard_deviation)
-                            .get::<ratio>();
-                        -tmp * tmp / 2.0
-                    };
-
-                    debug_assert!(!exist_val.is_nan());
-                    debug_assert!(!not_exist_val.is_nan());
-
-                    let min = if exist_val < not_exist_val {
-                        exist_val
-                    } else {
-                        not_exist_val
-                    };
-                    let exist_val = (exist_val - min).exp() * existence;
-                    let not_exist_val = (not_exist_val - min).exp() * existence.reverse();
-
-                    let existence = if exist_val.is_infinite() {
-                        Probability::one()
-                    } else if not_exist_val.is_infinite() {
-                        Probability::zero()
-                    } else {
-                        Probability::new(exist_val / (exist_val + not_exist_val)).unwrap_or_else(
-                            |err| unreachable!("Should never be out of bound: {:?}", err),
-                        )
-                    };
-                    let _ = self.manager.try_update(&wall_info.wall, &existence);
-                    //ignore if cannot update
+        for (i, distance_sensor) in self.distance_sensors.iter_mut().enumerate() {
+            let distance = if let Ok(distance) = distance_sensor.get_distance() {
+                distance
+            } else {
+                if self.past_poses[i].is_none() {
+                    self.past_poses[i] = Some(current_pose);
                 }
+                continue;
+            };
+
+            let sensor_relative_pose = distance_sensor.pose();
+            // TODO: use configurable value as index (e.g. `self.pose_histories[i].len() / val`)
+            let machine_pose = self.past_poses[i].take().unwrap_or(current_pose);
+            let sin_th = machine_pose.theta.value.sin();
+            let cos_th = machine_pose.theta.value.cos();
+
+            debug_assert!(!machine_pose.x.is_nan());
+            debug_assert!(!machine_pose.y.is_nan());
+            debug_assert!(!sensor_relative_pose.x.is_nan());
+            debug_assert!(!sensor_relative_pose.y.is_nan());
+
+            let sensor_pose = Pose {
+                x: machine_pose.x + sensor_relative_pose.x * cos_th
+                    - sensor_relative_pose.y * sin_th
+                    + delta_x,
+                y: machine_pose.y
+                    + sensor_relative_pose.x * sin_th
+                    + sensor_relative_pose.y * cos_th
+                    + delta_y,
+                theta: machine_pose.theta + sensor_relative_pose.theta,
+            };
+
+            let wall_info = if let Ok(wall_info) = self.converter.convert(&sensor_pose) {
+                wall_info
+            } else {
+                continue;
+            };
+
+            let existence =
+                if let Ok(existence) = self.manager.try_existence_probability(&wall_info.wall) {
+                    existence
+                } else {
+                    continue;
+                };
+
+            if existence.is_zero() {
+                continue;
+            } else if existence.is_one() {
+                let sigma_sens2 = distance.standard_deviation * distance.standard_deviation;
+                let k = (sigma2 / (sigma2 + sigma_sens2)).get::<ratio>();
+
+                let distance_diff = k * (wall_info.existing_distance - distance.mean);
+                let cos_th = sensor_pose.theta.value.cos();
+                let sin_th = sensor_pose.theta.value.sin();
+                delta_x += distance_diff * cos_th;
+                delta_y += distance_diff * sin_th;
+                sigma2 *= 1.0 - k;
+                continue;
             }
+
+            let exist_val = {
+                let tmp = ((wall_info.existing_distance - distance.mean)
+                    / distance.standard_deviation)
+                    .get::<ratio>();
+                -tmp * tmp / 2.0
+            };
+            let not_exist_val = {
+                let tmp = ((wall_info.not_existing_distance - distance.mean)
+                    / distance.standard_deviation)
+                    .get::<ratio>();
+                -tmp * tmp / 2.0
+            };
+
+            debug_assert!(!exist_val.is_nan());
+            debug_assert!(!not_exist_val.is_nan());
+
+            let min = if exist_val < not_exist_val {
+                exist_val
+            } else {
+                not_exist_val
+            };
+            let exist_val = (exist_val - min).exp() * existence;
+            let not_exist_val = (not_exist_val - min).exp() * existence.reverse();
+
+            let existence = if exist_val.is_infinite() {
+                Probability::one()
+            } else if not_exist_val.is_infinite() {
+                Probability::zero()
+            } else {
+                Probability::new(exist_val / (exist_val + not_exist_val))
+                    .unwrap_or_else(|err| unreachable!("Should never be out of bound: {:?}", err))
+            };
+
+            // Ignore the result.
+            let _ = self.manager.try_update(&wall_info.wall, &existence);
         }
+        // Update state.
+        state.x.x.mean += delta_x;
+        state.y.x.mean += delta_y;
+        let standard_deviation = crate::utils::math::sqrt(sigma2);
+        state.x.x.standard_deviation = standard_deviation;
+        state.y.x.standard_deviation = standard_deviation;
     }
 }
 
@@ -489,26 +584,26 @@ impl PoseConverterBuilder {
     }
 }
 
-pub struct WallDetectorBuilder<Manager, Detector> {
+pub struct WallDetectorBuilder<Manager, DistanceSensor> {
     wall_manager: Option<Rc<Manager>>,
-    obstacle_detector: Option<Detector>,
+    distance_sensors: Option<Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>>,
     square_width: Option<Length>,
     wall_width: Option<Length>,
     ignore_radius_from_pillar: Option<Length>,
     ignore_length_from_wall: Option<Length>,
 }
 
-impl<Manager, Detector> Default for WallDetectorBuilder<Manager, Detector> {
+impl<Manager, DistanceSensor> Default for WallDetectorBuilder<Manager, DistanceSensor> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Manager, Detector> WallDetectorBuilder<Manager, Detector> {
+impl<Manager, DistanceSensor> WallDetectorBuilder<Manager, DistanceSensor> {
     pub fn new() -> Self {
         Self {
             wall_manager: None,
-            obstacle_detector: None,
+            distance_sensors: None,
             square_width: None,
             wall_width: None,
             ignore_radius_from_pillar: None,
@@ -520,12 +615,6 @@ impl<Manager, Detector> WallDetectorBuilder<Manager, Detector> {
         /// **Required**,
         /// Sets a reference to an implementation of [WallProbabilityManager](WallProbabilityManager).
         wall_manager: Rc<Manager>
-    }
-
-    impl_setter! {
-        /// **Required**,
-        /// Sets an implementation of [ObstacleDetector](ObstacleDetector).
-        obstacle_detector: Detector
     }
 
     impl_setter! {
@@ -562,7 +651,13 @@ impl<Manager, Detector> WallDetectorBuilder<Manager, Detector> {
         ignore_length_from_wall: Length
     }
 
-    pub fn build<const N: usize>(&mut self) -> BuilderResult<WallDetector<Manager, Detector, N>> {
+    impl_setter! {
+        distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>
+    }
+
+    pub fn build<const N: usize>(
+        &mut self,
+    ) -> BuilderResult<WallDetector<Manager, DistanceSensor, N>> {
         let converter = PoseConverter::<N>::new(
             self.square_width.unwrap_or(DEFAULT_SQUARE_WIDTH),
             self.wall_width.unwrap_or(DEFAULT_WALL_WIDTH),
@@ -573,7 +668,7 @@ impl<Manager, Detector> WallDetectorBuilder<Manager, Detector> {
         );
         Ok(WallDetector::new(
             ok_or(self.wall_manager.take(), "wall_manager")?,
-            ok_or(self.obstacle_detector.take(), "obstacle_detector")?,
+            ok_or(self.distance_sensors.take(), "distance_sensors")?,
             converter,
         ))
     }

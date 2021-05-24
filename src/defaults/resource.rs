@@ -4,10 +4,9 @@ use alloc::rc::Rc;
 
 use heapless::Vec;
 
-use crate::obstacle_detector::SENSOR_SIZE_UPPER_BOUND;
 use crate::types::resources::*;
 use crate::utils::builder::BuilderResult;
-use crate::wall_manager::WallManager;
+use crate::wall_detector::SENSOR_SIZE_UPPER_BOUND;
 use crate::{get_or_err, Merge};
 
 /// An resource type for initialization of operators.
@@ -18,7 +17,7 @@ pub struct Resource<
     LeftMotor,
     RightMotor,
     DistanceSensor,
-    const N: usize,
+    WallManager,
 > {
     pub left_encoder: LeftEncoder,
     pub right_encoder: RightEncoder,
@@ -26,15 +25,15 @@ pub struct Resource<
     pub left_motor: LeftMotor,
     pub right_motor: RightMotor,
     pub distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>,
-    pub wall_manager: Rc<WallManager<N>>,
+    pub wall_manager: Rc<WallManager>,
 }
 
 macro_rules! impl_from {
     ($name: ident $(<$($type: ty),*>)? {
         $($field_name: ident,)*
     }) => {
-        impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, const N: usize>
-            From<$name $(<$($type),*>)?> for ResourceBuilder<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
+        impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, WallManager>
+            From<$name $(<$($type),*>)?> for ResourceBuilder<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, WallManager>
         {
             fn from(value: $name $(<$($type),*>)?) -> Self {
                 let mut resource = ResourceBuilder::default();
@@ -64,16 +63,25 @@ impl_from! {
 }
 
 impl_from! {
-    ObstacleDetectorResource<DistanceSensor> {
+    WallDetectorResource<WallManager, DistanceSensor> {
+        wall_manager,
         distance_sensors,
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, const N: usize>
-    From<Rc<WallManager<N>>>
-    for ResourceBuilder<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
+impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, WallManager>
+    From<Rc<WallManager>>
+    for ResourceBuilder<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        WallManager,
+    >
 {
-    fn from(value: Rc<WallManager<N>>) -> Self {
+    fn from(value: Rc<WallManager>) -> Self {
         Self {
             wall_manager: Some(value),
             ..Default::default()
@@ -88,12 +96,12 @@ pub struct ResourceContainer<
     LeftMotor,
     RightMotor,
     DistanceSensor,
-    const N: usize,
+    WallManager,
 > {
     pub estimator: Option<EstimatorResource<LeftEncoder, RightEncoder, Imu>>,
     pub controller: Option<MultiSisoControllerResource<LeftMotor, RightMotor>>,
-    pub obstacle_detector: Option<ObstacleDetectorResource<DistanceSensor>>,
-    pub wall_manager: Rc<WallManager<N>>,
+    pub wall_detector: Option<WallDetectorResource<WallManager, DistanceSensor>>,
+    pub wall_manager: Rc<WallManager>,
 }
 
 macro_rules! impl_as_mut {
@@ -105,7 +113,7 @@ macro_rules! impl_as_mut {
                 LeftMotor,
                 RightMotor,
                 DistanceSensor,
-                const N: usize,
+                WallManager,
             > AsMut<Option<$name $(<$($type),*>)?>>
             for ResourceContainer<
                 LeftEncoder,
@@ -114,7 +122,7 @@ macro_rules! impl_as_mut {
                 LeftMotor,
                 RightMotor,
                 DistanceSensor,
-                N,
+                WallManager,
             >
         {
             fn as_mut(&mut self) -> &mut Option<$name $(<$($type),*>)?> {
@@ -126,23 +134,57 @@ macro_rules! impl_as_mut {
 
 impl_as_mut!(estimator: EstimatorResource<LeftEncoder, RightEncoder, Imu>);
 impl_as_mut!(controller: MultiSisoControllerResource<LeftMotor, RightMotor>);
-impl_as_mut!(obstacle_detector: ObstacleDetectorResource<DistanceSensor>);
+impl_as_mut!(wall_detector: WallDetectorResource<WallManager, DistanceSensor>);
 
-impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, const N: usize>
-    AsRef<Rc<WallManager<N>>>
-    for ResourceContainer<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
+impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, WallManager>
+    AsRef<Rc<WallManager>>
+    for ResourceContainer<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        WallManager,
+    >
 {
-    fn as_ref(&self) -> &Rc<WallManager<N>> {
+    fn as_ref(&self) -> &Rc<WallManager> {
         &self.wall_manager
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, const N: usize>
-    From<Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>>
-    for ResourceContainer<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
+impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, WallManager>
+    From<
+        Resource<
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            LeftMotor,
+            RightMotor,
+            DistanceSensor,
+            WallManager,
+        >,
+    >
+    for ResourceContainer<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        WallManager,
+    >
 {
     fn from(
-        value: Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>,
+        value: Resource<
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            LeftMotor,
+            RightMotor,
+            DistanceSensor,
+            WallManager,
+        >,
     ) -> Self {
         let Resource {
             left_encoder,
@@ -163,14 +205,25 @@ impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, cons
                 left_motor,
                 right_motor,
             }),
-            obstacle_detector: Some(ObstacleDetectorResource { distance_sensors }),
+            wall_detector: Some(WallDetectorResource {
+                wall_manager: Rc::clone(&wall_manager),
+                distance_sensors,
+            }),
             wall_manager,
         }
     }
 }
 
-impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, const N: usize> Merge
-    for ResourceBuilder<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
+impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, WallManager> Merge
+    for ResourceBuilder<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        WallManager,
+    >
 {
     fn merge(mut self, mut rhs: Self) -> Self {
         // prioritize left hand side value.
@@ -198,7 +251,7 @@ pub struct ResourceBuilder<
     LeftMotor,
     RightMotor,
     DistanceSensor,
-    const N: usize,
+    WallManager,
 > {
     left_encoder: Option<LeftEncoder>,
     right_encoder: Option<RightEncoder>,
@@ -206,11 +259,19 @@ pub struct ResourceBuilder<
     left_motor: Option<LeftMotor>,
     right_motor: Option<RightMotor>,
     distance_sensors: Option<Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>>,
-    wall_manager: Option<Rc<WallManager<N>>>,
+    wall_manager: Option<Rc<WallManager>>,
 }
 
-impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, const N: usize> Default
-    for ResourceBuilder<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
+impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, WallManager> Default
+    for ResourceBuilder<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        WallManager,
+    >
 {
     fn default() -> Self {
         Self {
@@ -234,8 +295,16 @@ macro_rules! impl_setter {
     };
 }
 
-impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, const N: usize>
-    ResourceBuilder<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>
+impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, WallManager>
+    ResourceBuilder<
+        LeftEncoder,
+        RightEncoder,
+        Imu,
+        LeftMotor,
+        RightMotor,
+        DistanceSensor,
+        WallManager,
+    >
 {
     pub fn new() -> Self {
         Self {
@@ -252,7 +321,15 @@ impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, cons
     pub fn build(
         &mut self,
     ) -> BuilderResult<
-        Resource<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, N>,
+        Resource<
+            LeftEncoder,
+            RightEncoder,
+            Imu,
+            LeftMotor,
+            RightMotor,
+            DistanceSensor,
+            WallManager,
+        >,
     > {
         Ok(Resource {
             left_encoder: get_or_err!(self.left_encoder),
@@ -271,5 +348,5 @@ impl<LeftEncoder, RightEncoder, Imu, LeftMotor, RightMotor, DistanceSensor, cons
     impl_setter!(left_motor: LeftMotor);
     impl_setter!(right_motor: RightMotor);
     impl_setter!(distance_sensors: Vec<DistanceSensor, SENSOR_SIZE_UPPER_BOUND>);
-    impl_setter!(wall_manager: Rc<WallManager<N>>);
+    impl_setter!(wall_manager: Rc<WallManager>);
 }

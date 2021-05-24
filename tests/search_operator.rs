@@ -8,7 +8,6 @@ use components::{
     estimator::EstimatorBuilder,
     mazes::Maze,
     nodes::{Node, RunNode, SearchNode},
-    obstacle_detector::ObstacleDetector,
     operators::TrackingOperator,
     pattern_converters::DefaultPatternConverter,
     robot::Robot,
@@ -20,6 +19,7 @@ use components::{
         SearchKind,
     },
     utils::probability::Probability,
+    utils::random::Random,
     wall_detector::WallDetectorBuilder,
     wall_manager::WallManager,
 };
@@ -58,11 +58,17 @@ macro_rules! impl_search_operator_test {
 
                 let start_state = RobotState {
                     x: LengthState {
-                        x: Length::new::<millimeter>(45.0),
+                        x: Random {
+                            mean: Length::new::<millimeter>(45.0),
+                            standard_deviation: Default::default(),
+                        },
                         ..Default::default()
                     },
                     y: LengthState {
-                        x: Length::new::<millimeter>(45.0),
+                        x: Random {
+                            mean: Length::new::<millimeter>(45.0),
+                            standard_deviation: Default::default(),
+                        },
                         ..Default::default()
                     },
                     theta: AngleState {
@@ -129,6 +135,7 @@ macro_rules! impl_search_operator_test {
                                 .slip_angle_const(Acceleration::new::<meter_per_second_squared>(
                                     100.0,
                                 ))
+                                .standard_deviation_delta(Length::new::<meter>(1e-6))
                                 .build()
                                 .unwrap()
                         };
@@ -168,10 +175,9 @@ macro_rules! impl_search_operator_test {
                         };
 
                         let wall_detector = {
-                            let obstacle_detector = ObstacleDetector::new(distance_sensors);
                             WallDetectorBuilder::new()
                                 .wall_manager(Rc::clone(&wall_manager))
-                                .obstacle_detector(obstacle_detector)
+                                .distance_sensors(distance_sensors.into_iter().collect())
                                 .build::<N>()
                                 .unwrap()
                         };

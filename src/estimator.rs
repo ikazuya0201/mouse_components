@@ -40,6 +40,8 @@ pub struct EstimatorInner {
     slip_angle_const: Acceleration,
     slip_angle: Angle,
     approximation_threshold: AngularVelocity,
+    // TODO: Modified to return random variables from sensors.
+    standard_deviation_delta: Length,
 }
 
 impl EstimatorInner {
@@ -55,6 +57,7 @@ impl EstimatorInner {
         initial_state: RobotState,
         slip_angle_const: Acceleration,
         approximation_threshold: AngularVelocity,
+        standard_deviation_delta: Length,
     ) -> Self {
         Self {
             period,
@@ -64,6 +67,7 @@ impl EstimatorInner {
             slip_angle_const,
             slip_angle: Default::default(),
             approximation_threshold,
+            standard_deviation_delta,
         }
     }
 
@@ -112,8 +116,8 @@ impl EstimatorInner {
         let theta_m = self.state.theta.x - self.slip_angle + dtheta / 2.0;
         let sin_th = theta_m.value.sin();
         let cos_th = theta_m.value.cos();
-        self.state.x.x += trans_distance * cos_th;
-        self.state.y.x += trans_distance * sin_th;
+        self.state.x.x.mean += trans_distance * cos_th;
+        self.state.y.x.mean += trans_distance * sin_th;
         self.state.theta.x += dtheta;
         //------
 
@@ -125,6 +129,9 @@ impl EstimatorInner {
         self.state.theta.a =
             AngularAcceleration::from((angular_velocity - self.state.theta.v) / self.period);
         self.state.theta.v = angular_velocity;
+
+        self.state.x.x.standard_deviation += self.standard_deviation_delta;
+        self.state.y.x.standard_deviation += self.standard_deviation_delta;
     }
 }
 
@@ -169,6 +176,7 @@ pub struct EstimatorConfig {
     pub cut_off_frequency: Frequency,
     pub slip_angle_const: Acceleration,
     pub approximation_threshold: AngularVelocity,
+    pub standard_deviation_delta: Length,
 }
 
 /// State for [Estimator].
@@ -252,6 +260,10 @@ where
         &self.inner.state
     }
 
+    fn state_mut(&mut self) -> &mut Self::State {
+        &mut self.inner.state
+    }
+
     fn estimate(&mut self) {
         //velocity estimation
         let left_distance = block!(self.left_encoder.get_relative_distance()).unwrap();
@@ -298,6 +310,7 @@ pub struct EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
     initial_state: Option<RobotState>,
     slip_angle_const: Option<Acceleration>,
     approximation_threshold: Option<AngularVelocity>,
+    standard_deviation_delta: Option<Length>,
 }
 
 impl<LeftEncoder: Encoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder, Imu> {
@@ -338,6 +351,7 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
             initial_state: None,
             slip_angle_const: None,
             approximation_threshold: None,
+            standard_deviation_delta: None,
         }
     }
 
@@ -368,6 +382,11 @@ impl<LeftEncoder, RightEncoder, Imu> EstimatorBuilder<LeftEncoder, RightEncoder,
         self.approximation_threshold = Some(approximation_threshold);
         self
     }
+
+    pub fn standard_deviation_delta(&mut self, standard_deviation_delta: Length) -> &mut Self {
+        self.standard_deviation_delta = Some(standard_deviation_delta);
+        self
+    }
 }
 
 impl<LeftEncoder: Encoder, RightEncoder: Encoder, ImuType: Imu>
@@ -387,6 +406,7 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, ImuType: Imu>
                 get_or_err!(self.slip_angle_const),
                 self.approximation_threshold
                     .unwrap_or(EstimatorInner::DEFAULT_APPROXIMATION_THRESHOLD),
+                self.standard_deviation_delta.unwrap_or_default(),
             ),
             left_encoder: ok_or(self.left_encoder.take(), "left_encoder")?,
             right_encoder: ok_or(self.right_encoder.take(), "right_encoder")?,
@@ -397,6 +417,18 @@ impl<LeftEncoder: Encoder, RightEncoder: Encoder, ImuType: Imu>
 
 #[cfg(test)]
 mod tests {
+    use core::marker::PhantomData;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use approx::assert_abs_diff_eq;
+    use uom::si::{
+        acceleration::meter_per_second_squared, angle::radian,
+        angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
+        angular_velocity::degree_per_second, f32::*, frequency::hertz,
+        jerk::meter_per_second_cubed, length::meter, velocity::meter_per_second,
+    };
+
     use super::*;
     use crate::{
         prelude::*,
@@ -405,16 +437,7 @@ mod tests {
             SearchTrajectoryGeneratorBuilder,
         },
         types::data::{AngleState, LengthState, Pose, SearchKind, Target},
-    };
-    use approx::assert_abs_diff_eq;
-    use core::marker::PhantomData;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use uom::si::{
-        acceleration::meter_per_second_squared, angle::radian,
-        angular_acceleration::degree_per_second_squared, angular_jerk::degree_per_second_cubed,
-        angular_velocity::degree_per_second, f32::*, frequency::hertz,
-        jerk::meter_per_second_cubed, length::meter, velocity::meter_per_second,
+        utils::random::Random,
     };
 
     const EPSILON: f32 = 2e-2;
@@ -479,12 +502,18 @@ mod tests {
             if let Some(target) = self.trajectory.next() {
                 let state = RobotState {
                     x: LengthState {
-                        x: target.x.x,
+                        x: Random {
+                            mean: target.x.x,
+                            standard_deviation: Default::default(),
+                        },
                         v: target.x.v,
                         a: target.x.a,
                     },
                     y: LengthState {
-                        x: target.y.x,
+                        x: Random {
+                            mean: target.y.x,
+                            standard_deviation: Default::default(),
+                        },
                         v: target.y.v,
                         a: target.y.a,
                     },
@@ -522,8 +551,8 @@ mod tests {
             let current = self.inner.borrow().current.clone();
             let prev = self.inner.borrow().prev.clone();
             let angle = current.theta.x - prev.theta.x;
-            let xd = current.x.x - prev.x.x;
-            let yd = current.y.x - prev.y.x;
+            let xd = current.x.x.mean - prev.x.x.mean;
+            let yd = current.y.x.mean - prev.y.x.mean;
             let middle_angle = (current.theta.x + prev.theta.x) / 2.0;
             let d = xd * middle_angle.value.cos() + yd * middle_angle.value.sin();
             match self.direction {

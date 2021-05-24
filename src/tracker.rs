@@ -126,10 +126,10 @@ where
         //calculate control input for (x,y)
         let ux = target.x.a
             + self.dgain * (target.x.v - state.x.v)
-            + self.gain * (target.x.x - state.x.x);
+            + self.gain * (target.x.x - state.x.x.mean);
         let uy = target.y.a
             + self.dgain * (target.y.v - state.y.v)
-            + self.gain * (target.y.x - state.y.x);
+            + self.gain * (target.y.x - state.y.x.mean);
         let dux = target.x.j
             + self.dgain * (target.x.a - state.x.a)
             + self.gain * (target.x.v - state.x.v);
@@ -156,8 +156,8 @@ where
             } else {
                 let theta_d = normalize_angle(target.theta.x - state.theta.x);
                 let cos_th_d = theta_d.value.cos();
-                let xd = target.x.x - state.x.x;
-                let yd = target.y.x - state.y.x;
+                let xd = target.x.x - state.x.x.mean;
+                let yd = target.y.x - state.y.x.mean;
 
                 let wr = target.theta.v;
 

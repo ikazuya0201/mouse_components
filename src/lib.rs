@@ -15,7 +15,6 @@ pub mod defaults;
 pub mod estimator;
 pub mod mazes;
 pub mod nodes;
-pub mod obstacle_detector;
 pub mod operators;
 pub mod prelude;
 pub mod robot;
@@ -44,8 +43,6 @@ pub mod traits {
     pub use operators::{TrackingAgent, TrackingCommander};
     #[doc(no_inline)]
     pub use tracker::Controller;
-    #[doc(no_inline)]
-    pub use wall_detector::ObstacleDetector;
 }
 
 /// Types in this crate.
@@ -62,8 +59,6 @@ pub mod types {
             AbsoluteDirection, Node, Pattern, Position, RelativeDirection, RotationKind, RunNode,
             SearchNode,
         };
-        #[doc(no_inline)]
-        pub use obstacle_detector::Obstacle;
         #[doc(no_inline)]
         pub use tracker::{AngleState, ControlTarget, LengthState, RobotState};
         #[doc(no_inline)]
@@ -122,7 +117,7 @@ pub mod types {
         #[doc(no_inline)]
         pub use estimator::EstimatorResource;
         #[doc(no_inline)]
-        pub use obstacle_detector::ObstacleDetectorResource;
+        pub use wall_detector::WallDetectorResource;
     }
 }
 
@@ -135,7 +130,7 @@ pub mod sensors {
     #[doc(no_inline)]
     pub use estimator::{Encoder, Imu};
     #[doc(no_inline)]
-    pub use obstacle_detector::DistanceSensor;
+    pub use wall_detector::DistanceSensor;
 }
 
 const MAZE_WIDTH_UPPER_BOUND: usize = 32;
