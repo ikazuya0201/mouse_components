@@ -3,7 +3,6 @@
 
 use core::fmt;
 
-use heapless::Vec;
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
@@ -100,7 +99,7 @@ impl<const N: usize> Wall<N> {
 }
 
 pub struct WallManager<const N: usize> {
-    walls: Vec<Mutex<Probability>, WALL_NUMBER_UPPER_BOUND>,
+    walls: [Mutex<Probability>; WALL_NUMBER_UPPER_BOUND],
     existence_threshold: Probability,
 }
 
@@ -156,14 +155,11 @@ impl<const N: usize> fmt::Display for WallManager<N> {
 
 impl<const N: usize> WallManager<N> {
     fn _new(existence_threshold: Probability) -> Self {
-        let walls = core::iter::repeat_with(|| {
-            Mutex::new(Probability::new(0.5).expect("Should never panic"))
-        })
-        .take(WALL_NUMBER_UPPER_BOUND)
-        .collect();
+        #[allow(clippy::declare_interior_mutable_const)]
+        const WALL: Mutex<Probability> = unsafe { Mutex::new(Probability::new_unchecked(0.5)) };
 
         Self {
-            walls,
+            walls: [WALL; WALL_NUMBER_UPPER_BOUND],
             existence_threshold,
         }
     }
