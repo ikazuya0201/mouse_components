@@ -73,9 +73,9 @@ macro_rules! impl_construct_and_deconstruct_test {
                 .low_zeta(1.0)
                 .low_b(1e-3)
                 .search_velocity(Velocity::new::<meter_per_second>(0.3))
-                .max_velocity(Velocity::new::<meter_per_second>(1.0))
-                .max_acceleration(Acceleration::new::<meter_per_second_squared>(50.0))
-                .max_jerk(Jerk::new::<meter_per_second_cubed>(100.0))
+                .max_velocity(Velocity::new::<meter_per_second>(2.0))
+                .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
+                .max_jerk(Jerk::new::<meter_per_second_cubed>(50.0))
                 .spin_angular_velocity(AngularVelocity::new::<degree_per_second>(180.0))
                 .spin_angular_acceleration(AngularAcceleration::new::<degree_per_second_squared>(
                     1800.0,
@@ -83,7 +83,7 @@ macro_rules! impl_construct_and_deconstruct_test {
                 .spin_angular_jerk(AngularJerk::new::<degree_per_second_cubed>(7200.0))
                 .run_slalom_velocity(Velocity::new::<meter_per_second>(0.5))
                 .slip_angle_const(Acceleration::new::<meter_per_second_squared>(100.0))
-                .fail_safe_voltage_threshold(ElectricPotential::new::<volt>(10.0))
+                .fail_safe_voltage_threshold(ElectricPotential::new::<volt>(12.0))
                 .estimator_standard_deviation_delta(Length::new::<millimeter>(1e-3))
                 .build()
                 .unwrap();
@@ -231,5 +231,14 @@ impl_construct_and_deconstruct_test! {
     WallManager::<4>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/maze1.dat")),
     new_state::<4>(0, 0, South),
     (2, 0),
+    4,
+}
+
+impl_construct_and_deconstruct_test! {
+    test_return_operator_corner1:
+    ReturnOperator,
+    WallManager::<4>::with_str(Probability::new(0.1).unwrap(), include_str!("../mazes/return-corner1.dat")),
+    new_state::<4>(2, 0, East),
+    (0, 0),
     4,
 }
