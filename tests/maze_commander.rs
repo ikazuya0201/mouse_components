@@ -112,3 +112,24 @@ fn test_compute_shortest_path3() {
         .collect::<Vec<_>>(),
     )
 }
+
+#[test]
+fn test_compute_shortest_path_corner1() {
+    test_compute_shortest_path::<4>(
+        include_str!("../mazes/return-corner1.dat"),
+        new((2, 0, East)),
+        Position::new(0, 0).unwrap(),
+        &vec![
+            (2, 0, East),
+            (4, 1, NorthEast),
+            (5, 2, NorthEast),
+            (6, 4, North),
+            (4, 5, SouthWest),
+            (1, 2, SouthWest),
+            (0, 0, South),
+        ]
+        .into_iter()
+        .map(new)
+        .collect::<Vec<_>>(),
+    )
+}
