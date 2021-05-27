@@ -134,11 +134,27 @@ where
 
     fn generate(&self, parameters: &RunTrajectoryParameters) -> Self::Trajectory {
         let mut current_velocity = self.current_velocity.lock();
-        let (start, end) = match parameters.state {
-            RunState::Acceleration => (*current_velocity, self.run_slalom_velocity),
-            RunState::Constant => (self.run_slalom_velocity, self.run_slalom_velocity),
-            RunState::Deceleration1 => (*current_velocity, *current_velocity / 2.0),
-            RunState::Deceleration2 => (*current_velocity, Default::default()),
+        let (start, middle, end) = match parameters.state {
+            RunState::Acceleration => (
+                *current_velocity,
+                self.run_slalom_velocity,
+                self.run_slalom_velocity,
+            ),
+            RunState::Constant => (
+                self.run_slalom_velocity,
+                self.run_slalom_velocity,
+                self.run_slalom_velocity,
+            ),
+            RunState::Deceleration1 => (
+                *current_velocity,
+                *current_velocity * 0.5,
+                *current_velocity * 0.5,
+            ),
+            RunState::Deceleration2 => (
+                *current_velocity,
+                *current_velocity * 0.666_666_7,
+                Default::default(),
+            ),
         };
         let generate_straight = |distance: Length| {
             let (trajectory, terminal_velocity) = self
@@ -158,7 +174,7 @@ where
             RunKind::Slalom(kind, dir) => {
                 let (trajectory, terminal_velocity) = self
                     .slalom_generator
-                    .generate_slalom_with_terminal_velocity(kind, dir, start, end);
+                    .generate_slalom_with_terminal_velocity(kind, dir, start, middle, end);
                 (RunTrajectory::Slalom(trajectory), terminal_velocity)
             }
         };
@@ -239,4 +255,43 @@ impl<Generator> RunTrajectoryGeneratorBuilder<Generator> {
     impl_setter!(parameters_generator: Generator);
     impl_setter!(square_width: Length);
     impl_setter!(initial_velocity: Velocity);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ntest::timeout(50)]
+    fn test_finite_run_trajectory() {
+        use uom::si::{
+            acceleration::meter_per_second_squared, jerk::meter_per_second_cubed, length::meter,
+            time::second, velocity::meter_per_second,
+        };
+
+        let square_width = Length::new::<meter>(0.09);
+        let trajectory_generator = RunTrajectoryGeneratorBuilder::default()
+            .period(Time::new::<second>(0.001))
+            .max_velocity(Velocity::new::<meter_per_second>(2.0))
+            .max_acceleration(Acceleration::new::<meter_per_second_squared>(10.0))
+            .max_jerk(Jerk::new::<meter_per_second_cubed>(50.0))
+            .parameters_generator(DefaultSlalomParametersGenerator::new(
+                square_width,
+                Default::default(),
+            ))
+            .run_slalom_velocity(Velocity::new::<meter_per_second>(0.6))
+            .square_width(square_width)
+            .initial_velocity(Velocity::new::<meter_per_second>(0.3))
+            .build()
+            .expect("Should never panic");
+
+        let trajectory = trajectory_generator.generate(&RunTrajectoryParameters {
+            pose: Default::default(),
+            kind: RunKind::Slalom(SlalomKind::FastRun45Rev, SlalomDirection::Left),
+            state: RunState::Deceleration2,
+        });
+
+        // Do nothing
+        trajectory.for_each(|_| {});
+    }
 }

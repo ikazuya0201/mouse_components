@@ -132,12 +132,13 @@ where
         kind: SlalomKind,
         dir: SlalomDirection,
         v_start: Velocity,
+        v_middle: Velocity,
         v_end: Velocity,
     ) -> (SlalomTrajectory, Velocity) {
         let params = self.parameters_generator.generate(kind, dir);
         let (start_straight, middle_velocity) = self
             .straight_generator
-            .generate_with_terminal_velocity(params.l_start, v_start, v_end);
+            .generate_with_terminal_velocity(params.l_start, v_start, v_middle);
         let curve = self.generate_curve(
             params.l_start,
             Default::default(),
