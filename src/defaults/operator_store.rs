@@ -56,6 +56,12 @@ impl<const N: usize> OperatorStore<N> {
     }
 }
 
+/// Error on [OperatorStore].
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum OperatorStoreError<Mode> {
+    UnsupportedMode(Mode),
+}
+
 impl<
         LeftEncoder,
         RightEncoder,
@@ -81,6 +87,9 @@ where
     ImuType::Error: Debug,
     DistanceSensorType::Error: Debug,
 {
+    type Error = OperatorStoreError<Mode>;
+
+    #[allow(clippy::type_complexity)]
     fn exchange(
         &self,
         operator: Operators<
@@ -93,8 +102,10 @@ where
             N,
         >,
         mode: Mode,
-    ) -> Operators<LeftEncoder, RightEncoder, ImuType, LeftMotor, RightMotor, DistanceSensorType, N>
-    {
+    ) -> Result<
+        Operators<LeftEncoder, RightEncoder, ImuType, LeftMotor, RightMotor, DistanceSensorType, N>,
+        Self::Error,
+    > {
         let (mut state, mut resource) = operator.deconstruct();
         let state: StateContainer<N> = state.build().expect("Should never panic").into();
         let mut resource: ResourceContainer<
@@ -107,7 +118,7 @@ where
             WallManager<N>,
         > = resource.build().expect("Should never panic").into();
 
-        match mode {
+        Ok(match mode {
             Mode::Search(_) => Operators::Search(SearchOperator::construct(
                 &self.config,
                 &state,
@@ -131,7 +142,7 @@ where
             Mode::Run(_) => {
                 Operators::Run(RunOperator::construct(&self.config, &state, &mut resource))
             }
-            _ => todo!(),
-        }
+            mode => return Err(OperatorStoreError::UnsupportedMode(mode)),
+        })
     }
 }

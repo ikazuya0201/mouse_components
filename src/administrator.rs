@@ -12,8 +12,10 @@ pub enum OperatorError<T> {
 
 /// A trait that consumes and initializes operators.
 pub trait OperatorStore<Mode, Operator> {
+    type Error;
+
     /// Exchanges an operator by a given mode.
-    fn exchange(&self, operator: Operator, mode: Mode) -> Operator;
+    fn exchange(&self, operator: Operator, mode: Mode) -> Result<Operator, Self::Error>;
 }
 
 /// A trait that has a successor.
@@ -70,6 +72,13 @@ pub struct Administrator<Mode, Selector, Operator, Store, Manager> {
     manager: Manager,
 }
 
+/// Error on [Administrator].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum AdministratorError<OperatorError, StoreError> {
+    Operator(OperatorError),
+    OperatorStore(StoreError),
+}
+
 impl<Mode, SelectorType, OperatorType, Store, Manager>
     Administrator<Mode, SelectorType, OperatorType, Store, Manager>
 where
@@ -100,30 +109,31 @@ where
         self.manager.turn_on();
     }
 
-    pub fn run(&self) -> Result<(), OperatorType::Error> {
+    pub fn run(&self) -> Result<(), AdministratorError<OperatorType::Error, Store::Error>> {
         if self.is_select.load(Ordering::Relaxed) {
-            self.mode_select();
-            Ok(())
+            self.mode_select()
+                .map_err(AdministratorError::OperatorStore)
         } else {
             let operator = self.operator.borrow();
             if let Err(err) = operator.as_ref().unwrap_or_else(|| todo!()).run() {
                 match err {
                     OperatorError::Incompleted => Ok(()),
-                    OperatorError::Other(err) => Err(err),
+                    OperatorError::Other(err) => Err(AdministratorError::Operator(err)),
                 }
             } else {
                 self.manager.turn_off();
                 core::mem::drop(operator);
                 let mut mode = self.mode.borrow_mut();
                 *mode = mode.successor();
-                self.exchange_operator(*mode);
+                self.exchange_operator(*mode)
+                    .map_err(AdministratorError::OperatorStore)?;
                 self.manager.turn_on();
                 Ok(())
             }
         }
     }
 
-    fn exchange_operator(&self, mode: Mode) {
+    fn exchange_operator(&self, mode: Mode) -> Result<(), Store::Error> {
         let operator = {
             let operator = self
                 .operator
@@ -131,12 +141,13 @@ where
                 .take()
                 .expect("Should never be None");
             operator.stop();
-            self.store.exchange(operator, mode)
+            self.store.exchange(operator, mode)?
         };
         *self.operator.borrow_mut() = Some(operator);
+        Ok(())
     }
 
-    fn mode_select(&self) {
+    fn mode_select(&self) -> Result<(), Store::Error> {
         self.manager.turn_off();
         //waiting for switch off
         while self.selector.is_enabled() {}
@@ -150,10 +161,11 @@ where
 
         let mode = self.selector.mode();
         *self.mode.borrow_mut() = mode;
-        self.exchange_operator(mode);
+        self.exchange_operator(mode)?;
 
         self.is_select.store(false, Ordering::Relaxed);
         self.manager.turn_on();
+        Ok(())
     }
 }
 
