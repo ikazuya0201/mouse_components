@@ -1,7 +1,5 @@
 //! Implementations of nodes.
 
-mod direction;
-
 use core::convert::TryFrom;
 use core::num::NonZeroU16;
 
@@ -13,10 +11,10 @@ use crate::mazes::{
     GeometricNode, GraphNode, WallFinderNode, WallNode, WallSpaceNode, NEIGHBOR_NUMBER_UPPER_BOUND,
 };
 use crate::trajectory_generators::{RunKind, SearchKind, SlalomDirection, SlalomKind};
+use crate::utils::direction::{AbsoluteDirection, RelativeDirection};
 use crate::utils::forced_vec::ForcedVec;
 use crate::wall_manager::Wall;
 use crate::MAZE_WIDTH_UPPER_BOUND;
-pub use direction::{AbsoluteDirection, RelativeDirection};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 /// An enum that represents the type of edges of several graphs.

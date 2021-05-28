@@ -53,14 +53,16 @@ pub mod types {
         use super::*;
 
         #[doc(no_inline)]
-        pub use controllers::ControlParameters;
-        #[doc(no_inline)]
-        pub use nodes::{
-            AbsoluteDirection, Node, Pattern, Position, RelativeDirection, RotationKind, RunNode,
-            SearchNode,
+        pub use self::utils::{
+            direction::{AbsoluteDirection, RelativeDirection},
+            robot_state::{AngleState, LengthState, RobotState},
         };
         #[doc(no_inline)]
-        pub use tracker::{AngleState, ControlTarget, LengthState, RobotState};
+        pub use controllers::ControlParameters;
+        #[doc(no_inline)]
+        pub use nodes::{Node, Pattern, Position, RotationKind, RunNode, SearchNode};
+        #[doc(no_inline)]
+        pub use tracker::ControlTarget;
         #[doc(no_inline)]
         pub use trajectory_generators::Pose;
         #[doc(no_inline)]

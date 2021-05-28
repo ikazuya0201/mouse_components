@@ -1,7 +1,5 @@
 //! An implementation of [Tracker](crate::robot::Tracker).
 
-mod state;
-
 use core::marker::PhantomData;
 
 #[allow(unused_imports)]
@@ -18,9 +16,9 @@ use uom::{typenum::*, Kind};
 use super::robot::Tracker as ITracker;
 use super::trajectory_generators::Target;
 use crate::get_or_err;
+use crate::types::data::RobotState;
 use crate::utils::builder::RequiredFieldEmptyError;
 use crate::{Construct, Deconstruct};
-pub use state::{AngleState, LengthState, RobotState};
 
 type GainType = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 type BType = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;

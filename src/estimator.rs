@@ -15,7 +15,7 @@ use uom::si::{
 };
 
 use crate::robot::Estimator as IEstimator;
-use crate::tracker::RobotState;
+use crate::types::data::RobotState;
 use crate::utils::builder::{ok_or, BuilderResult};
 use crate::{get_or_err, Construct, Deconstruct};
 
