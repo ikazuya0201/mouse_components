@@ -7,4 +7,5 @@ pub(crate) mod macros;
 pub(crate) mod math;
 pub mod probability;
 pub mod random;
+pub mod robot_state;
 pub(crate) mod total;

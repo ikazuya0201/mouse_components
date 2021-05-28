@@ -53,6 +53,8 @@ pub mod types {
         use super::*;
 
         #[doc(no_inline)]
+        pub use self::utils::robot_state::{AngleState, LengthState, RobotState};
+        #[doc(no_inline)]
         pub use controllers::ControlParameters;
         #[doc(no_inline)]
         pub use nodes::{
@@ -60,7 +62,7 @@ pub mod types {
             SearchNode,
         };
         #[doc(no_inline)]
-        pub use tracker::{AngleState, ControlTarget, LengthState, RobotState};
+        pub use tracker::ControlTarget;
         #[doc(no_inline)]
         pub use trajectory_generators::Pose;
         #[doc(no_inline)]
