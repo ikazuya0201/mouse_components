@@ -1,8 +1,8 @@
 //! Implementations of commanders which is required by operators in [operators](crate::operators).
 
-mod run_commander;
-mod search_commander;
-mod setup_commander;
+mod run;
+mod search;
+mod setup;
 
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num_traits::{Bounded, PrimInt, Saturating, Unsigned};
@@ -10,14 +10,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::forced_vec::ForcedVec;
 use crate::MAZE_WIDTH_UPPER_BOUND;
-pub use run_commander::{
+pub use run::{
     ReturnCommander, ReturnCommanderConfig, RunCommand, RunCommander, RunCommanderConfig,
     RunCommanderError,
 };
-pub use search_commander::{
+pub use search::{
     NextNode, NodeChecker, SearchCommander, SearchCommanderConfig, UncheckedNodeFinder,
 };
-pub use setup_commander::{
+pub use setup::{
     ReturnSetupCommander, ReturnSetupCommanderConfig, RotationNode, RunSetupCommander,
     RunSetupCommanderConfig, SetupCommander, SetupCommanderError,
 };
