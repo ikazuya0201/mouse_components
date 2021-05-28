@@ -1,33 +1,33 @@
 //! Implementations of trajectory generators.
 
-mod run_trajectory_generator;
-mod search_trajectory_generator;
-mod setup_trajectory_generator;
-mod slalom_generator;
-mod spin_generator;
-mod straight_generator;
+mod run;
+mod search;
+mod setup;
+mod slalom;
+mod spin;
+mod straight;
 mod trajectory;
 
 use serde::{Deserialize, Serialize};
 use uom::si::f32::{Angle, Length};
 
-pub use run_trajectory_generator::{
+pub use self::spin::SpinTrajectory;
+pub use run::{
     RunKind, RunState, RunTrajectory, RunTrajectoryGenerator, RunTrajectoryGeneratorBuilder,
     RunTrajectoryGeneratorConfig, RunTrajectoryParameters,
 };
-pub use search_trajectory_generator::{
+pub use search::{
     SearchKind, SearchTrajectory, SearchTrajectoryGenerator, SearchTrajectoryGeneratorBuilder,
     SearchTrajectoryGeneratorConfig,
 };
-pub use setup_trajectory_generator::{
+pub use setup::{
     ReturnSetupTrajectoryGenerator, ReturnSetupTrajectoryGeneratorBuilder,
     ReturnSetupTrajectoryGeneratorConfig, SetupTrajectory,
 };
-pub use slalom_generator::{
+pub use slalom::{
     DefaultSlalomParametersGenerator, SlalomDirection, SlalomKind, SlalomParameters,
     SlalomParametersGenerator,
 };
-pub use spin_generator::SpinTrajectory;
 pub use trajectory::{AngleTarget, LengthTarget, ShiftTrajectory, SingleTrajectory, Target};
 
 #[derive(Clone, Copy, Debug, PartialEq, Default, Serialize, Deserialize)]

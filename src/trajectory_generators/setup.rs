@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use uom::si::angle::degree;
 use uom::si::f32::{Angle, AngularAcceleration, AngularJerk, AngularVelocity, Time};
 
-use super::spin_generator::{SpinGenerator, SpinTrajectory};
+use super::spin::{SpinGenerator, SpinTrajectory};
 use super::{ShiftTrajectory, SingleTrajectory, Target};
 use crate::nodes::RotationKind;
 use crate::trajectory_managers::TrackingTrajectoryGenerator;

@@ -10,10 +10,10 @@ use uom::si::{
     },
 };
 
-use super::slalom_generator::{SlalomDirection, SlalomKind, SlalomParametersGenerator};
-use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
-use super::spin_generator::{SpinGenerator, SpinTrajectory};
-use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
+use super::slalom::{SlalomDirection, SlalomKind, SlalomParametersGenerator};
+use super::slalom::{SlalomGenerator, SlalomTrajectory};
+use super::spin::{SpinGenerator, SpinTrajectory};
+use super::straight::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::StopTrajectory;
 use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
