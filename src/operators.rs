@@ -1,8 +1,8 @@
 //! Implementations of [Operator](crate::administrator::Operator) and their dependent traits.
 
-mod tracking_operator;
+mod tracking;
 
-pub use tracking_operator::{
+pub use tracking::{
     TrackingAgent, TrackingCommander, TrackingCommanderError, TrackingOperator,
     TrackingOperatorError,
 };
