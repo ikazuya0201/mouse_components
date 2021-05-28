@@ -15,7 +15,7 @@ use uom::si::{
     ratio::ratio,
 };
 
-use super::straight_generator::{
+use super::straight::{
     AngleOverallCalculator, AngleStraightCalculatorGenerator, StraightTrajectory,
     StraightTrajectoryGenerator,
 };

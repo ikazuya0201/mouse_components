@@ -1,13 +1,13 @@
 //! Implementations of [TrackingTrajectoryManager](crate::agents::TrackingTrajectoryManager).
 
-mod search_trajectory_manager;
-mod tracking_trajectory_manager;
+mod search;
+mod tracking;
 
-pub use search_trajectory_manager::{
+pub use search::{
     SearchTrajectoryGenerator, TrajectoryManager as SearchTrajectoryManager,
     TrajectoryManagerError as SearchTrajectoryManagerError,
 };
-pub use tracking_trajectory_manager::{
+pub use tracking::{
     TrackingTrajectoryGenerator, TrajectoryManager as TrackingTrajectoryManager,
     TrajectoryManagerError as TrackingTrajectoryManagerError,
 };

@@ -1,8 +1,8 @@
 //! Implementations of agents required by [operators](crate::operators).
 
-mod tracking_agent;
+mod tracking;
 
-pub use tracking_agent::{
+pub use tracking::{
     TrackingAgent, TrackingAgentError, TrajectoryManager as TrackingTrajectoryManager,
 };
 

@@ -2,11 +2,11 @@ use serde::{Deserialize, Serialize};
 use spin::Mutex;
 use uom::si::f32::{Acceleration, Jerk, Length, Time, Velocity};
 
-use super::slalom_generator::{
+use super::slalom::{
     DefaultSlalomParametersGenerator, SlalomDirection, SlalomKind, SlalomParametersGenerator,
 };
-use super::slalom_generator::{SlalomGenerator, SlalomTrajectory};
-use super::straight_generator::{StraightTrajectory, StraightTrajectoryGenerator};
+use super::slalom::{SlalomGenerator, SlalomTrajectory};
+use super::straight::{StraightTrajectory, StraightTrajectoryGenerator};
 use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
 use crate::trajectory_managers::TrackingTrajectoryGenerator;
