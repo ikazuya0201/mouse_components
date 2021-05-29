@@ -7,6 +7,7 @@ use components::{
     mazes::Maze,
     nodes::{Node, Position, RunNode, SearchNode},
     pattern_converters::LinearPatternConverter,
+    solvers::dijkstra::DijkstraSolver,
     types::data::{AbsoluteDirection, SearchKind},
     utils::probability::Probability,
     wall_manager::WallManager,
@@ -23,13 +24,14 @@ fn test_compute_shortest_path<const N: usize>(
     let maze =
         Maze::<_, _, SearchNode<N>>::new(Rc::new(wall_manager), LinearPatternConverter::default());
     let current: Node<N> = start.clone().into();
-    let commander = SearchCommander::<_, _, SearchNode<N>, _, _, _>::new(
+    let commander = SearchCommander::<_, _, SearchNode<N>, _, _, _, _>::new(
         start,
         goal,
         current,
         SearchKind::Init,
         SearchKind::Final,
         maze,
+        DijkstraSolver,
     );
 
     let path = commander.compute_shortest_path();

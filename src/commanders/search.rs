@@ -1,6 +1,7 @@
 use core::convert::{Infallible, TryFrom, TryInto};
 use core::fmt::Debug;
 use core::marker::PhantomData;
+use core::ops::Deref;
 
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num_traits::{PrimInt, Unsigned};
@@ -8,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
 use super::{
-    compute_shortest_path, AsId, AsIndex, CommanderState, CostNode, GeometricGraph, GoalVec, Graph,
-    RouteNode, HEAP_SIZE, NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
+    AsId, AsIndex, CommanderState, CostNode, GeometricGraph, GoalVec, Graph, RouteNode, SsspSolver,
+    HEAP_SIZE, NODE_NUMBER_UPPER_BOUND,
 };
 use crate::operators::{TrackingCommander, TrackingCommanderError};
 use crate::{Construct, Deconstruct, Merge};
@@ -49,7 +50,7 @@ const CANDIDATE_SIZE_UPPER_BOUND: usize = 4;
 
 /// An implementation of [TrackingCommander](crate::operators::TrackingCommander) required by
 /// [TrackingOperator](crate::operators::TrackingOperator).
-pub struct SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze> {
+pub struct SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze, Solver> {
     start: RunNode,
     goals: GoalVec<RunNode>,
     initial_route: Route,
@@ -58,11 +59,12 @@ pub struct SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze> {
     state: Mutex<State>,
     candidates: Mutex<Vec<SearchNode, CANDIDATE_SIZE_UPPER_BOUND>>,
     maze: Maze,
+    solver: Solver,
     _position: PhantomData<fn() -> Position>,
 }
 
-impl<Node, RunNode, SearchNode, Route, Position, Maze>
-    SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
+impl<Node, RunNode, SearchNode, Route, Position, Maze, Solver>
+    SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze, Solver>
 where
     RunNode: Clone,
     Position: Into<GoalVec<RunNode>>,
@@ -74,6 +76,7 @@ where
         initial_route: Route,
         final_route: Route,
         maze: Maze,
+        solver: Solver,
     ) -> Self {
         Self {
             start,
@@ -84,17 +87,23 @@ where
             state: Mutex::new(State::Initial),
             candidates: Mutex::new(Vec::new()),
             maze,
+            solver,
             _position: PhantomData,
         }
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Position, Maze>
-    SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
+impl<Node, RunNode, SearchNode, Route, Position, Maze, Solver>
+    SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze, Solver>
 {
-    pub fn release(self) -> (Node, Maze) {
-        let Self { current, maze, .. } = self;
-        (current.into_inner(), maze)
+    pub fn release(self) -> (Node, Maze, Solver) {
+        let Self {
+            current,
+            maze,
+            solver,
+            ..
+        } = self;
+        (current.into_inner(), maze, solver)
     }
 }
 
@@ -107,11 +116,12 @@ pub struct SearchCommanderConfig<RunNode, Route, Position> {
     pub final_route: Route,
 }
 
-impl<Node, RunNode, SearchNode, Route, Position, Maze, Config, State, Resource>
+impl<Node, RunNode, SearchNode, Route, Position, Maze, Solver, Config, State, Resource>
     Construct<Config, State, Resource>
-    for SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
+    for SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze, Solver>
 where
     Maze: Construct<Config, State, Resource>,
+    Solver: Construct<Config, State, Resource>,
     Config: AsRef<SearchCommanderConfig<RunNode, Route, Position>>,
     State: AsRef<CommanderState<Node>>,
     Node: Clone,
@@ -121,6 +131,7 @@ where
 {
     fn construct<'a>(config: &'a Config, state: &'a State, resource: &'a mut Resource) -> Self {
         let maze = Maze::construct(config, state, resource);
+        let solver = Solver::construct(config, state, resource);
         let config = config.as_ref();
         let state = state.as_ref();
         Self::new(
@@ -130,29 +141,36 @@ where
             config.initial_route.clone(),
             config.final_route.clone(),
             maze,
+            solver,
         )
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Position, Maze, State, Resource> Deconstruct<State, Resource>
-    for SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
+impl<Node, RunNode, SearchNode, Route, Position, Maze, Solver, State, Resource>
+    Deconstruct<State, Resource>
+    for SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze, Solver>
 where
     RunNode: Clone,
     Maze: Deconstruct<State, Resource>,
+    Solver: Deconstruct<State, Resource>,
     State: From<CommanderState<Node>> + Merge,
+    Resource: Merge,
 {
     fn deconstruct(self) -> (State, Resource) {
-        let (current_node, maze) = self.release();
-        let (state, resource) = maze.deconstruct();
+        let (current_node, maze, solver) = self.release();
+        let (maze_state, maze_resource) = maze.deconstruct();
+        let (solver_state, solver_resource) = solver.deconstruct();
         (
-            state.merge(CommanderState { current_node }.into()),
-            resource,
+            maze_state
+                .merge(solver_state)
+                .merge(CommanderState { current_node }.into()),
+            maze_resource.merge(solver_resource),
         )
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Position, Maze> core::fmt::Debug
-    for SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
+impl<Node, RunNode, SearchNode, Route, Position, Maze, Solver> core::fmt::Debug
+    for SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze, Solver>
 where
     Maze: core::fmt::Debug,
     SearchNode: core::fmt::Debug,
@@ -163,7 +181,7 @@ where
     }
 }
 
-impl<Node, RunNode, Cost, Position, Maze> TrackingCommander
+impl<Node, RunNode, Cost, Position, Maze, Solver> TrackingCommander
     for SearchCommander<
         Node,
         RunNode,
@@ -171,6 +189,7 @@ impl<Node, RunNode, Cost, Position, Maze> TrackingCommander
         <Maze::SearchNode as RouteNode>::Route,
         Position,
         Maze,
+        Solver,
     >
 where
     RunNode: PartialEq + Debug + AsIndex + Clone + AsId + From<RunNode::Id>,
@@ -190,6 +209,8 @@ where
     Node: From<Maze::SearchNode> + Clone + NextNode<<Maze::SearchNode as RouteNode>::Route>,
     <Maze::SearchNode as RouteNode>::Route: Clone,
     <Maze::SearchNode as RouteNode>::Error: core::fmt::Debug,
+    Solver: SsspSolver<RunNode, Maze>,
+    Solver::Path: Deref<Target = [RunNode]>,
 {
     type Error = Infallible;
     type Command = (Node, <Maze::SearchNode as RouteNode>::Route);
@@ -264,8 +285,8 @@ where
 }
 
 //TODO: write test
-impl<Node, RunNode, Cost, Route, Position, Maze>
-    SearchCommander<Node, RunNode, Maze::SearchNode, Route, Position, Maze>
+impl<Node, RunNode, Cost, Route, Position, Maze, Solver>
+    SearchCommander<Node, RunNode, Maze::SearchNode, Route, Position, Maze, Solver>
 where
     RunNode: PartialEq + Debug + AsIndex + Clone + AsId + From<RunNode::Id>,
     RunNode::Id: Clone,
@@ -274,12 +295,17 @@ where
     Maze: GeometricGraph<RunNode, Cost = Cost>
         + Graph<<Maze as UncheckedNodeFinder<RunNode>>::SearchNode, Cost = Cost>
         + UncheckedNodeFinder<RunNode>,
+    Solver: SsspSolver<RunNode, Maze>,
+    Solver::Path: Deref<Target = [RunNode]>,
 {
     fn next_node_candidates(
         &self,
         current: &Maze::SearchNode,
     ) -> Option<Vec<Maze::SearchNode, CANDIDATE_SIZE_UPPER_BOUND>> {
-        let shortest_path = compute_shortest_path(&self.start, &self.goals, &self.maze)?;
+        let shortest_path = self
+            .solver
+            .solve(&self.start, &self.goals, &self.maze)
+            .ok()?;
         let checker_nodes = self.maze.find_unchecked_nodes(&shortest_path);
 
         let candidates = self
@@ -335,15 +361,12 @@ where
     }
 }
 
-impl<Node, RunNode, SearchNode, Route, Position, Maze>
-    SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze>
+impl<Node, RunNode, SearchNode, Route, Position, Maze, Solver>
+    SearchCommander<Node, RunNode, SearchNode, Route, Position, Maze, Solver>
 where
-    RunNode: Clone + AsIndex + PartialEq + AsId + From<RunNode::Id>,
-    RunNode::Id: Clone,
-    Maze: GeometricGraph<RunNode>,
-    Maze::Cost: PrimInt + Unsigned,
+    Solver: SsspSolver<RunNode, Maze>,
 {
-    pub fn compute_shortest_path(&self) -> Option<Vec<RunNode, PATH_UPPER_BOUND>> {
-        compute_shortest_path(&self.start, &self.goals, &self.maze)
+    pub fn compute_shortest_path(&self) -> Result<Solver::Path, Solver::Error> {
+        self.solver.solve(&self.start, &self.goals, &self.maze)
     }
 }

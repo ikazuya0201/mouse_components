@@ -14,6 +14,7 @@ use components::{
     pattern_converters::DefaultPatternConverter,
     prelude::*,
     robot::Robot,
+    solvers::dijkstra::DijkstraSolver,
     tracker::TrackerBuilder,
     trajectory_generators::{DefaultSlalomParametersGenerator, RunTrajectoryGeneratorBuilder},
     trajectory_managers::TrackingTrajectoryManager,
@@ -229,7 +230,7 @@ macro_rules! impl_run_operator_test {
                 );
                 let start = RunNode::new(0, 0, North).unwrap();
                 let goal = Position::new(goal.0, goal.1).unwrap();
-                RunCommander::new(start, goal, maze)
+                RunCommander::new(start, goal, maze, DijkstraSolver)
             };
 
             let operator = TrackingOperator::new(commander, agent);
