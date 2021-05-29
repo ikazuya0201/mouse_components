@@ -99,6 +99,7 @@ pub type ReturnSetupOperator<
         RunNode<N>,
         Position<N>,
         CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
+        DijkstraSolver,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
@@ -158,6 +159,7 @@ pub type RunSetupOperator<
         RunNode<N>,
         Position<N>,
         CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
+        DijkstraSolver,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
