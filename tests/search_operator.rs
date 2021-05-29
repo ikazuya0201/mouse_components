@@ -11,6 +11,7 @@ use components::{
     operators::TrackingOperator,
     pattern_converters::DefaultPatternConverter,
     robot::Robot,
+    solvers::dijkstra::DijkstraSolver,
     tracker::TrackerBuilder,
     trajectory_generators::{DefaultSlalomParametersGenerator, SearchTrajectoryGeneratorBuilder},
     trajectory_managers::SearchTrajectoryManager,
@@ -226,6 +227,7 @@ macro_rules! impl_search_operator_test {
                         SearchKind::Init,
                         SearchKind::Final,
                         maze,
+                        DijkstraSolver,
                     )
                 };
 

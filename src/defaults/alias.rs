@@ -40,6 +40,7 @@ pub type SearchOperator<
         SearchKind,
         Position<N>,
         Maze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
+        DijkstraSolver,
     >,
     TrackingAgent<
         SearchTrajectoryManager<
