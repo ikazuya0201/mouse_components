@@ -11,6 +11,7 @@ use crate::{
     operators::TrackingOperator,
     pattern_converters::DefaultPatternConverter,
     robot::Robot,
+    solvers::dijkstra::DijkstraSolver,
     tracker::Tracker,
     trajectory_generators::{
         DefaultSlalomParametersGenerator, ReturnSetupTrajectoryGenerator, RunTrajectory,
@@ -68,6 +69,7 @@ pub type RunOperator<
         RunNode<N>,
         Position<N>,
         CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
+        DijkstraSolver,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<
@@ -126,6 +128,7 @@ pub type ReturnOperator<
         RunNode<N>,
         Position<N>,
         CheckedMaze<WallManager<N>, DefaultPatternConverter<u16>, SearchNode<N>>,
+        DijkstraSolver,
     >,
     TrackingAgent<
         TrackingTrajectoryManager<

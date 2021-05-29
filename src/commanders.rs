@@ -44,6 +44,14 @@ pub trait RouteNode {
     fn route(&self, to: &Self) -> Result<Self::Route, Self::Error>;
 }
 
+/// Solver for single source shortest path.
+pub trait SsspSolver<Node, Maze> {
+    type Error;
+    type Path;
+
+    fn solve(&self, start: &Node, goals: &[Node], maze: &Maze) -> Result<Self::Path, Self::Error>;
+}
+
 const GOAL_SIZE_UPPER_BOUND: usize = 8;
 
 pub(crate) type GoalVec<T> = Vec<T, GOAL_SIZE_UPPER_BOUND>;
@@ -82,7 +90,7 @@ pub(crate) const PATH_UPPER_BOUND: usize = MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_U
 pub(crate) const NODE_NUMBER_UPPER_BOUND: usize =
     16 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
-const HEAP_SIZE: usize = 8 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
+pub(crate) const HEAP_SIZE: usize = 8 * MAZE_WIDTH_UPPER_BOUND * MAZE_WIDTH_UPPER_BOUND;
 
 /// A trait that can be interpreted as index.
 pub trait AsIndex {
