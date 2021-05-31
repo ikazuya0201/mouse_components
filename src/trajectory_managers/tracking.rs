@@ -3,7 +3,7 @@ use spin::Mutex;
 
 use crate::agents::TrackingTrajectoryManager;
 use crate::trajectory_managers::CommandConverter;
-use crate::{impl_deconstruct_with_default, Construct};
+use crate::Construct;
 
 /// A trait that generates trajectory for search.
 pub trait TrackingTrajectoryGenerator<Command> {

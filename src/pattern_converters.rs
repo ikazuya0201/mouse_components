@@ -5,10 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::mazes::PatternConverter;
 use crate::types::data::Pattern;
-use crate::{
-    impl_deconstruct_with_default, impl_with_builder, Construct, Deconstruct,
-    MAZE_WIDTH_UPPER_BOUND,
-};
+use crate::{Construct, Deconstruct, MAZE_WIDTH_UPPER_BOUND};
 
 impl_with_builder! {
     /// A builder for [LinearPatternConverter].

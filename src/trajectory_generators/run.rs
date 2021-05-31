@@ -11,8 +11,7 @@ use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
 use crate::trajectory_managers::TrackingTrajectoryGenerator;
 use crate::utils::builder::BuilderResult;
-use crate::{get_or_err, impl_setter};
-use crate::{impl_deconstruct_with_default, Construct};
+use crate::Construct;
 
 /// An enum for describing a state of run.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]

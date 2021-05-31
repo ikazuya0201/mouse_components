@@ -6,7 +6,7 @@ use crate::nodes::{Node, NodeCreationError, RunNode};
 use crate::types::data::RobotState;
 use crate::types::states::*;
 use crate::utils::builder::RequiredFieldEmptyError;
-use crate::{get_or_err, impl_setter, impl_with_getter, Merge};
+use crate::Merge;
 
 impl_with_getter! {
     /// A state for operators.

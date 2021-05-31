@@ -8,7 +8,7 @@ use crate::nodes::RotationKind;
 use crate::trajectory_managers::TrackingTrajectoryGenerator;
 use crate::types::data::Pose;
 use crate::utils::builder::{ok_or, RequiredFieldEmptyError};
-use crate::{impl_deconstruct_with_default, Construct};
+use crate::Construct;
 
 /// An implementation of
 /// [TrackingTrajectoryGenerator](crate::trajectory_managers::TrackingTrajectoryGenerator).

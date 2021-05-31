@@ -5,7 +5,7 @@ use crate::commanders::{
     AsId, AsIndex, GeometricGraph, SsspSolver, HEAP_SIZE, NODE_NUMBER_UPPER_BOUND, PATH_UPPER_BOUND,
 };
 use crate::utils::forced_vec::ForcedVec;
-use crate::{impl_deconstruct_with_default, Construct};
+use crate::Construct;
 
 #[derive(Debug)]
 struct CostNode<Cost, Node>(Cost, Node);

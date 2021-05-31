@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use uom::si::f32::Length;
 use uom::si::{angle::revolution, length::meter};
 
-use crate::impl_setter;
 use crate::robot::WallDetector as IWallDetector;
 use crate::types::data::{Pose, RobotState};
 use crate::utils::{

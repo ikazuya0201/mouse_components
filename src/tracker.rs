@@ -15,7 +15,6 @@ use uom::{typenum::*, Kind};
 
 use super::robot::Tracker as ITracker;
 use super::trajectory_generators::Target;
-use crate::get_or_err;
 use crate::types::data::RobotState;
 use crate::utils::builder::RequiredFieldEmptyError;
 use crate::{Construct, Deconstruct};
