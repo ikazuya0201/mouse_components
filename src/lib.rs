@@ -4,8 +4,23 @@
 #![deny(warnings)]
 #![cfg_attr(nightly, feature(iter_advance_by))]
 
+macro_rules! impl_deconstruct_with_default {
+    ($name: ident $(<$($param: ident),*>)?) => {
+        impl<$($($param,)*)? State, Resource> crate::Deconstruct<State, Resource> for $name $(<$($param),*>)?
+            where State: Default,
+                  Resource: Default,
+        {
+            fn deconstruct(self) -> (State, Resource) {
+                (Default::default(), Default::default())
+            }
+        }
+    }
+}
+
 extern crate alloc;
 
+#[macro_use]
+pub mod utils;
 pub mod administrator;
 pub mod agents;
 pub mod command_converter;
@@ -16,15 +31,13 @@ pub mod estimator;
 pub mod mazes;
 pub mod nodes;
 pub mod operators;
+pub mod pattern_converters;
 pub mod prelude;
 pub mod robot;
+pub mod solvers;
 pub mod tracker;
 pub mod trajectory_generators;
 pub mod trajectory_managers;
-#[macro_use]
-pub mod utils;
-pub mod pattern_converters;
-pub mod solvers;
 pub mod wall_detector;
 pub mod wall_manager;
 
@@ -151,19 +164,4 @@ pub trait Deconstruct<State, Resource> {
 /// A conversion for merging two values.
 pub trait Merge {
     fn merge(self, rhs: Self) -> Self;
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! impl_deconstruct_with_default {
-    ($name: ident $(<$($param: ident),*>)?) => {
-        impl<$($($param,)*)? State, Resource> crate::Deconstruct<State, Resource> for $name $(<$($param),*>)?
-            where State: Default,
-                  Resource: Default,
-        {
-            fn deconstruct(self) -> (State, Resource) {
-                (Default::default(), Default::default())
-            }
-        }
-    }
 }

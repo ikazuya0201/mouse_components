@@ -11,7 +11,7 @@ use crate::nodes::{Node, RunNode, SearchNode};
 use crate::trajectory_generators::{RunKind, RunTrajectoryParameters};
 use crate::trajectory_managers::CommandConverter as ICommandConverter;
 use crate::types::data::{AbsoluteDirection, Pose};
-use crate::{impl_deconstruct_with_default, Construct};
+use crate::Construct;
 
 //NOTE: This struct is intended to be used by SearchOperator
 /// An implementation of [CommandConverter](crate::trajectory_managers::CommandConverter).

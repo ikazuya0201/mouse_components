@@ -7,8 +7,6 @@ use uom::si::f32::{
 };
 
 use crate::controllers::ControlParameters;
-use crate::impl_setter;
-use crate::impl_with_getter;
 use crate::nodes::{Position, RunNode};
 use crate::pattern_converters::DefaultPatternConverter;
 use crate::types::configs::*;

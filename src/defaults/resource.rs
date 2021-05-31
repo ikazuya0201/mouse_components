@@ -7,7 +7,7 @@ use heapless::Vec;
 use crate::types::resources::*;
 use crate::utils::builder::BuilderResult;
 use crate::wall_detector::SENSOR_SIZE_UPPER_BOUND;
-use crate::{get_or_err, Merge};
+use crate::Merge;
 
 /// An resource type for initialization of operators.
 pub struct Resource<

@@ -17,7 +17,7 @@ use uom::si::{
 use crate::robot::Estimator as IEstimator;
 use crate::types::data::RobotState;
 use crate::utils::builder::{ok_or, BuilderResult};
-use crate::{get_or_err, Construct, Deconstruct};
+use crate::{Construct, Deconstruct};
 
 pub trait Imu {
     type Error;

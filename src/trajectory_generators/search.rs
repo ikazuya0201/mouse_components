@@ -19,8 +19,7 @@ use super::trajectory::{ShiftTrajectory, Target};
 use super::Pose;
 use crate::trajectory_managers::SearchTrajectoryGenerator as ISearchTrajectoryGenerator;
 use crate::utils::builder::RequiredFieldEmptyError;
-use crate::{get_or_err, impl_setter};
-use crate::{impl_deconstruct_with_default, Construct};
+use crate::Construct;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum SearchKind {

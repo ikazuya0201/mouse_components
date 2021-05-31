@@ -1,5 +1,3 @@
-#[doc(hidden)]
-#[macro_export]
 macro_rules! impl_with_getter {
     (
         $(#[$meta:meta])*
@@ -68,8 +66,6 @@ macro_rules! impl_with_getter {
     }
 }
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! impl_setter {
     (
         $(#[$meta:meta])*
@@ -93,16 +89,12 @@ macro_rules! impl_setter {
     };
 }
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! get_or_err {
     ($self: ident . $field_name: ident) => {{
         crate::utils::builder::ok_or($self.$field_name.take(), core::stringify!($field_name))?
     }};
 }
 
-#[doc(hidden)]
-#[macro_export]
 macro_rules! impl_with_builder {
     (
         $(#[$builder_meta:meta])*
