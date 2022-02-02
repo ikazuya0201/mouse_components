@@ -2,7 +2,7 @@
 //!
 //! ### Example
 //! ```
-//! use components::prelude::*;
+//! use mousecore::prelude::*;
 //! ```
 
 #[doc(no_inline)]

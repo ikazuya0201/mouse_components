@@ -242,11 +242,11 @@ impl<const N: usize> From<Config<N>> for ConfigContainer<N> {
 ///     angular_velocity::degree_per_second, jerk::meter_per_second_cubed, length::meter,
 ///     time::second, velocity::meter_per_second, frequency::hertz, electric_potential::volt,
 /// };
-/// use components::nodes::RunNode;
-/// use components::types::data::{AbsoluteDirection, Pattern, SearchKind, ControlParameters,
+/// use mousecore::nodes::RunNode;
+/// use mousecore::types::data::{AbsoluteDirection, Pattern, SearchKind, ControlParameters,
 /// Position};
-/// use components::defaults::config::ConfigBuilder;
-/// use components::pattern_converters::LinearPatternConverter;
+/// use mousecore::defaults::config::ConfigBuilder;
+/// use mousecore::pattern_converters::LinearPatternConverter;
 ///
 /// use AbsoluteDirection::*;
 ///

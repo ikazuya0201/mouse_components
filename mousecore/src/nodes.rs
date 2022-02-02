@@ -72,7 +72,7 @@ impl<const N: usize> From<Position<N>> for GoalVec<RunNode<N>> {
         use AbsoluteDirection::*;
 
         let Position { x, y } = value;
-        core::array::IntoIter::new(if (x ^ y) & 1 == 1 {
+        IntoIterator::into_iter(if (x ^ y) & 1 == 1 {
             // on a wall
             [NorthEast, SouthEast, SouthWest, NorthWest]
         } else if (x | y) & 1 == 0 {

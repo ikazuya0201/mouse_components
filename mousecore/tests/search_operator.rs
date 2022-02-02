@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use components::{
+use mousecore::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
     commanders::SearchCommander,
@@ -51,7 +51,7 @@ macro_rules! impl_search_operator_test {
             const N: usize = $size;
 
             fn _test_search_operator(front_offset: Length, distance_sensors_poses: Vec<Pose>) {
-                use components::prelude::*;
+                use mousecore::prelude::*;
 
                 let input_str = $input_str;
                 let goal = $goal;
