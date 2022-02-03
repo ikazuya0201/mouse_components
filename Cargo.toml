@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "mousecore",
+    "mousesim",
 ]
 resolver = "2"
 
