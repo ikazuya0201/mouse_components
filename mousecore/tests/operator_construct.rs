@@ -2,7 +2,7 @@ extern crate alloc;
 
 use alloc::rc::Rc;
 
-use components::{
+use mousecore::{
     command_converter::CommandConverter,
     defaults::{
         alias::{

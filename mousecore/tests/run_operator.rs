@@ -2,7 +2,7 @@ extern crate std;
 
 use std::rc::Rc;
 
-use components::{
+use mousecore::{
     agents::TrackingAgent,
     command_converter::CommandConverter,
     commanders::RunCommander,

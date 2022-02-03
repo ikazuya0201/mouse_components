@@ -1,8 +1,8 @@
-extern crate components;
+extern crate mousecore;
 
 use std::rc::Rc;
 
-use components::{
+use mousecore::{
     commanders::SearchCommander,
     mazes::Maze,
     nodes::{Node, Position, RunNode, SearchNode},

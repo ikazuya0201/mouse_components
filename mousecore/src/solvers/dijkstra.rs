@@ -50,7 +50,7 @@ where
 
     fn solve(&self, start: &Node, goals: &[Node], maze: &Maze) -> Result<Self::Path, Self::Error> {
         let mut dists = [Maze::Cost::max_value(); NODE_NUMBER_UPPER_BOUND];
-        let start_cost = Maze::Cost::min_value() + maze.distance(&start, &goals[0]);
+        let start_cost = Maze::Cost::min_value() + maze.distance(start, &goals[0]);
         dists[start.as_index()] = start_cost;
 
         let mut prev = core::iter::repeat(None)

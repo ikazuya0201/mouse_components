@@ -3,7 +3,9 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::convert::Infallible;
 
-use components::{
+#[cfg(not(feature = "std"))]
+use micromath::F32Ext;
+use mousecore::{
     prelude::*,
     sensors::{
         DistanceSensor as IDistanceSensor, Encoder as IEncoder, Imu as IImu, Motor as IMotor,
@@ -29,6 +31,7 @@ pub struct AgentSimulator<const N: usize> {
 }
 
 impl<const N: usize> AgentSimulator<N> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         state: RobotState,
         period: Time,
@@ -79,7 +82,7 @@ impl<const N: usize> AgentSimulator<N> {
             .iter()
             .map(|pose| DistanceSensor {
                 inner: Rc::clone(&self.inner),
-                pose: pose.clone(),
+                pose: *pose,
                 wall_storage: Rc::clone(&self.wall_storage),
                 pose_converter: PoseConverterBuilder::new()
                     .square_width(square_width)
@@ -269,12 +272,12 @@ impl IEncoder for Encoder {
         let average_rot = self.average(&Self::rotational_velocity);
         let period = self.inner.borrow().period;
         match self.direction {
-            Direction::Right => Ok((average_trans
-                + Velocity::from(average_rot * self.wheel_interval / 2.0))
-                * period),
-            Direction::Left => Ok((average_trans
-                - Velocity::from(average_rot * self.wheel_interval / 2.0))
-                * period),
+            Direction::Right => {
+                Ok((average_trans + average_rot * self.wheel_interval / 2.0) * period)
+            }
+            Direction::Left => {
+                Ok((average_trans - average_rot * self.wheel_interval / 2.0) * period)
+            }
         }
     }
 }
@@ -351,7 +354,7 @@ impl<const N: usize> IDistanceSensor for DistanceSensor<N> {
         let wall_info = self
             .pose_converter
             .convert(&pose)
-            .map_err(|err| DistanceSensorError::PoseConverter(err))?;
+            .map_err(DistanceSensorError::PoseConverter)?;
         let distance = if self.wall_storage.exists(&wall_info.wall) {
             wall_info.existing_distance
         } else {
