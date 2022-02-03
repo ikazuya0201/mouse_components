@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ master, develop/v0.2, develop/v0.3 ]
+    branches: [ master, develop ]
   pull_request:
-    branches: [ master, develop/v0.2, develop/v0.3 ]
+    branches: [ master, develop ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,23 +12,32 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        rustc: [stable, nightly]
 
     steps:
     - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
-        toolchain: nightly
+        toolchain: ${{ matrix.rustc }}
         target: thumbv7em-none-eabihf
         override: true
-    - name: Build
-      run: cargo build --target=thumbv7em-none-eabihf --verbose -Zfeatures=dev_dep
+    - name: Build ${{ matrix.rustc }} on native
+      run: cargo build --target=thumbv7em-none-eabihf --verbose
 
     - uses: actions-rs/toolchain@v1
       with:
-        toolchain: nightly
+        toolchain: ${{ matrix.rustc }}
         target: x86_64-unknown-linux-gnu
+        components: clippy
         override: true
-    - name: Test
+    - name: Clippy ${{ matrix.rustc }}
+      run: cargo clippy --target=x86_64-unknown-linux-gnu --verbose
+    - name: Test ${{ matrix.rustc }}
       run: cargo test --target=x86_64-unknown-linux-gnu --verbose
-    - name: Test Ignored
+    - name: Test ignored ${{ matrix.rustc }}
       run: cargo test --target=x86_64-unknown-linux-gnu --verbose -- --ignored
+    - name: Doc ${{ matrix.rustc }}
+      run: cargo doc --target=x86_64-unknown-linux-gnu --verbose

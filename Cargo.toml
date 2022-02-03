@@ -1,41 +1,11 @@
-[package]
-name = "components"
-version = "0.3.0"
-authors = ["Kazuya Iimuro <ikazuya0201@gmail.com>"]
-edition = "2018"
+[workspace]
+members = [
+    "mousecore",
+    "mousesim",
+    "sensors",
+]
+resolver = "2"
 
 [profile.dev]
 opt-level = 3
 
-[dependencies]
-heapless = "0.5.3"
-generic-array = "0.13.2"
-typenum = "1.12.0"
-nb = "0.1.2"
-auto_enums = "0.7.5"
-
-[dependencies.uom]
-version = "0.29.0"
-default-features = false
-features = ["f32", "autoconvert", "si"]
-
-[dependencies.num]
-version = "0.2"
-default-features = false
-
-[dependencies.heap]
-version = "0.1.0"
-git = "https://github.com/ikazuya0201/heap"
-
-[dev-dependencies]
-approx = "0.3.2"
-criterion = "0.3.3"
-proptest = "0.10.1"
-
-[features]
-debug = []
-log = []
-
-[[bench]]
-name = "search_operator"
-harness = false
