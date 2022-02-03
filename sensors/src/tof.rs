@@ -41,13 +41,13 @@ where
     U: OutputPin,
 {
     //register addresses
-    const SYSTEM__INTERRUPT_CLEAR: u16 = 0x0015;
-    const SYSTEM__FRESH_OUT_OF_RESET: u16 = 0x0016;
-    const SYSTEM__INTERRUPT_CONFIG_GPIO: u16 = 0x0014;
-    const SYSRANGE__START: u16 = 0x0018;
-    const RESULT__INTERRUPT_STATUS_GPIO: u16 = 0x004F;
-    const RESULT__RANGE_VAL: u16 = 0x0062;
-    const I2C_SLAVE__DEVICE_ADDRESS: u16 = 0x0212;
+    const SYSTEM_INTERRUPT_CLEAR: u16 = 0x0015;
+    const SYSTEM_FRESH_OUT_OF_RESET: u16 = 0x0016;
+    const SYSTEM_INTERRUPT_CONFIG_GPIO: u16 = 0x0014;
+    const SYSRANGE_START: u16 = 0x0018;
+    const RESULT_INTERRUPT_STATUS_GPIO: u16 = 0x004F;
+    const RESULT_RANGE_VAL: u16 = 0x0062;
+    const I2C_SLAVE_DEVICE_ADDRESS: u16 = 0x0212;
 
     //default address of VL6180X
     const DEFAULT_ADDRESS: u8 = 0x29;
@@ -103,13 +103,13 @@ where
     }
 
     fn update_device_address(&mut self, new_address: u8) -> Result<(), VL6180XError> {
-        self.write_to_register(Self::I2C_SLAVE__DEVICE_ADDRESS, new_address)?;
+        self.write_to_register(Self::I2C_SLAVE_DEVICE_ADDRESS, new_address)?;
         self.device_address = new_address;
         Ok(())
     }
 
     fn check_if_working(&mut self) -> nb::Result<(), VL6180XError> {
-        let data = self.read_from_registers(Self::SYSTEM__FRESH_OUT_OF_RESET)?;
+        let data = self.read_from_registers(Self::SYSTEM_FRESH_OUT_OF_RESET)?;
         if data == Self::IDLE_VALUE {
             Ok(())
         } else {
@@ -119,7 +119,7 @@ where
 
     fn configure_range_mode(&mut self) -> Result<(), VL6180XError> {
         //enable internal interrupt of range mode
-        self.write_to_register(Self::SYSTEM__INTERRUPT_CONFIG_GPIO, 0x04)?;
+        self.write_to_register(Self::SYSTEM_INTERRUPT_CONFIG_GPIO, 0x04)?;
         Ok(())
     }
 
@@ -210,20 +210,20 @@ where
         match self.state {
             Idle => {
                 //start polling
-                self.write_to_register(Self::SYSRANGE__START, 0x01)?;
+                self.write_to_register(Self::SYSRANGE_START, 0x01)?;
                 self.state = Waiting;
                 Err(nb::Error::WouldBlock)
             }
             Waiting => {
-                let data = self.read_from_registers(Self::RESULT__INTERRUPT_STATUS_GPIO)?;
+                let data = self.read_from_registers(Self::RESULT_INTERRUPT_STATUS_GPIO)?;
                 if data & 0x04 != 0x04 {
                     return Err(nb::Error::WouldBlock);
                 }
                 //get result
-                let distance = self.read_from_registers(Self::RESULT__RANGE_VAL)?;
+                let distance = self.read_from_registers(Self::RESULT_RANGE_VAL)?;
 
                 //teach VL6180X to finish polling
-                self.write_to_register(Self::SYSTEM__INTERRUPT_CLEAR, 0x07)?;
+                self.write_to_register(Self::SYSTEM_INTERRUPT_CLEAR, 0x07)?;
 
                 self.state = Idle;
 
