@@ -2,6 +2,7 @@
 members = [
     "mousecore",
     "mousesim",
+    "sensors",
 ]
 resolver = "2"
 

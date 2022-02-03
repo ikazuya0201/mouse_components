@@ -1,0 +1,19 @@
+[package]
+name = "sensors"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+mousecore = { path = "../mousecore" }
+nb = "1.0.0"
+
+[dependencies.uom]
+version = "0.32.0"
+default-features = false
+features = ["si", "f32", "autoconvert"]
+
+[dependencies.embedded-hal]
+version = "0.2.3"
+features = ["unproven"]
