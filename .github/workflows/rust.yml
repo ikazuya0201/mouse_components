@@ -34,7 +34,7 @@ jobs:
         components: clippy
         override: true
     - name: Clippy ${{ matrix.rustc }}
-      run: cargo clippy --target=x86_64-unknown-linux-gnu --verbose
+      run: cargo clippy --target=x86_64-unknown-linux-gnu --verbose -- -D warnings
     - name: Test ${{ matrix.rustc }}
       run: cargo test --target=x86_64-unknown-linux-gnu --verbose
     - name: Test ignored ${{ matrix.rustc }}
