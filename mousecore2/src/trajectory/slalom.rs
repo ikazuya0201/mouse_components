@@ -19,8 +19,8 @@ use crate::{
     control::{LengthTarget, Target},
     trajectory::{
         straight::{
-            AngleOverallCalculator, AngleStraightCalculatorGenerator, StraightTrajectory,
-            StraightTrajectoryGenerator,
+            AngleOverallCalculator, AngleStraightCalculatorGenerator, StraightGenerator,
+            StraightTrajectory,
         },
         ShiftTrajectory,
     },
@@ -66,14 +66,14 @@ pub struct SlalomParameters {
 
 pub struct SlalomGenerator {
     period: Time,
-    straight_generator: StraightTrajectoryGenerator,
+    straight_generator: StraightGenerator,
 }
 
 impl SlalomGenerator {
     pub fn new(period: Time, v_max: Velocity, a_max: Acceleration, j_max: Jerk) -> Self {
         Self {
             period,
-            straight_generator: StraightTrajectoryGenerator::new(v_max, a_max, j_max, period),
+            straight_generator: StraightGenerator::new(v_max, a_max, j_max, period),
         }
     }
 }
@@ -87,8 +87,7 @@ impl SlalomGenerator {
         params: SlalomParameters,
         v: Velocity,
     ) -> SlalomTrajectory {
-        let straight1 =
-            StraightTrajectoryGenerator::generate_constant(params.l_start, v, self.period);
+        let straight1 = StraightGenerator::generate_constant(params.l_start, v, self.period);
         let curve = self.generate_curve(
             params.l_start,
             Default::default(),
@@ -106,7 +105,7 @@ impl SlalomGenerator {
                 y: params.y_curve_end,
                 theta: params.theta,
             },
-            StraightTrajectoryGenerator::generate_constant(params.l_end, v, self.period),
+            StraightGenerator::generate_constant(params.l_end, v, self.period),
         );
         straight1.chain(curve).chain(straight2)
     }
