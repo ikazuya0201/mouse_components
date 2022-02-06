@@ -2,5 +2,6 @@
 
 pub mod estimator;
 pub mod solver;
+pub mod tracker;
 
 const WIDTH: usize = 32;

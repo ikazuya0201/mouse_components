@@ -8,6 +8,7 @@ rust-version = "1.58.1"
 
 [dependencies]
 micromath = "2.0.0"
+typed-builder = "0.9.1"
 
 [dependencies.serde]
 version = "1.0.136"
@@ -22,3 +23,6 @@ features = ["serde"]
 version = "0.32.0"
 default-features = false
 features = ["f32", "autoconvert", "si", "use_serde"]
+
+[dev-dependencies]
+approx = "0.3.2"
