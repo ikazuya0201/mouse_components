@@ -8,9 +8,9 @@ use crate::WIDTH;
 /// A type for coordinate in maze.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct Coordinate<const W: u8> {
-    x: u8,
-    y: u8,
-    is_top: bool,
+    pub x: u8,
+    pub y: u8,
+    pub is_top: bool,
 }
 
 impl<const W: u8> Coordinate<W> {
