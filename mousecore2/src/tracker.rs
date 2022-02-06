@@ -1,5 +1,3 @@
-//! An implementation of [Tracker](crate::robot::Tracker).
-
 use core::marker::PhantomData;
 
 #[allow(unused_imports)]
