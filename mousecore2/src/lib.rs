@@ -3,6 +3,6 @@
 pub mod control;
 pub mod solver;
 pub mod state;
-pub mod wall_detector;
+pub mod wall;
 
 const WIDTH: usize = 32;
