@@ -20,7 +20,7 @@ use uom::{
     Kind,
 };
 
-use crate::estimator::State;
+use crate::state::State;
 
 type GainType = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 type BType = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
