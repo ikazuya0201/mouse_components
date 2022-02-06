@@ -367,15 +367,15 @@ impl<const W: u8> Commander<W> {
     pub fn next_coordinate(
         &self,
         wall_state: impl Fn(&Coordinate<W>) -> WallState,
-    ) -> Option<Coordinate<W>> {
+    ) -> Result<Option<Coordinate<W>>, SearchError> {
         for coord in &self.candidates {
             match wall_state(coord) {
-                WallState::Checked { exists: false } => return Some(*coord),
-                WallState::Unchecked => return None,
+                WallState::Checked { exists: false } => return Ok(Some(*coord)),
+                WallState::Unchecked => return Ok(None),
                 _ => (),
             }
         }
-        None
+        Err(SearchError::Unreachable)
     }
 }
 
