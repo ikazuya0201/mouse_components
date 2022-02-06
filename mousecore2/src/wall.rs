@@ -1,4 +1,4 @@
-use core::marker::PhantomData;
+use core::{fmt, marker::PhantomData};
 
 use heapless::Vec;
 #[allow(unused_imports)]
@@ -408,6 +408,221 @@ impl<const W: u8> PoseConverter<W> {
     }
 }
 
+const WALL_ARRAY_LEN: usize = WIDTH * WIDTH / 2;
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Walls<const W: u8>([u8; WALL_ARRAY_LEN]);
+
+impl<const W: u8> Default for Walls<W> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<const W: u8> Walls<W> {
+    pub fn new() -> Self {
+        let mut walls = Self([0; WALL_ARRAY_LEN]);
+        for i in 0..W {
+            walls.update(
+                &Coordinate {
+                    x: W - 1,
+                    y: i,
+                    is_top: false,
+                },
+                &WallState::Checked { exists: true },
+            );
+            walls.update(
+                &Coordinate {
+                    x: i,
+                    y: W - 1,
+                    is_top: true,
+                },
+                &WallState::Checked { exists: true },
+            );
+        }
+        walls
+    }
+
+    pub fn update(&mut self, coord: &Coordinate<W>, state: &WallState) {
+        let bit = match state {
+            WallState::Unchecked => 0,
+            WallState::Checked { exists: false } => 1,
+            WallState::Checked { exists: true } => 3,
+        };
+        let index = coord.as_index();
+        let shift = (index % 4) * 2;
+        (self.0)[index / 4] &= !(3 << shift);
+        (self.0)[index / 4] |= bit << shift;
+    }
+
+    pub fn wall_state(&self, wall: &Coordinate<W>) -> WallState {
+        let index = wall.as_index();
+        let bit = ((self.0)[index / 4] >> ((index % 4) * 2)) & 3;
+        match bit {
+            0 => WallState::Unchecked,
+            1 => WallState::Checked { exists: false },
+            3 => WallState::Checked { exists: true },
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseWallsError {
+    kind: ParseWallsErrorKind,
+    line: usize,
+    char_range: (usize, usize),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum ParseWallsErrorKind {
+    One { expected: &'static str },
+    Two { expected: [&'static str; 2] },
+}
+
+impl ParseWallsError {
+    fn new(expected: &'static str, line: usize, char_range: (usize, usize)) -> Self {
+        Self {
+            kind: ParseWallsErrorKind::One { expected },
+            line,
+            char_range,
+        }
+    }
+
+    fn new_two(expected: [&'static str; 2], line: usize, char_range: (usize, usize)) -> Self {
+        Self {
+            kind: ParseWallsErrorKind::Two { expected },
+            line,
+            char_range,
+        }
+    }
+}
+
+impl fmt::Display for ParseWallsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "line {}, character {} to {}, ",
+            self.line + 1,
+            self.char_range.0,
+            self.char_range.1
+        )?;
+        match self.kind {
+            ParseWallsErrorKind::One { expected } => write!(f, "here must be `{}`.", expected)?,
+            ParseWallsErrorKind::Two { expected } => {
+                write!(f, "here must be `{}` or `{}`.", expected[0], expected[1])?
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<const W: u8> core::str::FromStr for Walls<W> {
+    type Err = ParseWallsError;
+
+    // TODO: validation
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut walls = Self::new();
+        let mut update = |x, y, is_top, exists| {
+            walls.update(&Coordinate { x, y, is_top }, &WallState::Checked { exists });
+        };
+        let check = |s: &str, expected, len, y, x| {
+            if s.get(..len) == Some(expected) {
+                Ok(())
+            } else {
+                Err(ParseWallsError::new(expected, y, (x, x + len)))
+            }
+        };
+
+        for (y, mut s) in s.lines().enumerate().take(2 * W as usize + 1) {
+            let y = y as u8;
+            if y == 2 * W {
+                check(s, "+", 1, y as usize, 0)?;
+                s = &s[1..];
+                for x in 0..W {
+                    check(s, "---+", 4, y as usize, 4 * x as usize + 1)?;
+                    s = &s[4..];
+                }
+                break;
+            }
+            for x in 0..W {
+                if y & 1 == 0 {
+                    if x == 0 {
+                        check(s, "+", 1, y as usize, x as usize)?;
+                        s = &s[1..];
+                    }
+                    match s.get(..4) {
+                        Some("---+") => update(x, W - y / 2 - 1, true, true),
+                        Some("   +") => update(x, W - y / 2 - 1, true, false),
+                        _ => {
+                            return Err(ParseWallsError::new_two(
+                                ["---+", "   +"],
+                                y as usize,
+                                (4 * x as usize + 1, 4 * x as usize + 5),
+                            ))
+                        }
+                    }
+                    s = &s[4..];
+                } else {
+                    if x == 0 {
+                        check(s, "|", 1, y as usize, x as usize)?;
+                        s = &s[1..];
+                    }
+                    match s.get(..4) {
+                        Some("   |") => update(x, W - y / 2 - 1, false, true),
+                        Some("    ") => update(x, W - y / 2 - 1, false, false),
+                        _ => {
+                            return Err(ParseWallsError::new_two(
+                                ["   |", "    "],
+                                y as usize,
+                                (4 * x as usize + 1, 4 * x as usize + 5),
+                            ))
+                        }
+                    }
+                    s = &s[4..];
+                }
+            }
+        }
+        Ok(walls)
+    }
+}
+
+impl<const W: u8> fmt::Display for Walls<W> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let exists = |x, y, is_top| {
+            matches!(
+                self.wall_state(&Coordinate::new(x, y, is_top).unwrap()),
+                WallState::Checked { exists: true }
+            )
+        };
+        for y in (0..W).rev() {
+            for x in 0..W {
+                if exists(x, y, true) {
+                    write!(f, "+---")?;
+                } else {
+                    write!(f, "+   ")?;
+                }
+            }
+            writeln!(f, "+")?;
+
+            write!(f, "|")?;
+            for x in 0..W {
+                if exists(x, y, false) {
+                    write!(f, "   |")?;
+                } else {
+                    write!(f, "    ")?;
+                }
+            }
+            writeln!(f)?;
+        }
+        for _ in 0..W {
+            write!(f, "+---")?;
+        }
+        writeln!(f, "+")?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use approx::assert_relative_eq;
@@ -516,4 +731,68 @@ mod tests {
     define_convert_err_test!(convert_err_test3: (4, (-0.045, 0.045, 0.0)));
     define_convert_err_test!(convert_err_test4: (4, (0.045, 0.045, 45.0)));
     define_convert_err_test!(convert_err_test5: (4, (0.085, 0.045, 0.0)));
+
+    #[test]
+    fn test_empty_display() {
+        let s = Walls::<4>::new().to_string();
+        let expected = include_str!("../mazes/empty4.dat");
+        assert_eq!(&s, expected);
+    }
+
+    #[test]
+    fn test_simple_display() {
+        let mut walls = Walls::<4>::new();
+        let vec = vec![
+            (0, 0, false),
+            (0, 1, false),
+            (0, 2, false),
+            (1, 2, true),
+            (2, 2, true),
+            (2, 2, false),
+            (1, 1, false),
+            (2, 0, false),
+            (2, 0, true),
+        ];
+        for (x, y, is_top) in vec {
+            walls.update(
+                &Coordinate { x, y, is_top },
+                &WallState::Checked { exists: true },
+            );
+        }
+        let s = walls.to_string();
+        let expected = include_str!("../mazes/maze4_1.dat");
+        assert_eq!(&s, expected);
+    }
+
+    #[test]
+    fn test_parse() {
+        let test_cases = vec![
+            include_str!("../mazes/maze4_1.dat"),
+            include_str!("../mazes/maze4_2.dat"),
+            include_str!("../mazes/maze4_3.dat"),
+        ];
+
+        for s in test_cases {
+            let s2 = s.parse::<Walls<4>>().unwrap().to_string();
+            assert_eq!(&s2, s);
+        }
+    }
+
+    #[test]
+    fn test_parse_error() {
+        let test_cases = vec![
+            (
+                include_str!("../mazes/invalid4_1.dat"),
+                Err(ParseWallsError::new_two(["---+", "   +"], 0, (5, 9))),
+            ),
+            (
+                include_str!("../mazes/invalid4_2.dat"),
+                Err(ParseWallsError::new_two(["   |", "    "], 7, (5, 9))),
+            ),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(input.parse::<Walls<4>>(), expected);
+        }
+    }
 }

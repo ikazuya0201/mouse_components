@@ -1,8 +1,8 @@
 #![cfg_attr(not(test), no_std)]
 
 pub mod control;
-pub mod estimator;
 pub mod solver;
-pub mod wall_detector;
+pub mod state;
+pub mod wall;
 
 const WIDTH: usize = 32;
