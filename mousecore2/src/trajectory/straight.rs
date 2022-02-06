@@ -399,12 +399,12 @@ impl_calculator_generator!(
     AngleTarget
 );
 
-pub struct StraightTrajectoryGenerator {
+pub struct StraightGenerator {
     function_generator: LengthStraightCalculatorGenerator,
     period: Time,
 }
 
-impl StraightTrajectoryGenerator {
+impl StraightGenerator {
     pub fn new(v_max: Velocity, a_max: Acceleration, j_max: Jerk, period: Time) -> Self {
         Self {
             function_generator: LengthStraightCalculatorGenerator::new(v_max, a_max, j_max),
@@ -413,7 +413,7 @@ impl StraightTrajectoryGenerator {
     }
 }
 
-impl StraightTrajectoryGenerator {
+impl StraightGenerator {
     //NOTO: v_start and v_end should not be negative
     #[inline]
     pub fn generate(
@@ -657,7 +657,7 @@ mod tests {
             let v_max = Velocity::new::<meter_per_second>(v_max);
             let a_max = Acceleration::new::<meter_per_second_squared>(a_max);
             let j_max = Jerk::new::<meter_per_second_cubed>(j_max);
-            let generator = StraightTrajectoryGenerator::new(v_max, a_max, j_max, period);
+            let generator = StraightGenerator::new(v_max, a_max, j_max, period);
             let mut trajectory = generator.generate(
                 Length::new::<meter>(distance),
                 Velocity::new::<meter_per_second>(v_start),
