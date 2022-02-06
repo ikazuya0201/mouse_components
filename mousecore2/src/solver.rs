@@ -1,3 +1,5 @@
+use core::fmt;
+
 use heapless::{Deque, Vec};
 use serde::{Deserialize, Serialize};
 
@@ -423,79 +425,128 @@ impl<const W: u8> Walls<W> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseWallsError {
+    kind: ParseWallsErrorKind,
+    line: usize,
+    char_range: (usize, usize),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum ParseWallsErrorKind {
+    One { expected: &'static str },
+    Two { expected: [&'static str; 2] },
+}
+
+impl ParseWallsError {
+    fn new(expected: &'static str, line: usize, char_range: (usize, usize)) -> Self {
+        Self {
+            kind: ParseWallsErrorKind::One { expected },
+            line,
+            char_range,
+        }
+    }
+
+    fn new_two(expected: [&'static str; 2], line: usize, char_range: (usize, usize)) -> Self {
+        Self {
+            kind: ParseWallsErrorKind::Two { expected },
+            line,
+            char_range,
+        }
+    }
+}
+
+impl fmt::Display for ParseWallsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "line {}, character {} to {}, ",
+            self.line + 1,
+            self.char_range.0,
+            self.char_range.1
+        )?;
+        match self.kind {
+            ParseWallsErrorKind::One { expected } => write!(f, "here must be `{}`.", expected)?,
+            ParseWallsErrorKind::Two { expected } => {
+                write!(f, "here must be `{}` or `{}`.", expected[0], expected[1])?
+            }
+        }
+        Ok(())
+    }
+}
+
 impl<const W: u8> core::str::FromStr for Walls<W> {
-    type Err = core::convert::Infallible;
+    type Err = ParseWallsError;
 
     // TODO: validation
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut walls = Self::new();
-        s.lines()
-            .enumerate()
-            .take(2 * W as usize) //not consider bottom line
-            .for_each(|(y, line)| {
-                let y = y as u8;
-                line.chars().enumerate().skip(1).for_each(|(x, c)| {
-                    //not consider left line
-                    let x = x as u8;
-                    if y % 2 == 0 {
-                        //check top walls
-                        if x % 4 != 1 {
-                            return;
-                        }
-                        let x = x / 4;
-                        if c == '-' {
-                            walls.update(
-                                &Coordinate {
-                                    x,
-                                    y: W - y / 2 - 1,
-                                    is_top: true,
-                                },
-                                &WallState::Checked { exists: true },
-                            );
-                        } else {
-                            walls.update(
-                                &Coordinate {
-                                    x,
-                                    y: W - y / 2 - 1,
-                                    is_top: true,
-                                },
-                                &WallState::Checked { exists: false },
-                            );
-                        }
-                    } else {
-                        //check right walls
-                        if x % 4 != 0 {
-                            return;
-                        }
-                        let x = x / 4;
-                        if c == '|' {
-                            walls.update(
-                                &Coordinate {
-                                    x: x - 1,
-                                    y: W - y / 2 - 1,
-                                    is_top: false,
-                                },
-                                &WallState::Checked { exists: true },
-                            );
-                        } else {
-                            walls.update(
-                                &Coordinate {
-                                    x: x - 1,
-                                    y: W - y / 2 - 1,
-                                    is_top: false,
-                                },
-                                &WallState::Checked { exists: false },
-                            );
+        let mut update = |x, y, is_top, exists| {
+            walls.update(&Coordinate { x, y, is_top }, &WallState::Checked { exists });
+        };
+        let check = |s: &str, expected, len, y, x| {
+            if s.get(..len) == Some(expected) {
+                Ok(())
+            } else {
+                Err(ParseWallsError::new(expected, y, (x, x + len)))
+            }
+        };
+
+        for (y, mut s) in s.lines().enumerate().take(2 * W as usize + 1) {
+            let y = y as u8;
+            if y == 2 * W {
+                check(s, "+", 1, y as usize, 0)?;
+                s = &s[1..];
+                for x in 0..W {
+                    check(s, "---+", 4, y as usize, 4 * x as usize + 1)?;
+                    s = &s[4..];
+                }
+                break;
+            }
+            for x in 0..W {
+                if y & 1 == 0 {
+                    if x == 0 {
+                        check(s, "+", 1, y as usize, x as usize)?;
+                        s = &s[1..];
+                    }
+                    match s.get(..4) {
+                        Some("---+") => update(x, W - y / 2 - 1, true, true),
+                        Some("   +") => update(x, W - y / 2 - 1, true, false),
+                        _ => {
+                            return Err(ParseWallsError::new_two(
+                                ["---+", "   +"],
+                                y as usize,
+                                (4 * x as usize + 1, 4 * x as usize + 5),
+                            ))
                         }
                     }
-                });
-            });
+                    s = &s[4..];
+                } else {
+                    if x == 0 {
+                        check(s, "|", 1, y as usize, x as usize)?;
+                        s = &s[1..];
+                    }
+                    match s.get(..4) {
+                        Some("   |") => update(x, W - y / 2 - 1, false, true),
+                        Some("    ") => update(x, W - y / 2 - 1, false, false),
+                        _ => {
+                            return Err(ParseWallsError::new_two(
+                                ["   |", "    "],
+                                y as usize,
+                                (4 * x as usize + 1, 4 * x as usize + 5),
+                            ))
+                        }
+                    }
+                    s = &s[4..];
+                }
+            }
+        }
         Ok(walls)
     }
 }
 
-impl<const W: u8> core::fmt::Display for Walls<W> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl<const W: u8> fmt::Display for Walls<W> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let exists = |x, y, is_top| {
             matches!(
                 self.wall_state(&Coordinate::new(x, y, is_top).unwrap()),
@@ -591,6 +642,24 @@ mod tests {
         for s in test_cases {
             let s2 = s.parse::<Walls<4>>().unwrap().to_string();
             assert_eq!(&s2, s);
+        }
+    }
+
+    #[test]
+    fn test_parse_error() {
+        let test_cases = vec![
+            (
+                include_str!("../mazes/invalid4_1.dat"),
+                Err(ParseWallsError::new_two(["---+", "   +"], 0, (5, 9))),
+            ),
+            (
+                include_str!("../mazes/invalid4_2.dat"),
+                Err(ParseWallsError::new_two(["   |", "    "], 7, (5, 9))),
+            ),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(input.parse::<Walls<4>>(), expected);
         }
     }
 
