@@ -2,15 +2,18 @@ use core::marker::PhantomData;
 
 #[allow(unused_imports)]
 use micromath::F32Ext;
+use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 use uom::{
     si::{
         angle::radian,
         angular_velocity::radian_per_second,
+        electric_potential::volt,
         f32::{
-            Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, Frequency,
-            Jerk, Length, Time, Velocity,
+            Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity,
+            ElectricPotential, Frequency, Jerk, Length, Time, Velocity,
         },
+        time::second,
         Quantity, ISQ, SI,
     },
     typenum::*,
@@ -59,7 +62,7 @@ pub struct Tracker {
     gain: GainType,
     #[builder(setter(transform = |value: f32| Frequency{ value, dimension: PhantomData, units: PhantomData }))]
     dgain: Frequency,
-    #[builder(default)]
+    #[builder(default, setter(skip))]
     xi: Velocity,
     period: Time,
     xi_threshold: Velocity,
@@ -170,6 +173,74 @@ fn sinc(x: f32) -> f32 {
     let xx = x * x;
     let xxxx = xx * xx;
     xxxx * xxxx / 362880.0 - xxxx * xx / 5040.0 + xxxx / 120.0 - xx / 6.0 + 1.0
+}
+
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct ControlParameters {
+    pub kp: f32,
+    pub ki: f32,
+    pub kd: f32,
+    pub model_k: f32,
+    pub model_t1: f32,
+}
+
+#[derive(Debug, TypedBuilder)]
+pub struct Controller {
+    trans_params: ControlParameters,
+    rot_params: ControlParameters,
+    #[builder(default, setter(skip))]
+    trans_sum: f32,
+    #[builder(default, setter(skip))]
+    rot_sum: f32,
+    period: Time,
+}
+
+impl Controller {
+    fn control_each(
+        r: f32,
+        dr: f32,
+        y: f32,
+        dy: f32,
+        params: &ControlParameters,
+        period: Time,
+        error_sum: &mut f32,
+    ) -> ElectricPotential {
+        let vol_f = (dr * params.model_t1 + r) / params.model_k;
+        let vol_p = params.kp * (r - y);
+        let vol_i = params.ki * *error_sum;
+        let vol_d = params.kd * (dr - dy);
+        *error_sum += (r - y) * period.get::<second>();
+        ElectricPotential::new::<volt>(vol_f + vol_p + vol_i + vol_d)
+    }
+
+    pub fn control(
+        &mut self,
+        r: &ControlTarget,
+        y: &ControlTarget,
+    ) -> (ElectricPotential, ElectricPotential) {
+        let vol_t = Self::control_each(
+            r.v.value,
+            r.a.value,
+            y.v.value,
+            y.a.value,
+            &self.trans_params,
+            self.period,
+            &mut self.trans_sum,
+        );
+        let vol_r = Self::control_each(
+            r.omega.value,
+            r.alpha.value,
+            y.omega.value,
+            y.alpha.value,
+            &self.rot_params,
+            self.period,
+            &mut self.rot_sum,
+        );
+        let left_motor_voltage = vol_t - vol_r;
+        let right_motor_voltage = vol_t + vol_r;
+
+        (left_motor_voltage, right_motor_voltage)
+    }
 }
 
 #[cfg(test)]
