@@ -12,7 +12,7 @@ use uom::si::{
 use crate::solver::{Coordinate, WallState};
 use crate::WIDTH;
 
-struct WallInfo<const W: u8> {
+pub struct WallInfo<const W: u8> {
     pub coord: Coordinate<W>,
     pub existing_distance: Length,
     pub not_existing_distance: Length,
@@ -31,7 +31,7 @@ pub struct WallDetector<const W: u8> {
     wall_existence_array: [[[Probability; 2]; WIDTH]; WIDTH],
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Normal<T> {
     pub mean: T,
     pub stddev: T,
@@ -98,12 +98,12 @@ impl<const W: u8> WallDetector<W> {
 
     pub fn detect_and_update(
         &mut self,
-        distance: Normal<Length>,
-        pose: Pose,
+        distance: &Normal<Length>,
+        pose: &Pose,
     ) -> Option<(Coordinate<W>, WallState)> {
         use uom::si::ratio::ratio;
 
-        let wall_info = self.converter.convert(&pose)?;
+        let wall_info = self.converter.convert(pose)?;
 
         let existence = *self.wall_existence(&wall_info.coord);
 
@@ -159,7 +159,7 @@ impl<const W: u8> WallDetector<W> {
 const WALL_EXISTENCE_TH: Probability = Probability(0.1);
 
 #[derive(Clone, PartialEq, Debug)]
-struct PoseConverter<const W: u8> {
+pub struct PoseConverter<const W: u8> {
     i_square_width: i32, //[mm]
     square_width_half: Length,
     square_width: Length,
@@ -272,7 +272,7 @@ impl<const W: u8> PoseConverter<W> {
 }
 
 impl<const W: u8> PoseConverter<W> {
-    fn convert(&self, pose: &Pose) -> Option<WallInfo<W>> {
+    pub fn convert(&self, pose: &Pose) -> Option<WallInfo<W>> {
         #[derive(Clone, Copy, Debug)]
         enum Axis {
             X(Length),
@@ -450,9 +450,9 @@ impl<const W: u8> Walls<W> {
             WallState::Checked { exists: true } => 3,
         };
         let index = coord.as_index();
-        let shift = (index % 4) * 2;
-        (self.0)[index / 4] &= !(3 << shift);
-        (self.0)[index / 4] |= bit << shift;
+        let shift = (index & 3) * 2;
+        (self.0)[index >> 2] &= !(3 << shift);
+        (self.0)[index >> 2] |= bit << shift;
     }
 
     pub fn wall_state(&self, wall: &Coordinate<W>) -> WallState {
