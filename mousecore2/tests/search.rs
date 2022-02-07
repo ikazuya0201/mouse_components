@@ -1,6 +1,6 @@
 use mousecore2::{
     control::{ControlParameters, Controller, Target, Tracker},
-    solver::{Commander, Coordinate, Searcher},
+    solver::{AbsoluteDirection, Commander, Coordinate, RelativeDirection, SearchState, Searcher},
     state::{AngleState, Estimator, LengthState, SensorValue, State},
     trajectory::{
         slalom::{SlalomConfig, SlalomDirection, SlalomGenerator, SlalomKind},
@@ -183,14 +183,6 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
         )
     };
 
-    #[derive(Debug, Clone, Copy)]
-    enum Direction {
-        North,
-        East,
-        South,
-        West,
-    }
-
     let mut trajectory: Box<dyn Iterator<Item = Target>> = Box::new(ShiftTrajectory::new(
         Pose {
             x: state.x.x,
@@ -201,7 +193,11 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
     ));
     let mut next: Option<Box<dyn Iterator<Item = Target>>> = None;
     let mut commander = None::<Commander<W>>;
-    let mut robot = (Coordinate::<W>::new(0, 0, true).unwrap(), Direction::North);
+    let mut robot = SearchState::new(
+        Coordinate::<W>::new(0, 0, true).unwrap(),
+        AbsoluteDirection::North,
+    )
+    .unwrap();
     let mut simulator = Simulator::<W>::builder()
         .period(period)
         .trans_k(trans_k)
@@ -214,87 +210,6 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
         .last(state.clone())
         .max_voltage(ElectricPotential::new::<volt>(3.7))
         .build();
-
-    let next_robot = |robot: &(Coordinate<W>, Direction),
-                      next_coord: &Coordinate<W>|
-     -> (Direction, Box<dyn Iterator<Item = Target>>, bool) {
-        macro_rules! gen {
-            ($dir: expr, $traj: ident) => {{
-                let pose = Pose {
-                    x: (2.0 * (robot.0.x as f32) + 1.0 + if robot.0.is_top { 0.0 } else { 1.0 })
-                        * Length::new::<millimeter>(45.0),
-                    y: (2.0 * (robot.0.y as f32) + 1.0 + if robot.0.is_top { 1.0 } else { 0.0 })
-                        * Length::new::<millimeter>(45.0),
-                    theta: Angle::new::<degree>(match robot.1 {
-                        Direction::North => 90.0,
-                        Direction::South => -90.0,
-                        Direction::East => 0.0,
-                        Direction::West => 180.0,
-                    }),
-                };
-                (
-                    $dir,
-                    Box::new(ShiftTrajectory::new(pose, $traj.clone())),
-                    stringify!($traj) == "back",
-                )
-            }};
-        }
-        match (robot.0.is_top, robot.1) {
-            (true, Direction::North) => match (
-                next_coord.is_top,
-                next_coord.x as i8 - robot.0.x as i8,
-                next_coord.y as i8 - robot.0.y as i8,
-            ) {
-                (true, 0, 1) => gen!(Direction::North, front),
-                (false, 0, 1) => gen!(Direction::East, right),
-                (false, -1, 1) => gen!(Direction::West, left),
-                (true, 0, -1) | (false, -1, 0) | (false, 0, 0) => {
-                    gen!(Direction::South, back)
-                }
-                _ => unreachable!("{:?}", (robot, next_coord)),
-            },
-            (true, Direction::South) => match (
-                next_coord.is_top,
-                next_coord.x as i8 - robot.0.x as i8,
-                next_coord.y as i8 - robot.0.y as i8,
-            ) {
-                (true, 0, -1) => gen!(Direction::South, front),
-                (false, 0, 0) => gen!(Direction::East, left),
-                (false, -1, 0) => gen!(Direction::West, right),
-                (true, 0, 1) | (false, -1, 1) | (false, 0, 1) => {
-                    gen!(Direction::North, back)
-                }
-                _ => unreachable!(),
-            },
-            (false, Direction::East) => match (
-                next_coord.is_top,
-                next_coord.x as i8 - robot.0.x as i8,
-                next_coord.y as i8 - robot.0.y as i8,
-            ) {
-                (false, 1, 0) => gen!(Direction::East, front),
-                (true, 1, 0) => gen!(Direction::North, left),
-                (true, 1, -1) => gen!(Direction::South, right),
-                (true, 0, 0) | (true, 0, -1) | (false, -1, 0) => {
-                    gen!(Direction::West, back)
-                }
-                _ => unreachable!(),
-            },
-            (false, Direction::West) => match (
-                next_coord.is_top,
-                next_coord.x as i8 - robot.0.x as i8,
-                next_coord.y as i8 - robot.0.y as i8,
-            ) {
-                (false, -1, 0) => gen!(Direction::West, front),
-                (true, 0, -1) => gen!(Direction::South, left),
-                (true, 0, 0) => gen!(Direction::North, right),
-                (true, 1, 0) | (true, 1, -1) | (false, 1, 0) => {
-                    gen!(Direction::East, back)
-                }
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        }
-    };
 
     loop {
         // estimate
@@ -328,15 +243,25 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
             .map(|commander| commander.next_coordinate(|coord| walls.wall_state(coord)))
         {
             Some(Ok(Some(next_coord))) => {
-                let (dir, traj, is_back) = next_robot(&robot, &next_coord);
-                robot = (if is_back { robot.0 } else { next_coord }, dir);
-                next = Some(traj);
+                let pose = Pose::from_search_state::<W, true>(robot);
+                let dir = robot.update(&next_coord).unwrap();
+                macro_rules! gen {
+                    ($traj: ident) => {
+                        Box::new(ShiftTrajectory::new(pose, $traj.clone()))
+                    };
+                }
+                next = Some(match dir {
+                    RelativeDirection::Front => gen!(front),
+                    RelativeDirection::Right => gen!(right),
+                    RelativeDirection::Left => gen!(left),
+                    RelativeDirection::Back => gen!(back),
+                });
                 commander.take();
             }
             Some(Ok(None)) => (),
             Some(Err(err)) => unreachable!("{:?}", err),
             None if next.is_none() => {
-                match searcher.search(&robot.0, |coord| walls.wall_state(coord)) {
+                match searcher.search(&robot.coordinate(), |coord| walls.wall_state(coord)) {
                     Ok(Some(next)) => commander = Some(next),
                     Ok(None) => break,
                     Err(err) => unreachable!("{:?}", err),
