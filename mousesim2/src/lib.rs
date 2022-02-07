@@ -24,7 +24,7 @@ use uom::si::{
 #[derive(TypedBuilder)]
 pub struct Simulator<const W: u8> {
     #[builder(setter(transform = |s: &str| s.parse().unwrap()))]
-    pub walls: Walls<W>,
+    walls: Walls<W>,
     current: State,
     last: State,
     #[builder(default, setter(skip))]
@@ -43,6 +43,10 @@ pub struct Simulator<const W: u8> {
 }
 
 impl<const W: u8> Simulator<W> {
+    pub fn walls(&self) -> &Walls<W> {
+        &self.walls
+    }
+
     pub fn step(&mut self) {
         let mut next = self.current.clone();
 
