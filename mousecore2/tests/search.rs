@@ -367,6 +367,6 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
 
     assert_eq!(
         searcher.shortest_path(|coord| walls.wall_state(coord)),
-        searcher.shortest_path(|coord| simulator.walls.wall_state(coord))
+        searcher.shortest_path(|coord| simulator.walls().wall_state(coord))
     );
 }
