@@ -142,7 +142,7 @@ impl<const W: u8> Simulator<W> {
         self.right_voltage = right;
     }
 
-    pub fn distance_to_wall(&self, pose: &Pose) -> Option<Normal<Length>> {
+    pub fn distance_from_wall(&self, pose: &Pose) -> Option<Normal<Length>> {
         let wall_info = self.pose_converter.convert(pose)?;
         let distance = if matches!(
             self.walls.wall_state(&wall_info.coord),

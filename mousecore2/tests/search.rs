@@ -10,6 +10,7 @@ use mousecore2::{
     },
     wall::{Pose, WallDetector, Walls},
 };
+use mousesim2::Simulator;
 use uom::si::f32::{
     Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity, ElectricPotential,
     Jerk, Length, Time, Velocity,
@@ -20,7 +21,6 @@ use uom::si::{
     angular_velocity::degree_per_second, electric_potential::volt, jerk::meter_per_second_cubed,
     length::millimeter, time::second, velocity::meter_per_second,
 };
-use utils2::Simulator;
 
 #[test]
 fn test_search1() {
@@ -355,7 +355,7 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
                 theta: state.theta.x + pose.theta,
             };
 
-            if let Some(distance) = simulator.distance_to_wall(&pose) {
+            if let Some(distance) = simulator.distance_from_wall(&pose) {
                 if let Some((coord, wall_state)) = detector.detect_and_update(&distance, &pose) {
                     walls.update(&coord, &wall_state);
                 }
