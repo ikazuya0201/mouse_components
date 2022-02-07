@@ -23,9 +23,32 @@ use uom::si::{
 use utils2::Simulator;
 
 #[test]
-fn test_search() {
-    const W: u8 = 16;
+fn test_search1() {
+    test_search::<16>(include_str!("../mazes/maze16_1.dat"), (7, 7, false));
+}
 
+#[test]
+fn test_search2() {
+    test_search::<16>(include_str!("../mazes/maze16_2.dat"), (7, 7, false));
+}
+
+#[test]
+fn test_search3() {
+    test_search::<16>(include_str!("../mazes/maze16_3.dat"), (7, 7, false));
+}
+
+#[test]
+fn test_search4() {
+    test_search::<32>(include_str!("../mazes/maze32_1.dat"), (18, 14, false));
+}
+
+#[test]
+fn test_search5() {
+    test_search::<32>(include_str!("../mazes/maze32_2.dat"), (7, 6, false));
+}
+
+fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
+    let goal = Coordinate::new(goal.0, goal.1, goal.2).unwrap();
     // common settings
     let period = Time::new::<second>(0.001);
     let trans_k = 1.865;
@@ -94,10 +117,7 @@ fn test_search() {
         .build();
     let mut estimator = Estimator::builder().period(period).build();
     let mut detector = WallDetector::<W>::default();
-    let searcher = Searcher::<W>::new(
-        Coordinate::new(0, 0, true).unwrap(),
-        Coordinate::new(7, 7, false).unwrap(),
-    );
+    let searcher = Searcher::<W>::new(Coordinate::new(0, 0, true).unwrap(), goal);
 
     let (init, front, right, left, back) = {
         let v_max = Velocity::new::<meter_per_second>(0.3);
@@ -188,7 +208,7 @@ fn test_search() {
         .trans_t1(trans_t1)
         .rot_k(rot_k)
         .rot_t1(rot_t1)
-        .walls(include_str!("../mazes/maze16_1.dat"))
+        .walls(input)
         .wheel_interval(Length::new::<millimeter>(33.5))
         .current(state.clone())
         .last(state.clone())
