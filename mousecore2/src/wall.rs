@@ -4,12 +4,12 @@ use heapless::Vec;
 #[allow(unused_imports)]
 use micromath::F32Ext;
 use uom::si::{
-    angle::revolution,
+    angle::{degree, revolution},
     f32::{Angle, Length},
-    length::meter,
+    length::{meter, millimeter},
 };
 
-use crate::solver::{Coordinate, WallState};
+use crate::solver::{AbsoluteDirection, Coordinate, SearchState, WallState};
 use crate::WIDTH;
 
 pub struct WallInfo<const W: u8> {
@@ -23,6 +23,24 @@ pub struct Pose {
     pub x: Length,
     pub y: Length,
     pub theta: Angle,
+}
+
+impl Pose {
+    pub fn from_search_state<const W: u8, const H: bool>(value: SearchState<W>) -> Self {
+        let square_width = Length::new::<millimeter>(if H { 45.0 } else { 90.0 });
+        Self {
+            x: (2.0 * (value.coord.x as f32) + 1.0 + if value.coord.is_top { 0.0 } else { 1.0 })
+                * square_width,
+            y: (2.0 * (value.coord.y as f32) + 1.0 + if value.coord.is_top { 1.0 } else { 0.0 })
+                * square_width,
+            theta: Angle::new::<degree>(match value.dir {
+                AbsoluteDirection::North => 90.0,
+                AbsoluteDirection::South => -90.0,
+                AbsoluteDirection::East => 0.0,
+                AbsoluteDirection::West => 180.0,
+            }),
+        }
+    }
 }
 
 #[derive(Debug)]

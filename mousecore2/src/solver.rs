@@ -6,9 +6,9 @@ use crate::WIDTH;
 /// A type for coordinate in maze.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct Coordinate<const W: u8> {
-    pub x: u8,
-    pub y: u8,
-    pub is_top: bool,
+    pub(crate) x: u8,
+    pub(crate) y: u8,
+    pub(crate) is_top: bool,
 }
 
 impl<const W: u8> Coordinate<W> {
@@ -395,6 +395,117 @@ impl<const W: u8> Commander<W> {
             }
         }
         Err(SearchError::Unreachable)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AbsoluteDirection {
+    North,
+    East,
+    South,
+    West,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RelativeDirection {
+    Front,
+    Right,
+    Left,
+    Back,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SearchState<const W: u8> {
+    pub(crate) coord: Coordinate<W>,
+    pub(crate) dir: AbsoluteDirection,
+}
+
+impl<const W: u8> SearchState<W> {
+    pub fn new(coord: Coordinate<W>, dir: AbsoluteDirection) -> Option<Self> {
+        match (coord.is_top, dir) {
+            (true, AbsoluteDirection::North | AbsoluteDirection::South)
+            | (false, AbsoluteDirection::East | AbsoluteDirection::West) => {
+                Some(Self { coord, dir })
+            }
+            _ => None,
+        }
+    }
+
+    pub fn coordinate(&self) -> &Coordinate<W> {
+        &self.coord
+    }
+
+    pub fn direction(&self) -> &AbsoluteDirection {
+        &self.dir
+    }
+}
+
+impl<const W: u8> SearchState<W> {
+    pub fn update(&mut self, next_coord: &Coordinate<W>) -> Option<RelativeDirection> {
+        let SearchState {
+            coord: cur_coord,
+            dir: cur_dir,
+        } = &self;
+        let (abs, rel) = match (cur_coord.is_top, cur_dir) {
+            (true, AbsoluteDirection::North) => match (
+                next_coord.is_top,
+                next_coord.x as i8 - cur_coord.x as i8,
+                next_coord.y as i8 - cur_coord.y as i8,
+            ) {
+                (true, 0, 1) => (AbsoluteDirection::North, RelativeDirection::Front),
+                (false, 0, 1) => (AbsoluteDirection::East, RelativeDirection::Right),
+                (false, -1, 1) => (AbsoluteDirection::West, RelativeDirection::Left),
+                (true, 0, -1) | (false, -1, 0) | (false, 0, 0) => {
+                    (AbsoluteDirection::South, RelativeDirection::Back)
+                }
+                _ => return None,
+            },
+            (true, AbsoluteDirection::South) => match (
+                next_coord.is_top,
+                next_coord.x as i8 - cur_coord.x as i8,
+                next_coord.y as i8 - cur_coord.y as i8,
+            ) {
+                (true, 0, -1) => (AbsoluteDirection::South, RelativeDirection::Front),
+                (false, 0, 0) => (AbsoluteDirection::East, RelativeDirection::Left),
+                (false, -1, 0) => (AbsoluteDirection::West, RelativeDirection::Right),
+                (true, 0, 1) | (false, -1, 1) | (false, 0, 1) => {
+                    (AbsoluteDirection::North, RelativeDirection::Back)
+                }
+                _ => return None,
+            },
+            (false, AbsoluteDirection::East) => match (
+                next_coord.is_top,
+                next_coord.x as i8 - cur_coord.x as i8,
+                next_coord.y as i8 - cur_coord.y as i8,
+            ) {
+                (false, 1, 0) => (AbsoluteDirection::East, RelativeDirection::Front),
+                (true, 1, 0) => (AbsoluteDirection::North, RelativeDirection::Left),
+                (true, 1, -1) => (AbsoluteDirection::South, RelativeDirection::Right),
+                (true, 0, 0) | (true, 0, -1) | (false, -1, 0) => {
+                    (AbsoluteDirection::West, RelativeDirection::Back)
+                }
+                _ => return None,
+            },
+            (false, AbsoluteDirection::West) => match (
+                next_coord.is_top,
+                next_coord.x as i8 - cur_coord.x as i8,
+                next_coord.y as i8 - cur_coord.y as i8,
+            ) {
+                (false, -1, 0) => (AbsoluteDirection::West, RelativeDirection::Front),
+                (true, 0, -1) => (AbsoluteDirection::South, RelativeDirection::Left),
+                (true, 0, 0) => (AbsoluteDirection::North, RelativeDirection::Right),
+                (true, 1, 0) | (true, 1, -1) | (false, 1, 0) => {
+                    (AbsoluteDirection::East, RelativeDirection::Back)
+                }
+                _ => return None,
+            },
+            _ => return None,
+        };
+        if rel != RelativeDirection::Back {
+            self.coord = *next_coord;
+        }
+        self.dir = abs;
+        Some(rel)
     }
 }
 
