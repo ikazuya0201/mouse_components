@@ -20,7 +20,9 @@ impl<const W: u8> Coordinate<W> {
     }
 
     pub fn as_index(&self) -> usize {
-        ((self.y as usize) << (2 * W + 1)) | ((self.x as usize) << (W + 1)) | self.is_top as usize
+        ((self.y as usize) << (W.trailing_zeros() + 1))
+            | ((self.x as usize) << 1)
+            | self.is_top as usize
     }
 
     // Return extended neighbors of the give coordinate.
