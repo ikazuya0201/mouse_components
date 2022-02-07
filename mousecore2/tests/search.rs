@@ -307,7 +307,7 @@ fn test_search() {
             .as_ref()
             .map(|commander| commander.next_coordinate(|coord| walls.wall_state(coord)))
         {
-            Some(Ok(Some(next_coord))) if next.is_none() => {
+            Some(Ok(Some(next_coord))) => {
                 let (dir, traj, is_back) = next_robot(&robot, &next_coord);
                 robot = (if is_back { robot.0 } else { next_coord }, dir);
                 next = Some(traj);
@@ -315,11 +315,13 @@ fn test_search() {
             }
             Some(Ok(None)) => (),
             Some(Err(err)) => unreachable!("{:?}", err),
-            None => match searcher.search(&robot.0, |coord| walls.wall_state(coord)) {
-                Ok(Some(next)) => commander = Some(next),
-                Ok(None) => break,
-                Err(err) => unreachable!("{:?}", err),
-            },
+            None if next.is_none() => {
+                match searcher.search(&robot.0, |coord| walls.wall_state(coord)) {
+                    Ok(Some(next)) => commander = Some(next),
+                    Ok(None) => break,
+                    Err(err) => unreachable!("{:?}", err),
+                }
+            }
             _ => (),
         }
 
