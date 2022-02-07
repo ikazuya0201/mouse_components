@@ -4,6 +4,7 @@ pub mod control;
 pub mod solver;
 pub mod state;
 pub mod trajectory;
+pub mod utils;
 pub mod wall;
 
 const WIDTH: usize = 32;

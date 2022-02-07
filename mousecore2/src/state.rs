@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 #[allow(unused_imports)]
 use micromath::F32Ext;
 use serde::{Deserialize, Serialize};
@@ -35,15 +37,19 @@ pub struct SensorValue {
     pub angular_velocity: AngularVelocity,
 }
 
+// TODO: calculate alpha with cut-off frequency and period.
 #[derive(Debug, TypedBuilder)]
 pub struct Estimator {
     period: Time,
+    #[builder(default = 0.760_942_76)]
     alpha: f32,
+    #[builder(default = Acceleration { value: 100.0, dimension: PhantomData, units: PhantomData })]
     slip_angle_const: Acceleration,
+    #[builder(default = AngularVelocity { value: 0.1, dimension: PhantomData, units: PhantomData })]
     approx_th: AngularVelocity,
-    #[builder(default)]
+    #[builder(default, setter(skip))]
     slip_angle: Angle,
-    #[builder(default)]
+    #[builder(default, setter(skip))]
     translational_velocity: Velocity,
 }
 

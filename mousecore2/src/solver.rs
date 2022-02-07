@@ -20,7 +20,9 @@ impl<const W: u8> Coordinate<W> {
     }
 
     pub fn as_index(&self) -> usize {
-        ((self.y as usize) << (2 * W + 1)) | ((self.x as usize) << (W + 1)) | self.is_top as usize
+        ((self.y as usize) << (W.trailing_zeros() + 1))
+            | ((self.x as usize) << 1)
+            | self.is_top as usize
     }
 
     // Return extended neighbors of the give coordinate.
@@ -280,6 +282,24 @@ impl<const W: u8> Searcher<W> {
         prev
     }
 
+    pub fn shortest_path(
+        &self,
+        wall_state: impl Fn(&Coordinate<W>) -> WallState,
+    ) -> Vec<Coordinate<W>, QUE_MAX> {
+        let prev = self.bfs_tree(wall_state);
+        let mut path = Vec::new();
+        let mut cur = self.goal;
+        while let Some(next) = prev[cur] {
+            path.push(cur).unwrap();
+            if cur == self.start {
+                break;
+            }
+            cur = next;
+        }
+        path.reverse();
+        path
+    }
+
     fn unchecked_walls(
         &self,
         wall_state: impl Fn(&Coordinate<W>) -> WallState,
@@ -357,6 +377,7 @@ impl<const W: u8> Searcher<W> {
     }
 }
 
+#[derive(Debug)]
 pub struct Commander<const W: u8> {
     candidates: Vec<Coordinate<W>, 6>,
 }
@@ -382,24 +403,6 @@ mod tests {
     use super::*;
     use crate::wall::Walls;
     use std::vec::Vec;
-
-    fn restore_path<const W: u8>(
-        start: &Coordinate<W>,
-        goal: &Coordinate<W>,
-        prev: &[Option<Coordinate<W>>],
-    ) -> Vec<Coordinate<W>> {
-        let mut path = Vec::new();
-        let mut cur = *goal;
-        while let Some(next) = prev[cur] {
-            path.push(cur);
-            if &cur == start {
-                break;
-            }
-            cur = next;
-        }
-        path.reverse();
-        path
-    }
 
     fn new_coord<const W: u8>((x, y, is_top): (u8, u8, bool)) -> Coordinate<W> {
         Coordinate::new(x, y, is_top).unwrap()
@@ -433,8 +436,7 @@ mod tests {
             let walls = walls.parse::<Walls<W>>().unwrap();
             let expected = expected.into_iter().map(new_coord::<W>).collect::<Vec<_>>();
             let searcher = Searcher::<W>::new(start, goal);
-            let prev = searcher.bfs_tree(|coord| walls.wall_state(coord));
-            let path = restore_path(&start, &goal, &prev);
+            let path = searcher.shortest_path(|coord| walls.wall_state(coord));
             assert_eq!(path.as_slice(), expected.as_slice());
         }
     }
