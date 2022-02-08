@@ -468,6 +468,22 @@ impl<const W: u8> Walls<W> {
                 &WallState::Checked { exists: true },
             );
         }
+        walls.update(
+            &Coordinate {
+                x: 0,
+                y: 0,
+                is_top: false,
+            },
+            &WallState::Checked { exists: true },
+        );
+        walls.update(
+            &Coordinate {
+                x: 0,
+                y: 0,
+                is_top: true,
+            },
+            &WallState::Checked { exists: false },
+        );
         walls
     }
 
