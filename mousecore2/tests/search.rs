@@ -24,30 +24,68 @@ use uom::si::{
 
 #[test]
 fn test_search1() {
-    test_search::<16>(include_str!("../mazes/maze16_1.dat"), (7, 7, false));
+    test_search::<16>(
+        include_str!("../mazes/maze16_1.dat"),
+        (7, 7, false),
+        Default::default(),
+    );
 }
 
 #[test]
 fn test_search2() {
-    test_search::<16>(include_str!("../mazes/maze16_2.dat"), (7, 7, false));
+    test_search::<16>(
+        include_str!("../mazes/maze16_2.dat"),
+        (7, 7, false),
+        Default::default(),
+    );
 }
 
 #[test]
 fn test_search3() {
-    test_search::<16>(include_str!("../mazes/maze16_3.dat"), (7, 7, false));
+    test_search::<16>(
+        include_str!("../mazes/maze16_3.dat"),
+        (7, 7, false),
+        Default::default(),
+    );
 }
 
 #[test]
 fn test_search4() {
-    test_search::<32>(include_str!("../mazes/maze32_1.dat"), (18, 14, false));
+    test_search::<32>(
+        include_str!("../mazes/maze32_1.dat"),
+        (18, 14, false),
+        Default::default(),
+    );
 }
 
 #[test]
 fn test_search5() {
-    test_search::<32>(include_str!("../mazes/maze32_2.dat"), (7, 6, false));
+    test_search::<32>(
+        include_str!("../mazes/maze32_2.dat"),
+        (7, 6, false),
+        Default::default(),
+    );
 }
 
-fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
+#[test]
+fn test_search_offset1() {
+    test_search::<32>(
+        include_str!("../mazes/maze32_1.dat"),
+        (18, 14, false),
+        Length::new::<millimeter>(10.0),
+    );
+}
+
+#[test]
+fn test_search_offset2() {
+    test_search::<32>(
+        include_str!("../mazes/maze32_2.dat"),
+        (7, 6, false),
+        Length::new::<millimeter>(10.0),
+    );
+}
+
+fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool), front_offset: Length) {
     let goal = Coordinate::new(goal.0, goal.1, goal.2).unwrap();
     // common settings
     let period = Time::new::<second>(0.001);
@@ -86,7 +124,6 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
             theta: Angle::new::<degree>(-90.0),
         },
     ];
-    // let front_offset = Length::new::<millimeter>(10.0);
 
     let mut state = state;
     let mut walls = Walls::<W>::new();
@@ -119,14 +156,14 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
     let mut detector = WallDetector::<W>::default();
     let searcher = Searcher::<W>::new(Coordinate::new(0, 0, true).unwrap(), goal);
 
+    let square_width = Length::new::<millimeter>(90.0);
+
     let (init, front, right, left, back) = {
         let v_max = Velocity::new::<meter_per_second>(0.3);
         let a_max = Acceleration::new::<meter_per_second_squared>(10.0);
         let j_max = Jerk::new::<meter_per_second_cubed>(100.0);
 
-        let square_width = Length::new::<millimeter>(90.0);
-
-        let slalom_config = SlalomConfig::default();
+        let slalom_config = SlalomConfig::new(square_width, front_offset);
         let slalom = SlalomGenerator::new(period, v_max, a_max, j_max);
         let spin = SpinGenerator::new(
             AngularVelocity::new::<degree_per_second>(1440.0),
@@ -136,7 +173,7 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
         );
         let straight = StraightGenerator::new(v_max, a_max, j_max, period);
         (
-            straight.generate(square_width / 2.0, Default::default(), v_max),
+            straight.generate(square_width / 2.0 + front_offset, Default::default(), v_max),
             straight.generate(square_width, v_max, v_max),
             slalom.generate_constant_slalom(
                 slalom_config.parameters(SlalomKind::Search90, SlalomDirection::Right),
@@ -147,10 +184,10 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
                 v_max,
             ),
             straight
-                .generate(square_width / 2.0, v_max, Default::default())
+                .generate(square_width / 2.0 - front_offset, v_max, Default::default())
                 .chain(StopTrajectory::new(
                     Pose {
-                        x: square_width / 2.0,
+                        x: square_width / 2.0 - front_offset,
                         ..Default::default()
                     },
                     period,
@@ -158,14 +195,14 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
                 ))
                 .chain(ShiftTrajectory::new(
                     Pose {
-                        x: square_width / 2.0,
+                        x: square_width / 2.0 - front_offset,
                         ..Default::default()
                     },
                     spin.generate(Angle::new::<degree>(180.0)),
                 ))
                 .chain(StopTrajectory::new(
                     Pose {
-                        x: square_width / 2.0,
+                        x: square_width / 2.0 - front_offset,
                         y: Default::default(),
                         theta: Angle::new::<degree>(180.0),
                     },
@@ -174,11 +211,11 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
                 ))
                 .chain(ShiftTrajectory::new(
                     Pose {
-                        x: square_width / 2.0,
+                        x: square_width / 2.0 - front_offset,
                         y: Default::default(),
                         theta: Angle::new::<degree>(180.0),
                     },
-                    straight.generate(square_width / 2.0, Default::default(), v_max),
+                    straight.generate(square_width / 2.0 + front_offset, Default::default(), v_max),
                 )),
         )
     };
@@ -243,7 +280,7 @@ fn test_search<const W: u8>(input: &'static str, goal: (u8, u8, bool)) {
             .map(|commander| commander.next_coordinate(|coord| walls.wall_state(coord)))
         {
             Some(Ok(Some(next_coord))) => {
-                let pose = Pose::from_search_state::<W, true>(robot);
+                let pose = Pose::from_search_state::<W>(robot, square_width, front_offset);
                 let dir = robot.update(&next_coord).unwrap();
                 macro_rules! gen {
                     ($traj: ident) => {

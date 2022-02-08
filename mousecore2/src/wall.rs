@@ -6,7 +6,7 @@ use micromath::F32Ext;
 use uom::si::{
     angle::{degree, revolution},
     f32::{Angle, Length},
-    length::{meter, millimeter},
+    length::meter,
 };
 
 use crate::solver::{AbsoluteDirection, Coordinate, SearchState, WallState};
@@ -26,19 +26,29 @@ pub struct Pose {
 }
 
 impl Pose {
-    pub fn from_search_state<const W: u8, const H: bool>(value: SearchState<W>) -> Self {
-        let square_width = Length::new::<millimeter>(if H { 45.0 } else { 90.0 });
-        Self {
-            x: (2.0 * (value.coord.x as f32) + 1.0 + if value.coord.is_top { 0.0 } else { 1.0 })
-                * square_width,
-            y: (2.0 * (value.coord.y as f32) + 1.0 + if value.coord.is_top { 1.0 } else { 0.0 })
-                * square_width,
-            theta: Angle::new::<degree>(match value.dir {
-                AbsoluteDirection::North => 90.0,
-                AbsoluteDirection::South => -90.0,
-                AbsoluteDirection::East => 0.0,
-                AbsoluteDirection::West => 180.0,
-            }),
+    pub fn from_search_state<const W: u8>(
+        value: SearchState<W>,
+        square_width: Length,
+        front_offset: Length,
+    ) -> Self {
+        let (x, y) = (
+            (2.0 * (value.coord.x as f32) + 1.0 + if value.coord.is_top { 0.0 } else { 1.0 })
+                * square_width
+                / 2.0,
+            (2.0 * (value.coord.y as f32) + 1.0 + if value.coord.is_top { 1.0 } else { 0.0 })
+                * square_width
+                / 2.0,
+        );
+        let (x, y, theta) = match value.dir {
+            AbsoluteDirection::North => (x, y + front_offset, 90.0),
+            AbsoluteDirection::South => (x, y - front_offset, -90.0),
+            AbsoluteDirection::East => (x + front_offset, y, 0.0),
+            AbsoluteDirection::West => (x - front_offset, y, 180.0),
+        };
+        Pose {
+            x,
+            y,
+            theta: Angle::new::<degree>(theta),
         }
     }
 }
