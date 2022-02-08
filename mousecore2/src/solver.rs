@@ -28,6 +28,7 @@ impl<const W: u8> Coordinate<W> {
     // Return extended neighbors of the give coordinate.
     //
     // c: self, n: neighbor
+    // same for diagonal
     //
     // top
     // +---+-n-+
@@ -36,13 +37,13 @@ impl<const W: u8> Coordinate<W> {
     //       .
     // |   |   |
     // +---+-n-+
-    // |   |   |
-    // +---+-n-+
+    // n   |   |
+    // +-n-+-n-+
     // |   n   n
     // +---+-c-+
     // |   n   n
-    // +---+-n-+
-    // |   |   |
+    // +-n-+-n-+
+    // n   |   |
     // +---+-n-+
     // |   |   |
     //       .
@@ -54,52 +55,77 @@ impl<const W: u8> Coordinate<W> {
     // +---   ---+---+-n-+-n-+---   ---+
     // n   ...   n   n   c   n   ...   n
     // +---   ---+---+-n-+-n-+---   ---+
-    // |         |   |   |   |         |
-    // +---   ---+---+---+---+---   ---+
+    // |         |   n   |   n         |
+    // +---   ---+-n-+---+---+-n-   ---+
     fn extended_neighbors(
         &self,
         filter: impl Fn(&Coordinate<W>) -> bool,
-    ) -> Vec<Coordinate<W>, { WIDTH + 3 }> {
+    ) -> Vec<Coordinate<W>, { 6 * WIDTH }> {
         let mut neighbors = Vec::new();
         let mut add_with_check = |x, y, is_top| {
             if let Some(coord) = self.new_relative(x, y, is_top) {
                 if (filter)(&coord) {
                     neighbors.push(coord).unwrap();
-                    return true;
+                    return Some(());
                 }
             }
-            false
+            None
         };
+        macro_rules! check_seq {
+            ($f: expr) => {
+                (1..).map_while($f).for_each(|_| {});
+            };
+        }
         if self.is_top {
-            add_with_check(0, 0, false);
-            add_with_check(-1, 0, false);
-            add_with_check(0, 1, false);
-            add_with_check(-1, 1, false);
-            for dy in 1.. {
-                if !add_with_check(0, dy, true) {
-                    break;
-                }
-            }
-            for dy in 1.. {
-                if !add_with_check(0, -dy, true) {
-                    break;
-                }
-            }
+            // top right
+            check_seq!(|i| {
+                add_with_check(i - 1, i, false)?;
+                add_with_check(i, i, true)
+            });
+            // bottom left
+            check_seq!(|i: i8| {
+                add_with_check(-i, 1 - i, false)?;
+                add_with_check(-i, -i, true)
+            });
+            // top left
+            check_seq!(|i: i8| {
+                add_with_check(-i, i, false)?;
+                add_with_check(-i, i, true)
+            });
+            // bottom right
+            check_seq!(|i: i8| {
+                add_with_check(i - 1, 1 - i, false)?;
+                add_with_check(i, -i, true)
+            });
+            // top
+            check_seq!(|i| add_with_check(0, i, true));
+            // bottom
+            check_seq!(|i: i8| add_with_check(0, -i, true));
         } else {
-            add_with_check(0, 0, true);
-            add_with_check(0, -1, true);
-            add_with_check(1, 0, true);
-            add_with_check(1, -1, true);
-            for dx in 1.. {
-                if !add_with_check(dx, 0, false) {
-                    break;
-                }
-            }
-            for dx in 1.. {
-                if !add_with_check(-dx, 0, false) {
-                    break;
-                }
-            }
+            // top right
+            check_seq!(|i| {
+                add_with_check(i, i - 1, true)?;
+                add_with_check(i, i, false)
+            });
+            // bottom left
+            check_seq!(|i: i8| {
+                add_with_check(1 - i, -i, true)?;
+                add_with_check(-i, -i, false)
+            });
+            // top left
+            check_seq!(|i: i8| {
+                add_with_check(1 - i, i - 1, true)?;
+                add_with_check(-i, i, false)
+            });
+            // bottom right
+            check_seq!(|i: i8| {
+                add_with_check(i, -i, true)?;
+                add_with_check(i, -i, false)
+            });
+            // right
+            check_seq!(|i| add_with_check(i, 0, false));
+            // left
+            check_seq!(|i: i8| add_with_check(-i, 0, false));
         }
         neighbors
     }
@@ -108,52 +134,93 @@ impl<const W: u8> Coordinate<W> {
     //
     // If `self` is not a neighbor of `other`, this method panics.
     // The returned coordinates contain `self`, but do not contain `other`.
-    fn intermediate_coords(&self, other: &Self) -> Vec<Coordinate<W>, { WIDTH - 2 }> {
+    fn intermediate_coords(&self, other: &Self) -> Vec<Coordinate<W>, { 2 * WIDTH }> {
         let mut coords = Vec::new();
+        coords.push(*self).unwrap();
+
+        let mut add_with_check = |x, y, is_top| {
+            if let Some(coord) = self.new_relative(x, y, is_top) {
+                if &coord != other {
+                    coords.push(coord).unwrap();
+                    return Some(());
+                }
+            }
+            None
+        };
+        macro_rules! add_seq {
+            ($f: expr) => {
+                (1..).map_while($f).for_each(|_| {});
+            };
+        }
+
+        let dx = other.x as i8 - self.x as i8;
+        let dy = other.y as i8 - self.y as i8;
         if self.is_top {
-            if other.is_top {
-                assert_eq!(self.x, other.x);
-                assert_ne!(self.y, other.y);
-                // `self.y` inclusive
-                if self.y > other.y {
-                    (other.y + 1)..(self.y + 1)
-                } else {
-                    self.y..other.y
-                }
-                .for_each(|y| {
-                    coords
-                        .push(Coordinate::new(self.x, y, true).unwrap())
-                        .unwrap()
+            if dx >= 0 && ((!other.is_top && dx + 1 == dy) || (other.is_top && dx == dy)) {
+                // top right
+                add_seq!(|i| {
+                    add_with_check(i - 1, i, false)?;
+                    add_with_check(i, i, true)
                 });
+            } else if dx < 0 && ((!other.is_top && dx + 1 == dy) || (other.is_top && dx == dy)) {
+                // bottom left
+                add_seq!(|i: i8| {
+                    add_with_check(-i, 1 - i, false)?;
+                    add_with_check(-i, -i, true)
+                });
+            } else if dx < 0 && dx == -dy {
+                // top left
+                add_seq!(|i: i8| {
+                    add_with_check(-i, i, false)?;
+                    add_with_check(-i, i, true)
+                });
+            } else if dx >= 0 && dx == -dy {
+                // bottom right
+                add_seq!(|i: i8| {
+                    add_with_check(i - 1, 1 - i, false)?;
+                    add_with_check(i, -i, true)
+                });
+            } else if dx == 0 && dy > 0 && other.is_top {
+                // top
+                add_seq!(|i| add_with_check(0, i, true));
+            } else if dx == 0 && dy < 0 && other.is_top {
+                // bottom
+                add_seq!(|i: i8| add_with_check(0, -i, true));
             } else {
-                let dx = other.x as i8 - self.x as i8;
-                let dy = other.y as i8 - self.y as i8;
-                match (dx, dy) {
-                    (0, 0) | (-1, 0) | (-1, 1) | (0, 1) => coords.push(*self).unwrap(),
-                    _ => unreachable!(),
-                }
+                unreachable!()
             }
-        } else if other.is_top {
-            let dx = other.x as i8 - self.x as i8;
-            let dy = other.y as i8 - self.y as i8;
-            match (dx, dy) {
-                (0, 0) | (0, -1) | (1, 0) | (1, -1) => coords.push(*self).unwrap(),
-                _ => unreachable!(),
-            }
-        } else {
-            assert_ne!(self.x, other.x);
-            assert_eq!(self.y, other.y);
-            // `self.x` inclusive
-            if self.x > other.x {
-                (other.x + 1)..(self.x + 1)
-            } else {
-                self.x..other.x
-            }
-            .for_each(|x| {
-                coords
-                    .push(Coordinate::new(x, self.y, false).unwrap())
-                    .unwrap()
+        } else if dy >= 0 && ((dx == dy + 1 && other.is_top) || (dx == dy && !other.is_top)) {
+            // top right
+            add_seq!(|i| {
+                add_with_check(i, i - 1, true)?;
+                add_with_check(i, i, false)
             });
+        } else if dy < 0 && ((dx == dy + 1 && other.is_top) || (dx == dy && !other.is_top)) {
+            // bottom left
+            add_seq!(|i: i8| {
+                add_with_check(1 - i, -i, true)?;
+                add_with_check(-i, -i, false)
+            });
+        } else if dy >= 0 && dx == -dy {
+            // top left
+            add_seq!(|i: i8| {
+                add_with_check(1 - i, i - 1, true)?;
+                add_with_check(-i, i, false)
+            });
+        } else if dy < 0 && dx == -dy {
+            // bottom right
+            add_seq!(|i: i8| {
+                add_with_check(i, -i, true)?;
+                add_with_check(i, -i, false)
+            });
+        } else if dx > 0 && dy == 0 && !other.is_top {
+            // right
+            add_seq!(|i| add_with_check(i, 0, false));
+        } else if dx <= 0 && dy == 0 && !other.is_top {
+            // left
+            add_seq!(|i: i8| add_with_check(-i, 0, false));
+        } else {
+            unreachable!()
         }
         coords
     }
@@ -533,7 +600,6 @@ mod tests {
                 (3, 2, true),
                 (3, 1, true),
                 (2, 1, false),
-                (2, 1, true),
                 (1, 2, false),
                 (1, 1, true),
                 (1, 0, true),
