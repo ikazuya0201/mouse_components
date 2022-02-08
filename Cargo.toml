@@ -5,6 +5,7 @@ members = [
     "mousesim",
     "mousesim2",
     "sensors",
+    "sensors2",
 ]
 resolver = "2"
 
