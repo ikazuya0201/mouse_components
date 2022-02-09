@@ -57,26 +57,6 @@ where
     }
 }
 
-pub struct SingleTrajectory {
-    target: Option<Target>,
-}
-
-impl SingleTrajectory {
-    pub fn new(target: Target) -> Self {
-        Self {
-            target: Some(target),
-        }
-    }
-}
-
-impl Iterator for SingleTrajectory {
-    type Item = Target;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.target.take()
-    }
-}
-
 pub struct ShiftTrajectory<T> {
     pose: Pose,
     inner: T,
