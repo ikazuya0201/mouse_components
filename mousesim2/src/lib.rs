@@ -3,9 +3,9 @@
 #[allow(unused_imports)]
 use micromath::F32Ext;
 use mousecore2::{
+    control::MotorOutput,
     solver::WallState,
     state::State,
-    utils::SideData,
     wall::{Normal, Pose, PoseConverter, Walls},
 };
 use typed_builder::TypedBuilder;
@@ -20,6 +20,12 @@ use uom::si::{
     ratio::ratio,
     velocity::meter_per_second,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct EncoderOutput {
+    pub left: Length,
+    pub right: Length,
+}
 
 #[derive(TypedBuilder)]
 pub struct Simulator<const W: u8> {
@@ -100,12 +106,12 @@ impl<const W: u8> Simulator<W> {
                 * AngularVelocity::new::<radian_per_second>(self.rot_k * rot_voltage.get::<volt>())
     }
 
-    pub fn distance(&self) -> SideData<Length> {
+    pub fn distance(&self) -> EncoderOutput {
         let average_trans = self.average(&|state| {
             state.x.v * state.theta.x.value.cos() + state.y.v * state.theta.x.value.sin()
         });
         let average_rot = self.average(&|state| state.theta.v);
-        SideData {
+        EncoderOutput {
             left: (average_trans - average_rot * self.wheel_interval / 2.0) * self.period,
             right: (average_trans + average_rot * self.wheel_interval / 2.0) * self.period,
         }
@@ -130,7 +136,7 @@ impl<const W: u8> Simulator<W> {
         self.current.x.a * theta.value.cos() + self.current.y.a * theta.value.sin()
     }
 
-    pub fn apply(&mut self, voltage: &SideData<ElectricPotential>) {
+    pub fn apply(&mut self, voltage: &MotorOutput) {
         let limit = |val| {
             if val > self.max_voltage {
                 self.max_voltage

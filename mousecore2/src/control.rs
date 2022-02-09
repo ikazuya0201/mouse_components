@@ -20,7 +20,13 @@ use uom::{
     Kind,
 };
 
-use crate::{state::State, utils::SideData};
+use crate::state::State;
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct MotorOutput {
+    pub left: ElectricPotential,
+    pub right: ElectricPotential,
+}
 
 type GainType = Quantity<ISQ<Z0, Z0, N2, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
 type BType = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<f32>, f32>;
@@ -213,7 +219,7 @@ impl Controller {
         ElectricPotential::new::<volt>(vol_f + vol_p + vol_i + vol_d)
     }
 
-    pub fn control(&mut self, r: &ControlTarget, y: &ControlTarget) -> SideData<ElectricPotential> {
+    pub fn control(&mut self, r: &ControlTarget, y: &ControlTarget) -> MotorOutput {
         let vol_t = Self::control_each(
             r.v.value,
             r.a.value,
@@ -235,7 +241,7 @@ impl Controller {
         let left_motor_voltage = vol_t - vol_r;
         let right_motor_voltage = vol_t + vol_r;
 
-        SideData {
+        MotorOutput {
             left: left_motor_voltage,
             right: right_motor_voltage,
         }
