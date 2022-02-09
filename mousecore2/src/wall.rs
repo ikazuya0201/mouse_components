@@ -494,14 +494,14 @@ impl<const W: u8> Walls<W> {
             WallState::Checked { exists: true } => 3,
         };
         let index = coord.as_index();
-        let shift = (index & 3) * 2;
+        let shift = (index & 3) << 1;
         (self.0)[index >> 2] &= !(3 << shift);
         (self.0)[index >> 2] |= bit << shift;
     }
 
     pub fn wall_state(&self, wall: &Coordinate<W>) -> WallState {
         let index = wall.as_index();
-        let bit = ((self.0)[index / 4] >> ((index % 4) * 2)) & 3;
+        let bit = ((self.0)[index >> 2] >> ((index & 3) << 1)) & 3;
         match bit {
             0 => WallState::Unchecked,
             1 => WallState::Checked { exists: false },

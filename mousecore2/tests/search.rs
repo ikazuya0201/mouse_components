@@ -24,7 +24,7 @@ use uom::si::{
 
 #[test]
 fn test_search1() {
-    test_search::<16, 2>(
+    test_search::<16>(
         include_str!("../mazes/maze16_1.dat"),
         &[(7, 7, false), (7, 7, true)],
         Default::default(),
@@ -33,7 +33,7 @@ fn test_search1() {
 
 #[test]
 fn test_search2() {
-    test_search::<16, 2>(
+    test_search::<16>(
         include_str!("../mazes/maze16_2.dat"),
         &[(7, 7, false), (7, 7, true)],
         Default::default(),
@@ -42,7 +42,7 @@ fn test_search2() {
 
 #[test]
 fn test_search3() {
-    test_search::<16, 2>(
+    test_search::<16>(
         include_str!("../mazes/maze16_3.dat"),
         &[(7, 7, false), (7, 7, true)],
         Default::default(),
@@ -51,7 +51,7 @@ fn test_search3() {
 
 #[test]
 fn test_search4() {
-    test_search::<32, 2>(
+    test_search::<32>(
         include_str!("../mazes/maze32_1.dat"),
         &[(18, 14, false), (18, 14, true)],
         Default::default(),
@@ -60,7 +60,7 @@ fn test_search4() {
 
 #[test]
 fn test_search5() {
-    test_search::<32, 2>(
+    test_search::<32>(
         include_str!("../mazes/maze32_2.dat"),
         &[(7, 6, false), (7, 6, true)],
         Default::default(),
@@ -69,7 +69,7 @@ fn test_search5() {
 
 #[test]
 fn test_search_offset1() {
-    test_search::<32, 2>(
+    test_search::<32>(
         include_str!("../mazes/maze32_1.dat"),
         &[(18, 14, false), (18, 14, true)],
         Length::new::<millimeter>(10.0),
@@ -78,18 +78,14 @@ fn test_search_offset1() {
 
 #[test]
 fn test_search_offset2() {
-    test_search::<32, 2>(
+    test_search::<32>(
         include_str!("../mazes/maze32_2.dat"),
         &[(7, 6, false), (7, 6, true)],
         Length::new::<millimeter>(10.0),
     );
 }
 
-fn test_search<const W: u8, const N: usize>(
-    input: &'static str,
-    goals: &[(u8, u8, bool)],
-    front_offset: Length,
-) {
+fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8, bool)], front_offset: Length) {
     let goals = goals
         .into_iter()
         .map(|&(x, y, is_top)| Coordinate::new(x, y, is_top).unwrap())
@@ -161,7 +157,7 @@ fn test_search<const W: u8, const N: usize>(
         .build();
     let mut estimator = Estimator::builder().period(period).build();
     let mut detector = WallDetector::<W>::default();
-    let searcher = Searcher::<W, N>::new(Coordinate::new(0, 0, true).unwrap(), &goals);
+    let searcher = Searcher::<W>::new(Coordinate::new(0, 0, true).unwrap(), &goals);
 
     let square_width = Length::new::<millimeter>(90.0);
 
