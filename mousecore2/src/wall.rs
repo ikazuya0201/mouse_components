@@ -532,6 +532,14 @@ impl<const W: u8> Walls<W> {
     }
 }
 
+impl<'a, const W: u8> TryFrom<&'a [u8]> for Walls<W> {
+    type Error = <[u8; WALL_ARRAY_LEN] as TryFrom<&'a [u8]>>::Error;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into()?))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseWallsError {
     kind: ParseWallsErrorKind,
