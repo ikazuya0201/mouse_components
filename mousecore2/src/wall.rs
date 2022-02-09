@@ -59,12 +59,6 @@ pub struct WallDetector<const W: u8> {
     wall_existence_array: [[[Probability; 2]; WIDTH]; WIDTH],
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Normal<T> {
-    pub mean: T,
-    pub stddev: T,
-}
-
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
 struct Probability(f32);
 
@@ -143,7 +137,8 @@ impl<const W: u8> WallDetector<W> {
 
     pub fn detect_and_update(
         &mut self,
-        distance: &Normal<Length>,
+        &dist_mean: &Length,
+        &dist_stddev: &Length,
         pose: &Pose,
     ) -> Option<(Coordinate<W>, WallState)> {
         use uom::si::ratio::ratio;
@@ -157,13 +152,11 @@ impl<const W: u8> WallDetector<W> {
         }
 
         let exist_val = {
-            let tmp =
-                ((wall_info.existing_distance - distance.mean) / distance.stddev).get::<ratio>();
+            let tmp = ((wall_info.existing_distance - dist_mean) / dist_stddev).get::<ratio>();
             -tmp * tmp / 2.0
         };
         let not_exist_val = {
-            let tmp = ((wall_info.not_existing_distance - distance.mean) / distance.stddev)
-                .get::<ratio>();
+            let tmp = ((wall_info.not_existing_distance - dist_mean) / dist_stddev).get::<ratio>();
             -tmp * tmp / 2.0
         };
 

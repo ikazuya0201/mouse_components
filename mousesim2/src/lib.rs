@@ -6,7 +6,7 @@ use mousecore2::{
     control::MotorOutput,
     solver::WallState,
     state::State,
-    wall::{Normal, Pose, PoseConverter, Walls},
+    wall::{Pose, PoseConverter, Walls},
 };
 use typed_builder::TypedBuilder;
 use uom::si::{
@@ -25,6 +25,12 @@ use uom::si::{
 pub struct EncoderOutput {
     pub left: Length,
     pub right: Length,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct Normal<T> {
+    pub mean: T,
+    pub stddev: T,
 }
 
 #[derive(TypedBuilder)]

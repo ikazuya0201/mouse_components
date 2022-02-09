@@ -324,7 +324,9 @@ fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8, bool)], front
             };
 
             if let Some(distance) = simulator.distance_from_wall(&pose) {
-                if let Some((coord, wall_state)) = detector.detect_and_update(&distance, &pose) {
+                if let Some((coord, wall_state)) =
+                    detector.detect_and_update(&distance.mean, &distance.stddev, &pose)
+                {
                     walls.update(&coord, &wall_state);
                 }
             }
