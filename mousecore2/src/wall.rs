@@ -116,6 +116,23 @@ impl<const W: u8> WallDetector<W> {
         }
     }
 
+    pub fn with_walls(walls: &Walls<W>) -> Self {
+        let mut detector = Self::new();
+        for i in 0..W {
+            for j in 0..W {
+                for k in 0..2 {
+                    let coord = Coordinate::<W>::new(i, j, k == 0).unwrap();
+                    *detector.wall_existence_mut(&coord) = match walls.wall_state(&coord) {
+                        WallState::Unchecked => Probability::mid(),
+                        WallState::Checked { exists: true } => Probability::one(),
+                        WallState::Checked { exists: false } => Probability::zero(),
+                    };
+                }
+            }
+        }
+        detector
+    }
+
     fn wall_existence(&self, coord: &Coordinate<W>) -> &Probability {
         &self.wall_existence_array[coord.x as usize][coord.y as usize][coord.is_top as usize]
     }
@@ -512,6 +529,14 @@ impl<const W: u8> Walls<W> {
 
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl<'a, const W: u8> TryFrom<&'a [u8]> for Walls<W> {
+    type Error = <[u8; WALL_ARRAY_LEN] as TryFrom<&'a [u8]>>::Error;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into()?))
     }
 }
 
