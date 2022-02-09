@@ -31,6 +31,13 @@ impl Filter {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum NeighborKind {
+    VerticalOrHorizontal,
+    BottomLeftToTopRight,
+    TopLeftToBottomRight,
+}
+
 /// A type for coordinate in maze.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct Coordinate<const W: u8> {
@@ -88,12 +95,18 @@ impl<const W: u8> Coordinate<W> {
     fn extended_neighbors(
         &self,
         filter: impl Fn(&Coordinate<W>) -> bool,
-    ) -> Vec<Coordinate<W>, { 6 * WIDTH }> {
+        exclude: Option<NeighborKind>,
+    ) -> Vec<(Coordinate<W>, NeighborKind), { 6 * WIDTH }> {
+        use NeighborKind::*;
+
         let mut neighbors = Vec::new();
-        let mut add_with_check = |x, y, is_top| {
+        let mut add_with_check = |x, y, is_top, kind| {
+            if Some(kind) == exclude {
+                return None;
+            }
             if let Some(coord) = self.new_relative(x, y, is_top) {
                 if (filter)(&coord) {
-                    neighbors.push(coord).unwrap();
+                    neighbors.push((coord, kind)).unwrap();
                     return Some(());
                 }
             }
@@ -107,53 +120,53 @@ impl<const W: u8> Coordinate<W> {
         if self.is_top {
             // top right
             check_seq!(|i| {
-                add_with_check(i - 1, i, false)?;
-                add_with_check(i, i, true)
+                add_with_check(i - 1, i, false, BottomLeftToTopRight)?;
+                add_with_check(i, i, true, BottomLeftToTopRight)
             });
             // bottom left
             check_seq!(|i: i8| {
-                add_with_check(-i, 1 - i, false)?;
-                add_with_check(-i, -i, true)
+                add_with_check(-i, 1 - i, false, BottomLeftToTopRight)?;
+                add_with_check(-i, -i, true, BottomLeftToTopRight)
             });
             // top left
             check_seq!(|i: i8| {
-                add_with_check(-i, i, false)?;
-                add_with_check(-i, i, true)
+                add_with_check(-i, i, false, TopLeftToBottomRight)?;
+                add_with_check(-i, i, true, TopLeftToBottomRight)
             });
             // bottom right
             check_seq!(|i: i8| {
-                add_with_check(i - 1, 1 - i, false)?;
-                add_with_check(i, -i, true)
+                add_with_check(i - 1, 1 - i, false, TopLeftToBottomRight)?;
+                add_with_check(i, -i, true, TopLeftToBottomRight)
             });
             // top
-            check_seq!(|i| add_with_check(0, i, true));
+            check_seq!(|i| add_with_check(0, i, true, VerticalOrHorizontal));
             // bottom
-            check_seq!(|i: i8| add_with_check(0, -i, true));
+            check_seq!(|i: i8| add_with_check(0, -i, true, VerticalOrHorizontal));
         } else {
             // top right
             check_seq!(|i| {
-                add_with_check(i, i - 1, true)?;
-                add_with_check(i, i, false)
+                add_with_check(i, i - 1, true, BottomLeftToTopRight)?;
+                add_with_check(i, i, false, BottomLeftToTopRight)
             });
             // bottom left
             check_seq!(|i: i8| {
-                add_with_check(1 - i, -i, true)?;
-                add_with_check(-i, -i, false)
+                add_with_check(1 - i, -i, true, BottomLeftToTopRight)?;
+                add_with_check(-i, -i, false, BottomLeftToTopRight)
             });
             // top left
             check_seq!(|i: i8| {
-                add_with_check(1 - i, i - 1, true)?;
-                add_with_check(-i, i, false)
+                add_with_check(1 - i, i - 1, true, TopLeftToBottomRight)?;
+                add_with_check(-i, i, false, TopLeftToBottomRight)
             });
             // bottom right
             check_seq!(|i: i8| {
-                add_with_check(i, -i, true)?;
-                add_with_check(i, -i, false)
+                add_with_check(i, -i, true, TopLeftToBottomRight)?;
+                add_with_check(i, -i, false, TopLeftToBottomRight)
             });
             // right
-            check_seq!(|i| add_with_check(i, 0, false));
+            check_seq!(|i| add_with_check(i, 0, false, VerticalOrHorizontal));
             // left
-            check_seq!(|i: i8| add_with_check(-i, 0, false));
+            check_seq!(|i: i8| add_with_check(-i, 0, false, VerticalOrHorizontal));
         }
         neighbors
     }
@@ -244,7 +257,7 @@ impl<const W: u8> Coordinate<W> {
         } else if dx > 0 && dy == 0 && !other.is_top {
             // right
             add_seq!(|i| add_with_check(i, 0, false));
-        } else if dx <= 0 && dy == 0 && !other.is_top {
+        } else if dx < 0 && dy == 0 && !other.is_top {
             // left
             add_seq!(|i: i8| add_with_check(-i, 0, false));
         } else {
@@ -299,7 +312,6 @@ impl<const W: u8> Coordinate<W> {
         neighbors
     }
 
-    #[allow(unused)]
     fn is_neighbor(&self, other: &Self) -> bool {
         let dx = other.x as i8 - self.x as i8;
         let dy = other.y as i8 - self.y as i8;
@@ -379,23 +391,23 @@ impl<const W: u8> Searcher<W> {
 
     fn bfs_tree(
         &self,
-        wall_state: impl Fn(&Coordinate<W>) -> WallState,
+        is_wall: impl Fn(&Coordinate<W>) -> bool,
     ) -> Option<([Option<Coordinate<W>>; QUE_MAX], Coordinate<W>)> {
         let mut que = Deque::<_, QUE_MAX>::new();
         let mut prev = [None; QUE_MAX];
-        que.push_back(self.start).unwrap();
+        que.push_back((self.start, None)).unwrap();
         prev[self.start] = Some(self.start);
 
-        while let Some(node) = que.pop_front() {
-            if self.goal_filter.contains(&node) {
-                return Some((prev, node));
-            }
-            for next in node.extended_neighbors(|coord| {
-                !matches!(wall_state(coord), WallState::Checked { exists: true })
-                    && prev[*coord].is_none()
-            }) {
+        while let Some((node, kind)) = que.pop_front() {
+            for (next, kind) in node.extended_neighbors(|coord| !is_wall(coord), kind) {
+                if prev[next].is_some() {
+                    continue;
+                }
                 prev[next] = Some(node);
-                que.push_back(next).unwrap();
+                if self.goal_filter.contains(&next) {
+                    return Some((prev, next));
+                }
+                que.push_back((next, Some(kind))).unwrap();
             }
         }
         None
@@ -403,9 +415,9 @@ impl<const W: u8> Searcher<W> {
 
     pub fn shortest_path(
         &self,
-        wall_state: impl Fn(&Coordinate<W>) -> WallState,
+        is_wall: impl Fn(&Coordinate<W>) -> bool,
     ) -> Option<Vec<Coordinate<W>, QUE_MAX>> {
-        let (prev, mut cur) = self.bfs_tree(wall_state)?;
+        let (prev, mut cur) = self.bfs_tree(is_wall)?;
         let mut path = Vec::new();
         while let Some(next) = prev[cur] {
             path.push(cur).unwrap();
@@ -423,47 +435,77 @@ impl<const W: u8> Searcher<W> {
         wall_state: impl Fn(&Coordinate<W>) -> WallState,
         prev: &[Option<Coordinate<W>>],
         goal: Coordinate<W>,
-    ) -> Vec<Coordinate<W>, QUE_MAX> {
-        let mut walls = Vec::<_, QUE_MAX>::new();
+    ) -> Option<Filter> {
+        let mut filter = Filter::new();
+        let mut flag = false;
         let mut cur = goal;
         while let Some(next) = prev[cur] {
             cur.intermediate_coords(&next)
                 .into_iter()
                 .filter(|node| wall_state(node) == WallState::Unchecked)
-                .for_each(|node| walls.push(node).unwrap());
+                .for_each(|node| {
+                    flag = true;
+                    filter.set(&node);
+                });
             if next == self.start {
                 break;
             }
             cur = next;
         }
-        walls
+        if flag {
+            Some(filter)
+        } else {
+            None
+        }
     }
 
     fn candidates(
         current: &Coordinate<W>,
         wall_state: impl Fn(&Coordinate<W>) -> WallState + Copy,
-        unchecked_walls: &[Coordinate<W>],
-    ) -> Vec<Coordinate<W>, 6> {
+        unchecked_wall: impl Fn(&Coordinate<W>) -> bool,
+    ) -> Option<Vec<Coordinate<W>, 6>> {
         let mut que = Deque::<_, QUE_MAX>::new();
         let mut is_visisted = [false; QUE_MAX];
-        let mut candidates = Vec::<_, 6>::new();
-        for &wall in unchecked_walls {
-            que.push_back(wall).unwrap();
-            is_visisted[wall] = true;
+        is_visisted[*current] = true;
+        let neighbors = current.neighbors(wall_state);
+
+        let candidates = |nearest: Coordinate<W>| {
+            let mut candidates = Vec::new();
+            candidates.push(nearest).unwrap();
+            let is_near = |coord| nearest.is_neighbor(coord);
+            let is_self = |coord| &nearest == coord || current == coord;
+            neighbors
+                .iter()
+                .filter(|coord| is_near(coord) && !is_self(*coord))
+                .for_each(|coord| candidates.push(*coord).unwrap());
+            neighbors
+                .iter()
+                .filter(|coord| !is_near(coord) && !is_self(*coord))
+                .for_each(|coord| candidates.push(*coord).unwrap());
+            candidates
+        };
+
+        for (i, &next) in neighbors.iter().enumerate() {
+            if unchecked_wall(&next) {
+                return Some(candidates(next));
+            }
+            que.push_back((next, i)).unwrap();
+            is_visisted[next] = true;
         }
-        while let Some(node) = que.pop_front() {
+
+        while let Some((node, i)) = que.pop_front() {
             for next in node.neighbors(wall_state) {
-                if next == *current {
-                    candidates.push(node).unwrap();
-                }
                 if is_visisted[next] {
                     continue;
                 }
+                if unchecked_wall(&next) {
+                    return Some(candidates(neighbors[i]));
+                }
                 is_visisted[next] = true;
-                que.push_back(next).unwrap();
+                que.push_back((next, i)).unwrap();
             }
         }
-        candidates
+        None
     }
 
     pub fn search(
@@ -471,20 +513,22 @@ impl<const W: u8> Searcher<W> {
         current: &Coordinate<W>,
         wall_state: impl Fn(&Coordinate<W>) -> WallState + Copy,
     ) -> Result<Option<Commander<W>>, SearchError> {
-        let (prev, goal) = self.bfs_tree(wall_state).ok_or(SearchError::Unreachable)?;
+        let (prev, goal) = self
+            .bfs_tree(|coord| wall_state(coord) == WallState::Checked { exists: true })
+            .ok_or(SearchError::Unreachable)?;
 
-        let walls = self.unchecked_walls(wall_state, &prev, goal);
+        let walls_filter = self.unchecked_walls(wall_state, &prev, goal);
 
         // All walls between the path from start to goal are checked.
-        if walls.is_empty() {
+        if walls_filter.is_none() {
             return Ok(None);
         }
+        let walls_filter =
+            walls_filter.expect("Should never fail: `walls` have already been verified as `Some`.");
 
-        let candidates = Self::candidates(current, wall_state, &walls);
-
-        if candidates.is_empty() {
-            return Err(SearchError::Unreachable);
-        }
+        let candidates =
+            Self::candidates(current, wall_state, |coord| walls_filter.contains(coord))
+                .ok_or(SearchError::Unreachable)?;
 
         Ok(Some(Commander { candidates }))
     }
@@ -644,8 +688,7 @@ mod tests {
                 (0, 3, false),
                 (2, 3, false),
                 (3, 2, true),
-                (3, 1, true),
-                (2, 1, false),
+                (3, 0, true),
                 (1, 2, false),
                 (1, 1, true),
                 (1, 0, true),
@@ -660,7 +703,12 @@ mod tests {
             let expected = expected.into_iter().map(new_coord::<W>).collect::<Vec<_>>();
             let searcher = Searcher::<W>::new(start, &goals);
             let path = searcher
-                .shortest_path(|coord| walls.wall_state(coord))
+                .shortest_path(|coord| {
+                    matches!(
+                        walls.wall_state(coord),
+                        WallState::Checked { exists: true } | WallState::Unchecked
+                    )
+                })
                 .unwrap();
             assert_eq!(path.as_slice(), expected.as_slice());
         }
@@ -697,13 +745,19 @@ mod tests {
             for wall in unchecked_walls {
                 walls.update(&new_coord(wall), &WallState::Unchecked);
             }
-            let mut expected = expected.into_iter().map(new_coord::<W>).collect::<Vec<_>>();
-            expected.sort();
+            let expected = expected.into_iter().map(new_coord::<W>).collect::<Vec<_>>();
             let searcher = Searcher::<W>::new(start, &goals);
-            let (prev, goal) = searcher.bfs_tree(|coord| walls.wall_state(coord)).unwrap();
-            let mut walls = searcher.unchecked_walls(|coord| walls.wall_state(coord), &prev, goal);
-            walls.sort();
-            assert_eq!(walls.as_slice(), expected.as_slice());
+            let (prev, goal) = searcher
+                .bfs_tree(|coord| {
+                    matches!(walls.wall_state(coord), WallState::Checked { exists: true })
+                })
+                .unwrap();
+            let walls_filter = searcher
+                .unchecked_walls(|coord| walls.wall_state(coord), &prev, goal)
+                .unwrap();
+            assert!(expected
+                .into_iter()
+                .all(|coord| walls_filter.contains(&coord)));
         }
     }
 

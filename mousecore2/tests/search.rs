@@ -1,6 +1,9 @@
 use mousecore2::{
     control::{ControlParameters, Controller, Target, Tracker},
-    solver::{AbsoluteDirection, Commander, Coordinate, RelativeDirection, SearchState, Searcher},
+    solver::{
+        AbsoluteDirection, Commander, Coordinate, RelativeDirection, SearchState, Searcher,
+        WallState,
+    },
     state::{AngleState, Estimator, LengthState, SensorValue, State},
     trajectory::{
         slalom::{SlalomConfig, SlalomDirection, SlalomGenerator, SlalomKind},
@@ -331,7 +334,13 @@ fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8, bool)], front
     }
 
     assert_eq!(
-        searcher.shortest_path(|coord| walls.wall_state(coord)),
-        searcher.shortest_path(|coord| simulator.walls().wall_state(coord))
+        searcher.shortest_path(|coord| !matches!(
+            walls.wall_state(coord),
+            WallState::Checked { exists: false }
+        )),
+        searcher.shortest_path(|coord| !matches!(
+            simulator.walls().wall_state(coord),
+            WallState::Checked { exists: false }
+        ))
     );
 }
