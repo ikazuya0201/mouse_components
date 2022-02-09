@@ -509,6 +509,10 @@ impl<const W: u8> Walls<W> {
             _ => unreachable!(),
         }
     }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
