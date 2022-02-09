@@ -286,9 +286,9 @@ impl<const W: u8> Coordinate<W> {
     }
 }
 
-pub struct Searcher<const W: u8> {
+pub struct Searcher<const W: u8, const N: usize> {
     start: Coordinate<W>,
-    goal: Coordinate<W>,
+    goals: Vec<Coordinate<W>, N>,
 }
 
 /// State of wall.
@@ -320,9 +320,12 @@ impl<T, const W: u8> core::ops::IndexMut<Coordinate<W>> for [T] {
     }
 }
 
-impl<const W: u8> Searcher<W> {
-    pub fn new(start: Coordinate<W>, goal: Coordinate<W>) -> Self {
-        Self { start, goal }
+impl<const W: u8, const N: usize> Searcher<W, N> {
+    pub fn new(start: Coordinate<W>, goals: &[Coordinate<W>]) -> Self {
+        Self {
+            start,
+            goals: goals.iter().cloned().collect(),
+        }
     }
 
     fn bfs_tree(
@@ -335,7 +338,7 @@ impl<const W: u8> Searcher<W> {
         prev[self.start] = Some(self.start);
 
         while let Some(node) = que.pop_front() {
-            if node == self.goal {
+            if self.goals.iter().any(|&goal| goal == node) {
                 break;
             }
             for next in node.extended_neighbors(|coord| {
@@ -355,7 +358,12 @@ impl<const W: u8> Searcher<W> {
     ) -> Vec<Coordinate<W>, QUE_MAX> {
         let prev = self.bfs_tree(wall_state);
         let mut path = Vec::new();
-        let mut cur = self.goal;
+        let mut cur = self
+            .goals
+            .iter()
+            .find(|&&goal| prev[goal].is_some())
+            .cloned()
+            .unwrap();
         while let Some(next) = prev[cur] {
             path.push(cur).unwrap();
             if cur == self.start {
@@ -373,7 +381,12 @@ impl<const W: u8> Searcher<W> {
         prev: &[Option<Coordinate<W>>],
     ) -> Vec<Coordinate<W>, QUE_MAX> {
         let mut walls = Vec::<_, QUE_MAX>::new();
-        let mut cur = self.goal;
+        let mut cur = self
+            .goals
+            .iter()
+            .find(|&&goal| prev[goal].is_some())
+            .cloned()
+            .unwrap();
         while let Some(next) = prev[cur] {
             cur.intermediate_coords(&next)
                 .into_iter()
@@ -422,7 +435,7 @@ impl<const W: u8> Searcher<W> {
         let prev = self.bfs_tree(wall_state);
 
         // Unreachable to goal from start.
-        if prev[self.goal].is_none() {
+        if self.goals.iter().all(|&goal| prev[goal].is_none()) {
             return Err(SearchError::Unreachable);
         }
 
@@ -590,7 +603,7 @@ mod tests {
     fn test_shortest_path() {
         let test_cases = vec![(
             (0, 0, true),
-            (1, 0, true),
+            [(1, 0, true), (1, 0, false)],
             include_str!("../mazes/maze4_1.dat"),
             vec![
                 (0, 0, true),
@@ -607,12 +620,12 @@ mod tests {
         )];
 
         const W: u8 = 4;
-        for (start, goal, walls, expected) in test_cases {
+        for (start, goals, walls, expected) in test_cases {
             let start = new_coord(start);
-            let goal = new_coord(goal);
+            let goals = goals.map(|goal| new_coord(goal));
             let walls = walls.parse::<Walls<W>>().unwrap();
             let expected = expected.into_iter().map(new_coord::<W>).collect::<Vec<_>>();
-            let searcher = Searcher::<W>::new(start, goal);
+            let searcher = Searcher::<W, 2>::new(start, &goals);
             let path = searcher.shortest_path(|coord| walls.wall_state(coord));
             assert_eq!(path.as_slice(), expected.as_slice());
         }
@@ -622,7 +635,7 @@ mod tests {
     fn test_unchecked_wall() {
         let test_cases = vec![(
             (0, 0, true),
-            (1, 0, true),
+            [(1, 0, true), (1, 0, false)],
             include_str!("../mazes/maze4_1.dat"),
             vec![
                 (0, 1, true),
@@ -642,16 +655,16 @@ mod tests {
         )];
 
         const W: u8 = 4;
-        for (start, goal, walls, unchecked_walls, expected) in test_cases {
+        for (start, goals, walls, unchecked_walls, expected) in test_cases {
             let start = new_coord(start);
-            let goal = new_coord(goal);
+            let goals = goals.map(|goal| new_coord(goal));
             let mut walls = walls.parse::<Walls<W>>().unwrap();
             for wall in unchecked_walls {
                 walls.update(&new_coord(wall), &WallState::Unchecked);
             }
             let mut expected = expected.into_iter().map(new_coord::<W>).collect::<Vec<_>>();
             expected.sort();
-            let searcher = Searcher::<W>::new(start, goal);
+            let searcher = Searcher::<W, 2>::new(start, &goals);
             let prev = searcher.bfs_tree(|coord| walls.wall_state(coord));
             let mut walls = searcher.unchecked_walls(|coord| walls.wall_state(coord), &prev);
             walls.sort();
@@ -663,7 +676,7 @@ mod tests {
     fn test_search() {
         let test_cases = vec![(
             (0, 0, true),
-            (1, 0, true),
+            [(1, 0, true), (1, 0, false)],
             include_str!("../mazes/maze4_1.dat"),
             vec![
                 (0, 1, true),
@@ -678,16 +691,16 @@ mod tests {
         )];
 
         const W: u8 = 4;
-        for (start, goal, walls, unchecked_walls, current, expected) in test_cases {
+        for (start, goals, walls, unchecked_walls, current, expected) in test_cases {
             let start = new_coord(start);
-            let goal = new_coord(goal);
+            let goals = goals.map(|goal| new_coord(goal));
             let mut walls = walls.parse::<Walls<W>>().unwrap();
             for wall in unchecked_walls {
                 walls.update(&new_coord(wall), &WallState::Unchecked);
             }
             let current = new_coord(current);
             let expected = expected.into_iter().map(new_coord::<W>).collect::<Vec<_>>();
-            let searcher = Searcher::<W>::new(start, goal);
+            let searcher = Searcher::<W, 2>::new(start, &goals);
             let Commander { candidates } = searcher
                 .search(&current, |coord| walls.wall_state(coord))
                 .unwrap()
