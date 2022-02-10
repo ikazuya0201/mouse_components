@@ -336,7 +336,7 @@ impl<const W: u8> Coordinate<W> {
         let &Self { x, y, .. } = self;
         let x = (x as i8).checked_add(dx)?;
         let y = (y as i8).checked_add(dy)?;
-        if x.is_negative() || y.is_negative() {
+        if x.is_negative() || y.is_negative() || x >= W as i8 || y >= W as i8 {
             return None;
         }
         Some(Self {
@@ -796,5 +796,10 @@ mod tests {
                 .unwrap();
             assert_eq!(candidates.as_slice(), expected.as_slice());
         }
+    }
+
+    #[test]
+    fn test_extended_neighbors_corner1() {
+        new_coord::<4>((0, 0, true)).extended_neighbors(|_| true, None);
     }
 }
