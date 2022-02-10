@@ -587,8 +587,8 @@ pub enum RelativeDirection {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SearchState<const W: u8> {
-    pub(crate) coord: Coordinate<W>,
-    pub(crate) dir: AbsoluteDirection,
+    coord: Coordinate<W>,
+    dir: AbsoluteDirection,
 }
 
 impl<const W: u8> SearchState<W> {
