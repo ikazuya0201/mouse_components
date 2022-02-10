@@ -1,6 +1,6 @@
 use core::{num::NonZeroU16, ops::ControlFlow};
 
-use heapless::{binary_heap::Max, BinaryHeap, Vec};
+use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num_traits::{Bounded, PrimInt, Saturating, Unsigned};
 
 use crate::solve::search::Coordinate;
@@ -296,9 +296,9 @@ impl<const W: u8> Node<W> {
                 (2, 2, East) => Slalom(FastRun90, Right),
                 (2, 1, SouthEast) => Slalom(FastRun135, Right),
                 (2, 0, South) => Slalom(FastRun180, Right),
-                (-1, 2, NorthEast) => Slalom(FastRun45, Left),
-                (-2, 2, East) => Slalom(FastRun90, Left),
-                (-2, 1, SouthEast) => Slalom(FastRun135, Left),
+                (-1, 2, NorthWest) => Slalom(FastRun45, Left),
+                (-2, 2, West) => Slalom(FastRun90, Left),
+                (-2, 1, SouthWest) => Slalom(FastRun135, Left),
                 (-2, 0, South) => Slalom(FastRun180, Left),
                 _ => return None,
             },
@@ -443,7 +443,7 @@ where
 
     let mut dist = [C::max_value(); QUE_MAX];
     let mut prev = [None; QUE_MAX];
-    let mut heap = BinaryHeap::<_, Max, QUE_MAX>::new();
+    let mut heap = BinaryHeap::<_, Min, QUE_MAX>::new();
     dist[start] = C::zero();
     prev[start] = Some(start);
     heap.push(CostNode {
@@ -468,6 +468,9 @@ where
         for (next, kind) in nodet.successors(is_wall) {
             let next = NodeId::from(next);
             let cost = cost.saturating_add(into_cost(&kind));
+            if dist[next] <= cost {
+                continue;
+            }
             heap.push(CostNode { cost, node: next }).ok();
             dist[next] = cost;
             prev[next] = Some(node);
@@ -479,7 +482,8 @@ where
     let mut cur = goal;
     let mut path = Vec::new();
     while let Some(next) = prev[cur] {
-        path.push(Node::from(cur)).unwrap();
+        path.push(Node::from(cur))
+            .unwrap_or_else(|_| unreachable!("{:?}", path));
         if cur == start {
             break;
         }
