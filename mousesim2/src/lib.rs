@@ -4,8 +4,8 @@
 use micromath::F32Ext;
 use mousecore2::{
     control::MotorOutput,
-    solver::WallState,
-    state::State,
+    estimate::State,
+    solve::WallState,
     wall::{Pose, PoseConverter, Walls},
 };
 use typed_builder::TypedBuilder;
