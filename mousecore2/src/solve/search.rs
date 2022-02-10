@@ -41,14 +41,14 @@ enum NeighborKind {
 /// A type for coordinate in maze.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct Coordinate<const W: u8> {
-    pub(crate) x: u8,
-    pub(crate) y: u8,
-    pub(crate) is_top: bool,
+    x: u8,
+    y: u8,
+    is_top: bool,
 }
 
 impl<const W: u8> Coordinate<W> {
     pub fn new(x: u8, y: u8, is_top: bool) -> Option<Self> {
-        if x >= W || y >= W {
+        if x >= W || y >= W || !W.is_power_of_two() {
             return None;
         }
         Some(Self { x, y, is_top })
@@ -58,6 +58,18 @@ impl<const W: u8> Coordinate<W> {
         ((self.y as usize) << (W.trailing_zeros() + 1))
             | ((self.x as usize) << 1)
             | self.is_top as usize
+    }
+
+    pub(crate) fn x(&self) -> u8 {
+        self.x
+    }
+
+    pub(crate) fn y(&self) -> u8 {
+        self.y
+    }
+
+    pub(crate) fn is_top(&self) -> bool {
+        self.is_top
     }
 
     // Return extended neighbors of the give coordinate.
