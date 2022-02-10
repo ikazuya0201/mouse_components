@@ -88,6 +88,18 @@ impl<const W: u8> Node<W> {
         }
     }
 
+    pub fn x(&self) -> u8 {
+        self.coord.x
+    }
+
+    pub fn y(&self) -> u8 {
+        self.coord.y
+    }
+
+    pub fn direction(&self) -> AbsoluteDirection {
+        self.dir
+    }
+
     fn as_index(&self) -> usize {
         use AbsoluteDirection::*;
 

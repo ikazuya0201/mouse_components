@@ -9,7 +9,10 @@ use uom::si::{
     length::meter,
 };
 
-use crate::solve::search::{AbsoluteDirection, Coordinate, SearchState, WallState};
+use crate::solve::{
+    run::Node,
+    search::{AbsoluteDirection, Coordinate, SearchState, WallState},
+};
 use crate::WIDTH;
 
 pub struct WallInfo<const W: u8> {
@@ -61,6 +64,24 @@ impl Pose {
             x,
             y,
             theta: Angle::new::<degree>(theta),
+        }
+    }
+
+    pub fn from_node<const W: u8>(value: Node<W>, square_width: Length) -> Self {
+        use crate::solve::run::AbsoluteDirection::*;
+        Pose {
+            x: value.x() as f32 * square_width / 2.0,
+            y: value.y() as f32 * square_width / 2.0,
+            theta: Angle::new::<degree>(match value.direction() {
+                North => 90.0,
+                NorthEast => 45.0,
+                East => 0.0,
+                SouthEast => -45.0,
+                South => -90.0,
+                SouthWest => -135.0,
+                West => 180.0,
+                NorthWest => 135.0,
+            }),
         }
     }
 }
