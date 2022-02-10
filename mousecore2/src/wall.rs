@@ -9,7 +9,7 @@ use uom::si::{
     length::meter,
 };
 
-use crate::solver::{AbsoluteDirection, Coordinate, SearchState, WallState};
+use crate::solve::{AbsoluteDirection, Coordinate, SearchState, WallState};
 use crate::WIDTH;
 
 pub struct WallInfo<const W: u8> {

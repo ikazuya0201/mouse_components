@@ -20,7 +20,7 @@ use uom::{
     Kind,
 };
 
-use crate::state::State;
+use crate::estimate::State;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct MotorOutput {
