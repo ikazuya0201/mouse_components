@@ -1,3 +1,5 @@
+use core::ops::ControlFlow;
+
 use heapless::{Deque, Vec};
 use serde::{Deserialize, Serialize};
 
@@ -114,19 +116,19 @@ impl<const W: u8> Coordinate<W> {
         let mut neighbors = Vec::new();
         let mut add_with_check = |x, y, is_top, kind| {
             if Some(kind) == exclude {
-                return None;
+                return ControlFlow::Break(());
             }
             if let Some(coord) = self.new_relative(x, y, is_top) {
                 if (filter)(&coord) {
                     neighbors.push((coord, kind)).unwrap();
-                    return Some(());
+                    return ControlFlow::Continue(());
                 }
             }
-            None
+            ControlFlow::Break(())
         };
         macro_rules! check_seq {
             ($f: expr) => {
-                (1..).map_while($f).for_each(|_| {});
+                (1..).try_for_each($f);
             };
         }
         if self.is_top {
@@ -195,14 +197,14 @@ impl<const W: u8> Coordinate<W> {
             if let Some(coord) = self.new_relative(x, y, is_top) {
                 if &coord != other {
                     coords.push(coord).unwrap();
-                    return Some(());
+                    return ControlFlow::Continue(());
                 }
             }
-            None
+            ControlFlow::Break(())
         };
         macro_rules! add_seq {
             ($f: expr) => {
-                (1..).map_while($f).for_each(|_| {});
+                (1..).try_for_each($f);
             };
         }
 
