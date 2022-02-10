@@ -1,7 +1,7 @@
 use mousecore2::{
     control::{ControlParameters, Controller, Target, Tracker},
     estimate::{AngleState, Estimator, LengthState, SensorValue, State},
-    solve::{
+    solve::search::{
         AbsoluteDirection, Commander, Coordinate, RelativeDirection, SearchState, Searcher,
         WallState,
     },
