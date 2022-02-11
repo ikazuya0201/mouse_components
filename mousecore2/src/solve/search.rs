@@ -61,14 +61,6 @@ impl<const W: u8> Coordinate<W> {
             | (self.y & 1) as usize
     }
 
-    pub(crate) fn xh(&self) -> u8 {
-        self.x >> 1
-    }
-
-    pub(crate) fn yh(&self) -> u8 {
-        self.y >> 1
-    }
-
     pub(crate) fn is_top(&self) -> bool {
         self.y & 1 == 1
     }
@@ -219,20 +211,16 @@ impl<const W: u8> Coordinate<W> {
                 }
             }
         };
+        add_with_check(1, -1);
+        add_with_check(-1, -1);
+        add_with_check(-1, 1);
+        add_with_check(1, 1);
         if self.is_top() {
-            add_with_check(1, -1);
             add_with_check(0, -2);
-            add_with_check(-1, -1);
-            add_with_check(-1, 1);
-            add_with_check(1, 1);
             add_with_check(0, 2);
         } else {
-            add_with_check(-1, 1);
             add_with_check(-2, 0);
-            add_with_check(-1, -1);
-            add_with_check(1, -1);
             add_with_check(2, 0);
-            add_with_check(1, 1);
         }
         neighbors
     }
@@ -240,21 +228,9 @@ impl<const W: u8> Coordinate<W> {
     fn is_neighbor(&self, other: &Self) -> bool {
         let dx = other.x as i8 - self.x as i8;
         let dy = other.y as i8 - self.y as i8;
-        matches!(
-            (dx, dy, self.is_top(), other.is_top()),
-            (0, 0, true, false)
-                | (0, -1, true, true)
-                | (-1, 0, true, false)
-                | (-1, 1, true, false)
-                | (0, 1, true, false)
-                | (0, 1, true, true)
-                | (0, 0, false, true)
-                | (-1, 0, false, false)
-                | (0, -1, false, true)
-                | (1, -1, false, true)
-                | (1, 0, false, false)
-                | (1, 0, false, true)
-        )
+        (self.is_top() && matches!((dx, dy), (0, -2) | (0, 2)))
+            || (!self.is_top() && matches!((dx, dy), (-2, 0) | (2, 0)))
+            || matches!((dx, dy), (1, -1) | (-1, -1) | (-1, 1) | (1, 1))
     }
 
     fn new_relative(&self, dx: i8, dy: i8) -> Option<Self> {
@@ -512,77 +488,67 @@ impl<const W: u8> SearchState<W> {
         }
     }
 
-    pub fn coordinate(&self) -> &Coordinate<W> {
-        &self.coord
+    pub fn coordinate(&self) -> Coordinate<W> {
+        self.coord
     }
 
-    pub fn direction(&self) -> &AbsoluteDirection {
-        &self.dir
+    pub(crate) fn x(&self) -> u8 {
+        self.coord.x
+    }
+
+    pub(crate) fn y(&self) -> u8 {
+        self.coord.y
+    }
+
+    pub(crate) fn direction(&self) -> AbsoluteDirection {
+        self.dir
     }
 }
 
 impl<const W: u8> SearchState<W> {
     pub fn update(&mut self, next_coord: &Coordinate<W>) -> Option<RelativeDirection> {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+
         let SearchState {
             coord: cur_coord,
             dir: cur_dir,
         } = &self;
+        let dx = next_coord.x as i8 - cur_coord.x as i8;
+        let dy = next_coord.y as i8 - cur_coord.y as i8;
+
         let (abs, rel) = match (cur_coord.is_top(), cur_dir) {
-            (true, AbsoluteDirection::North) => match (
-                next_coord.is_top(),
-                next_coord.xh() as i8 - cur_coord.xh() as i8,
-                next_coord.yh() as i8 - cur_coord.yh() as i8,
-            ) {
-                (true, 0, 1) => (AbsoluteDirection::North, RelativeDirection::Front),
-                (false, 0, 1) => (AbsoluteDirection::East, RelativeDirection::Right),
-                (false, -1, 1) => (AbsoluteDirection::West, RelativeDirection::Left),
-                (true, 0, -1) | (false, -1, 0) | (false, 0, 0) => {
-                    (AbsoluteDirection::South, RelativeDirection::Back)
-                }
+            (true, North) => match (dx, dy) {
+                (0, 2) => (North, Front),
+                (1, 1) => (East, Right),
+                (-1, 1) => (West, Left),
+                (0, -2) | (1, -1) | (-1, -1) => (South, Back),
                 _ => return None,
             },
-            (true, AbsoluteDirection::South) => match (
-                next_coord.is_top(),
-                next_coord.xh() as i8 - cur_coord.xh() as i8,
-                next_coord.yh() as i8 - cur_coord.yh() as i8,
-            ) {
-                (true, 0, -1) => (AbsoluteDirection::South, RelativeDirection::Front),
-                (false, 0, 0) => (AbsoluteDirection::East, RelativeDirection::Left),
-                (false, -1, 0) => (AbsoluteDirection::West, RelativeDirection::Right),
-                (true, 0, 1) | (false, -1, 1) | (false, 0, 1) => {
-                    (AbsoluteDirection::North, RelativeDirection::Back)
-                }
+            (true, South) => match (dx, dy) {
+                (0, -2) => (South, Front),
+                (1, -1) => (East, Left),
+                (-1, -1) => (West, Right),
+                (0, 2) | (1, 1) | (-1, 1) => (North, Back),
                 _ => return None,
             },
-            (false, AbsoluteDirection::East) => match (
-                next_coord.is_top(),
-                next_coord.xh() as i8 - cur_coord.xh() as i8,
-                next_coord.yh() as i8 - cur_coord.yh() as i8,
-            ) {
-                (false, 1, 0) => (AbsoluteDirection::East, RelativeDirection::Front),
-                (true, 1, 0) => (AbsoluteDirection::North, RelativeDirection::Left),
-                (true, 1, -1) => (AbsoluteDirection::South, RelativeDirection::Right),
-                (true, 0, 0) | (true, 0, -1) | (false, -1, 0) => {
-                    (AbsoluteDirection::West, RelativeDirection::Back)
-                }
+            (false, East) => match (dx, dy) {
+                (2, 0) => (East, Front),
+                (1, -1) => (South, Right),
+                (1, 1) => (North, Left),
+                (-2, 0) | (-1, -1) | (-1, 1) => (West, Back),
                 _ => return None,
             },
-            (false, AbsoluteDirection::West) => match (
-                next_coord.is_top(),
-                next_coord.xh() as i8 - cur_coord.xh() as i8,
-                next_coord.yh() as i8 - cur_coord.yh() as i8,
-            ) {
-                (false, -1, 0) => (AbsoluteDirection::West, RelativeDirection::Front),
-                (true, 0, -1) => (AbsoluteDirection::South, RelativeDirection::Left),
-                (true, 0, 0) => (AbsoluteDirection::North, RelativeDirection::Right),
-                (true, 1, 0) | (true, 1, -1) | (false, 1, 0) => {
-                    (AbsoluteDirection::East, RelativeDirection::Back)
-                }
+            (false, West) => match (dx, dy) {
+                (-2, 0) => (West, Front),
+                (-1, -1) => (South, Left),
+                (-1, 1) => (North, Right),
+                (2, 0) | (1, -1) | (1, 1) => (East, Back),
                 _ => return None,
             },
             _ => unreachable!(),
         };
-        if rel != RelativeDirection::Back {
+        if rel != Back {
             self.coord = *next_coord;
         }
         self.dir = abs;
