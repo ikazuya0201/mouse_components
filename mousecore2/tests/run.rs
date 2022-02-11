@@ -200,7 +200,7 @@ fn test_run<const W: u8>(input: &'static str, goals: &[(u8, u8, Posture)]) {
         trajectories.push_back(trajectory);
     }
 
-    let vol_th = ElectricPotential::new::<volt>(10.0);
+    let vol_th = ElectricPotential::new::<volt>(4.0);
 
     loop {
         // estimate

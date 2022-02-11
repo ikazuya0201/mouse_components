@@ -57,8 +57,8 @@ impl Pose {
     pub fn from_node<const W: u8>(value: Node<W>, square_width: Length) -> Self {
         use crate::solve::run::Posture::*;
         Pose {
-            x: value.x() as f32 * square_width / 2.0,
-            y: value.y() as f32 * square_width / 2.0,
+            x: (value.x() + 1) as f32 * square_width / 2.0,
+            y: (value.y() + 1) as f32 * square_width / 2.0,
             theta: Angle::new::<degree>(match value.posture() {
                 North => 90.0,
                 NorthEast => 45.0,
