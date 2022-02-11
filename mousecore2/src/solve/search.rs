@@ -507,66 +507,48 @@ impl<const W: u8> SearchState<W> {
 
 impl<const W: u8> SearchState<W> {
     pub fn update(&mut self, next_coord: &Coordinate<W>) -> Option<RelativeDirection> {
+        use AbsoluteDirection::*;
+        use RelativeDirection::*;
+
         let SearchState {
             coord: cur_coord,
             dir: cur_dir,
         } = &self;
+        let dx = next_coord.x as i8 - cur_coord.x as i8;
+        let dy = next_coord.y as i8 - cur_coord.y as i8;
+
         let (abs, rel) = match (cur_coord.is_top(), cur_dir) {
-            (true, AbsoluteDirection::North) => match (
-                next_coord.is_top(),
-                next_coord.xh() as i8 - cur_coord.xh() as i8,
-                next_coord.yh() as i8 - cur_coord.yh() as i8,
-            ) {
-                (true, 0, 1) => (AbsoluteDirection::North, RelativeDirection::Front),
-                (false, 0, 1) => (AbsoluteDirection::East, RelativeDirection::Right),
-                (false, -1, 1) => (AbsoluteDirection::West, RelativeDirection::Left),
-                (true, 0, -1) | (false, -1, 0) | (false, 0, 0) => {
-                    (AbsoluteDirection::South, RelativeDirection::Back)
-                }
+            (true, North) => match (dx, dy) {
+                (0, 2) => (North, Front),
+                (1, 1) => (East, Right),
+                (-1, 1) => (West, Left),
+                (0, -2) | (1, -1) | (-1, -1) => (South, Back),
                 _ => return None,
             },
-            (true, AbsoluteDirection::South) => match (
-                next_coord.is_top(),
-                next_coord.xh() as i8 - cur_coord.xh() as i8,
-                next_coord.yh() as i8 - cur_coord.yh() as i8,
-            ) {
-                (true, 0, -1) => (AbsoluteDirection::South, RelativeDirection::Front),
-                (false, 0, 0) => (AbsoluteDirection::East, RelativeDirection::Left),
-                (false, -1, 0) => (AbsoluteDirection::West, RelativeDirection::Right),
-                (true, 0, 1) | (false, -1, 1) | (false, 0, 1) => {
-                    (AbsoluteDirection::North, RelativeDirection::Back)
-                }
+            (true, South) => match (dx, dy) {
+                (0, -2) => (South, Front),
+                (1, -1) => (East, Left),
+                (-1, -1) => (West, Right),
+                (0, 2) | (1, 1) | (-1, 1) => (North, Back),
                 _ => return None,
             },
-            (false, AbsoluteDirection::East) => match (
-                next_coord.is_top(),
-                next_coord.xh() as i8 - cur_coord.xh() as i8,
-                next_coord.yh() as i8 - cur_coord.yh() as i8,
-            ) {
-                (false, 1, 0) => (AbsoluteDirection::East, RelativeDirection::Front),
-                (true, 1, 0) => (AbsoluteDirection::North, RelativeDirection::Left),
-                (true, 1, -1) => (AbsoluteDirection::South, RelativeDirection::Right),
-                (true, 0, 0) | (true, 0, -1) | (false, -1, 0) => {
-                    (AbsoluteDirection::West, RelativeDirection::Back)
-                }
+            (false, East) => match (dx, dy) {
+                (2, 0) => (East, Front),
+                (1, -1) => (South, Right),
+                (1, 1) => (North, Left),
+                (-2, 0) | (-1, -1) | (-1, 1) => (West, Back),
                 _ => return None,
             },
-            (false, AbsoluteDirection::West) => match (
-                next_coord.is_top(),
-                next_coord.xh() as i8 - cur_coord.xh() as i8,
-                next_coord.yh() as i8 - cur_coord.yh() as i8,
-            ) {
-                (false, -1, 0) => (AbsoluteDirection::West, RelativeDirection::Front),
-                (true, 0, -1) => (AbsoluteDirection::South, RelativeDirection::Left),
-                (true, 0, 0) => (AbsoluteDirection::North, RelativeDirection::Right),
-                (true, 1, 0) | (true, 1, -1) | (false, 1, 0) => {
-                    (AbsoluteDirection::East, RelativeDirection::Back)
-                }
+            (false, West) => match (dx, dy) {
+                (-2, 0) => (West, Front),
+                (-1, -1) => (South, Left),
+                (-1, 1) => (North, Right),
+                (2, 0) | (1, -1) | (1, 1) => (East, Back),
                 _ => return None,
             },
             _ => unreachable!(),
         };
-        if rel != RelativeDirection::Back {
+        if rel != Back {
             self.coord = *next_coord;
         }
         self.dir = abs;
