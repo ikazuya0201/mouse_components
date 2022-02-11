@@ -35,7 +35,7 @@ impl Pose {
         front_offset: Length,
     ) -> Self {
         let (x, y) = (
-            (2.0 * (value.coordinate().x() as f32)
+            (2.0 * (value.coordinate().xh() as f32)
                 + 1.0
                 + if value.coordinate().is_top() {
                     0.0
@@ -44,7 +44,7 @@ impl Pose {
                 })
                 * square_width
                 / 2.0,
-            (2.0 * (value.coordinate().y() as f32)
+            (2.0 * (value.coordinate().yh() as f32)
                 + 1.0
                 + if value.coordinate().is_top() {
                     1.0
@@ -86,10 +86,12 @@ impl Pose {
     }
 }
 
+const EXISTENCE_ARRAY_LEN: usize = WIDTH * WIDTH * 2;
+
 #[derive(Debug)]
 pub struct WallDetector<const W: u8> {
     converter: PoseConverter<W>,
-    wall_existence_array: [[[Probability; 2]; WIDTH]; WIDTH],
+    wall_existence_array: [Probability; EXISTENCE_ARRAY_LEN],
 }
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
@@ -139,7 +141,7 @@ impl<const W: u8> WallDetector<W> {
     pub fn new() -> Self {
         Self {
             converter: PoseConverter::default(),
-            wall_existence_array: [[[Probability::mid(); 2]; WIDTH]; WIDTH],
+            wall_existence_array: [Probability::mid(); EXISTENCE_ARRAY_LEN],
         }
     }
 
@@ -148,7 +150,8 @@ impl<const W: u8> WallDetector<W> {
         for i in 0..W {
             for j in 0..W {
                 for k in 0..2 {
-                    let coord = Coordinate::<W>::new(i, j, k == 0).unwrap();
+                    let coord =
+                        Coordinate::<W>::new((i << 1) | ((1 + k) & 1), (j << 1) | k).unwrap();
                     *detector.wall_existence_mut(&coord) = match walls.wall_state(&coord) {
                         WallState::Unchecked => Probability::mid(),
                         WallState::Checked { exists: true } => Probability::one(),
@@ -161,12 +164,11 @@ impl<const W: u8> WallDetector<W> {
     }
 
     fn wall_existence(&self, coord: &Coordinate<W>) -> &Probability {
-        &self.wall_existence_array[coord.x() as usize][coord.y() as usize][coord.is_top() as usize]
+        &self.wall_existence_array[coord.as_index()]
     }
 
     fn wall_existence_mut(&mut self, coord: &Coordinate<W>) -> &mut Probability {
-        &mut self.wall_existence_array[coord.x() as usize][coord.y() as usize]
-            [coord.is_top() as usize]
+        &mut self.wall_existence_array[coord.as_index()]
     }
 
     pub fn detect_and_update(
@@ -443,25 +445,25 @@ impl<const W: u8> PoseConverter<W> {
                 if x_quo < 0 || y_quo < 0 {
                     return None;
                 }
-                Coordinate::new(x_quo as u8, y_quo as u8, false)
+                Coordinate::new(((x_quo as u8) << 1) | 1, (y_quo as u8) << 1)
             }
             Left => {
                 if x_quo < 1 || y_quo < 0 {
                     return None;
                 }
-                Coordinate::new((x_quo - 1) as u8, y_quo as u8, false)
+                Coordinate::new((((x_quo - 1) as u8) << 1) | 1, (y_quo as u8) << 1)
             }
             Top => {
                 if x_quo < 0 || y_quo < 0 {
                     return None;
                 }
-                Coordinate::new(x_quo as u8, y_quo as u8, true)
+                Coordinate::new((x_quo as u8) << 1, ((y_quo as u8) << 1) | 1)
             }
             Bottom => {
                 if x_quo < 0 || y_quo < 1 {
                     return None;
                 }
-                Coordinate::new(x_quo as u8, (y_quo - 1) as u8, true)
+                Coordinate::new((x_quo as u8) << 1, (((y_quo - 1) as u8) << 1) | 1)
             }
         }?;
 
@@ -496,20 +498,20 @@ impl<const W: u8> Walls<W> {
         let mut walls = Self([0; WALL_ARRAY_LEN]);
         for i in 0..W {
             walls.update(
-                &Coordinate::new(W - 1, i, false).unwrap(),
+                &Coordinate::new(((W - 1) << 1) | 1, i << 1).unwrap(),
                 &WallState::Checked { exists: true },
             );
             walls.update(
-                &Coordinate::new(i, W - 1, true).unwrap(),
+                &Coordinate::new(i << 1, ((W - 1) << 1) | 1).unwrap(),
                 &WallState::Checked { exists: true },
             );
         }
         walls.update(
-            &Coordinate::new(0, 0, false).unwrap(),
+            &Coordinate::new(1, 0).unwrap(),
             &WallState::Checked { exists: true },
         );
         walls.update(
-            &Coordinate::new(0, 0, true).unwrap(),
+            &Coordinate::new(0, 1).unwrap(),
             &WallState::Checked { exists: false },
         );
         walls
@@ -607,9 +609,9 @@ impl<const W: u8> core::str::FromStr for Walls<W> {
     // TODO: validation
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut walls = Self::new();
-        let mut update = |x, y, is_top, exists| {
+        let mut update = |x, y, exists| {
             walls.update(
-                &Coordinate::new(x, y, is_top).unwrap(),
+                &Coordinate::new(x, y).unwrap(),
                 &WallState::Checked { exists },
             );
         };
@@ -638,9 +640,11 @@ impl<const W: u8> core::str::FromStr for Walls<W> {
                         check(s, "+", 1, y as usize, x as usize)?;
                         s = &s[1..];
                     }
+                    let xt = x << 1;
+                    let yt = ((W - (y >> 1) - 1) << 1) | 1;
                     match s.get(..4) {
-                        Some("---+") => update(x, W - y / 2 - 1, true, true),
-                        Some("   +") => update(x, W - y / 2 - 1, true, false),
+                        Some("---+") => update(xt, yt, true),
+                        Some("   +") => update(xt, yt, false),
                         _ => {
                             return Err(ParseWallsError::new_two(
                                 ["---+", "   +"],
@@ -655,9 +659,11 @@ impl<const W: u8> core::str::FromStr for Walls<W> {
                         check(s, "|", 1, y as usize, x as usize)?;
                         s = &s[1..];
                     }
+                    let xt = (x << 1) | 1;
+                    let yt = (W - (y >> 1) - 1) << 1;
                     match s.get(..4) {
-                        Some("   |") => update(x, W - y / 2 - 1, false, true),
-                        Some("    ") => update(x, W - y / 2 - 1, false, false),
+                        Some("   |") => update(xt, yt, true),
+                        Some("    ") => update(xt, yt, false),
                         _ => {
                             return Err(ParseWallsError::new_two(
                                 ["   |", "    "],
@@ -676,15 +682,15 @@ impl<const W: u8> core::str::FromStr for Walls<W> {
 
 impl<const W: u8> fmt::Display for Walls<W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let exists = |x, y, is_top| {
+        let exists = |x, y| {
             matches!(
-                self.wall_state(&Coordinate::new(x, y, is_top).unwrap()),
+                self.wall_state(&Coordinate::new(x, y).unwrap()),
                 WallState::Checked { exists: true }
             )
         };
         for y in (0..W).rev() {
             for x in 0..W {
-                if exists(x, y, true) {
+                if exists(x << 1, (y << 1) | 1) {
                     write!(f, "+---")?;
                 } else {
                     write!(f, "+   ")?;
@@ -694,7 +700,7 @@ impl<const W: u8> fmt::Display for Walls<W> {
 
             write!(f, "|")?;
             for x in 0..W {
-                if exists(x, y, false) {
+                if exists((x << 1) | 1, y << 1) {
                     write!(f, "   |")?;
                 } else {
                     write!(f, "    ")?;
@@ -730,9 +736,9 @@ mod tests {
                     theta: Angle::new::<degree>(input.2),
                 };
                 let expected = WallInfo {
-                    coord: Coordinate::<$size>::new(expected.0, expected.1, expected.2).unwrap(),
-                    existing_distance: Length::new::<meter>(expected.3),
-                    not_existing_distance: Length::new::<meter>(expected.4),
+                    coord: Coordinate::<$size>::new(expected.0, expected.1).unwrap(),
+                    existing_distance: Length::new::<meter>(expected.2),
+                    not_existing_distance: Length::new::<meter>(expected.3),
                 };
 
                 let converter = PoseConverter::<$size>::new(
@@ -780,37 +786,37 @@ mod tests {
     define_convert_ok_test! (
     convert_ok_test1: (4, (
         (0.045, 0.045, 0.0),
-        (0, 0, false, 0.042, 0.132),
+        (1, 0, 0.042, 0.132),
     )));
     define_convert_ok_test! (
     convert_ok_test2: (4, (
         (0.077, 0.045, 45.0),
-        (0, 0, false, 2.0f32.sqrt() * 0.01, 2.0f32.sqrt() * 0.042),
+        (1, 0, 2.0f32.sqrt() * 0.01, 2.0f32.sqrt() * 0.042),
     )));
     define_convert_ok_test! (
     convert_ok_test3: (4, (
         (0.135, 0.045, 180.0),
-        (0, 0, false, 0.042, 0.132),
+        (1, 0, 0.042, 0.132),
     )));
     define_convert_ok_test! (
     convert_ok_test4: (4, (
         (0.045, 0.135, 270.0),
-        (0, 0, true, 0.042, 0.132),
+        (0, 1, 0.042, 0.132),
     )));
     define_convert_ok_test! (
     convert_ok_test5: (4, (
         (0.135, 0.135, 90.0),
-        (1, 1, true, 0.042, 0.132),
+        (2, 3, 0.042, 0.132),
     )));
     define_convert_ok_test! (
     convert_ok_test6: (4, (
         (0.135, 0.135, 180.0),
-        (0, 1, false, 0.042, 0.132),
+        (1, 2, 0.042, 0.132),
     )));
     define_convert_ok_test! (
     convert_ok_test7: (4, (
         (0.045, 0.135, 0.0),
-        (0, 1, false, 0.042, 0.132),
+        (1, 2, 0.042, 0.132),
     )));
 
     define_convert_err_test!(convert_err_test1: (4, (0.0, 0.0, 0.0)));
@@ -830,19 +836,19 @@ mod tests {
     fn test_simple_display() {
         let mut walls = Walls::<4>::new();
         let vec = vec![
-            (0, 0, false),
-            (0, 1, false),
-            (0, 2, false),
-            (1, 2, true),
-            (2, 2, true),
-            (2, 2, false),
-            (1, 1, false),
-            (2, 0, false),
-            (2, 0, true),
+            (1, 0),
+            (1, 2),
+            (1, 4),
+            (2, 5),
+            (4, 5),
+            (5, 4),
+            (3, 2),
+            (5, 0),
+            (4, 1),
         ];
-        for (x, y, is_top) in vec {
+        for (x, y) in vec {
             walls.update(
-                &Coordinate::new(x, y, is_top).unwrap(),
+                &Coordinate::new(x, y).unwrap(),
                 &WallState::Checked { exists: true },
             );
         }

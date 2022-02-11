@@ -45,33 +45,32 @@ enum NeighborKind {
 pub struct Coordinate<const W: u8> {
     x: u8,
     y: u8,
-    is_top: bool,
 }
 
 impl<const W: u8> Coordinate<W> {
-    pub fn new(x: u8, y: u8, is_top: bool) -> Option<Self> {
-        if x >= W || y >= W || !W.is_power_of_two() {
+    pub fn new(x: u8, y: u8) -> Option<Self> {
+        if !W.is_power_of_two() || x >= (W << 1) || y >= (W << 1) || (x ^ y) & 1 == 0 {
             return None;
         }
-        Some(Self { x, y, is_top })
+        Some(Self { x, y })
     }
 
-    pub fn as_index(&self) -> usize {
-        ((self.y as usize) << (W.trailing_zeros() + 1))
-            | ((self.x as usize) << 1)
-            | self.is_top as usize
+    pub(crate) fn as_index(&self) -> usize {
+        (((self.y as usize) >> 1) << (W.trailing_zeros() + 1))
+            | (((self.x as usize) >> 1) << 1)
+            | (self.y & 1) as usize
     }
 
-    pub(crate) fn x(&self) -> u8 {
-        self.x
+    pub(crate) fn xh(&self) -> u8 {
+        self.x >> 1
     }
 
-    pub(crate) fn y(&self) -> u8 {
-        self.y
+    pub(crate) fn yh(&self) -> u8 {
+        self.y >> 1
     }
 
     pub(crate) fn is_top(&self) -> bool {
-        self.is_top
+        self.y & 1 == 1
     }
 
     // Return extended neighbors of the give coordinate.
@@ -114,11 +113,11 @@ impl<const W: u8> Coordinate<W> {
         use NeighborKind::*;
 
         let mut neighbors = Vec::new();
-        let mut add_with_check = |x, y, is_top, kind| {
+        let mut add_with_check = |x, y, kind| {
             if Some(kind) == exclude {
                 return ControlFlow::Break(());
             }
-            if let Some(coord) = self.new_relative(x, y, is_top) {
+            if let Some(coord) = self.new_relative(x, y) {
                 if (filter)(&coord) {
                     neighbors.push((coord, kind)).unwrap();
                     return ControlFlow::Continue(());
@@ -126,61 +125,21 @@ impl<const W: u8> Coordinate<W> {
             }
             ControlFlow::Break(())
         };
-        macro_rules! check_seq {
+        macro_rules! add_seq {
             ($f: expr) => {
                 (1..).try_for_each($f);
             };
         }
-        if self.is_top {
-            // top right
-            check_seq!(|i| {
-                add_with_check(i - 1, i, false, BottomLeftToTopRight)?;
-                add_with_check(i, i, true, BottomLeftToTopRight)
-            });
-            // bottom left
-            check_seq!(|i: i8| {
-                add_with_check(-i, 1 - i, false, BottomLeftToTopRight)?;
-                add_with_check(-i, -i, true, BottomLeftToTopRight)
-            });
-            // top left
-            check_seq!(|i: i8| {
-                add_with_check(-i, i, false, TopLeftToBottomRight)?;
-                add_with_check(-i, i, true, TopLeftToBottomRight)
-            });
-            // bottom right
-            check_seq!(|i: i8| {
-                add_with_check(i - 1, 1 - i, false, TopLeftToBottomRight)?;
-                add_with_check(i, -i, true, TopLeftToBottomRight)
-            });
-            // top
-            check_seq!(|i| add_with_check(0, i, true, VerticalOrHorizontal));
-            // bottom
-            check_seq!(|i: i8| add_with_check(0, -i, true, VerticalOrHorizontal));
+        add_seq!(|i| add_with_check(i, i, BottomLeftToTopRight));
+        add_seq!(|i| add_with_check(-i, -i, BottomLeftToTopRight));
+        add_seq!(|i| add_with_check(-i, i, TopLeftToBottomRight));
+        add_seq!(|i| add_with_check(i, -i, TopLeftToBottomRight));
+        if self.is_top() {
+            add_seq!(|i| add_with_check(0, 2 * i, VerticalOrHorizontal));
+            add_seq!(|i| add_with_check(0, -2 * i, VerticalOrHorizontal));
         } else {
-            // top right
-            check_seq!(|i| {
-                add_with_check(i, i - 1, true, BottomLeftToTopRight)?;
-                add_with_check(i, i, false, BottomLeftToTopRight)
-            });
-            // bottom left
-            check_seq!(|i: i8| {
-                add_with_check(1 - i, -i, true, BottomLeftToTopRight)?;
-                add_with_check(-i, -i, false, BottomLeftToTopRight)
-            });
-            // top left
-            check_seq!(|i: i8| {
-                add_with_check(1 - i, i - 1, true, TopLeftToBottomRight)?;
-                add_with_check(-i, i, false, TopLeftToBottomRight)
-            });
-            // bottom right
-            check_seq!(|i: i8| {
-                add_with_check(i, -i, true, TopLeftToBottomRight)?;
-                add_with_check(i, -i, false, TopLeftToBottomRight)
-            });
-            // right
-            check_seq!(|i| add_with_check(i, 0, false, VerticalOrHorizontal));
-            // left
-            check_seq!(|i: i8| add_with_check(-i, 0, false, VerticalOrHorizontal));
+            add_seq!(|i| add_with_check(2 * i, 0, VerticalOrHorizontal));
+            add_seq!(|i| add_with_check(-2 * i, 0, VerticalOrHorizontal));
         }
         neighbors
     }
@@ -193,8 +152,8 @@ impl<const W: u8> Coordinate<W> {
         let mut coords = Vec::new();
         coords.push(*self).unwrap();
 
-        let mut add_with_check = |x, y, is_top| {
-            if let Some(coord) = self.new_relative(x, y, is_top) {
+        let mut add_with_check = |x, y| {
+            if let Some(coord) = self.new_relative(x, y) {
                 if &coord != other {
                     coords.push(coord).unwrap();
                     return ControlFlow::Continue(());
@@ -203,79 +162,31 @@ impl<const W: u8> Coordinate<W> {
             ControlFlow::Break(())
         };
         macro_rules! add_seq {
-            ($f: expr) => {
+            ($f: expr) => {{
                 (1..).try_for_each($f);
-            };
+            }};
         }
 
         let dx = other.x as i8 - self.x as i8;
         let dy = other.y as i8 - self.y as i8;
-        if self.is_top {
-            if dx >= 0 && ((!other.is_top && dx + 1 == dy) || (other.is_top && dx == dy)) {
-                // top right
-                add_seq!(|i| {
-                    add_with_check(i - 1, i, false)?;
-                    add_with_check(i, i, true)
-                });
-            } else if dx < 0 && ((!other.is_top && dx + 1 == dy) || (other.is_top && dx == dy)) {
-                // bottom left
-                add_seq!(|i: i8| {
-                    add_with_check(-i, 1 - i, false)?;
-                    add_with_check(-i, -i, true)
-                });
-            } else if dx < 0 && dx == -dy {
-                // top left
-                add_seq!(|i: i8| {
-                    add_with_check(-i, i, false)?;
-                    add_with_check(-i, i, true)
-                });
-            } else if dx >= 0 && dx == -dy {
-                // bottom right
-                add_seq!(|i: i8| {
-                    add_with_check(i - 1, 1 - i, false)?;
-                    add_with_check(i, -i, true)
-                });
-            } else if dx == 0 && dy > 0 && other.is_top {
-                // top
-                add_seq!(|i| add_with_check(0, i, true));
-            } else if dx == 0 && dy < 0 && other.is_top {
-                // bottom
-                add_seq!(|i: i8| add_with_check(0, -i, true));
-            } else {
-                unreachable!()
+        match (dx, dy) {
+            (dx, dy) if dx == dy && dx > 0 => add_seq!(|i| add_with_check(i, i)),
+            (dx, dy) if dx == dy && dx < 0 => add_seq!(|i| add_with_check(-i, -i)),
+            (dx, dy) if dx == -dy && dx < 0 => add_seq!(|i| add_with_check(-i, i)),
+            (dx, dy) if dx == -dy && dx > 0 => add_seq!(|i| add_with_check(i, -i)),
+            (dx, 0) if dx > 0 && dx & 1 == 0 && !self.is_top() => {
+                add_seq!(|i| add_with_check(i, 0))
             }
-        } else if dy >= 0 && ((dx == dy + 1 && other.is_top) || (dx == dy && !other.is_top)) {
-            // top right
-            add_seq!(|i| {
-                add_with_check(i, i - 1, true)?;
-                add_with_check(i, i, false)
-            });
-        } else if dy < 0 && ((dx == dy + 1 && other.is_top) || (dx == dy && !other.is_top)) {
-            // bottom left
-            add_seq!(|i: i8| {
-                add_with_check(1 - i, -i, true)?;
-                add_with_check(-i, -i, false)
-            });
-        } else if dy >= 0 && dx == -dy {
-            // top left
-            add_seq!(|i: i8| {
-                add_with_check(1 - i, i - 1, true)?;
-                add_with_check(-i, i, false)
-            });
-        } else if dy < 0 && dx == -dy {
-            // bottom right
-            add_seq!(|i: i8| {
-                add_with_check(i, -i, true)?;
-                add_with_check(i, -i, false)
-            });
-        } else if dx > 0 && dy == 0 && !other.is_top {
-            // right
-            add_seq!(|i| add_with_check(i, 0, false));
-        } else if dx < 0 && dy == 0 && !other.is_top {
-            // left
-            add_seq!(|i: i8| add_with_check(-i, 0, false));
-        } else {
-            unreachable!()
+            (dx, 0) if dx < 0 && dx & 1 == 0 && !self.is_top() => {
+                add_seq!(|i| add_with_check(-i, 0))
+            }
+            (0, dy) if dy > 0 && dy & 1 == 0 && self.is_top() => {
+                add_seq!(|i| add_with_check(0, i))
+            }
+            (0, dy) if dy < 0 && dy & 1 == 0 && self.is_top() => {
+                add_seq!(|i| add_with_check(0, -i))
+            }
+            _ => unreachable!(),
         }
         coords
     }
@@ -301,27 +212,27 @@ impl<const W: u8> Coordinate<W> {
     // +---+---+---+
     fn neighbors(&self, wall_state: impl Fn(&Coordinate<W>) -> WallState) -> Vec<Coordinate<W>, 6> {
         let mut neighbors = Vec::new();
-        let mut add_with_check = |x, y, is_top| {
-            if let Some(coord) = self.new_relative(x, y, is_top) {
+        let mut add_with_check = |x, y| {
+            if let Some(coord) = self.new_relative(x, y) {
                 if !matches!(wall_state(&coord), WallState::Checked { exists: true }) {
                     neighbors.push(coord).unwrap();
                 }
             }
         };
-        if self.is_top {
-            add_with_check(0, 0, false);
-            add_with_check(0, -1, true);
-            add_with_check(-1, 0, false);
-            add_with_check(-1, 1, false);
-            add_with_check(0, 1, false);
-            add_with_check(0, 1, true);
+        if self.is_top() {
+            add_with_check(1, -1);
+            add_with_check(0, -2);
+            add_with_check(-1, -1);
+            add_with_check(-1, 1);
+            add_with_check(1, 1);
+            add_with_check(0, 2);
         } else {
-            add_with_check(0, 0, true);
-            add_with_check(-1, 0, false);
-            add_with_check(0, -1, true);
-            add_with_check(1, -1, true);
-            add_with_check(1, 0, false);
-            add_with_check(1, 0, true);
+            add_with_check(-1, 1);
+            add_with_check(-2, 0);
+            add_with_check(-1, -1);
+            add_with_check(1, -1);
+            add_with_check(2, 0);
+            add_with_check(1, 1);
         }
         neighbors
     }
@@ -330,7 +241,7 @@ impl<const W: u8> Coordinate<W> {
         let dx = other.x as i8 - self.x as i8;
         let dy = other.y as i8 - self.y as i8;
         matches!(
-            (dx, dy, self.is_top, other.is_top),
+            (dx, dy, self.is_top(), other.is_top()),
             (0, 0, true, false)
                 | (0, -1, true, true)
                 | (-1, 0, true, false)
@@ -346,17 +257,16 @@ impl<const W: u8> Coordinate<W> {
         )
     }
 
-    fn new_relative(&self, dx: i8, dy: i8, is_top: bool) -> Option<Self> {
+    fn new_relative(&self, dx: i8, dy: i8) -> Option<Self> {
         let &Self { x, y, .. } = self;
         let x = (x as i8).checked_add(dx)?;
         let y = (y as i8).checked_add(dy)?;
-        if x.is_negative() || y.is_negative() || x >= W as i8 || y >= W as i8 {
+        if x.is_negative() || y.is_negative() || x >= 2 * W as i8 || y >= 2 * W as i8 {
             return None;
         }
         Some(Self {
             x: x as u8,
             y: y as u8,
-            is_top,
         })
     }
 }
@@ -593,7 +503,7 @@ pub struct SearchState<const W: u8> {
 
 impl<const W: u8> SearchState<W> {
     pub fn new(coord: Coordinate<W>, dir: AbsoluteDirection) -> Option<Self> {
-        match (coord.is_top, dir) {
+        match (coord.is_top(), dir) {
             (true, AbsoluteDirection::North | AbsoluteDirection::South)
             | (false, AbsoluteDirection::East | AbsoluteDirection::West) => {
                 Some(Self { coord, dir })
@@ -617,11 +527,11 @@ impl<const W: u8> SearchState<W> {
             coord: cur_coord,
             dir: cur_dir,
         } = &self;
-        let (abs, rel) = match (cur_coord.is_top, cur_dir) {
+        let (abs, rel) = match (cur_coord.is_top(), cur_dir) {
             (true, AbsoluteDirection::North) => match (
-                next_coord.is_top,
-                next_coord.x as i8 - cur_coord.x as i8,
-                next_coord.y as i8 - cur_coord.y as i8,
+                next_coord.is_top(),
+                next_coord.xh() as i8 - cur_coord.xh() as i8,
+                next_coord.yh() as i8 - cur_coord.yh() as i8,
             ) {
                 (true, 0, 1) => (AbsoluteDirection::North, RelativeDirection::Front),
                 (false, 0, 1) => (AbsoluteDirection::East, RelativeDirection::Right),
@@ -632,9 +542,9 @@ impl<const W: u8> SearchState<W> {
                 _ => return None,
             },
             (true, AbsoluteDirection::South) => match (
-                next_coord.is_top,
-                next_coord.x as i8 - cur_coord.x as i8,
-                next_coord.y as i8 - cur_coord.y as i8,
+                next_coord.is_top(),
+                next_coord.xh() as i8 - cur_coord.xh() as i8,
+                next_coord.yh() as i8 - cur_coord.yh() as i8,
             ) {
                 (true, 0, -1) => (AbsoluteDirection::South, RelativeDirection::Front),
                 (false, 0, 0) => (AbsoluteDirection::East, RelativeDirection::Left),
@@ -645,9 +555,9 @@ impl<const W: u8> SearchState<W> {
                 _ => return None,
             },
             (false, AbsoluteDirection::East) => match (
-                next_coord.is_top,
-                next_coord.x as i8 - cur_coord.x as i8,
-                next_coord.y as i8 - cur_coord.y as i8,
+                next_coord.is_top(),
+                next_coord.xh() as i8 - cur_coord.xh() as i8,
+                next_coord.yh() as i8 - cur_coord.yh() as i8,
             ) {
                 (false, 1, 0) => (AbsoluteDirection::East, RelativeDirection::Front),
                 (true, 1, 0) => (AbsoluteDirection::North, RelativeDirection::Left),
@@ -658,9 +568,9 @@ impl<const W: u8> SearchState<W> {
                 _ => return None,
             },
             (false, AbsoluteDirection::West) => match (
-                next_coord.is_top,
-                next_coord.x as i8 - cur_coord.x as i8,
-                next_coord.y as i8 - cur_coord.y as i8,
+                next_coord.is_top(),
+                next_coord.xh() as i8 - cur_coord.xh() as i8,
+                next_coord.yh() as i8 - cur_coord.yh() as i8,
             ) {
                 (false, -1, 0) => (AbsoluteDirection::West, RelativeDirection::Front),
                 (true, 0, -1) => (AbsoluteDirection::South, RelativeDirection::Left),
@@ -670,7 +580,7 @@ impl<const W: u8> SearchState<W> {
                 }
                 _ => return None,
             },
-            _ => return None,
+            _ => unreachable!(),
         };
         if rel != RelativeDirection::Back {
             self.coord = *next_coord;
@@ -686,26 +596,26 @@ mod tests {
     use crate::wall::Walls;
     use std::vec::Vec;
 
-    fn new_coord<const W: u8>((x, y, is_top): (u8, u8, bool)) -> Coordinate<W> {
-        Coordinate::new(x, y, is_top).unwrap()
+    fn new_coord<const W: u8>((x, y): (u8, u8)) -> Coordinate<W> {
+        Coordinate::new(x, y).unwrap()
     }
 
     #[test]
     fn test_shortest_path() {
         let test_cases = vec![(
-            (0, 0, true),
-            [(1, 0, true), (1, 0, false)],
+            (0, 1),
+            [(2, 1), (3, 0)],
             include_str!("../../mazes/maze4_1.dat"),
             vec![
-                (0, 0, true),
-                (0, 2, true),
-                (0, 3, false),
-                (2, 3, false),
-                (3, 2, true),
-                (3, 0, true),
-                (1, 2, false),
-                (1, 1, true),
-                (1, 0, true),
+                (0, 1),
+                (0, 5),
+                (1, 6),
+                (5, 6),
+                (6, 5),
+                (6, 1),
+                (3, 4),
+                (2, 3),
+                (2, 1),
             ],
         )];
 
@@ -731,24 +641,11 @@ mod tests {
     #[test]
     fn test_unchecked_wall() {
         let test_cases = vec![(
-            (0, 0, true),
-            [(1, 0, true), (1, 0, false)],
+            (0, 1),
+            [(2, 1), (3, 0)],
             include_str!("../../mazes/maze4_1.dat"),
-            vec![
-                (0, 1, true),
-                (1, 0, false),
-                (0, 2, true),
-                (1, 3, false),
-                (2, 3, false),
-                (2, 1, false),
-            ],
-            vec![
-                (0, 1, true),
-                (0, 2, true),
-                (1, 3, false),
-                (2, 3, false),
-                (2, 1, false),
-            ],
+            vec![(0, 3), (3, 0), (0, 5), (3, 6), (5, 6), (5, 2)],
+            vec![(0, 3), (0, 5), (3, 6), (5, 6), (5, 2)],
         )];
 
         const W: u8 = 4;
@@ -778,19 +675,12 @@ mod tests {
     #[test]
     fn test_search() {
         let test_cases = vec![(
-            (0, 0, true),
-            [(1, 0, true), (1, 0, false)],
+            (0, 1),
+            [(2, 1), (1, 2)],
             include_str!("../../mazes/maze4_1.dat"),
-            vec![
-                (0, 1, true),
-                (1, 0, false),
-                (0, 2, true),
-                (1, 3, false),
-                (2, 3, false),
-                (2, 1, true),
-            ],
-            (3, 0, true),
-            vec![(2, 1, false), (3, 1, true)],
+            vec![(0, 3), (3, 0), (0, 5), (3, 6), (5, 6), (4, 3)],
+            (6, 1),
+            vec![(5, 2), (6, 3)],
         )];
 
         const W: u8 = 4;
@@ -814,6 +704,6 @@ mod tests {
 
     #[test]
     fn test_extended_neighbors_corner1() {
-        new_coord::<4>((0, 0, true)).extended_neighbors(|_| true, None);
+        new_coord::<4>((0, 1)).extended_neighbors(|_| true, None);
     }
 }
