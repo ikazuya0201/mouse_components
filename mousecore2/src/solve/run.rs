@@ -388,7 +388,7 @@ pub fn shortest_path<C, const W: u8>(
     is_goal: impl Fn(&Node<W>) -> bool,
     is_wall: impl Fn(&Coordinate<W>) -> bool + Copy,
     into_cost: impl Fn(&EdgeKind) -> C,
-) -> Option<Vec<Node<W>, PATH_MAX>>
+) -> Option<(Vec<Node<W>, PATH_MAX>, C)>
 where
     C: Bounded + PrimInt + Saturating + Unsigned,
 {
@@ -482,7 +482,7 @@ where
         cur = next;
     }
     path.reverse();
-    Some(path)
+    Some((path, dist[goal]))
 }
 
 #[cfg(test)]
@@ -509,7 +509,7 @@ mod tests {
             .map(|&node| new_node::<W>(node))
             .collect::<Vec<_, PATH_MAX>>();
 
-        let path = shortest_path(
+        let (path, _) = shortest_path(
             start,
             |node| goals.iter().any(|goal| node == goal),
             |coord| {
@@ -527,8 +527,9 @@ mod tests {
                 Slalom180 => 25,
                 SlalomDiagonal90 => 15,
             },
-        );
-        assert_eq!(path.unwrap(), expected);
+        )
+        .unwrap();
+        assert_eq!(path, expected);
     }
 
     fn new_node<const W: u8>((x, y, dir): (u8, u8, Posture)) -> Node<W> {
