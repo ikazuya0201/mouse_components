@@ -65,6 +65,14 @@ impl<const W: u8> Coordinate<W> {
         self.y & 1 == 1
     }
 
+    pub fn x(&self) -> u8 {
+        self.x
+    }
+
+    pub fn y(&self) -> u8 {
+        self.y
+    }
+
     // Return extended neighbors of the give coordinate.
     //
     // c: self, n: neighbor
@@ -474,14 +482,14 @@ pub enum TrajectoryKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SearchState<const W: u8> {
     coord: Coordinate<W>,
-    dir: Posture,
+    posture: Posture,
 }
 
 impl<const W: u8> SearchState<W> {
-    pub fn new(coord: Coordinate<W>, dir: Posture) -> Option<Self> {
-        match (coord.is_top(), dir) {
+    pub fn new(coord: Coordinate<W>, posture: Posture) -> Option<Self> {
+        match (coord.is_top(), posture) {
             (true, Posture::North | Posture::South) | (false, Posture::East | Posture::West) => {
-                Some(Self { coord, dir })
+                Some(Self { coord, posture })
             }
             _ => None,
         }
@@ -491,16 +499,16 @@ impl<const W: u8> SearchState<W> {
         self.coord
     }
 
-    pub(crate) fn x(&self) -> u8 {
+    pub fn x(&self) -> u8 {
         self.coord.x
     }
 
-    pub(crate) fn y(&self) -> u8 {
+    pub fn y(&self) -> u8 {
         self.coord.y
     }
 
-    pub(crate) fn direction(&self) -> Posture {
-        self.dir
+    pub fn posture(&self) -> Posture {
+        self.posture
     }
 }
 
@@ -511,7 +519,7 @@ impl<const W: u8> SearchState<W> {
 
         let SearchState {
             coord: cur_coord,
-            dir: cur_dir,
+            posture: cur_dir,
         } = &self;
         let dx = next_coord.x as i8 - cur_coord.x as i8;
         let dy = next_coord.y as i8 - cur_coord.y as i8;
@@ -550,7 +558,7 @@ impl<const W: u8> SearchState<W> {
         if rel != Back {
             self.coord = *next_coord;
         }
-        self.dir = abs;
+        self.posture = abs;
         Some(rel)
     }
 }
