@@ -29,7 +29,7 @@ use uom::si::{
 fn test_search1() {
     test_search::<16>(
         include_str!("../mazes/maze16_1.dat"),
-        &[(7, 7, false), (7, 7, true)],
+        &[(15, 14), (14, 15)],
         Default::default(),
     );
 }
@@ -38,7 +38,7 @@ fn test_search1() {
 fn test_search2() {
     test_search::<16>(
         include_str!("../mazes/maze16_2.dat"),
-        &[(7, 7, false), (7, 7, true)],
+        &[(15, 14), (14, 15)],
         Default::default(),
     );
 }
@@ -47,7 +47,7 @@ fn test_search2() {
 fn test_search3() {
     test_search::<16>(
         include_str!("../mazes/maze16_3.dat"),
-        &[(7, 7, false), (7, 7, true)],
+        &[(15, 14), (14, 15)],
         Default::default(),
     );
 }
@@ -56,7 +56,7 @@ fn test_search3() {
 fn test_search4() {
     test_search::<32>(
         include_str!("../mazes/maze32_1.dat"),
-        &[(18, 14, false), (18, 14, true)],
+        &[(37, 28), (36, 29)],
         Default::default(),
     );
 }
@@ -65,7 +65,7 @@ fn test_search4() {
 fn test_search5() {
     test_search::<32>(
         include_str!("../mazes/maze32_2.dat"),
-        &[(7, 6, false), (7, 6, true)],
+        &[(15, 14), (14, 15)],
         Default::default(),
     );
 }
@@ -74,7 +74,7 @@ fn test_search5() {
 fn test_search_offset1() {
     test_search::<32>(
         include_str!("../mazes/maze32_1.dat"),
-        &[(18, 14, false), (18, 14, true)],
+        &[(37, 28), (36, 29)],
         Length::new::<millimeter>(10.0),
     );
 }
@@ -83,15 +83,15 @@ fn test_search_offset1() {
 fn test_search_offset2() {
     test_search::<32>(
         include_str!("../mazes/maze32_2.dat"),
-        &[(7, 6, false), (7, 6, true)],
+        &[(15, 14), (14, 15)],
         Length::new::<millimeter>(10.0),
     );
 }
 
-fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8, bool)], front_offset: Length) {
+fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8)], front_offset: Length) {
     let goals = goals
         .into_iter()
-        .map(|&(x, y, is_top)| Coordinate::new(x, y, is_top).unwrap())
+        .map(|&(x, y)| Coordinate::new(x, y).unwrap())
         .collect::<Vec<_>>();
     // common settings
     let period = Time::new::<second>(0.001);
@@ -160,7 +160,7 @@ fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8, bool)], front
         .build();
     let mut estimator = Estimator::builder().period(period).build();
     let mut detector = WallDetector::<W>::default();
-    let searcher = Searcher::<W>::new(Coordinate::new(0, 0, true).unwrap(), &goals);
+    let searcher = Searcher::<W>::new(Coordinate::new(0, 1).unwrap(), &goals);
 
     let square_width = Length::new::<millimeter>(90.0);
 
@@ -237,7 +237,7 @@ fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8, bool)], front
     let mut next: Option<Box<dyn Iterator<Item = Target>>> = None;
     let mut commander = None::<Commander<W>>;
     let mut robot = SearchState::new(
-        Coordinate::<W>::new(0, 0, true).unwrap(),
+        Coordinate::<W>::new(0, 1).unwrap(),
         AbsoluteDirection::North,
     )
     .unwrap();

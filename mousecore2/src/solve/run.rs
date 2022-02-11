@@ -146,8 +146,8 @@ impl<const W: u8> Node<W> {
             |dx, dy| {
                 if let Some(coord) = self.coord.new_relative(dx, dy) {
                     let coord = match (coord.x & 1, coord.y & 1) {
-                        (1, 0) => Coordinate::new(coord.x >> 1, coord.y >> 1, false).unwrap(),
-                        (0, 1) => Coordinate::new(coord.x >> 1, coord.y >> 1, true).unwrap(),
+                        (1, 0) => Coordinate::new(coord.x, coord.y).unwrap(),
+                        (0, 1) => Coordinate::new(coord.x, coord.y).unwrap(),
                         _ => unreachable!(),
                     };
                     if is_wall(&coord) {
