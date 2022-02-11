@@ -1,9 +1,10 @@
 use core::{num::NonZeroU16, ops::ControlFlow};
 
-use heapless::{binary_heap::Max, BinaryHeap, Vec};
+use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num_traits::{Bounded, PrimInt, Saturating, Unsigned};
 
 use crate::solve::search::Coordinate;
+use crate::trajectory::slalom::{SlalomDirection, SlalomKind};
 use crate::WIDTH;
 
 const QUE_MAX: usize = WIDTH * WIDTH * 16;
@@ -86,6 +87,18 @@ impl<const W: u8> Node<W> {
         } else {
             None
         }
+    }
+
+    pub fn x(&self) -> u8 {
+        self.coord.x
+    }
+
+    pub fn y(&self) -> u8 {
+        self.coord.y
+    }
+
+    pub fn direction(&self) -> AbsoluteDirection {
+        self.dir
     }
 
     fn as_index(&self) -> usize {
@@ -249,6 +262,72 @@ impl<const W: u8> Node<W> {
         let coord = self.coord.new_relative(dx, dy)?;
         Some(Self { coord, dir })
     }
+
+    pub fn trajectory_kind(&self, other: &Self) -> Option<TrajectoryKind> {
+        use AbsoluteDirection::*;
+        use SlalomDirection::*;
+        use SlalomKind::*;
+        use TrajectoryKind::*;
+
+        let dx = other.coord.x as i8 - self.coord.x as i8;
+        let dy = other.coord.y as i8 - self.coord.y as i8;
+        let rel = match self.dir {
+            North | NorthEast => (dx, dy, other.dir),
+            East | SouthEast => (
+                -dy,
+                dx,
+                AbsoluteDirection::from_u8((6 + other.dir as u8) & 7),
+            ),
+            South | SouthWest => (
+                -dx,
+                -dy,
+                AbsoluteDirection::from_u8((4 + other.dir as u8) & 7),
+            ),
+            West | NorthWest => (
+                dy,
+                -dx,
+                AbsoluteDirection::from_u8((2 + other.dir as u8) & 7),
+            ),
+        };
+        Some(match (self.coord.x & 1, self.coord.y & 1, self.dir) {
+            (0, 0, North | East | South | West) => match rel {
+                (0, y, North) if y > 0 && y & 1 == 0 => Straight((y as u8) >> 1),
+                (1, 2, NorthEast) => Slalom(FastRun45, Right),
+                (2, 2, East) => Slalom(FastRun90, Right),
+                (2, 1, SouthEast) => Slalom(FastRun135, Right),
+                (2, 0, South) => Slalom(FastRun180, Right),
+                (-1, 2, NorthWest) => Slalom(FastRun45, Left),
+                (-2, 2, West) => Slalom(FastRun90, Left),
+                (-2, 1, SouthWest) => Slalom(FastRun135, Left),
+                (-2, 0, South) => Slalom(FastRun180, Left),
+                _ => return None,
+            },
+            //left
+            (1, 0, NorthEast | SouthWest) | (0, 1, NorthWest | SouthEast) => match rel {
+                (x, y, NorthEast) if x == y && x > 0 => StraightDiagonal(x as u8),
+                (1, 2, North) => Slalom(FastRun45Rev, Left),
+                (0, 2, NorthWest) => Slalom(FastRunDiagonal90, Left),
+                (-1, 2, West) => Slalom(FastRun135Rev, Left),
+                _ => return None,
+            },
+            // right
+            (0, 1, NorthEast | SouthWest) | (1, 0, NorthWest | SouthEast) => match rel {
+                (x, y, NorthEast) if x == y && x > 0 => StraightDiagonal(x as u8),
+                (2, 1, East) => Slalom(FastRun45Rev, Right),
+                (2, 0, SouthEast) => Slalom(FastRunDiagonal90, Right),
+                (2, -1, South) => Slalom(FastRun135Rev, Right),
+                _ => return None,
+            },
+            _ => return None,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrajectoryKind {
+    Straight(u8),
+    StraightDiagonal(u8),
+    Slalom(SlalomKind, SlalomDirection),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -364,7 +443,7 @@ where
 
     let mut dist = [C::max_value(); QUE_MAX];
     let mut prev = [None; QUE_MAX];
-    let mut heap = BinaryHeap::<_, Max, QUE_MAX>::new();
+    let mut heap = BinaryHeap::<_, Min, QUE_MAX>::new();
     dist[start] = C::zero();
     prev[start] = Some(start);
     heap.push(CostNode {
@@ -389,6 +468,9 @@ where
         for (next, kind) in nodet.successors(is_wall) {
             let next = NodeId::from(next);
             let cost = cost.saturating_add(into_cost(&kind));
+            if dist[next] <= cost {
+                continue;
+            }
             heap.push(CostNode { cost, node: next }).ok();
             dist[next] = cost;
             prev[next] = Some(node);
@@ -400,7 +482,8 @@ where
     let mut cur = goal;
     let mut path = Vec::new();
     while let Some(next) = prev[cur] {
-        path.push(Node::from(cur)).unwrap();
+        path.push(Node::from(cur))
+            .unwrap_or_else(|_| unreachable!("{:?}", path));
         if cur == start {
             break;
         }
