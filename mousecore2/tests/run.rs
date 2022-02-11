@@ -125,7 +125,7 @@ fn test_run<const W: u8>(input: &'static str, goals: &[(u8, u8, Posture)]) {
         .max_voltage(ElectricPotential::new::<volt>(3.7))
         .build();
 
-    let path = shortest_path(
+    let (path, _) = shortest_path(
         Node::new(0, 0, North).unwrap(),
         |node| goals.iter().any(|goal| node == goal),
         |coord| {
