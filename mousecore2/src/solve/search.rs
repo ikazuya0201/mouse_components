@@ -219,20 +219,16 @@ impl<const W: u8> Coordinate<W> {
                 }
             }
         };
+        add_with_check(1, -1);
+        add_with_check(-1, -1);
+        add_with_check(-1, 1);
+        add_with_check(1, 1);
         if self.is_top() {
-            add_with_check(1, -1);
             add_with_check(0, -2);
-            add_with_check(-1, -1);
-            add_with_check(-1, 1);
-            add_with_check(1, 1);
             add_with_check(0, 2);
         } else {
-            add_with_check(-1, 1);
             add_with_check(-2, 0);
-            add_with_check(-1, -1);
-            add_with_check(1, -1);
             add_with_check(2, 0);
-            add_with_check(1, 1);
         }
         neighbors
     }
@@ -240,21 +236,9 @@ impl<const W: u8> Coordinate<W> {
     fn is_neighbor(&self, other: &Self) -> bool {
         let dx = other.x as i8 - self.x as i8;
         let dy = other.y as i8 - self.y as i8;
-        matches!(
-            (dx, dy, self.is_top(), other.is_top()),
-            (0, 0, true, false)
-                | (0, -1, true, true)
-                | (-1, 0, true, false)
-                | (-1, 1, true, false)
-                | (0, 1, true, false)
-                | (0, 1, true, true)
-                | (0, 0, false, true)
-                | (-1, 0, false, false)
-                | (0, -1, false, true)
-                | (1, -1, false, true)
-                | (1, 0, false, false)
-                | (1, 0, false, true)
-        )
+        (self.is_top() && matches!((dx, dy), (0, -2) | (0, 2)))
+            || (!self.is_top() && matches!((dx, dy), (-2, 0) | (2, 0)))
+            || matches!((dx, dy), (1, -1) | (-1, -1) | (-1, 1) | (1, 1))
     }
 
     fn new_relative(&self, dx: i8, dy: i8) -> Option<Self> {
