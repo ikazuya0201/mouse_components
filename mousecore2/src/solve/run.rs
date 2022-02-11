@@ -2,6 +2,7 @@ use core::{num::NonZeroU16, ops::ControlFlow};
 
 use heapless::{binary_heap::Min, BinaryHeap, Vec};
 use num_traits::{Bounded, PrimInt, Saturating, Unsigned};
+use serde::{Deserialize, Serialize};
 
 use crate::solve::search::Coordinate;
 use crate::trajectory::slalom::{SlalomDirection, SlalomKind};
@@ -11,7 +12,7 @@ const QUE_MAX: usize = WIDTH * WIDTH * 16;
 const PATH_MAX: usize = WIDTH * WIDTH;
 const NEIGHBOR_MAX: usize = 2 * WIDTH + 4;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Posture {
     North = 0,
     NorthEast = 1,
