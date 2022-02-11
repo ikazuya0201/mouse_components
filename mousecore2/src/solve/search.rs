@@ -456,7 +456,7 @@ impl<const W: u8> Commander<W> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AbsoluteDirection {
+pub enum Posture {
     North,
     East,
     South,
@@ -464,7 +464,7 @@ pub enum AbsoluteDirection {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum RelativeDirection {
+pub enum TrajectoryKind {
     Front,
     Right,
     Left,
@@ -474,14 +474,13 @@ pub enum RelativeDirection {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SearchState<const W: u8> {
     coord: Coordinate<W>,
-    dir: AbsoluteDirection,
+    dir: Posture,
 }
 
 impl<const W: u8> SearchState<W> {
-    pub fn new(coord: Coordinate<W>, dir: AbsoluteDirection) -> Option<Self> {
+    pub fn new(coord: Coordinate<W>, dir: Posture) -> Option<Self> {
         match (coord.is_top(), dir) {
-            (true, AbsoluteDirection::North | AbsoluteDirection::South)
-            | (false, AbsoluteDirection::East | AbsoluteDirection::West) => {
+            (true, Posture::North | Posture::South) | (false, Posture::East | Posture::West) => {
                 Some(Self { coord, dir })
             }
             _ => None,
@@ -500,15 +499,15 @@ impl<const W: u8> SearchState<W> {
         self.coord.y
     }
 
-    pub(crate) fn direction(&self) -> AbsoluteDirection {
+    pub(crate) fn direction(&self) -> Posture {
         self.dir
     }
 }
 
 impl<const W: u8> SearchState<W> {
-    pub fn update(&mut self, next_coord: &Coordinate<W>) -> Option<RelativeDirection> {
-        use AbsoluteDirection::*;
-        use RelativeDirection::*;
+    pub fn update(&mut self, next_coord: &Coordinate<W>) -> Option<TrajectoryKind> {
+        use Posture::*;
+        use TrajectoryKind::*;
 
         let SearchState {
             coord: cur_coord,

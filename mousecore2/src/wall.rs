@@ -11,7 +11,7 @@ use uom::si::{
 
 use crate::solve::{
     run::Node,
-    search::{AbsoluteDirection, Coordinate, SearchState, WallState},
+    search::{Coordinate, Posture, SearchState, WallState},
 };
 use crate::WIDTH;
 
@@ -34,7 +34,7 @@ impl Pose {
         square_width: Length,
         front_offset: Length,
     ) -> Self {
-        use AbsoluteDirection::*;
+        use Posture::*;
 
         let half = square_width / 2.0;
         let (x, y) = (
@@ -55,11 +55,11 @@ impl Pose {
     }
 
     pub fn from_node<const W: u8>(value: Node<W>, square_width: Length) -> Self {
-        use crate::solve::run::AbsoluteDirection::*;
+        use crate::solve::run::Posture::*;
         Pose {
             x: value.x() as f32 * square_width / 2.0,
             y: value.y() as f32 * square_width / 2.0,
-            theta: Angle::new::<degree>(match value.direction() {
+            theta: Angle::new::<degree>(match value.posture() {
                 North => 90.0,
                 NorthEast => 45.0,
                 East => 0.0,
