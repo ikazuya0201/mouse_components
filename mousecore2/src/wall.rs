@@ -34,31 +34,18 @@ impl Pose {
         square_width: Length,
         front_offset: Length,
     ) -> Self {
+        use AbsoluteDirection::*;
+
+        let half = square_width / 2.0;
         let (x, y) = (
-            (2.0 * (value.coordinate().xh() as f32)
-                + 1.0
-                + if value.coordinate().is_top() {
-                    0.0
-                } else {
-                    1.0
-                })
-                * square_width
-                / 2.0,
-            (2.0 * (value.coordinate().yh() as f32)
-                + 1.0
-                + if value.coordinate().is_top() {
-                    1.0
-                } else {
-                    0.0
-                })
-                * square_width
-                / 2.0,
+            (value.x() as f32 + 1.0) * half,
+            (value.y() as f32 + 1.0) * half,
         );
         let (x, y, theta) = match value.direction() {
-            AbsoluteDirection::North => (x, y + front_offset, 90.0),
-            AbsoluteDirection::South => (x, y - front_offset, -90.0),
-            AbsoluteDirection::East => (x + front_offset, y, 0.0),
-            AbsoluteDirection::West => (x - front_offset, y, 180.0),
+            North => (x, y + front_offset, 90.0),
+            South => (x, y - front_offset, -90.0),
+            East => (x + front_offset, y, 0.0),
+            West => (x - front_offset, y, 180.0),
         };
         Pose {
             x,

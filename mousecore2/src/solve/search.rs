@@ -61,14 +61,6 @@ impl<const W: u8> Coordinate<W> {
             | (self.y & 1) as usize
     }
 
-    pub(crate) fn xh(&self) -> u8 {
-        self.x >> 1
-    }
-
-    pub(crate) fn yh(&self) -> u8 {
-        self.y >> 1
-    }
-
     pub(crate) fn is_top(&self) -> bool {
         self.y & 1 == 1
     }
@@ -496,12 +488,20 @@ impl<const W: u8> SearchState<W> {
         }
     }
 
-    pub fn coordinate(&self) -> &Coordinate<W> {
-        &self.coord
+    pub fn coordinate(&self) -> Coordinate<W> {
+        self.coord
     }
 
-    pub fn direction(&self) -> &AbsoluteDirection {
-        &self.dir
+    pub(crate) fn x(&self) -> u8 {
+        self.coord.x
+    }
+
+    pub(crate) fn y(&self) -> u8 {
+        self.coord.y
+    }
+
+    pub(crate) fn direction(&self) -> AbsoluteDirection {
+        self.dir
     }
 }
 
