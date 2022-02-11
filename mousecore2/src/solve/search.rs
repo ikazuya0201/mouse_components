@@ -55,7 +55,7 @@ impl<const W: u8> Coordinate<W> {
         Some(Self { x, y })
     }
 
-    pub fn as_index(&self) -> usize {
+    pub(crate) fn as_index(&self) -> usize {
         (((self.y as usize) >> 1) << (W.trailing_zeros() + 1))
             | (((self.x as usize) >> 1) << 1)
             | (self.y & 1) as usize

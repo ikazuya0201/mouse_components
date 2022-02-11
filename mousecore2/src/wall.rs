@@ -86,10 +86,12 @@ impl Pose {
     }
 }
 
+const EXISTENCE_ARRAY_LEN: usize = WIDTH * WIDTH * 2;
+
 #[derive(Debug)]
 pub struct WallDetector<const W: u8> {
     converter: PoseConverter<W>,
-    wall_existence_array: [[[Probability; 2]; WIDTH]; WIDTH],
+    wall_existence_array: [Probability; EXISTENCE_ARRAY_LEN],
 }
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
@@ -139,7 +141,7 @@ impl<const W: u8> WallDetector<W> {
     pub fn new() -> Self {
         Self {
             converter: PoseConverter::default(),
-            wall_existence_array: [[[Probability::mid(); 2]; WIDTH]; WIDTH],
+            wall_existence_array: [Probability::mid(); EXISTENCE_ARRAY_LEN],
         }
     }
 
@@ -162,13 +164,11 @@ impl<const W: u8> WallDetector<W> {
     }
 
     fn wall_existence(&self, coord: &Coordinate<W>) -> &Probability {
-        &self.wall_existence_array[coord.xh() as usize][coord.yh() as usize]
-            [coord.is_top() as usize]
+        &self.wall_existence_array[coord.as_index()]
     }
 
     fn wall_existence_mut(&mut self, coord: &Coordinate<W>) -> &mut Probability {
-        &mut self.wall_existence_array[coord.xh() as usize][coord.yh() as usize]
-            [coord.is_top() as usize]
+        &mut self.wall_existence_array[coord.as_index()]
     }
 
     pub fn detect_and_update(
