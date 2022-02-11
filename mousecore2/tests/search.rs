@@ -2,8 +2,7 @@ use mousecore2::{
     control::{ControlParameters, Controller, Target, Tracker},
     estimate::{AngleState, Estimator, LengthState, SensorValue, State},
     solve::search::{
-        AbsoluteDirection, Commander, Coordinate, RelativeDirection, SearchState, Searcher,
-        WallState,
+        Commander, Coordinate, Posture, SearchState, Searcher, TrajectoryKind, WallState,
     },
     trajectory::{
         slalom::{SlalomConfig, SlalomDirection, SlalomGenerator, SlalomKind},
@@ -236,11 +235,7 @@ fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8)], front_offse
     ));
     let mut next: Option<Box<dyn Iterator<Item = Target>>> = None;
     let mut commander = None::<Commander<W>>;
-    let mut robot = SearchState::new(
-        Coordinate::<W>::new(0, 1).unwrap(),
-        AbsoluteDirection::North,
-    )
-    .unwrap();
+    let mut robot = SearchState::new(Coordinate::<W>::new(0, 1).unwrap(), Posture::North).unwrap();
     let mut simulator = Simulator::<W>::builder()
         .period(period)
         .trans_k(trans_k)
@@ -294,10 +289,10 @@ fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8)], front_offse
                     };
                 }
                 next = Some(match dir {
-                    RelativeDirection::Front => gen!(front),
-                    RelativeDirection::Right => gen!(right),
-                    RelativeDirection::Left => gen!(left),
-                    RelativeDirection::Back => gen!(back),
+                    TrajectoryKind::Front => gen!(front),
+                    TrajectoryKind::Right => gen!(right),
+                    TrajectoryKind::Left => gen!(left),
+                    TrajectoryKind::Back => gen!(back),
                 });
                 commander.take();
             }

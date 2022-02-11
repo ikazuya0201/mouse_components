@@ -2,7 +2,7 @@ use mousecore2::{
     control::{ControlParameters, Controller, Target, Tracker},
     estimate::{AngleState, Estimator, LengthState, SensorValue, State},
     solve::{
-        run::{shortest_path, AbsoluteDirection, EdgeKind, Node, TrajectoryKind},
+        run::{shortest_path, EdgeKind, Node, Posture, TrajectoryKind},
         search::WallState,
     },
     trajectory::{
@@ -19,7 +19,7 @@ use uom::si::{
     jerk::meter_per_second_cubed, length::millimeter, time::second, velocity::meter_per_second,
 };
 
-use AbsoluteDirection::*;
+use Posture::*;
 
 #[test]
 fn test_run1() {
@@ -47,7 +47,7 @@ fn test_run2() {
     );
 }
 
-fn test_run<const W: u8>(input: &'static str, goals: &[(u8, u8, AbsoluteDirection)]) {
+fn test_run<const W: u8>(input: &'static str, goals: &[(u8, u8, Posture)]) {
     let goals = goals
         .into_iter()
         .map(|&(x, y, dir)| Node::new(x, y, dir).unwrap())

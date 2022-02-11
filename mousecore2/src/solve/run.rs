@@ -12,7 +12,7 @@ const PATH_MAX: usize = WIDTH * WIDTH;
 const NEIGHBOR_MAX: usize = 2 * WIDTH + 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AbsoluteDirection {
+pub enum Posture {
     North = 0,
     NorthEast = 1,
     East = 2,
@@ -23,9 +23,9 @@ pub enum AbsoluteDirection {
     NorthWest = 7,
 }
 
-impl AbsoluteDirection {
-    fn from_u8(val: u8) -> AbsoluteDirection {
-        use AbsoluteDirection::*;
+impl Posture {
+    fn from_u8(val: u8) -> Posture {
+        use Posture::*;
 
         match val {
             0 => North,
@@ -68,44 +68,44 @@ impl<const W: u8> RunCoord<W> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Node<const W: u8> {
     coord: RunCoord<W>,
-    dir: AbsoluteDirection,
+    posture: Posture,
 }
 
 impl<const W: u8> Node<W> {
-    pub fn new(x: u8, y: u8, dir: AbsoluteDirection) -> Option<Self> {
-        use AbsoluteDirection::*;
+    pub fn new(x: u8, y: u8, posture: Posture) -> Option<Self> {
+        use Posture::*;
 
         let coord = RunCoord::new(x, y)?;
         if matches!(
-            (dir, (x & 1, y & 1)),
+            (posture, (x & 1, y & 1)),
             (
                 NorthEast | NorthWest | SouthEast | SouthWest,
                 (1, 0) | (0, 1)
             ) | (North | East | South | West, (0, 0))
         ) {
-            Some(Self { coord, dir })
+            Some(Self { coord, posture })
         } else {
             None
         }
     }
 
-    pub fn x(&self) -> u8 {
+    pub(crate) fn x(&self) -> u8 {
         self.coord.x
     }
 
-    pub fn y(&self) -> u8 {
+    pub(crate) fn y(&self) -> u8 {
         self.coord.y
     }
 
-    pub fn direction(&self) -> AbsoluteDirection {
-        self.dir
+    pub(crate) fn posture(&self) -> Posture {
+        self.posture
     }
 
     fn as_index(&self) -> usize {
-        use AbsoluteDirection::*;
+        use Posture::*;
 
         let dir = if (self.coord.x ^ self.coord.y) & 1 == 1 {
-            match self.dir {
+            match self.posture {
                 NorthEast => 0,
                 SouthEast => 1,
                 SouthWest => 2,
@@ -113,7 +113,7 @@ impl<const W: u8> Node<W> {
                 _ => unreachable!(),
             }
         } else if (self.coord.x | self.coord.y) & 1 == 0 {
-            match self.dir {
+            match self.posture {
                 North => 0,
                 East => 1,
                 South => 2,
@@ -174,12 +174,12 @@ impl<const W: u8> Node<W> {
     fn succs_flow(
         &self,
         cont: impl Fn(i8, i8) -> ControlFlow<(), ()>,
-        mut add: impl FnMut(i8, i8, AbsoluteDirection, EdgeKind) -> ControlFlow<(), ()>,
+        mut add: impl FnMut(i8, i8, Posture, EdgeKind) -> ControlFlow<(), ()>,
     ) -> ControlFlow<(), ()> {
-        use AbsoluteDirection::*;
         use EdgeKind::*;
+        use Posture::*;
 
-        let rot = |dx: i8, dy: i8| match self.dir {
+        let rot = |dx: i8, dy: i8| match self.posture {
             North | NorthEast => (dx, dy),
             East | SouthEast => (dy, -dx),
             South | SouthWest => (-dx, -dy),
@@ -193,16 +193,16 @@ impl<const W: u8> Node<W> {
 
         let mut add = |dx: i8, dy: i8, dir, kind| {
             let (dx, dy) = rot(dx, dy);
-            let dir = match self.dir {
+            let dir = match self.posture {
                 North | NorthEast => dir,
-                East | SouthEast => AbsoluteDirection::from_u8((dir as u8 + 2) & 7),
-                South | SouthWest => AbsoluteDirection::from_u8((dir as u8 + 4) & 7),
-                West | NorthWest => AbsoluteDirection::from_u8((dir as u8 + 6) & 7),
+                East | SouthEast => Posture::from_u8((dir as u8 + 2) & 7),
+                South | SouthWest => Posture::from_u8((dir as u8 + 4) & 7),
+                West | NorthWest => Posture::from_u8((dir as u8 + 6) & 7),
             };
             add(dx, dy, dir, kind)
         };
 
-        match (self.coord.x & 1, self.coord.y & 1, self.dir) {
+        match (self.coord.x & 1, self.coord.y & 1, self.posture) {
             (0, 0, North | East | South | West) => {
                 cont(0, 1)?;
                 // straight
@@ -258,38 +258,29 @@ impl<const W: u8> Node<W> {
         ControlFlow::Break(())
     }
 
-    fn new_relative(&self, dx: i8, dy: i8, dir: AbsoluteDirection) -> Option<Self> {
+    fn new_relative(&self, dx: i8, dy: i8, dir: Posture) -> Option<Self> {
         let coord = self.coord.new_relative(dx, dy)?;
-        Some(Self { coord, dir })
+        Some(Self {
+            coord,
+            posture: dir,
+        })
     }
 
     pub fn trajectory_kind(&self, other: &Self) -> Option<TrajectoryKind> {
-        use AbsoluteDirection::*;
+        use Posture::*;
         use SlalomDirection::*;
         use SlalomKind::*;
         use TrajectoryKind::*;
 
         let dx = other.coord.x as i8 - self.coord.x as i8;
         let dy = other.coord.y as i8 - self.coord.y as i8;
-        let rel = match self.dir {
-            North | NorthEast => (dx, dy, other.dir),
-            East | SouthEast => (
-                -dy,
-                dx,
-                AbsoluteDirection::from_u8((6 + other.dir as u8) & 7),
-            ),
-            South | SouthWest => (
-                -dx,
-                -dy,
-                AbsoluteDirection::from_u8((4 + other.dir as u8) & 7),
-            ),
-            West | NorthWest => (
-                dy,
-                -dx,
-                AbsoluteDirection::from_u8((2 + other.dir as u8) & 7),
-            ),
+        let rel = match self.posture {
+            North | NorthEast => (dx, dy, other.posture),
+            East | SouthEast => (-dy, dx, Posture::from_u8((6 + other.posture as u8) & 7)),
+            South | SouthWest => (-dx, -dy, Posture::from_u8((4 + other.posture as u8) & 7)),
+            West | NorthWest => (dy, -dx, Posture::from_u8((2 + other.posture as u8) & 7)),
         };
-        Some(match (self.coord.x & 1, self.coord.y & 1, self.dir) {
+        Some(match (self.coord.x & 1, self.coord.y & 1, self.posture) {
             (0, 0, North | East | South | West) => match rel {
                 (0, y, North) if y > 0 && y & 1 == 0 => Straight((y as u8) >> 1),
                 (1, 2, NorthEast) => Slalom(FastRun45, Right),
@@ -358,7 +349,7 @@ impl<const W: u8> From<Node<W>> for NodeId<W> {
 
 impl<const W: u8> From<NodeId<W>> for Node<W> {
     fn from(value: NodeId<W>) -> Self {
-        use AbsoluteDirection::*;
+        use Posture::*;
 
         let value = value.0.get();
         let x = ((value >> 1) & ((1 << Self::y_offset()) - 1)) as u8;
@@ -386,7 +377,7 @@ impl<const W: u8> From<NodeId<W>> for Node<W> {
 
         Self {
             coord: RunCoord { x, y },
-            dir,
+            posture: dir,
         }
     }
 }
@@ -497,17 +488,17 @@ where
 mod tests {
     use super::*;
     use crate::{solve::search::WallState, wall::Walls};
-    use AbsoluteDirection::*;
+    use Posture::*;
 
     fn test_shortest_path<const W: u8>(
         walls: &str,
-        goals: &[(u8, u8, AbsoluteDirection)],
-        expected: &[(u8, u8, AbsoluteDirection)],
+        goals: &[(u8, u8, Posture)],
+        expected: &[(u8, u8, Posture)],
     ) {
         use EdgeKind::*;
 
         let walls = walls.parse::<Walls<W>>().unwrap();
-        let start = new_node((0, 0, AbsoluteDirection::North));
+        let start = new_node((0, 0, Posture::North));
         let goals = goals
             .into_iter()
             .map(|&node| new_node(node))
@@ -539,7 +530,7 @@ mod tests {
         assert_eq!(path.unwrap(), expected);
     }
 
-    fn new_node<const W: u8>((x, y, dir): (u8, u8, AbsoluteDirection)) -> Node<W> {
+    fn new_node<const W: u8>((x, y, dir): (u8, u8, Posture)) -> Node<W> {
         Node::new(x, y, dir).unwrap()
     }
 
