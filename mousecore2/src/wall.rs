@@ -41,7 +41,7 @@ impl Pose {
             (value.x() as f32 + 1.0) * half,
             (value.y() as f32 + 1.0) * half,
         );
-        let (x, y, theta) = match value.direction() {
+        let (x, y, theta) = match value.posture() {
             North => (x, y + front_offset, 90.0),
             South => (x, y - front_offset, -90.0),
             East => (x + front_offset, y, 0.0),

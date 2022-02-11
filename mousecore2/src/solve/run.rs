@@ -90,15 +90,15 @@ impl<const W: u8> Node<W> {
         }
     }
 
-    pub(crate) fn x(&self) -> u8 {
+    pub fn x(&self) -> u8 {
         self.coord.x
     }
 
-    pub(crate) fn y(&self) -> u8 {
+    pub fn y(&self) -> u8 {
         self.coord.y
     }
 
-    pub(crate) fn posture(&self) -> Posture {
+    pub fn posture(&self) -> Posture {
         self.posture
     }
 
