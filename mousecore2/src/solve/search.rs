@@ -461,6 +461,16 @@ impl<const W: u8> Commander<W> {
         }
         Err(SearchError::Unreachable)
     }
+
+    pub fn force_next_coordinate(
+        &self,
+        wall_state: impl Fn(&Coordinate<W>) -> WallState,
+    ) -> Option<Coordinate<W>> {
+        self.candidates
+            .iter()
+            .find(|coord| matches!(wall_state(coord), WallState::Checked { exists: false }))
+            .cloned()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
