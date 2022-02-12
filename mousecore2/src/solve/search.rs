@@ -35,7 +35,7 @@ impl Filter {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum NeighborKind {
-    VerticalOrHorizontal,
+    VerticalOrHorizontal = 0,
     BottomLeftToTopRight,
     TopLeftToBottomRight,
 }
@@ -108,13 +108,13 @@ impl<const W: u8> Coordinate<W> {
     fn extended_neighbors(
         &self,
         filter: impl Fn(&Coordinate<W>) -> bool,
-        exclude: Option<NeighborKind>,
+        excludes: &[bool],
     ) -> Vec<(Coordinate<W>, NeighborKind), { 6 * WIDTH }> {
         use NeighborKind::*;
 
         let mut neighbors = Vec::new();
         let mut add_with_check = |x, y, kind| {
-            if Some(kind) == exclude {
+            if excludes[kind as usize] {
                 return ControlFlow::Break(());
             }
             if let Some(coord) = self.new_relative(x, y) {
@@ -303,11 +303,13 @@ impl<const W: u8> Searcher<W> {
     ) -> Option<([Option<Coordinate<W>>; QUE_MAX], Coordinate<W>)> {
         let mut que = Deque::<_, QUE_MAX>::new();
         let mut prev = [None; QUE_MAX];
-        que.push_back((self.start, None)).unwrap();
+        let mut kinds = [[false; 3]; QUE_MAX];
+        que.push_back(self.start).unwrap();
         prev[self.start] = Some(self.start);
 
-        while let Some((node, kind)) = que.pop_front() {
-            for (next, kind) in node.extended_neighbors(|coord| !is_wall(coord), kind) {
+        while let Some(node) = que.pop_front() {
+            for (next, kind) in node.extended_neighbors(|coord| !is_wall(coord), &kinds[node]) {
+                kinds[next][kind as usize] = true;
                 if prev[next].is_some() {
                     continue;
                 }
@@ -315,7 +317,7 @@ impl<const W: u8> Searcher<W> {
                 if self.goal_filter.contains(&next) {
                     return Some((prev, next));
                 }
-                que.push_back((next, Some(kind))).unwrap();
+                que.push_back(next).unwrap();
             }
         }
         None
@@ -700,6 +702,6 @@ mod tests {
 
     #[test]
     fn test_extended_neighbors_corner1() {
-        new_coord::<4>((0, 1)).extended_neighbors(|_| true, None);
+        new_coord::<4>((0, 1)).extended_neighbors(|_| true, &[false, false, false]);
     }
 }
