@@ -647,19 +647,32 @@ mod tests {
 
     #[test]
     fn test_search() {
-        let test_cases = vec![(
-            (0, 1),
-            [(2, 1), (1, 2)],
-            include_str!("../../mazes/maze4_1.dat"),
-            vec![(0, 3), (3, 0), (0, 5), (3, 6), (5, 6), (4, 3)],
-            (6, 1),
-            vec![(5, 2), (6, 3)],
-        )];
+        let test_cases = vec![
+            (
+                (0, 1),
+                vec![(2, 1), (3, 0)],
+                include_str!("../../mazes/maze4_1.dat"),
+                vec![(0, 3), (3, 0), (0, 5), (3, 6), (5, 6), (4, 3)],
+                (6, 1),
+                vec![(5, 2), (6, 3)],
+            ),
+            (
+                (0, 1),
+                vec![(2, 1), (3, 0)],
+                include_str!("../../mazes/maze4_4.dat"),
+                vec![(3, 0), (5, 0)],
+                (5, 2),
+                vec![(6, 1), (4, 3), (3, 2)],
+            ),
+        ];
 
         const W: u8 = 4;
         for (start, goals, walls, unchecked_walls, current, expected) in test_cases {
             let start = new_coord(start);
-            let goals = goals.map(|goal| new_coord(goal));
+            let goals = goals
+                .into_iter()
+                .map(|goal| new_coord(goal))
+                .collect::<Vec<_>>();
             let mut walls = walls.parse::<Walls<W>>().unwrap();
             for wall in unchecked_walls {
                 walls.update(&new_coord(wall), &WallState::Unchecked);
