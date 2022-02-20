@@ -1,10 +1,7 @@
 [workspace]
 members = [
-    "mousecore",
     "mousecore2",
-    "mousesim",
     "mousesim2",
-    "sensors",
     "sensors2",
 ]
 resolver = "2"
