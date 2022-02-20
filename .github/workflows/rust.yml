@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, develop ]
+    branches: [ master ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,26 +18,21 @@ jobs:
         rustc: [stable, nightly]
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: ${{ matrix.rustc }}
-        target: thumbv7em-none-eabihf
-        override: true
-    - name: Build ${{ matrix.rustc }} on native
-      run: cargo build --target=thumbv7em-none-eabihf --verbose
-
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ matrix.rustc }}
         target: x86_64-unknown-linux-gnu
-        components: clippy
+        components: clippy, rustfmt
         override: true
-    - name: Clippy ${{ matrix.rustc }}
-      run: cargo clippy --target=x86_64-unknown-linux-gnu --verbose -- -D warnings
-    - name: Test ${{ matrix.rustc }}
-      run: cargo test --target=x86_64-unknown-linux-gnu --verbose
-    - name: Test ignored ${{ matrix.rustc }}
-      run: cargo test --target=x86_64-unknown-linux-gnu --verbose -- --ignored
-    - name: Doc ${{ matrix.rustc }}
-      run: cargo doc --target=x86_64-unknown-linux-gnu --verbose
+    - uses: davidB/rust-cargo-make@v1
+    - uses: actions/checkout@v1
+    - name: Run CI with ${{ matrix.rustc }}
+      run: cargo make ci
+
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rustc }}
+        override: true
+        target: thumbv7em-none-eabihf
+    - name: Build with ${{ matrix.rustc }} on native
+      run: cargo build --target=thumbv7em-none-eabihf
