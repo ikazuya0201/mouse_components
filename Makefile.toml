@@ -1,0 +1,61 @@
+[config]
+default_to_workspace = false
+
+[tasks.ci]
+dependencies = [
+    "rustfmt-strict",
+    "clippy-strict",
+    "build",
+    "ci-test",
+    "doc",
+]
+
+[tasks.clippy-strict]
+command = "cargo"
+args = [
+    "clippy",
+    "--",
+    "--deny",
+    "warnings",
+]
+
+[tasks.build]
+command = "cargo"
+args = [
+    "build",
+]
+
+[tasks.ci-test]
+dependencies = [
+    "test",
+    "test-ignored",
+]
+
+[tasks.test]
+command = "cargo"
+args = [
+    "test",
+]
+
+[tasks.test-ignored]
+command = "cargo"
+args = [
+    "test",
+    "--",
+    "--ignored",
+]
+
+[tasks.doc]
+command = "cargo"
+args = [
+    "doc",
+]
+
+[tasks.rustfmt-strict]
+command = "cargo"
+args = [
+    "fmt",
+    "--all",
+    "--",
+    "--check",
+]
