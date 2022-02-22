@@ -64,10 +64,6 @@ pub struct ControlTarget {
 
 #[derive(Debug, TypedBuilder)]
 pub struct Tracker {
-    #[builder(setter(transform = |value: f32| GainType{ value, dimension: PhantomData, units: PhantomData }))]
-    gain: GainType,
-    #[builder(setter(transform = |value: f32| Frequency{ value, dimension: PhantomData, units: PhantomData }))]
-    dgain: Frequency,
     #[builder(default, setter(skip))]
     xi: Velocity,
     period: Time,
@@ -78,26 +74,19 @@ pub struct Tracker {
 }
 
 impl Tracker {
-    pub fn track(&mut self, state: &State, target: &Target) -> (ControlTarget, ControlTarget) {
+    pub fn track(
+        &mut self,
+        state: &State,
+        target: &Target,
+        input: &TrackingInput,
+    ) -> (ControlTarget, ControlTarget) {
         let sin_th = state.theta.x.value.sin();
         let cos_th = state.theta.x.value.cos();
 
         let vv = state.x.v * cos_th + state.y.v * sin_th;
         let va = state.x.a * cos_th + state.y.a * sin_th;
 
-        //calculate control input for (x,y)
-        let ux = target.x.a
-            + self.dgain * (target.x.v - state.x.v)
-            + self.gain * (target.x.x - state.x.x);
-        let uy = target.y.a
-            + self.dgain * (target.y.v - state.y.v)
-            + self.gain * (target.y.x - state.y.x);
-        let dux = target.x.j
-            + self.dgain * (target.x.a - state.x.a)
-            + self.gain * (target.x.v - state.x.v);
-        let duy = target.y.j
-            + self.dgain * (target.y.a - state.y.a)
-            + self.gain * (target.y.v - state.y.v);
+        let TrackingInput { ux, uy, dux, duy } = *input;
 
         let dxi = ux * cos_th + uy * sin_th;
         self.xi += self.period * dxi;
@@ -246,6 +235,41 @@ impl Controller {
             right: right_motor_voltage,
         }
     }
+}
+
+#[derive(Debug, TypedBuilder)]
+pub struct NavigationController {
+    #[builder(setter(transform = |value: f32| GainType{ value, dimension: PhantomData, units: PhantomData }))]
+    gain: GainType,
+    #[builder(setter(transform = |value: f32| Frequency{ value, dimension: PhantomData, units: PhantomData }))]
+    dgain: Frequency,
+}
+
+impl NavigationController {
+    pub fn navigate(&self, state: &State, target: &Target) -> TrackingInput {
+        TrackingInput {
+            ux: target.x.a
+                + self.dgain * (target.x.v - state.x.v)
+                + self.gain * (target.x.x - state.x.x),
+            uy: target.y.a
+                + self.dgain * (target.y.v - state.y.v)
+                + self.gain * (target.y.x - state.y.x),
+            dux: target.x.j
+                + self.dgain * (target.x.a - state.x.a)
+                + self.gain * (target.x.v - state.x.v),
+            duy: target.y.j
+                + self.dgain * (target.y.a - state.y.a)
+                + self.gain * (target.y.v - state.y.v),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TrackingInput {
+    pub ux: Acceleration,
+    pub uy: Acceleration,
+    pub dux: Jerk,
+    pub duy: Jerk,
 }
 
 #[cfg(test)]
