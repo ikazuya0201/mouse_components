@@ -34,3 +34,5 @@ approx = "0.3.2"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 mousesim2 = { path = "../mousesim2" }
+
+[features]

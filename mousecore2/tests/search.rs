@@ -1,5 +1,5 @@
 use mousecore2::{
-    control::{ControlParameters, Controller, Target, Tracker},
+    control::{ControlParameters, Controller, NavigationController, Target, Tracker},
     estimate::{AngleState, Estimator, LengthState, SensorValue, State},
     solve::search::{
         Commander, Coordinate, Posture, SearchState, Searcher, TrajectoryKind, WallState,
@@ -134,11 +134,13 @@ fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8)], front_offse
     let mut walls = Walls::<W>::new();
     let mut tracker = Tracker::builder()
         .period(period)
-        .gain(40.0)
-        .dgain(4.0)
         .zeta(1.0)
         .b(1.0)
         .xi_threshold(Velocity::new::<meter_per_second>(0.2))
+        .build();
+    let navigation = NavigationController::builder()
+        .gain(40.0)
+        .dgain(4.0)
         .build();
     let mut controller = Controller::builder()
         .trans_params(ControlParameters {
@@ -271,7 +273,8 @@ fn test_search<const W: u8>(input: &'static str, goals: &[(u8, u8)], front_offse
         } else {
             unreachable!()
         };
-        let (control_target, control_state) = tracker.track(&state, &target);
+        let input = navigation.navigate(&state, &target);
+        let (control_target, control_state) = tracker.track(&state, &target, &input);
         let vol = controller.control(&control_target, &control_state);
         simulator.apply(&vol);
 

@@ -11,8 +11,11 @@ use uom::{
         electric_potential::volt,
         f32::{
             Acceleration, Angle, AngularAcceleration, AngularJerk, AngularVelocity,
-            ElectricPotential, Frequency, Jerk, Length, Time, Velocity,
+            AvailableEnergy, ElectricPotential, Frequency, Jerk, Length, Ratio, Time, Velocity,
         },
+        jerk::meter_per_second_cubed,
+        length::millimeter,
+        ratio::ratio,
         time::second,
         Quantity, ISQ, SI,
     },
@@ -20,7 +23,7 @@ use uom::{
     Kind,
 };
 
-use crate::estimate::State;
+use crate::{estimate::State, solve::search::Coordinate};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct MotorOutput {
@@ -64,10 +67,6 @@ pub struct ControlTarget {
 
 #[derive(Debug, TypedBuilder)]
 pub struct Tracker {
-    #[builder(setter(transform = |value: f32| GainType{ value, dimension: PhantomData, units: PhantomData }))]
-    gain: GainType,
-    #[builder(setter(transform = |value: f32| Frequency{ value, dimension: PhantomData, units: PhantomData }))]
-    dgain: Frequency,
     #[builder(default, setter(skip))]
     xi: Velocity,
     period: Time,
@@ -78,26 +77,19 @@ pub struct Tracker {
 }
 
 impl Tracker {
-    pub fn track(&mut self, state: &State, target: &Target) -> (ControlTarget, ControlTarget) {
+    pub fn track(
+        &mut self,
+        state: &State,
+        target: &Target,
+        input: &TrackingInput,
+    ) -> (ControlTarget, ControlTarget) {
         let sin_th = state.theta.x.value.sin();
         let cos_th = state.theta.x.value.cos();
 
         let vv = state.x.v * cos_th + state.y.v * sin_th;
         let va = state.x.a * cos_th + state.y.a * sin_th;
 
-        //calculate control input for (x,y)
-        let ux = target.x.a
-            + self.dgain * (target.x.v - state.x.v)
-            + self.gain * (target.x.x - state.x.x);
-        let uy = target.y.a
-            + self.dgain * (target.y.v - state.y.v)
-            + self.gain * (target.y.x - state.y.x);
-        let dux = target.x.j
-            + self.dgain * (target.x.a - state.x.a)
-            + self.gain * (target.x.v - state.x.v);
-        let duy = target.y.j
-            + self.dgain * (target.y.a - state.y.a)
-            + self.gain * (target.y.v - state.y.v);
+        let TrackingInput { ux, uy, dux, duy } = *input;
 
         let dxi = ux * cos_th + uy * sin_th;
         self.xi += self.period * dxi;
@@ -248,13 +240,249 @@ impl Controller {
     }
 }
 
+#[derive(Debug, TypedBuilder)]
+pub struct NavigationController {
+    #[builder(setter(transform = |value: f32| GainType{ value, dimension: PhantomData, units: PhantomData }))]
+    gain: GainType,
+    #[builder(setter(transform = |value: f32| Frequency{ value, dimension: PhantomData, units: PhantomData }))]
+    dgain: Frequency,
+}
+
+impl NavigationController {
+    pub fn navigate(&self, state: &State, target: &Target) -> TrackingInput {
+        TrackingInput {
+            ux: target.x.a
+                + self.dgain * (target.x.v - state.x.v)
+                + self.gain * (target.x.x - state.x.x),
+            uy: target.y.a
+                + self.dgain * (target.y.v - state.y.v)
+                + self.gain * (target.y.x - state.y.x),
+            dux: target.x.j
+                + self.dgain * (target.x.a - state.x.a)
+                + self.gain * (target.x.v - state.x.v),
+            duy: target.y.j
+                + self.dgain * (target.y.a - state.y.a)
+                + self.gain * (target.y.v - state.y.v),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TrackingInput {
+    pub ux: Acceleration,
+    pub uy: Acceleration,
+    pub dux: Jerk,
+    pub duy: Jerk,
+}
+
+fn remquof(value: Length, base: Length) -> (i8, Length) {
+    let iwidth = base.get::<millimeter>() as usize;
+    let ivalue = value.get::<millimeter>() as usize;
+    let div = ivalue / iwidth;
+    (div as i8, value - base * div as f32)
+}
+
+#[derive(Debug, TypedBuilder)]
+pub struct SupervisoryController {
+    #[builder(setter(transform = |value: f32| Frequency{ value, dimension: PhantomData, units: PhantomData }))]
+    margin: Frequency,
+    avoidance_distance: Length,
+    square_width: Length,
+}
+
+impl SupervisoryController {
+    pub fn supervise<const W: u8>(
+        &self,
+        input: &TrackingInput,
+        state: &State,
+        is_wall: impl Fn(&Coordinate<W>) -> bool,
+    ) -> TrackingInput {
+        let (a1, a2, b) = match self.nearest_obstacle(state, is_wall) {
+            Obstacle::Pillar { x, y } => {
+                let a1 = 2.0 * (state.x.x - x);
+                let a2 = 2.0 * (state.y.x - y);
+                let b = 2.0 * (state.x.v * state.x.v + state.y.v * state.y.v)
+                    + 4.0
+                        * self.margin
+                        * ((state.x.x - x) * state.x.v + (state.y.x - y) * state.y.v)
+                    + self.margin
+                        * self.margin
+                        * ((state.x.x - x) * (state.x.x - x) + (state.y.x - y) * (state.y.x - y)
+                            - self.avoidance_distance * self.avoidance_distance);
+                (a1, a2, b)
+            }
+            Obstacle::WallX { x: d } => {
+                let a1 = 2.0 * (state.x.x - d);
+                let b = 2.0 * state.x.v * state.x.v
+                    + 4.0 * self.margin * (state.x.x - d) * state.x.v
+                    + self.margin
+                        * self.margin
+                        * ((state.x.x - d) * (state.x.x - d)
+                            - self.avoidance_distance * self.avoidance_distance);
+                (a1, Default::default(), b)
+            }
+            Obstacle::WallY { y: d } => {
+                let a2 = 2.0 * (state.y.x - d);
+                let b = 2.0 * state.y.v * state.y.v
+                    + 4.0 * self.margin * (state.y.x - d) * state.y.v
+                    + self.margin
+                        * self.margin
+                        * ((state.y.x - d) * (state.y.x - d)
+                            - self.avoidance_distance * self.avoidance_distance);
+                (Default::default(), a2, b)
+            }
+        };
+        self.apply_constraints(input, a1, a2, b)
+    }
+
+    fn nearest_obstacle<const W: u8>(
+        &self,
+        state: &State,
+        is_wall: impl Fn(&Coordinate<W>) -> bool,
+    ) -> Obstacle {
+        let (divx, remx) = remquof(state.x.x, self.square_width);
+        let (divy, remy) = remquof(state.y.x, self.square_width);
+        assert!(divx >= 0);
+        assert!(divy >= 0);
+
+        let map = |xwall, ywall, pillar, cond| {
+            (
+                if cond {
+                    [(xwall, true), (ywall, false)]
+                } else {
+                    [(ywall, false), (xwall, true)]
+                },
+                pillar,
+            )
+        };
+        let (walls, pillar) = match (
+            2.0 * remx > self.square_width,
+            2.0 * remy > self.square_width,
+        ) {
+            (true, true) => map(
+                (2 * divx + 1, 2 * divy),
+                (2 * divx, 2 * divy + 1),
+                (divx + 1, divy + 1),
+                remx > remy,
+            ),
+            (true, false) => map(
+                (2 * divx + 1, 2 * divy),
+                (2 * divx, 2 * divy - 1),
+                (divx + 1, divy),
+                remy > self.square_width - remx,
+            ),
+            (false, true) => map(
+                (2 * divx - 1, 2 * divy),
+                (2 * divx, 2 * divy + 1),
+                (divx, divy + 1),
+                remy < self.square_width - remx,
+            ),
+            (false, false) => map(
+                (2 * divx - 1, 2 * divy),
+                (2 * divx, 2 * divy - 1),
+                (divx, divy),
+                remx < remy,
+            ),
+        };
+        for ((x, y), is_x) in walls {
+            if x < 0 {
+                assert!(is_x);
+                return Obstacle::WallX {
+                    x: Default::default(),
+                };
+            }
+            if y < 0 {
+                assert!(!is_x);
+                return Obstacle::WallY {
+                    y: Default::default(),
+                };
+            }
+            if let Some(coord) = Coordinate::new(x as u8, y as u8) {
+                if !is_wall(&coord) {
+                    continue;
+                }
+                return if is_x {
+                    Obstacle::WallX {
+                        x: (x + 1) as f32 * self.square_width / 2.0,
+                    }
+                } else {
+                    Obstacle::WallY {
+                        y: (y + 1) as f32 * self.square_width / 2.0,
+                    }
+                };
+            }
+        }
+        Obstacle::Pillar {
+            x: pillar.0 as f32 * self.square_width,
+            y: pillar.1 as f32 * self.square_width,
+        }
+    }
+
+    fn apply_constraints(
+        &self,
+        &TrackingInput { ux, uy, dux, duy }: &TrackingInput,
+        a1: Length,
+        a2: Length,
+        b: AvailableEnergy,
+    ) -> TrackingInput {
+        assert!(!a1.is_nan());
+        assert!(!a2.is_nan());
+        assert!(!b.is_nan());
+        if a1 * ux + a2 * uy + b >= AvailableEnergy::default() {
+            return TrackingInput { ux, uy, dux, duy };
+        }
+        let (ux2, uy2) = if a2 != Length::default() {
+            let a = -a1 / a2;
+            let b = -b / a2;
+            let c1 = a * a + Ratio::new::<ratio>(1.0);
+            let c2 = 2.0 * (a * b - ux - a * uy);
+            let ux2 = -c2 / (2.0 * c1);
+            let uy2 = a * ux2 + b;
+            (ux2, uy2)
+        } else if a1 != Length::default() {
+            let a = -a2 / a1;
+            let b = -b / a1;
+            let c1 = a * a + Ratio::new::<ratio>(1.0);
+            let c2 = 2.0 * (a * b - uy - a * ux);
+            let uy2 = -c2 / (2.0 * c1);
+            let ux2 = a * uy2 + b;
+            (ux2, uy2)
+        } else {
+            unreachable!("Infeasible")
+        };
+        assert!(!ux2.is_nan());
+        assert!(!uy2.is_nan());
+
+        let to_polar = |x: f32, y: f32| ((x * x + y * y).sqrt(), y.atan2(x));
+        let (r, t) = to_polar(ux.value, uy.value);
+        let (r2, t2) = to_polar(ux2.value, uy2.value);
+        let (dr, dt) = to_polar(dux.value, duy.value);
+        let dr2 = Jerk::new::<meter_per_second_cubed>(dr * r2 / r);
+        let dt2 = dt + t2 - t;
+        let dux2 = dr2 * dt2.cos();
+        let duy2 = dr2 * dt2.sin();
+        TrackingInput {
+            ux: ux2,
+            uy: uy2,
+            dux: dux2,
+            duy: duy2,
+        }
+    }
+}
+
+enum Obstacle {
+    Pillar { x: Length, y: Length },
+    WallX { x: Length },
+    WallY { y: Length },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_relative_eq;
 
     #[test]
     fn test_normalize_angle() {
-        use approx::assert_relative_eq;
         use uom::si::angle::degree;
 
         let test_cases = vec![
@@ -273,6 +501,17 @@ mod tests {
                 expected.value,
                 epsilon = 0.001
             );
+        }
+    }
+
+    #[test]
+    fn test_remquof() {
+        let test_cases = vec![(200.0, 2, 20.0), (714.0, 7, 84.0)];
+        let base = Length::new::<millimeter>(90.0);
+        for (value, exp_div, exp_rem) in test_cases {
+            let (div, rem) = remquof(Length::new::<millimeter>(value), base);
+            assert_eq!(div, exp_div);
+            assert_relative_eq!(rem.get::<millimeter>(), exp_rem, epsilon = 0.001);
         }
     }
 }

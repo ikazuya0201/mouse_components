@@ -1,5 +1,7 @@
 use mousecore2::{
-    control::{ControlParameters, Controller, Target, Tracker},
+    control::{
+        ControlParameters, Controller, NavigationController, SupervisoryController, Target, Tracker,
+    },
     estimate::{AngleState, Estimator, LengthState, SensorValue, State},
     solve::{
         run::{shortest_path, EdgeKind, Node, Posture, TrajectoryKind},
@@ -73,15 +75,24 @@ fn test_run<const W: u8>(input: &'static str, goals: &[(u8, u8, Posture)]) {
         },
     };
 
+    let square_width = Length::new::<millimeter>(90.0);
+
     let mut state = state;
     let walls = input.parse::<Walls<W>>().unwrap();
     let mut tracker = Tracker::builder()
         .period(period)
-        .gain(40.0)
-        .dgain(4.0)
         .zeta(1.0)
         .b(1.0)
         .xi_threshold(Velocity::new::<meter_per_second>(0.2))
+        .build();
+    let navigation = NavigationController::builder()
+        .gain(40.0)
+        .dgain(4.0)
+        .build();
+    let supervisor = SupervisoryController::builder()
+        .square_width(square_width)
+        .margin(100.0)
+        .avoidance_distance(Length::new::<millimeter>(20.0))
         .build();
     let mut controller = Controller::builder()
         .trans_params(ControlParameters {
@@ -102,9 +113,7 @@ fn test_run<const W: u8>(input: &'static str, goals: &[(u8, u8, Posture)]) {
         .build();
     let mut estimator = Estimator::builder().period(period).build();
 
-    let square_width = Length::new::<millimeter>(90.0);
-
-    let v_max = Velocity::new::<meter_per_second>(0.3);
+    let v_max = Velocity::new::<meter_per_second>(1.0);
     let a_max = Acceleration::new::<meter_per_second_squared>(10.0);
     let j_max = Jerk::new::<meter_per_second_cubed>(100.0);
 
@@ -230,9 +239,22 @@ fn test_run<const W: u8>(input: &'static str, goals: &[(u8, u8, Posture)]) {
         } else {
             unreachable!()
         };
-        let (control_target, control_state) = tracker.track(&state, &target);
+        let input = navigation.navigate(&state, &target);
+        let input = supervisor.supervise(&input, &state, |coord| {
+            !matches!(
+                walls.wall_state(coord),
+                WallState::Checked { exists: false }
+            )
+        });
+        let (control_target, control_state) = tracker.track(&state, &target, &input);
         let vol = controller.control(&control_target, &control_state);
-        assert!(vol.left <= vol_th && vol.right <= vol_th);
+        assert!(
+            vol.left.abs() <= vol_th && vol.right.abs() <= vol_th,
+            "left: {:?}, right: {:?}, th: {:?}",
+            vol.left,
+            vol.right,
+            vol_th
+        );
         simulator.apply(&vol);
 
         simulator.step();
