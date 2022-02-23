@@ -23,7 +23,7 @@ use uom::{
     Kind,
 };
 
-use crate::{estimate::State, solve::search::Coordinate};
+use crate::estimate::State;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct MotorOutput {
@@ -291,131 +291,33 @@ pub struct SupervisoryController {
 }
 
 impl SupervisoryController {
-    pub fn supervise<const W: u8>(
-        &self,
-        input: &TrackingInput,
-        state: &State,
-        is_wall: impl Fn(&Coordinate<W>) -> bool,
-    ) -> TrackingInput {
-        let (a1, a2, b) = match self.nearest_obstacle(state, is_wall) {
-            Obstacle::Pillar { x, y } => {
-                let a1 = 2.0 * (state.x.x - x);
-                let a2 = 2.0 * (state.y.x - y);
-                let b = 2.0 * (state.x.v * state.x.v + state.y.v * state.y.v)
-                    + 4.0
-                        * self.margin
-                        * ((state.x.x - x) * state.x.v + (state.y.x - y) * state.y.v)
-                    + self.margin
-                        * self.margin
-                        * ((state.x.x - x) * (state.x.x - x) + (state.y.x - y) * (state.y.x - y)
-                            - self.avoidance_distance * self.avoidance_distance);
-                (a1, a2, b)
-            }
-            Obstacle::WallX { x: d } => {
-                let a1 = 2.0 * (state.x.x - d);
-                let b = 2.0 * state.x.v * state.x.v
-                    + 4.0 * self.margin * (state.x.x - d) * state.x.v
-                    + self.margin
-                        * self.margin
-                        * ((state.x.x - d) * (state.x.x - d)
-                            - self.avoidance_distance * self.avoidance_distance);
-                (a1, Default::default(), b)
-            }
-            Obstacle::WallY { y: d } => {
-                let a2 = 2.0 * (state.y.x - d);
-                let b = 2.0 * state.y.v * state.y.v
-                    + 4.0 * self.margin * (state.y.x - d) * state.y.v
-                    + self.margin
-                        * self.margin
-                        * ((state.y.x - d) * (state.y.x - d)
-                            - self.avoidance_distance * self.avoidance_distance);
-                (Default::default(), a2, b)
-            }
-        };
+    pub fn supervise(&self, input: &TrackingInput, state: &State) -> TrackingInput {
+        let (x, y) = self.nearest_pillar(state);
+        let a1 = 2.0 * (state.x.x - x);
+        let a2 = 2.0 * (state.y.x - y);
+        let b = 2.0 * (state.x.v * state.x.v + state.y.v * state.y.v)
+            + 4.0 * self.margin * ((state.x.x - x) * state.x.v + (state.y.x - y) * state.y.v)
+            + self.margin
+                * self.margin
+                * ((state.x.x - x) * (state.x.x - x) + (state.y.x - y) * (state.y.x - y)
+                    - self.avoidance_distance * self.avoidance_distance);
         self.apply_constraints(input, a1, a2, b)
     }
 
-    fn nearest_obstacle<const W: u8>(
-        &self,
-        state: &State,
-        is_wall: impl Fn(&Coordinate<W>) -> bool,
-    ) -> Obstacle {
+    fn nearest_pillar(&self, state: &State) -> (Length, Length) {
         let (divx, remx) = remquof(state.x.x, self.square_width);
         let (divy, remy) = remquof(state.y.x, self.square_width);
-        assert!(divx >= 0);
-        assert!(divy >= 0);
 
-        let map = |xwall, ywall, pillar, cond| {
-            (
-                if cond {
-                    [(xwall, true), (ywall, false)]
-                } else {
-                    [(ywall, false), (xwall, true)]
-                },
-                pillar,
-            )
-        };
-        let (walls, pillar) = match (
+        let (x, y) = match (
             2.0 * remx > self.square_width,
             2.0 * remy > self.square_width,
         ) {
-            (true, true) => map(
-                (2 * divx + 1, 2 * divy),
-                (2 * divx, 2 * divy + 1),
-                (divx + 1, divy + 1),
-                remx > remy,
-            ),
-            (true, false) => map(
-                (2 * divx + 1, 2 * divy),
-                (2 * divx, 2 * divy - 1),
-                (divx + 1, divy),
-                remy > self.square_width - remx,
-            ),
-            (false, true) => map(
-                (2 * divx - 1, 2 * divy),
-                (2 * divx, 2 * divy + 1),
-                (divx, divy + 1),
-                remy < self.square_width - remx,
-            ),
-            (false, false) => map(
-                (2 * divx - 1, 2 * divy),
-                (2 * divx, 2 * divy - 1),
-                (divx, divy),
-                remx < remy,
-            ),
+            (true, true) => (divx + 1, divy + 1),
+            (true, false) => (divx + 1, divy),
+            (false, true) => (divx, divy + 1),
+            (false, false) => (divx, divy),
         };
-        for ((x, y), is_x) in walls {
-            if x < 0 {
-                assert!(is_x);
-                return Obstacle::WallX {
-                    x: Default::default(),
-                };
-            }
-            if y < 0 {
-                assert!(!is_x);
-                return Obstacle::WallY {
-                    y: Default::default(),
-                };
-            }
-            if let Some(coord) = Coordinate::new(x as u8, y as u8) {
-                if !is_wall(&coord) {
-                    continue;
-                }
-                return if is_x {
-                    Obstacle::WallX {
-                        x: (x + 1) as f32 * self.square_width / 2.0,
-                    }
-                } else {
-                    Obstacle::WallY {
-                        y: (y + 1) as f32 * self.square_width / 2.0,
-                    }
-                };
-            }
-        }
-        Obstacle::Pillar {
-            x: pillar.0 as f32 * self.square_width,
-            y: pillar.1 as f32 * self.square_width,
-        }
+        (x as f32 * self.square_width, y as f32 * self.square_width)
     }
 
     fn apply_constraints(
@@ -468,12 +370,6 @@ impl SupervisoryController {
             duy: duy2,
         }
     }
-}
-
-enum Obstacle {
-    Pillar { x: Length, y: Length },
-    WallX { x: Length },
-    WallY { y: Length },
 }
 
 #[cfg(test)]
