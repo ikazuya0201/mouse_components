@@ -292,32 +292,55 @@ pub struct SupervisoryController {
 
 impl SupervisoryController {
     pub fn supervise(&self, input: &TrackingInput, state: &State) -> TrackingInput {
-        let (x, y) = self.nearest_pillar(state);
-        let a1 = 2.0 * (state.x.x - x);
-        let a2 = 2.0 * (state.y.x - y);
-        let b = 2.0 * (state.x.v * state.x.v + state.y.v * state.y.v)
-            + 4.0 * self.margin * ((state.x.x - x) * state.x.v + (state.y.x - y) * state.y.v)
-            + self.margin
-                * self.margin
-                * ((state.x.x - x) * (state.x.x - x) + (state.y.x - y) * (state.y.x - y)
-                    - self.avoidance_distance * self.avoidance_distance);
+        let b_part = 2.0 * (state.x.v * state.x.v + state.y.v * state.y.v);
+        let (a1, a2, b) = self
+            .nearest_pillars(state)
+            .map(|(x, y)| {
+                let a1 = 2.0 * (state.x.x - x);
+                let a2 = 2.0 * (state.y.x - y);
+                let b = b_part
+                    + 4.0
+                        * self.margin
+                        * ((state.x.x - x) * state.x.v + (state.y.x - y) * state.y.v)
+                    + self.margin
+                        * self.margin
+                        * ((state.x.x - x) * (state.x.x - x) + (state.y.x - y) * (state.y.x - y)
+                            - self.avoidance_distance * self.avoidance_distance);
+                (a1, a2, b)
+            })
+            .min_by(|&(a11, a12, b1), &(a21, a22, b2)| {
+                (a11 * input.ux + a12 * input.uy + b1)
+                    .partial_cmp(&(a21 * input.ux + a22 * input.uy + b2))
+                    .expect("Should never fail: never be NaN.")
+            })
+            .unwrap();
         self.apply_constraints(input, a1, a2, b)
     }
 
-    fn nearest_pillar(&self, state: &State) -> (Length, Length) {
+    fn nearest_pillars(&self, state: &State) -> impl Iterator<Item = (Length, Length)> + '_ {
         let (divx, remx) = remquof(state.x.x, self.square_width);
         let (divy, remy) = remquof(state.y.x, self.square_width);
 
-        let (x, y) = match (
-            2.0 * remx > self.square_width,
-            2.0 * remy > self.square_width,
-        ) {
-            (true, true) => (divx + 1, divy + 1),
-            (true, false) => (divx + 1, divy),
-            (false, true) => (divx, divy + 1),
-            (false, false) => (divx, divy),
-        };
-        (x as f32 * self.square_width, y as f32 * self.square_width)
+        IntoIterator::into_iter([
+            (divx, divy),
+            (divx + 1, divy),
+            (divx, divy + 1),
+            (divx + 1, divy + 1),
+        ])
+        .chain(IntoIterator::into_iter(
+            match (remy > remx, remy > self.square_width - remx) {
+                (true, true) => [(divx, divy + 2), (divx + 1, divy + 2)],
+                (true, false) => [(divx - 1, divy), (divx - 1, divy + 1)],
+                (false, true) => [(divx + 2, divy), (divx + 2, divy + 1)],
+                (false, false) => [(divx, divy - 1), (divx + 1, divy - 1)],
+            },
+        ))
+        .map(|(x, y)| {
+            (
+                (x + 1) as f32 * self.square_width,
+                (y + 1) as f32 * self.square_width,
+            )
+        })
     }
 
     fn apply_constraints(
