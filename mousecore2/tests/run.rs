@@ -240,12 +240,7 @@ fn test_run<const W: u8>(input: &'static str, goals: &[(u8, u8, Posture)]) {
             unreachable!()
         };
         let input = navigation.navigate(&state, &target);
-        let input = supervisor.supervise(&input, &state, |coord| {
-            !matches!(
-                walls.wall_state(coord),
-                WallState::Checked { exists: false }
-            )
-        });
+        let input = supervisor.supervise(&input, &state);
         let (control_target, control_state) = tracker.track(&state, &target, &input);
         let vol = controller.control(&control_target, &control_state);
         assert!(
