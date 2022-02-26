@@ -14,5 +14,5 @@ default-features = false
 features = ["si", "f32", "autoconvert"]
 
 [dependencies.embedded-hal]
-version = "0.2.3"
+version = "0.2.7"
 features = ["unproven"]
