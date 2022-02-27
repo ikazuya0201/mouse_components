@@ -17,6 +17,7 @@ where
     adc_pin: PIN,
     voltage: ElectricPotential,
     alpha: f32,
+    ratio: f32,
     _adc_marker: PhantomData<ADC>,
 }
 
@@ -26,7 +27,6 @@ where
     PIN: Channel<ADC>,
     <T as OneShot<ADC, u16, PIN>>::Error: core::fmt::Debug,
 {
-    const RATIO: f32 = 1.9;
     const AVDD_VOLTAGE: ElectricPotential = ElectricPotential {
         dimension: PhantomData,
         units: PhantomData,
@@ -35,7 +35,13 @@ where
     const MAX_ADC_VALUE: f32 = 4096.0;
     const SUM_NUM: u16 = 100;
 
-    pub fn new(adc: T, adc_pin: PIN, period: Time, cut_off_frequency: Frequency) -> Self {
+    pub fn new(
+        adc: T,
+        adc_pin: PIN,
+        period: Time,
+        cut_off_frequency: Frequency,
+        battery_ratio: f32,
+    ) -> Self {
         let alpha =
             1.0 / (2.0 * core::f32::consts::PI * (period * cut_off_frequency).get::<ratio>() + 1.0);
         let mut voltmeter = Self {
@@ -43,6 +49,7 @@ where
             adc_pin,
             voltage: ElectricPotential::new::<volt>(0.0),
             alpha,
+            ratio: battery_ratio,
             _adc_marker: PhantomData,
         };
 
@@ -61,7 +68,7 @@ where
 
     fn current_voltage(&mut self) -> ElectricPotential {
         let value = block!(self.adc.read(&mut self.adc_pin)).unwrap() as f32;
-        value * Self::AVDD_VOLTAGE * Self::RATIO / Self::MAX_ADC_VALUE
+        value * Self::AVDD_VOLTAGE * self.ratio / Self::MAX_ADC_VALUE
     }
 
     pub fn voltage(&self) -> ElectricPotential {
