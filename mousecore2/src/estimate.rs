@@ -88,7 +88,7 @@ impl Estimator {
         } else {
             // arc approximation
             2.0 * self.translational_velocity * (dtheta / 2.0).value.sin() / ang_vel
-        };
+        } / self.slip_angle.value.cos();
 
         let theta_m = state.theta.x - self.slip_angle + dtheta / 2.0;
         let sin_th = theta_m.value.sin();
