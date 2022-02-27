@@ -107,6 +107,8 @@ where
 
         write(Self::RA_REG_BANK_SEL, 0x00); //switch to user bank 0
 
+        self.accel_offset = Default::default();
+        self.gyro_offset = Default::default();
         wait_ok!(self.calibrate(spi, timer));
         wait_ok!(self.calibrate(spi, timer));
     }
