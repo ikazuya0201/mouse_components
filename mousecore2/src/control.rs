@@ -211,6 +211,11 @@ impl Controller {
         ElectricPotential::new::<volt>(vol_f + vol_p + vol_i + vol_d)
     }
 
+    pub fn reset(&mut self) {
+        self.trans_sum = Default::default();
+        self.rot_sum = Default::default();
+    }
+
     pub fn control(&mut self, r: &ControlTarget, y: &ControlTarget) -> MotorOutput {
         let vol_t = Self::control_each(
             r.v.value,
