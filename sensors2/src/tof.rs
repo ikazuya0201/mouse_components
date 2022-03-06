@@ -183,34 +183,39 @@ where
         ((address >> 8) as u8, address as u8)
     }
 
+    pub fn request_polling<I: Write + WriteRead>(
+        &mut self,
+        i2c: &'_ mut I,
+    ) -> nb::Result<(), VL6180XError> {
+        self.write_to_register(i2c, Self::SYSRANGE_START, 0x01)?;
+        self.state = State::Waiting;
+        Ok(())
+    }
+
+    pub fn is_polling_requested(&self) -> bool {
+        self.state == State::Waiting
+    }
+
     pub fn distance<I: Write + WriteRead>(
         &mut self,
         i2c: &'_ mut I,
     ) -> nb::Result<Length, VL6180XError> {
-        use State::*;
-
-        match self.state {
-            Idle => {
-                //start polling
-                self.write_to_register(i2c, Self::SYSRANGE_START, 0x01)?;
-                self.state = Waiting;
-                Err(nb::Error::WouldBlock)
-            }
-            Waiting => {
-                let data = self.read_from_registers(i2c, Self::RESULT_INTERRUPT_STATUS_GPIO)?;
-                if data & 0x04 != 0x04 {
-                    return Err(nb::Error::WouldBlock);
-                }
-                //get result
-                let distance = self.read_from_registers(i2c, Self::RESULT_RANGE_VAL)?;
-
-                //teach VL6180X to finish polling
-                self.write_to_register(i2c, Self::SYSTEM_INTERRUPT_CLEAR, 0x07)?;
-
-                self.state = Idle;
-
-                Ok(Length::new::<meter>(distance as f32 / 1000.0))
-            }
+        if self.state == State::Idle {
+            return Err(nb::Error::WouldBlock);
         }
+
+        let data = self.read_from_registers(i2c, Self::RESULT_INTERRUPT_STATUS_GPIO)?;
+        if data & 0x04 != 0x04 {
+            return Err(nb::Error::WouldBlock);
+        }
+        //get result
+        let distance = self.read_from_registers(i2c, Self::RESULT_RANGE_VAL)?;
+
+        //teach VL6180X to finish polling
+        self.write_to_register(i2c, Self::SYSTEM_INTERRUPT_CLEAR, 0x07)?;
+
+        self.state = State::Idle;
+
+        Ok(Length::new::<meter>(distance as f32 / 1000.0))
     }
 }
